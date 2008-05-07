@@ -560,11 +560,12 @@ void print_atoms(samp_table_t *table){
   uint32_t nwdth = sprintf(d, "%d", nvars);
   uint32_t i;
   printf("--------------------------------------------------------------------------------\n");
-  printf("| %*s | tval | %-*s |\n", nwdth, "i", 67-nwdth, "atom");
+  printf("| %*s | tval | prob   | %-*s |\n", nwdth, "i", 57-nwdth, "atom");
   printf("--------------------------------------------------------------------------------\n");
   for (i = 0; i < nvars; i++){
     samp_truth_value_t tv = atom_table->assignment[i];
-    printf("| %-*u | %-4s | ", nwdth, i, samp_truth_value_string(tv));
+    printf("| %-*u | %-4s | % 5.3f | ", nwdth, i, samp_truth_value_string(tv),
+	   atom_table->pmodel[i]);
     print_atom(atom_table->atom[i], table);
     printf("\n");
   }

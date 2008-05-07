@@ -24,6 +24,49 @@
 
   input_command_t * input_command;
 
+  bool yy_check_int(char *str){
+    int32_t i;
+    for(i=0; str[i] != '\0'; i++){
+      if (! isdigit(str[i])) {
+	yyerror("Integer expected");
+	return false;
+      }
+    }
+    return true;
+  }
+
+  bool yy_check_float(char *str){
+    bool have_digit = false;
+    bool have_dot = false;
+    int32_t i;
+    if (str[0] == '.' || str[0] == '+' || str[0] == '-' || isdigit(str[0])) {
+      if (str[0] == '.') {
+	have_dot = true;
+      } else if (isdigit(str[0])) {
+	have_digit = true;
+      }
+      for(i=1; str[i] != '\0'; i++){
+	if (isdigit(str[i])){
+	  have_digit = true;
+	} else if (str[i] == '.') {
+	  if (have_dot) {
+	    yyerror("Number has two decimal points");
+	    return false;
+	  }
+	  else
+	    have_dot = true;
+	} else {
+	  yyerror("Invalid floating point number");
+	  return false;
+	}
+      }
+    } else {
+      yyerror("Invalid floating point number");
+      return false;
+    }
+    return true;
+  }
+
   void yy_command(int kind, input_decl_t *decl) {
     input_command_t * command
       = (input_command_t *) safe_malloc(sizeof(input_command_t));
@@ -66,6 +109,12 @@
     vardecl->sort = sort;
     yy_command(VAR, (input_decl_t *) vardecl);
   };
+  void yy_atomdecl (input_atom_t *atom) {
+    input_atomdecl_t *atomdecl
+      = (input_atomdecl_t *) safe_malloc(sizeof(input_atomdecl_t));
+    atomdecl->atom = atom;
+    yy_command(ATOM, (input_decl_t *) atomdecl);
+  };
   void yy_assertdecl (input_atom_t *atom) {
     input_assertdecl_t * assertdecl
       = (input_assertdecl_t *) safe_malloc(sizeof(input_assertdecl_t));
@@ -85,11 +134,81 @@
     askdecl->clause = clause;
     yy_command(ASK, (input_decl_t *) askdecl);
   };
+  void yy_mcsatdecl () {
+    // yyargs has yyarglen string arguments
+    // We map them to sa_probability, samp_temperature, rvar_probability,
+    // max_flips, and max_samples, in that order.  Missing args get default values.
+    if (yyarglen > 5) {
+      yyerror("mcsat: too many args");
+    }
+    input_mcsatdecl_t *mcsatdecl
+      = (input_mcsatdecl_t *) safe_malloc(sizeof(input_mcsatdecl_t));
+    // sa_probability
+    if (yyarglen > 0) {
+      if (yy_check_float(yyargs[0])) {
+	mcsatdecl->sa_probability = atof(yyargs[0]);
+      }
+    } else {
+      mcsatdecl->sa_probability = DEFAULT_SA_PROBABILITY;
+    }
+    // samp_temperature
+    if (yyarglen > 1) {
+      if (yy_check_float(yyargs[1])) {
+	mcsatdecl->samp_temperature = atof(yyargs[1]);
+      }
+    } else {
+      mcsatdecl->samp_temperature = DEFAULT_SAMP_TEMPERATURE;
+    }
+    // rvar_probability
+    if (yyarglen > 2) {
+      if (yy_check_float(yyargs[2])) {
+	mcsatdecl->rvar_probability = atof(yyargs[2]);
+      }
+    } else {
+      mcsatdecl->rvar_probability = DEFAULT_RVAR_PROBABILITY;
+    }
+    // max_flips
+    if (yyarglen > 3) {
+      if (yy_check_int(yyargs[3])) {
+	mcsatdecl->max_flips = atoi(yyargs[3]);
+      }
+    } else {
+      mcsatdecl->max_flips = DEFAULT_MAX_FLIPS;
+    }
+    // max_samples
+    if (yyarglen > 4) {
+      if (yy_check_int(yyargs[4])) {
+	mcsatdecl->max_samples = atoi(yyargs[4]);
+      }
+    } else {
+      mcsatdecl->max_samples = DEFAULT_MAX_SAMPLES;
+    }
+    yy_command(MCSAT, (input_decl_t *) mcsatdecl);
+  };
   void yy_dumptables () {
     yy_command(DUMPTABLES, (input_decl_t *) NULL);
   };
+  void yy_reset (char *name) {
+    if (strcasecmp(name, "PROBABILITIES") == 0) {
+      yy_command(RESET, (input_decl_t *) NULL);
+    } else {
+      yyerror("Can only reset 'probabilities' at the moment");
+    }
+  };
   void yy_test () {
     yy_command(TEST, (input_decl_t *) NULL);
+  };
+  void yy_verbosity (char *level) {
+    int32_t i;
+    for (i=0; level[i] != '\0'; i++) {
+      if (! isdigit(level[i])) {
+	yyerror("Invalid verbosity");
+      }
+    }
+    input_verbositydecl_t *verbositydecl
+      = (input_verbositydecl_t *) safe_malloc(sizeof(input_verbositydecl_t));
+    verbositydecl->level = atoi(level);
+    yy_command(VERBOSITY, (input_decl_t *) verbositydecl);
   };
   void yy_help () {
     yy_command(HELP, (input_decl_t *) NULL);
@@ -160,10 +279,14 @@
 %token SORT
 %token CONST
 %token VAR
+%token ATOM
 %token ASSERT
 %token ADD
 %token ASK
+%token MCSAT
+%token RESET
 %token DUMPTABLES
+%token VERBOSITY
 %token TEST
 %token HELP
 %token QUIT
@@ -212,14 +335,19 @@ decl: PREDICATE atom witness { yy_preddecl($2, $3); }
 | CONST args ':' NAME { yy_constdecl($4); }
 | VAR NAME ':' NAME { yy_vardecl($2, $4); }
 | ASSERT atom { yy_assertdecl($2); }
+| ATOM atom { yy_atomdecl($2); }
 | ADD clause addwt { yy_adddecl($2, $3); }
 | ASK clause { yy_askdecl($2); }
+| MCSAT eargs {yy_mcsatdecl();}
+| RESET NAME {yy_reset($2);}
 | DUMPTABLES { yy_dumptables(); }
+| VERBOSITY NUM {yy_verbosity($2);}
 | TEST { yy_test(); }
 | HELP { yy_help(); }
 ;
 
-witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;};
+witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;}
+       | /* empty */ {$$ = true;};
 
 clause: literals { $$ = yy_clause(); };
       | '(' args ')' { copy_yyargs_to_yyvars(); }
@@ -235,6 +363,11 @@ literal: atom {$$ = yy_literal(0,$1);}
 
 atom: NAME '(' args ')' {$$ = yy_atom($1);}
     ;
+
+eargs: /*empty*/
+     | eargs ',' arg { yyargs[yyarglen] = str_copy($3); yyarglen+=1;}
+     ;
+
 
 args: arg { yyargs[yyarglen] = str_copy($1); yyarglen+=1;}
     | args ',' arg { yyargs[yyarglen] = str_copy($3); yyarglen+=1;}
@@ -304,18 +437,28 @@ int yylex (void) {
       return CONST;
     else if (strcasecmp(str, "VAR") == 0)
       return VAR;
+    else if (strcasecmp(str, "ATOM") == 0)
+      return ATOM;
     else if (strcasecmp(str, "ASSERT") == 0)
       return ASSERT;
     else if (strcasecmp(str, "ADD") == 0)
       return ADD;
     else if (strcasecmp(str, "ASK") == 0)
       return ASK;
+    else if (strcasecmp(str, "MCSAT") == 0)
+      return MCSAT;
+    else if (strcasecmp(str, "RESET") == 0)
+      return RESET;
     else if (strcasecmp(str, "DUMPTABLES") == 0)
       return DUMPTABLES;
+    else if (strcasecmp(str, "VERBOSITY") == 0)
+      return VERBOSITY;
     else if (strcasecmp(str, "TEST") == 0)
       return TEST;
     else if (strcasecmp(str, "HELP") == 0)
       return HELP;
+    else if (strcasecmp(str, "QUIT") == 0)
+      return QUIT;
     else
       return NAME;
   }

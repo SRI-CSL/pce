@@ -20,6 +20,9 @@ typedef struct input_vardecl_s {
   char *name;
   char *sort;
 } input_vardecl_t;
+typedef struct input_atomdecl_s {
+  input_atom_t *atom;
+} input_atomdecl_t;
 typedef struct input_assertdecl_s {
   input_atom_t *atom;
 } input_assertdecl_t;
@@ -30,6 +33,16 @@ typedef struct input_adddecl_s {
 typedef struct input_askdecl_s {
   input_clause_t *clause;
 } input_askdecl_t;
+typedef struct input_mcsatdecl_s {
+  double sa_probability;
+  double samp_temperature;
+  double rvar_probability;
+  int32_t max_flips;
+  int32_t max_samples;
+} input_mcsatdecl_t;
+typedef struct input_verbositydecl_s {
+  int32_t level;
+} input_verbositydecl_t;
 typedef union input_decl_s {
   input_preddecl_t preddecl;
   input_sortdecl_t sortdecl;
@@ -37,7 +50,9 @@ typedef union input_decl_s {
   input_vardecl_t vardecl;
   input_assertdecl_t assertdecl;
   input_adddecl_t adddecl;
-  input_askdecl_t  askdecl;
+  input_askdecl_t askdecl;
+  input_mcsatdecl_t mcsatdecl;
+  input_verbositydecl_t verbositydecl;
 } input_decl_t;
 
 typedef struct input_command_s {

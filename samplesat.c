@@ -1250,7 +1250,7 @@ void sample_sat(samp_table_t *table, double sa_probability,
   update_pmodel(table);
 }
 
-void mc_sat(samp_table_t *table, double sa_probability,
+extern void mc_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 	    uint32_t max_flips, uint32_t max_samples){
   first_sample_sat(table, sa_probability, samp_temperature,

@@ -35,15 +35,19 @@
      SORT = 261,
      CONST = 262,
      VAR = 263,
-     ASSERT = 264,
-     ADD = 265,
-     ASK = 266,
-     DUMPTABLES = 267,
-     TEST = 268,
-     HELP = 269,
-     QUIT = 270,
-     NAME = 271,
-     NUM = 272
+     ATOM = 264,
+     ASSERT = 265,
+     ADD = 266,
+     ASK = 267,
+     MCSAT = 268,
+     RESET = 269,
+     DUMPTABLES = 270,
+     VERBOSITY = 271,
+     TEST = 272,
+     HELP = 273,
+     QUIT = 274,
+     NAME = 275,
+     NUM = 276
    };
 #endif
 /* Tokens.  */
@@ -53,21 +57,25 @@
 #define SORT 261
 #define CONST 262
 #define VAR 263
-#define ASSERT 264
-#define ADD 265
-#define ASK 266
-#define DUMPTABLES 267
-#define TEST 268
-#define HELP 269
-#define QUIT 270
-#define NAME 271
-#define NUM 272
+#define ATOM 264
+#define ASSERT 265
+#define ADD 266
+#define ASK 267
+#define MCSAT 268
+#define RESET 269
+#define DUMPTABLES 270
+#define VERBOSITY 271
+#define TEST 272
+#define HELP 273
+#define QUIT 274
+#define NAME 275
+#define NUM 276
 
 
 
 
 #if ! defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
-#line 175 "yacc.y"
+#line 298 "yacc.y"
 typedef union YYSTYPE {
   bool bval;
   char *str;
@@ -77,7 +85,7 @@ typedef union YYSTYPE {
   input_atom_t *atom;
 } YYSTYPE;
 /* Line 1447 of yacc.c.  */
-#line 81 "y.tab.h"
+#line 89 "y.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

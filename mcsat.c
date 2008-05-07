@@ -10,6 +10,7 @@
 #include "memalloc.h"
 
 bool nonstrict = 0;
+int32_t verbosity_level = 1;
 
 extern input_command_t * input_command;
 extern int yyparse ();
@@ -266,9 +267,15 @@ int main(){
 	add_var(var_table, decl->name, sort_table, decl->sort);
 	break;
       }
+      case ATOM: {
+	// invoke add_atom
+	input_atomdecl_t * decl = (input_atomdecl_t *) input_command->decl;
+	add_atom(&table, decl->atom);
+	break;
+      }
       case ASSERT: {
 	// Need to check that the predicate is a witness predicate,
-	// then invoke add_atom or assert_atom.
+	// then invoke assert_atom.
 	input_assertdecl_t * decl = (input_assertdecl_t *) input_command->decl;
 	assert_atom(&table, decl->atom);
 	break;
@@ -289,9 +296,21 @@ int main(){
 	}
 	break;
       }
-      case ASK:
+      case ASK: {
 	printf("Got ask\n");
 	break;
+      }
+      case MCSAT: {
+	input_mcsatdecl_t *decl = (input_mcsatdecl_t *) input_command->decl;
+	mc_sat(&table, decl->sa_probability, decl->samp_temperature,
+	       decl->rvar_probability, decl->max_flips, decl->max_samples);
+	safe_free(decl);
+	break;
+      }
+      case RESET: {
+	// Not implemented yet
+	break;
+      }
       case DUMPTABLES: {
 	printf("Dumping tables...\n");
 	dump_sort_table(&table);
@@ -302,6 +321,12 @@ int main(){
 	dump_clause_table(&table);
 	dump_rule_table(&table);
 	break;
+      }
+      case VERBOSITY: {
+	input_verbositydecl_t *decl
+	  = (input_verbositydecl_t *) input_command->decl;
+	verbosity_level = decl->level;
+	safe_free(decl);
       }
       case TEST: {
 	test(&table);

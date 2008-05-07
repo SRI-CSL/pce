@@ -12,6 +12,14 @@
 
 #define MCSAT_CONFLICT 21
 
+#define DEFAULT_SA_PROBABILITY .7
+#define DEFAULT_SAMP_TEMPERATURE 0.0
+#define DEFAULT_RVAR_PROBABILITY .5
+#define DEFAULT_MAX_FLIPS 10
+#define DEFAULT_MAX_SAMPLES 50
+
+extern int32_t verbosity_level;
+
 extern int32_t add_const(const_table_t *const_table,
 		      char *name,
 		      sort_table_t *sort_table,
@@ -74,6 +82,10 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
 void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 		uint32_t max_flips);
+
+void mc_sat(samp_table_t *table, double sa_probability,
+		double samp_temperature, double rvar_probability,
+	    uint32_t max_flips, uint32_t max_samples);
 
 #endif /* __SAMPLESAT_H */     
 
