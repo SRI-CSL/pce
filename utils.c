@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <float.h>
+#include <stdarg.h>
 #include "memalloc.h"
 #include "prng.h"
 #include "int_array_sort.h"
@@ -16,6 +17,16 @@ char * str_copy(char *name){
   char * new_name = safe_malloc(++len * sizeof(char));
   memcpy(new_name, name, len);
   return new_name;
+}
+
+// Conditional print - only prints if level <= verbosity_level
+void cprintf(int32_t level, const char *fmt, ...){
+  if(level <= verbosity_level){
+    va_list argp;
+    va_start(argp, fmt);
+    vprintf(fmt, argp);
+    va_end(argp);
+  }
 }
 
 samp_atom_t *atom_copy(samp_atom_t *atom, int32_t arity){
@@ -150,7 +161,7 @@ int32_t add_const(const_table_t *const_table,
 		  char *sort_name){
   int32_t sort_index = sort_name_index(sort_name, sort_table);
   if (sort_index == -1){
-    printf("\nSort name %s has not been declared.", sort_name);
+    printf("Sort name %s has not been declared.\n", sort_name);
     return -1;
   }
   int32_t index = stbl_find(&(const_table->const_name_index), name);
@@ -167,7 +178,7 @@ int32_t add_const(const_table_t *const_table,
     stbl_add(&(const_table->const_name_index), name, n);
     return 0;
   } else {
-    printf("\nConstant %s already exists", name);
+    printf("Constant %s already exists\n", name);
     return -1;
   }
 }

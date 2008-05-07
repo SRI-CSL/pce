@@ -18,8 +18,6 @@
 #define DEFAULT_MAX_FLIPS 10
 #define DEFAULT_MAX_SAMPLES 50
 
-extern int32_t verbosity_level;
-
 extern int32_t add_const(const_table_t *const_table,
 		      char *name,
 		      sort_table_t *sort_table,

@@ -4,11 +4,14 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <assert.h>
 #include "array_hash_map.h"
 #include "symbol_tables.h"
 #include "integer_stack.h"
 
+extern int32_t verbosity_level;
+extern void cprintf(int32_t level, const char *fmt, ...);
 extern char * str_copy(char *name);
   
 //from simplexstructures.h

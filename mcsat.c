@@ -177,7 +177,7 @@ int main(){
   const_table_t *const_table = &(table.const_table);
   var_table_t *var_table = &(table.var_table);
   pred_table_t *pred_table = &(table.pred_table);
-  //atom_table_t *atom_table = &(table.atom_table);
+  atom_table_t *atom_table = &(table.atom_table);
   //clause_table_t *clause_table = &(table.clause_table);
   /* Create the symbol table */
   stbl_t symbol_table_r;
@@ -242,7 +242,7 @@ int main(){
 	for (i = 0; i<decl->num_names; i++) {
 	  // Need to see if name in var_table
 	  if (var_index(decl->name[i], var_table) == -1) {
-	    printf("Adding const %s\n", decl->name[i]);
+	    cprintf(1,"Adding const %s\n", decl->name[i]);
 	    add_const(const_table, decl->name[i], sort_table, decl->sort);
 	  }
 	  else
@@ -314,7 +314,12 @@ int main(){
 	break;
       }
       case RESET: {
-	// Not implemented yet
+	// Simply resets the probabilities of the atom table to -1.0
+	printf("Resetting probabilities of atoms to -1.0\n");
+	int32_t i;
+	for (i=0; i<atom_table->num_vars; i++) {
+	  atom_table->pmodel[i] = -1;
+	}
 	break;
       }
       case DUMPTABLES: {
@@ -334,6 +339,7 @@ int main(){
 	verbosity_level = decl->level;
 	printf("Setting verbosity to %d\n", verbosity_level);
 	safe_free(decl);
+	break;
       }
       case TEST: {
 	test(&table);
