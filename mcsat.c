@@ -302,6 +302,12 @@ int main(){
       }
       case MCSAT: {
 	input_mcsatdecl_t *decl = (input_mcsatdecl_t *) input_command->decl;
+	printf("Calling MCSAT with parameters:\n");
+	printf(" sa_probability = %f\n", decl->sa_probability);
+	printf(" samp_temperature = %f\n", decl->samp_temperature);
+	printf(" rvar_probability = %f\n", decl->rvar_probability);
+	printf(" max_flips = %d\n", decl->max_flips);
+	printf(" max_samples = %d\n", decl->max_samples);
 	mc_sat(&table, decl->sa_probability, decl->samp_temperature,
 	       decl->rvar_probability, decl->max_flips, decl->max_samples);
 	safe_free(decl);
@@ -326,6 +332,7 @@ int main(){
 	input_verbositydecl_t *decl
 	  = (input_verbositydecl_t *) input_command->decl;
 	verbosity_level = decl->level;
+	printf("Setting verbosity to %d\n", verbosity_level);
 	safe_free(decl);
       }
       case TEST: {
@@ -334,15 +341,26 @@ int main(){
       }
       case HELP: {
 	printf("\nInput grammar:\n");
-	printf(" sort NAME ';'\n const NAME ':' NAME ';'\n");
-	printf(" predicate ATOM (direct|indirect) ';'\n assert ATOM ';'\n");
-	printf(" add CLAUSE WEIGHT ';'\n");
-	printf(" ask CLAUSE ';'\n dumptables ';'\n help ';'\n quit ';'\n");
+	printf(" sort NAME ';'\n const NAME++',' ':' NAME ';'\n");
+	printf(" predicate ATOM [direct|indirect] ';'\n");
+	printf(" atom ATOM ';'\n assert ATOM ';'\n");
+	printf(" add CLAUSE [NUM] ';'\n");
+	printf(" ask CLAUSE ';'\n");
+	printf(" mcsat NUM**','\n");
+	printf(" reset probabilities\n");
+	printf(" dumptables ';'\n verbosity NUM ';'\n help ';'\n quit ';'\n");
 	printf("where:\n CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n");
 	printf(" LITERAL := ['~'] ATOM\n ATOM := NAME '(' ARG++',' ')'\n");
 	printf(" ARG := NAME | NUM\n");
 	printf(" NAME := chars except whitespace parens ':' ',' ';'\n");
 	printf(" NUM := ['+'|'-'] simple floating point number\n");
+	printf("predicates default to 'direct' (i.e., witness/observable)\n");
+	printf("mcsat NUMs are optional, and represent, in order:\n");
+	printf("  sa_probability - double\n");
+	printf("  samp_temperature - double\n");
+	printf("  rvar_probability - double\n");
+	printf("  max_flips - int\n");
+	printf("  max_samples - int\n");
 	break;
       }
       case QUIT:
