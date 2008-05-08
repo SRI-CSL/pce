@@ -134,12 +134,14 @@
     askdecl->clause = clause;
     yy_command(ASK, (input_decl_t *) askdecl);
   };
-  void yy_mcsatdecl () {
+  bool yy_mcsatdecl () {
     // yyargs has yyarglen string arguments
     // We map them to sa_probability, samp_temperature, rvar_probability,
     // max_flips, and max_samples, in that order.  Missing args get default values.
     if (yyarglen > 5) {
       yyerror("mcsat: too many args");
+      yyarglen = 0;
+      return false;
     }
     input_mcsatdecl_t *mcsatdecl
       = (input_mcsatdecl_t *) safe_malloc(sizeof(input_mcsatdecl_t));
@@ -147,6 +149,9 @@
     if (yyarglen > 0) {
       if (yy_check_float(yyargs[0])) {
 	mcsatdecl->sa_probability = atof(yyargs[0]);
+      } else {
+	yyarglen = 0;
+	return false;
       }
     } else {
       mcsatdecl->sa_probability = DEFAULT_SA_PROBABILITY;
@@ -155,6 +160,9 @@
     if (yyarglen > 1) {
       if (yy_check_float(yyargs[1])) {
 	mcsatdecl->samp_temperature = atof(yyargs[1]);
+      } else {
+	yyarglen = 0;
+	return false;
       }
     } else {
       mcsatdecl->samp_temperature = DEFAULT_SAMP_TEMPERATURE;
@@ -163,6 +171,9 @@
     if (yyarglen > 2) {
       if (yy_check_float(yyargs[2])) {
 	mcsatdecl->rvar_probability = atof(yyargs[2]);
+      } else {
+	yyarglen = 0;
+	return false;
       }
     } else {
       mcsatdecl->rvar_probability = DEFAULT_RVAR_PROBABILITY;
@@ -171,6 +182,9 @@
     if (yyarglen > 3) {
       if (yy_check_int(yyargs[3])) {
 	mcsatdecl->max_flips = atoi(yyargs[3]);
+      } else {
+	yyarglen = 0;
+	return false;
       }
     } else {
       mcsatdecl->max_flips = DEFAULT_MAX_FLIPS;
@@ -179,11 +193,16 @@
     if (yyarglen > 4) {
       if (yy_check_int(yyargs[4])) {
 	mcsatdecl->max_samples = atoi(yyargs[4]);
+      } else {
+	yyarglen = 0;
+	return false;
       }
     } else {
       mcsatdecl->max_samples = DEFAULT_MAX_SAMPLES;
     }
     yy_command(MCSAT, (input_decl_t *) mcsatdecl);
+    yyarglen = 0;
+    return true;
   };
   void yy_dumptables () {
     yy_command(DUMPTABLES, (input_decl_t *) NULL);
@@ -338,7 +357,7 @@ decl: PREDICATE atom witness { yy_preddecl($2, $3); }
 | ATOM atom { yy_atomdecl($2); }
 | ADD clause addwt { yy_adddecl($2, $3); }
 | ASK clause { yy_askdecl($2); }
-| MCSAT eargs {yy_mcsatdecl();}
+| MCSAT eargs {if (! yy_mcsatdecl()) YYABORT;}
 | RESET NAME {yy_reset($2);}
 | DUMPTABLES { yy_dumptables(); }
 | VERBOSITY NUM {yy_verbosity($2);}
@@ -364,9 +383,7 @@ literal: atom {$$ = yy_literal(0,$1);}
 atom: NAME '(' args ')' {$$ = yy_atom($1);}
     ;
 
-eargs: /*empty*/
-     | eargs ',' arg { yyargs[yyarglen] = str_copy($3); yyarglen+=1;}
-     ;
+eargs: /*empty*/ | args ;
 
 
 args: arg { yyargs[yyarglen] = str_copy($1); yyarglen+=1;}
