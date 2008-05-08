@@ -293,6 +293,7 @@ extern void add_sort(sort_table_t *sort_table, char *name);
 #define INIT_CLAUSE_SIZE 16
 #define INIT_ATOM_SIZE 16
 #define INIT_MODEL_TABLE_SIZE 64
+#define INIT_SUBSTIT_TABLE_SIZE 8 // number of vars in rules - likely to be small
 
 typedef  struct pred_entry_s {
   int32_t arity;//number of arguments; negative for evidence predicate
@@ -413,6 +414,16 @@ typedef struct clause_buffer_s {
   int32_t *data;
 } clause_buffer_t;
 
+typedef struct substit_entry_s {
+  int32_t const_index;
+  bool fixed;
+} substit_entry_t;
+
+typedef struct substit_buffer_s {
+  int32_t size;
+  substit_entry_t *entries;
+} substit_buffer_t;
+
 int32_t sort_name_index(char *name, sort_table_t *sort_table);
 
 int32_t *sort_signature(char **in_signature, int32_t arity, sort_table_t *sort_table);
@@ -473,7 +484,7 @@ void print_rules(rule_table_t *rule_table);
 
 void print_state(samp_table_t *table);
 
-clause_buffer_t substit_buffer;
+substit_buffer_t substit_buffer;
 
 void substit_buffer_resize(int32_t length);
 

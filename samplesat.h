@@ -47,7 +47,10 @@ extern int32_t add_rule(input_clause_t *in_rule,
 			double weight,
 			samp_table_t *samp_table);
 
-extern void all_ground_instances(samp_rule_t *rule, samp_table_t *table);
+extern void all_ground_instances_of_rule(int32_t rule, samp_table_t *table);
+
+extern void create_new_const_rule_instances(int32_t constidx,
+					    samp_table_t *table);
 
 extern void link_propagate(samp_table_t *table,
 		    samp_literal_t lit);

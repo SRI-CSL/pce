@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <string.h>
+#include <float.h>
 #include "utils.h"
 #include "mcsat.h"
 #include "y.tab.h"
@@ -153,7 +154,12 @@ void dump_rule_table (samp_table_t *samp_table) {
   printf("--------------------------------------------------------------------------------\n");
   for(i=0; i<nrules; i++) {
     samp_rule_t *rule = rule_table->samp_rules[i];
-    printf("| %*"PRIu32" | % 9.3f | ", nwdth, i, rule_table->samp_rules[i]->weight);
+    double wt = rule_table->samp_rules[i]->weight;
+    if (wt == DBL_MAX) {
+      printf("| %*"PRIu32" |    MAX    | ", nwdth, i);
+    } else {
+      printf("| %*"PRIu32" | % 9.3f | ", nwdth, i, wt);
+    }
     print_rule(rule, samp_table, nwdth+17);
     printf("\n");
   }
@@ -164,7 +170,7 @@ void test (samp_table_t *table) {
   rule_table_t *rule_table = &(table->rule_table);
   int32_t i;
   for (i = 0; i<rule_table->num_rules; i++) {
-    all_ground_instances(rule_table->samp_rules[i], table);
+    all_ground_instances_of_rule(i, table);
   }
   dump_rule_table(table);
   dump_clause_table(table);
@@ -243,7 +249,12 @@ int main(){
 	  // Need to see if name in var_table
 	  if (var_index(decl->name[i], var_table) == -1) {
 	    cprintf(1,"Adding const %s\n", decl->name[i]);
-	    add_const(const_table, decl->name[i], sort_table, decl->sort);
+	    if(add_const(const_table, decl->name[i],
+			 sort_table, decl->sort) != -1){
+	      int32_t cidx = const_index(decl->name[i], const_table);
+	      // We don't invoke this in add_const, as this is eager.
+	      create_new_const_rule_instances(cidx, &table);
+	    }
 	  }
 	  else
 	    fprintf(stderr, "%s is a variable, cannot be redeclared a constant\n",
@@ -291,8 +302,17 @@ int main(){
 	}
 	else {
 	  // Have variables - adding a rule
-	  printf("Adding rule with weight %lf\n", decl->weight);
-	  add_rule(decl->clause, decl->weight, &table);
+	  double wt = decl->weight;
+	  if (wt == DBL_MAX) {
+	    printf("Adding rule with MAX weight\n");
+	  } else {
+	    printf("Adding rule with weight %lf\n", wt);
+	  }
+	  int32_t ruleidx = add_rule(decl->clause, decl->weight, &table);
+	  // Create instances here rather than add_rule, as this is eager
+	  if (ruleidx != -1) {
+	    all_ground_instances_of_rule(ruleidx, &table);
+	  }
 	}
 	break;
       }

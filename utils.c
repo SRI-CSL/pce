@@ -965,8 +965,6 @@ bool valid_clause_table(clause_table_t *clause_table,
   return 1;
 }
 
-			
-
 bool valid_table(samp_table_t *table){
   sort_table_t *sort_table = &(table->sort_table); 
   const_table_t *const_table = &(table->const_table);
@@ -982,27 +980,23 @@ bool valid_table(samp_table_t *table){
   return 1;
 }
 
-clause_buffer_t substit_buffer = {0, NULL};
+substit_buffer_t substit_buffer = {0, NULL};
 
 // Fill this in later
 void substit_buffer_resize(int32_t length) {
-  if (substit_buffer.data == NULL){
-    substit_buffer.data = (int32_t *) safe_malloc(INIT_CLAUSE_SIZE * sizeof(int32_t));
-    substit_buffer.size = INIT_CLAUSE_SIZE;
+  if (substit_buffer.entries == NULL){
+    substit_buffer.entries = (substit_entry_t *)
+      safe_malloc(INIT_SUBSTIT_TABLE_SIZE * sizeof(substit_entry_t));
+    substit_buffer.size = INIT_SUBSTIT_TABLE_SIZE;
   }
   int32_t size = substit_buffer.size;
   if (size < length){
-    if (MAX_SIZE(sizeof(int32_t), 0) - size <= size/2){
+    if (MAX_SIZE(sizeof(substit_entry_t), 0) - size <= size/2){
       out_of_memory();
     }
     size += size/2;
-    substit_buffer.data =
-      (int32_t  *) safe_realloc(substit_buffer.data, size * sizeof(int32_t));
+    substit_buffer.entries = (substit_entry_t *)
+      safe_realloc(substit_buffer.entries, size * sizeof(substit_entry_t));
     substit_buffer.size = size;
-  }
-  // Now clear out the array
-  int i;
-  for(i = 0; i<size; i++) {
-    substit_buffer.data[i] = -1;
   }
 }

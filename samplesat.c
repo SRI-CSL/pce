@@ -405,7 +405,7 @@ int32_t add_rule(input_clause_t *rule,
     int32_t pred = new_rule->literals[i]->atom->pred;
     add_rule_to_pred(pred_table, pred, current_rule);
   }
-  return 0;
+  return current_rule;
 }
     
 
@@ -902,26 +902,26 @@ void init_sample_sat(samp_table_t *table){
 // Checks that the constants array is the right length, and the sorts match.
 // Returns -1 if there is a problem.
 int32_t substit(samp_rule_t *rule,
-		int32_t *constants,
+		substit_entry_t *substs,
 		samp_table_t *table){
   const_table_t *const_table = &(table->const_table);
   pred_table_t *pred_table = &(table->pred_table);
   int32_t i;
   for(i=0; i<rule->num_vars; i++){
-    if (constants[i] == -1) {
+    if (substs[i].const_index == -1) {
       fprintf(stderr, "substit: Not enough constants - %d given, %d required\n",
 	      i, rule->num_vars);
       return -1;
     }
     int32_t vsort = rule->vars[i]->sort_index;
-    int32_t csort = const_sort_index(constants[i], const_table);
+    int32_t csort = const_sort_index(substs[i].const_index, const_table);
     if (vsort != csort) {
       fprintf(stderr, "substit: Constant/variable sorts do not match at %d\n",
 	      i);
       return -1;
     }
   }
-  if(constants[i] != -1) {
+  if(substs[i].const_index != -1) {
     fprintf(stderr, "substit: Too many constants - %d given, %d required\n",
 	    i, rule->num_vars);
       return -1;
@@ -938,7 +938,7 @@ int32_t substit(samp_rule_t *rule,
       int32_t argidx = new_atom->args[j];
       if (argidx < 0) {
 	// Have a var, index to var (and hence, const) array is -(argidx + 1)
-	new_atom->args[j] = constants[-(argidx + 1)];
+	new_atom->args[j] = substs[-(argidx + 1)].const_index;
       }
     }
     int32_t added_atom = add_internal_atom(table, new_atom);
@@ -958,24 +958,71 @@ int32_t substit(samp_rule_t *rule,
 void all_ground_instances_rec(int32_t vidx,
 			      samp_rule_t *rule,
 			      samp_table_t *table) {
-  sort_table_t *sort_table = &(table->sort_table);
-  int32_t vsort = rule->vars[vidx]->sort_index;
-  sort_entry_t entry = sort_table->entries[vsort];
-  int32_t i;
-  for(i=0; i<entry.cardinality; i++){
-    substit_buffer.data[vidx] = entry.constants[i];
+  if(substit_buffer.entries[vidx].fixed){
+    // Simply do the substitution, or go to the next var
     if (vidx == rule->num_vars - 1) {
-      substit(rule, substit_buffer.data, table);
+      substit_buffer.entries[vidx+1].const_index = -1;
+      substit(rule, substit_buffer.entries, table);
     } else {
       all_ground_instances_rec(vidx+1, rule, table);
+    }
+  } else {
+    sort_table_t *sort_table = &(table->sort_table);
+    int32_t vsort = rule->vars[vidx]->sort_index;
+    sort_entry_t entry = sort_table->entries[vsort];
+    int32_t i;
+    for(i=0; i<entry.cardinality; i++){
+      substit_buffer.entries[vidx].const_index = entry.constants[i];
+      if (vidx == rule->num_vars - 1) {
+	substit_buffer.entries[vidx+1].const_index = -1;
+	substit(rule, substit_buffer.entries, table);
+      } else {
+	all_ground_instances_rec(vidx+1, rule, table);
+      }
     }
   }
 }
 
-void all_ground_instances(samp_rule_t *rule, samp_table_t *table) {
+// Called when a rule is added.
+void all_ground_instances_of_rule(int32_t rule_index, samp_table_t *table) {
+  rule_table_t *rule_table = &(table->rule_table);
+  samp_rule_t *rule = rule_table->samp_rules[rule_index];
   substit_buffer_resize(rule->num_vars);
+  int32_t i;
+  for(i=0; i<substit_buffer.size; i++){
+    substit_buffer.entries[i].fixed = false;
+  }
   all_ground_instances_rec(0, rule, table);
 }
+
+void fixed_const_ground_instances(int32_t fvidx,
+				  samp_rule_t *rule,
+				  samp_table_t *table) {
+  all_ground_instances_rec(0, rule, table);
+}
+
+// If a new constant is added, we need to generate all new instances of
+// rules involving this constant.
+void create_new_const_rule_instances(int32_t constidx, samp_table_t *table) {
+  const_table_t *const_table = &(table->const_table);
+  //sort_table_t *sort_table = &(table->sort_table);
+  rule_table_t *rule_table = &(table->rule_table);
+  const_entry_t centry = const_table->entries[constidx];
+  int32_t csort = centry.sort_index;
+  int32_t i, j;
+  for(i=0; i<rule_table->num_rules; i++){
+    samp_rule_t *rule = rule_table->samp_rules[i];
+    for(j=0; j<rule->num_vars; j++){
+      if(rule->vars[j]->sort_index == csort){
+	// Set the substit_buffer - no need to resize, as there are no new rules
+	substit_buffer.entries[j].const_index = constidx;
+	substit_buffer.entries[j].fixed = true;
+	fixed_const_ground_instances(j, rule, table);
+      }
+    }
+  }
+}
+  
 
 /* Like init_sample_sat, but takes an existing state and sets it up for a
    second round of sampling
