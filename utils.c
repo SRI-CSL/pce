@@ -292,7 +292,7 @@ int32_t *pred_signature(int32_t predicate, pred_table_t *pred_table){
   if (predicate <= 0){
     return pred_table->evpred_tbl.entries[-predicate].signature;
   } else {
-    return pred_table->evpred_tbl.entries[predicate].signature;
+    return pred_table->pred_tbl.entries[predicate].signature;
   }
 }
 
@@ -887,6 +887,18 @@ bool valid_atom_table(atom_table_t *atom_table,
 /* Evaluates a clause to false (-1) or to the literal index evaluating to true.
  */
 int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
+  int32_t i;
+  for (i = 0; i < clause->numlits; i++){
+    if (assigned_true_lit(assignment, clause->disjunct[i]))
+      return i;
+  }
+  return -1;
+}
+
+/* Evaluates a clause to -1 if all literals are false, and i if the
+   i'th literal is true, in the given assignment. 
+*/
+int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
   int32_t i;
   for (i = 0; i < clause->numlits; i++){
     if (assigned_true_lit(assignment, clause->disjunct[i]))
