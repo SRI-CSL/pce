@@ -732,10 +732,102 @@ void cost_flip_unfixed_variable(samp_table_t *table,
   }
 }
 
+static inline double choose(){
+  return ((uint32_t)rand())/((double) RAND_MAX + 1.0);
+}
+
+bool kill_select_clause(double weight){
+  if (weight == DBL_MAX) return 0;
+  double expval = exp(-weight);
+  double choice = choose();
+  if (choice < expval) return 1;
+  return 0;
+}
+
+void kill_clause_list(samp_clause_t **link_ptr,
+		      samp_clause_t *link,
+		      clause_table_t *clause_table){
+    while (link != NULL){
+      if (kill_select_clause(fabs(link->weight))){
+	*link_ptr = link->link;
+	link->link = clause_table->dead_clauses; //insert into dead clauses
+	clause_table->dead_clauses = link;
+	link = *link_ptr;
+      } else {
+	link_ptr = &(link->link);
+	link = link->link;
+      }
+    }
+}
+		      
+
+void kill_clauses(samp_table_t *table){
+  clause_table_t *clause_table = &(table->clause_table);
+  atom_table_t *atom_table = &(table->atom_table);
+
+  //unsat_clauses is empty; need to only kill satisfied clauses
+  //kill sat_clauses
+  kill_clause_list(&(clause_table->sat_clauses),
+		   clause_table->sat_clauses,
+		   clause_table);
+  int32_t i, lit;
+  //kill watched clauses
+  for (i = 0; i < atom_table->num_vars; i++){
+    lit = pos_lit(i);
+    kill_clause_list(&(clause_table->watched[lit]),
+		     clause_table->watched[lit],
+		     clause_table);
+    lit = neg_lit(i);
+    kill_clause_list(&(clause_table->watched[lit]),
+		     clause_table->watched[lit],
+		     clause_table);
+  }
+}
+
 void signal_conflict(){
   fprintf(stderr, "Hit a conflict\n");
   exit(MCSAT_CONFLICT);
 }
+
+void fix_lit_true(samp_table_t *table, int32_t lit){
+  int32_t var = var_of(lit);
+  if (fixed_tval(table->atom_table.assignment[var])){
+    if (assigned_false(table->atom_table.assignment[var])){
+	signal_conflict();//The unit literal can't be fixed true,
+                           //since it is fixed false
+    }
+  } else {
+    if (is_pos(lit)){
+      cprintf(2, "Fixing %d to true\n", var);
+      table->atom_table.assignment[var] = v_fixed_true;
+      table->atom_table.num_unfixed_vars--;
+    } else {
+      cprintf(2, "Fixing %d to false\n", var);	  
+	  table->atom_table.assignment[var] = v_fixed_false;
+	  table->atom_table.num_unfixed_vars--;
+    }
+  }
+}
+
+void fix_lit_false(samp_table_t *table, int32_t lit){
+  int32_t var = var_of(lit);
+  if (fixed_tval(table->atom_table.assignment[var])){
+    if (assigned_true(table->atom_table.assignment[var]))
+	signal_conflict(); //The unit literal can't be fixed false,
+                           //since it is fixed true
+  } else {
+    if (is_pos(lit)){
+      cprintf(2, "Fixing %d to true\n", var);
+      table->atom_table.assignment[var] = v_fixed_false;
+      table->atom_table.num_unfixed_vars--;
+    } else {
+      cprintf(2, "Fixing %d to false\n", var);	  
+      table->atom_table.assignment[var] = v_fixed_true;
+      table->atom_table.num_unfixed_vars--;
+    }
+  }
+}
+
 
 //Fixes the truth values derived from unit and negative weight clauses
 void negative_unit_propagate(samp_table_t *table){
@@ -743,49 +835,17 @@ void negative_unit_propagate(samp_table_t *table){
   int32_t i;
   link = table->clause_table.negative_or_unit_clauses;
   while (link != NULL){
-    if (link->weight >= 0){//must be a unit clause
-      if (fixed_tval(table->atom_table.assignment[var_of(link->disjunct[0])]) &&
-	  assigned_false(table->atom_table.assignment[var_of(link->disjunct[0])])){
-	signal_conflict();
-	return;  //The unit literal can't be fixed true, since it is fixed false
-      } else {
-	if (is_pos(link->disjunct[0])){
-	  printf("Fixing %d to true\n", var_of(link->disjunct[0]));
-	  table->atom_table.assignment[var_of(link->disjunct[0])] = v_fixed_true;
-	  table->atom_table.num_unfixed_vars--;
-	} else {
-	  printf("Fixing %d to false\n", var_of(link->disjunct[0]));	  
-	  table->atom_table.assignment[var_of(link->disjunct[0])] = v_fixed_false;
-	  table->atom_table.num_unfixed_vars--;
-	}
-      }
-    } else { //we have a negative weight clause
+    if (!kill_select_clause(fabs(link->weight))){
+      if (link->weight >= 0){//must be a unit clause
+	fix_lit_true(table, link->disjunct[0]);
+      } else { //we have a negative weight clause
 	i = 0;
 	while (i < link->numlits){
-	  if (is_pos(link->disjunct[i])){
-	    if (fixed_tval(table->atom_table.assignment[var_of(link->disjunct[i])]) &&
-		assigned_true_lit(table->atom_table.assignment, link->disjunct[i])){
-	      signal_conflict();
-	      return;
-	    } else {
-	      printf("Fixing %d to false\n", var_of(link->disjunct[i]));
-	      table->atom_table.assignment[var_of(link->disjunct[i++])] = v_fixed_false;
-	      table->atom_table.num_unfixed_vars--;
+	  fix_lit_false(table, link->disjunct[i++]);
 	    }
-	  } else {
-	    if (fixed_tval(table->atom_table.assignment[var_of(link->disjunct[i])]) &&
-		assigned_false_lit(table->atom_table.assignment, link->disjunct[i])){
-	      signal_conflict();
-	      return;
-	    } else {
-	      printf("Fixing %d to true\n", var_of(link->disjunct[i]));
-	      table->atom_table.assignment[var_of(link->disjunct[i++])] = v_fixed_true;
-	      table->atom_table.num_unfixed_vars--;
-	    }
-	  }
-	}
       }
-      link = link->link;
+    }
+    link = link->link;
   }
 }
 
@@ -1027,57 +1087,6 @@ void create_new_const_rule_instances(int32_t constidx, samp_table_t *table) {
    second round of sampling
  */
 
-static inline double choose(){
-  return ((uint32_t)rand())/((double) RAND_MAX + 1.0);
-}
-
-bool kill_select_clause(double weight){
-  if (weight == DBL_MAX) return 0;
-  double expval = exp(-weight);
-  double choice = choose();
-  if (choice < expval) return 1;
-  return 0;
-}
-
-void kill_clause_list(samp_clause_t **link_ptr,
-		      samp_clause_t *link,
-		      clause_table_t *clause_table){
-    while (link != NULL){
-      if (kill_select_clause(fabs(link->weight))){
-	*link_ptr = link->link;
-	link->link = clause_table->dead_clauses; //insert into dead clauses
-	clause_table->dead_clauses = link;
-	link = *link_ptr;
-      } else {
-	link_ptr = &(link->link);
-	link = link->link;
-      }
-    }
-}
-		      
-
-void kill_clauses(samp_table_t *table){
-  clause_table_t *clause_table = &(table->clause_table);
-  atom_table_t *atom_table = &(table->atom_table);
-
-  //unsat_clauses is empty; need to only kill satisfied clauses
-  //kill sat_clauses
-  kill_clause_list(&(clause_table->sat_clauses),
-		   clause_table->sat_clauses,
-		   clause_table);
-  int32_t i, lit;
-  //kill watched clauses
-  for (i = 0; i < atom_table->num_vars; i++){
-    lit = pos_lit(i);
-    kill_clause_list(&(clause_table->watched[lit]),
-		     clause_table->watched[lit],
-		     clause_table);
-    lit = neg_lit(i);
-    kill_clause_list(&(clause_table->watched[lit]),
-		     clause_table->watched[lit],
-		     clause_table);
-  }
-}
 
 int32_t length_clause_list(samp_clause_t *link){
   int32_t length = 0;
