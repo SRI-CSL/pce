@@ -685,13 +685,12 @@ void flip_unfixed_variable(samp_table_t *table,
     table->atom_table.assignment[var] = v_false;
     link_propagate(table,
 		   pos_lit(var));
-    scan_unsat_clauses(table);
   } else {
     table->atom_table.assignment[var] = v_true;
     link_propagate(table,
 		   neg_lit(var));
-    // scan_unsat_clauses(table); //can be done externally
   }
+  scan_unsat_clauses(table);
 }
 
 //computes the cost of flipping an unfixed variable without the actual flip
