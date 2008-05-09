@@ -503,6 +503,8 @@ bool valid_atom_table(atom_table_t *atom_table,
 
 int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
 
+int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
+
 extern bool valid_table(samp_table_t *table);
 
 #endif /* __UTILS_H */     
