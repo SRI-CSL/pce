@@ -903,7 +903,13 @@ void init_sample_sat(samp_table_t *table){
   for (i = 0; i < atom_table->num_vars; i++){
     clause_table->watched[pos_lit(i)] = NULL;
     clause_table->watched[neg_lit(i)] = NULL;
+    atom_table->pmodel[i] = -1;
   }
+
+  clause_table->sat_clauses = NULL;
+  clause_table->unsat_clauses = NULL;
+  clause_table->negative_or_unit_clauses = NULL;
+  clause_table->dead_clauses = NULL;
 
   for (i = 0; i < clause_table->num_clauses; i++){
     if (clause_table->samp_clauses[i]->weight < 0 ||
@@ -1107,31 +1113,18 @@ void restore_sat_dead_clauses(clause_table_t *clause_table,
 			      samp_clause_t **link_ptr){
     int32_t lit, val;
   while (link != NULL){
-    if (link->weight >= 0){
-      val = eval_clause(assignment, link);
-      if (val != -1){
-	lit = link->disjunct[val];
-	link->disjunct[val] = link->disjunct[0];
-	link->disjunct[0] = lit;
-	*link_ptr = link->link;
-	link->link = clause_table->watched[lit];
-	clause_table->watched[lit] = link;
-	link = *link_ptr;
-      } else {
-	link_ptr = &(link->link);
-	link = link->link;
-      }
+    val = eval_clause(assignment, link);
+    if (val != -1){
+      lit = link->disjunct[val];
+      link->disjunct[val] = link->disjunct[0];
+      link->disjunct[0] = lit;
+      *link_ptr = link->link;
+      link->link = clause_table->watched[lit];
+      clause_table->watched[lit] = link;
+      link = *link_ptr;
     } else {
-      val = eval_neg_clause(assignment, link);
-      if (val != -1){
-	*link_ptr = link->link;
-	link->link = clause_table->negative_or_unit_clauses;
-	clause_table->negative_or_unit_clauses = link;
-	link = *link_ptr;
-      } else {
-	link_ptr = &(link->link);
-	link = link->link;
-      }
+      link_ptr = &(link->link);
+      link = link->link;
     }
   }
 }
