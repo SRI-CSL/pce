@@ -784,9 +784,10 @@ void kill_clauses(samp_table_t *table){
   }
 }
 
+bool conflict; 
 void signal_conflict(){
   fprintf(stderr, "Hit a conflict\n");
-  exit(MCSAT_CONFLICT);
+  conflict = 1;
 }
 
 void fix_lit_true(samp_table_t *table, int32_t lit){
@@ -1314,14 +1315,16 @@ void first_sample_sat(samp_table_t *table, double sa_probability,
 void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 		uint32_t max_flips){
+  conflict = 0;
   reset_sample_sat(table);
   uint32_t num_flips = max_flips;
   while (table->clause_table.num_unsat_clauses > 0 &&
-	 num_flips > 0){
+	 num_flips > 0 &&
+	 !conflict){
     sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
     num_flips--;
   }
-  update_pmodel(table);
+  if (!conflict) update_pmodel(table);
 }
 
 extern void mc_sat(samp_table_t *table, double sa_probability,
