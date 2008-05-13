@@ -499,6 +499,7 @@ void init_clause_table(clause_table_t *table){
   table->unsat_clauses = NULL;
   table->sat_clauses = NULL;
   table->negative_or_unit_clauses = NULL;
+  table->dead_negative_or_unit_clauses = NULL; 
   table->num_unsat_clauses = 0;
 }
 
@@ -640,6 +641,7 @@ void print_clause_list(samp_clause_t *link, samp_table_t *table){
     print_clause(link, table);
     link = link->link;
   }
+  printf("\n");
  }
 
 void print_clause_table(samp_table_t *table, int32_t num_vars){
@@ -667,7 +669,14 @@ void print_clause_table(samp_table_t *table, int32_t num_vars){
   printf("Dead clauses:\n");
   link = clause_table->dead_clauses;
   print_clause_list(link, table);
+  printf("Negative/Unit clauses:\n");
+  link = clause_table->negative_or_unit_clauses;
+  print_clause_list(link, table);
+  printf("Dead negative/unit clauses:\n");
+  link = clause_table->dead_negative_or_unit_clauses;
+  print_clause_list(link, table);
 }
+
 
 void print_state(samp_table_t *table){
   atom_table_t *atom_table = &(table->atom_table);
@@ -934,6 +943,15 @@ bool valid_clause_table(clause_table_t *clause_table,
 	link->numlits != 1) return 0;
     link = link->link;
   }
+
+  //check dead_negative_or_unit_clauses
+  link = clause_table->dead_negative_or_unit_clauses;
+  while (link != NULL){
+    if (link->weight >= 0 &&
+	link->numlits != 1) return 0;
+    link = link->link;
+  }
+
   
   //check that every watched clause is satisfied and has the watched literal
   //as its first disjunct.
