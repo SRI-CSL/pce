@@ -337,6 +337,7 @@ int main(){
 	// Simply resets the probabilities of the atom table to -1.0
 	printf("Resetting probabilities of atoms to -1.0\n");
 	int32_t i;
+	atom_table->num_samples = 0;
 	for (i=0; i<atom_table->num_vars; i++) {
 	  atom_table->pmodel[i] = -1;
 	}
