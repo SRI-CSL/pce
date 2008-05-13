@@ -852,8 +852,8 @@ void negative_unit_propagate(samp_table_t *table){
 	  fix_lit_false(table, link->disjunct[i++]);
 	    }
       }
-      link = link->link;
       link_ptr = &(link->link);
+      link = link->link;
     } else {//move the clause to the dead_negative_or_unit_clauses list
       *link_ptr = link->link;
       link->link = clause_table->dead_negative_or_unit_clauses;
@@ -1171,12 +1171,11 @@ void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
 					    samp_clause_t *link,
 					    samp_clause_t **link_ptr){
   bool restore;
-  int32_t lit;
   while (link != NULL){
     if (link->weight < 0){
-      restore = (eval_clause(assignment, link) != -1);
+      restore = (eval_neg_clause(assignment, link) == -1);
     } else {//unit clause
-      restore = (eval_clause(assignment, link) == -1);
+      restore = (eval_clause(assignment, link) != -1);
     }
     if (restore){
       *link_ptr = link->link;
@@ -1198,10 +1197,10 @@ void reset_sample_sat(samp_table_t *table){
   pred_table_t *pred_table = &(table->pred_table);
   samp_truth_value_t *assignment = atom_table->assignment;
   uint32_t i;
-  int32_t lit;
   //move satisfied dead clauses to watched lists
   samp_clause_t **link_ptr = &(clause_table->dead_negative_or_unit_clauses);
   samp_clause_t *link  = *link_ptr;
+  int32_t lit;
 
   restore_sat_dead_negative_unit_clauses(clause_table, assignment, link, link_ptr);
 
