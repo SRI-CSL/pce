@@ -733,7 +733,7 @@ void cost_flip_unfixed_variable(samp_table_t *table,
 }
 
 static inline double choose(){
-  return ((uint32_t)rand())/((double) RAND_MAX + 1.0);
+  return ((double)random())/((double) RAND_MAX + 1.0);
 }
 
 bool kill_select_clause(double weight){
@@ -863,13 +863,12 @@ void negative_unit_propagate(samp_table_t *table){
 //assigns a random truth value to unfixed vars and returns number of unfixed vars.
 void init_random_assignment(samp_truth_value_t *assignment, int32_t num_vars,
 			    int32_t *num_unfixed_vars){
-  uint32_t i, num, choice;
+  uint32_t i, num;
   *num_unfixed_vars = 0;
   num = num_vars;
   for (i = 0; i < num_vars; i++){
     if (!fixed_tval(assignment[i])){
-      choice = random_uint(2);
-      if (choice == 0){
+      if (choose() < 0.5){
 	assignment[i] = v_false;
       } else {
 	assignment[i] = v_true;
@@ -1155,7 +1154,7 @@ void reset_sample_sat(samp_table_t *table){
   //Next, pick random assignments for unfixed vars and flip variables if needed
   for (i = 0; i < atom_table->num_vars; i++){
     if (!atom_eatom(i, pred_table, atom_table)){
-      choice = random_uint(2);
+      choice = (choose() < 0.5);
       if ((assigned_true(assignment[i]) && (choice == 0)) ||
 	  (assigned_false(assignment[i]) && (choice == 1))){
 	flip_unfixed_variable(table, i);
