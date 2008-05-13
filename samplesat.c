@@ -695,7 +695,7 @@ void flip_unfixed_variable(samp_table_t *table,
 
 //computes the cost of flipping an unfixed variable without the actual flip
 void cost_flip_unfixed_variable(samp_table_t *table,
-				double *dcost, 
+				int32_t *dcost, 
 				int32_t var){
   *dcost = 0;
   samp_literal_t lit, nlit;
@@ -714,7 +714,7 @@ void cost_flip_unfixed_variable(samp_table_t *table,
       i++;
     }
     if (i >= link->numlits){
-      *dcost += link->weight;
+      *dcost++;
     }
     link = link->link;
   }
@@ -726,7 +726,7 @@ void cost_flip_unfixed_variable(samp_table_t *table,
       i++;
     }
     if (i < link->numlits){
-      *dcost -= link->weight;
+      *dcost--;
     }
     link = link->link;
   }
@@ -1287,8 +1287,8 @@ int32_t choose_clause_var(samp_table_t *table,
   if (choice < rvar_probability){//flip a random unfixed variable
     var = random_uint(length_integer_stack(&clause_var_stack));
   } else {
-    double dcost = DBL_MAX;
-    double vcost = 0;
+    int32_t dcost = INT32_MAX;
+    int32_t vcost = 0;
     var = length_integer_stack(&clause_var_stack);
     for (i = 0; i < length_integer_stack(&clause_var_stack); i++){
       cost_flip_unfixed_variable(table, &vcost,
@@ -1312,7 +1312,7 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
   clause_table_t *clause_table = &(table->clause_table);
   atom_table_t *atom_table = &(table->atom_table);
   samp_truth_value_t *assignment = atom_table->assignment;
-  double dcost;
+  int32_t dcost;
   double choice = choose();
   int32_t var;
   uint32_t clause_position;
