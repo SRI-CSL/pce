@@ -371,6 +371,7 @@ typedef struct clause_table_s {
   samp_clause_t *dead_clauses;//list of unselected clauses
   samp_clause_t *negative_or_unit_clauses; //list of negative weight or unit 
                                            //clauses for fast unit propagation
+  samp_clause_t *dead_negative_or_unit_clauses; //killed clauses
   samp_clause_t *sat_clauses; //list of fixed satisfied clauses
 } clause_table_t;
 
