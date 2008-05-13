@@ -12,11 +12,11 @@
 
 #define MCSAT_CONFLICT 21
 
-#define DEFAULT_SA_PROBABILITY .7
-#define DEFAULT_SAMP_TEMPERATURE 0.0
-#define DEFAULT_RVAR_PROBABILITY .5
-#define DEFAULT_MAX_FLIPS 10
-#define DEFAULT_MAX_SAMPLES 50
+#define DEFAULT_SA_PROBABILITY .5
+#define DEFAULT_SAMP_TEMPERATURE 0.91
+#define DEFAULT_RVAR_PROBABILITY .2
+#define DEFAULT_MAX_FLIPS 1000
+#define DEFAULT_MAX_SAMPLES 1000
 
 extern int32_t add_const(const_table_t *const_table,
 		      char *name,
