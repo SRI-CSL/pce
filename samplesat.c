@@ -714,7 +714,7 @@ void cost_flip_unfixed_variable(samp_table_t *table,
       i++;
     }
     if (i >= link->numlits){
-      *dcost++;
+      *dcost += 1;
     }
     link = link->link;
   }
@@ -726,7 +726,7 @@ void cost_flip_unfixed_variable(samp_table_t *table,
       i++;
     }
     if (i < link->numlits){
-      *dcost--;
+      *dcost -= 1;
     }
     link = link->link;
   }
