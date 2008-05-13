@@ -947,7 +947,6 @@ void init_sample_sat(samp_table_t *table){
   for (i = 0; i < atom_table->num_vars; i++){
     clause_table->watched[pos_lit(i)] = NULL;
     clause_table->watched[neg_lit(i)] = NULL;
-    atom_table->pmodel[i] = -1;
   }
 
   clause_table->sat_clauses = NULL;
