@@ -909,6 +909,7 @@ void init_sample_sat(samp_table_t *table){
   clause_table->sat_clauses = NULL;
   clause_table->unsat_clauses = NULL;
   clause_table->negative_or_unit_clauses = NULL;
+  clause_table->dead_negative_or_unit_clauses = NULL;
   clause_table->dead_clauses = NULL;
 
   for (i = 0; i < clause_table->num_clauses; i++){
