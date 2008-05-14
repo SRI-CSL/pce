@@ -38,6 +38,7 @@ typedef struct input_mcsatdecl_s {
   double samp_temperature;
   double rvar_probability;
   int32_t max_flips;
+  int32_t max_extra_flips;
   int32_t max_samples;
 } input_mcsatdecl_t;
 typedef struct input_verbositydecl_s {
