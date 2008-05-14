@@ -450,7 +450,7 @@ void init_atom_table(atom_table_t *table){
   table->atom = (samp_atom_t **) safe_malloc(table->size * sizeof(samp_atom_t *));
   table->assignment = (samp_truth_value_t *)
     safe_malloc(table->size * sizeof(samp_truth_value_t));
-  table->pmodel = (double *) safe_malloc(table->size * sizeof(int32_t));
+  table->pmodel = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
   uint32_t i;
   for (i = 0; i < table->size; i++)
     table->pmodel[i] = 0;//was -1
