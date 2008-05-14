@@ -1391,7 +1391,7 @@ void sample_sat(samp_table_t *table, double sa_probability,
     sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
     num_flips--;
   }
-  num_flips = min(num_flips, max_extra_flips);
+  num_flips = imin(num_flips, max_extra_flips);
   while (!conflict &&
 	 num_flips > 0){
     sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
