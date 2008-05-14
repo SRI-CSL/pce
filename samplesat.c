@@ -1350,12 +1350,12 @@ void update_pmodel(samp_table_t *table){
   samp_truth_value_t *assignment = table->atom_table.assignment;
   int32_t num_vars = table->atom_table.num_vars;
   int32_t num_samples = table->atom_table.num_samples++;
-  double *pmodel = table->atom_table.pmodel;
-  double coeff = (double) num_samples/(++num_samples);
+  int32_t *pmodel = table->atom_table.pmodel;
+  //  double coeff = (double) num_samples/(++num_samples);
   int32_t i; 
   for (i = 0; i < num_vars; i++){
     if (assigned_true(assignment[i])){
-      (pmodel[i])++
+      (pmodel[i])++;
 	}}
 }
 
