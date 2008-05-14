@@ -453,7 +453,7 @@ void init_atom_table(atom_table_t *table){
   table->pmodel = (double *) safe_malloc(table->size * sizeof(int32_t));
   uint32_t i;
   for (i = 0; i < table->size; i++)
-    table->pmodel[i] = -1;
+    table->pmodel[i] = 0;//was -1
   table->num_samples = 0;
   init_array_hmap(&(table->atom_var_hash), ARRAY_HMAP_DEFAULT_SIZE);
   //  table->entries[0].atom = (samp_atom_t *) safe_malloc(sizeof(samp_atom_t));
