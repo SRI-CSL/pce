@@ -1317,7 +1317,8 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
   int32_t var;
   uint32_t clause_position;
   samp_clause_t *link;
-  if (choice < sa_probability){//choose and flip an unfixed variable
+  if (clause_table->num_unsat_clauses <= 0 ||
+      choice < sa_probability){//choose and flip an unfixed variable
     var = choose_unfixed_variable(assignment, atom_table->num_vars,
 				  atom_table->num_unfixed_vars);
     if (var == -1) return;
@@ -1380,7 +1381,7 @@ void first_sample_sat(samp_table_t *table, double sa_probability,
 
 void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
-		uint32_t max_flips){
+		uint32_t max_flips, uint32_t max_extra_flips){
   conflict = 0;
   reset_sample_sat(table);
   uint32_t num_flips = max_flips;
@@ -1390,12 +1391,20 @@ void sample_sat(samp_table_t *table, double sa_probability,
     sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
     num_flips--;
   }
+  num_flips = min(num_flips, max_extra_flips);
+  while (!conflict &&
+	 num_flips > 0){
+    sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
+    num_flips--;
+  }
+	 
   if (!conflict) update_pmodel(table);
 }
 
 extern void mc_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
-	    uint32_t max_flips, uint32_t max_samples){
+		   uint32_t max_flips, uint32_t max_extra_flips,
+		   uint32_t max_samples){
   first_sample_sat(table, sa_probability, samp_temperature,
 		   rvar_probability, max_flips);
   print_state(table);
@@ -1403,7 +1412,7 @@ extern void mc_sat(samp_table_t *table, double sa_probability,
   assert(valid_table(table));
   for (i = 0; i < max_samples; i++){
     sample_sat(table, sa_probability, samp_temperature,
-	       rvar_probability, max_flips);
+	       rvar_probability, max_flips, max_extra_flips);
     print_state(table);
     assert(valid_table(table));
   }
