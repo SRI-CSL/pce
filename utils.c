@@ -23,6 +23,12 @@ char * str_copy(char *name){
   return new_name;
 }
 
+static int32_t verbosity_level = 1;
+
+void set_verbosity_level(int32_t v) {
+  verbosity_level = v;
+}
+
 // Conditional print - only prints if level <= verbosity_level
 void cprintf(int32_t level, const char *fmt, ...){
   if(level <= verbosity_level){
@@ -50,7 +56,7 @@ int32_t *intarray_copy(int32_t *signature, int32_t length){
 
 void init_sort_table(sort_table_t *sort_table){
   int32_t size = INIT_SORT_TABLE_SIZE;
-  if (size >= MAX_SIZE(sizeof(sort_entry_t), 0)){
+  if (size >= MAXSIZE(sizeof(sort_entry_t), 0)){
     out_of_memory();
   }
   sort_table->size = size;
@@ -71,7 +77,7 @@ void reset_sort_table(sort_table_t *sort_table){
 }
 
 static void sort_table_resize(sort_table_t *sort_table, uint32_t n){
-  if (n >= MAX_SIZE(sizeof(sort_entry_t), 0)){
+  if (n >= MAXSIZE(sizeof(sort_entry_t), 0)){
     out_of_memory();
   }
   sort_table->entries = (sort_entry_t *) safe_realloc(sort_table->entries,
@@ -125,7 +131,7 @@ int32_t *sort_signature(char **in_signature,
 
 void init_const_table(const_table_t *const_table){
   int32_t size = INIT_CONST_TABLE_SIZE;
-  if (size >= MAX_SIZE(sizeof(const_entry_t), 0)){
+  if (size >= MAXSIZE(sizeof(const_entry_t), 0)){
     out_of_memory();
   }
   const_table->size = size;
@@ -136,7 +142,7 @@ void init_const_table(const_table_t *const_table){
 }
 
 static void const_table_resize(const_table_t *const_table, uint32_t n){
-  if (n >= MAX_SIZE(sizeof(const_entry_t), 0)){
+  if (n >= MAXSIZE(sizeof(const_entry_t), 0)){
     out_of_memory();
   }
   const_table->entries = (const_entry_t *) safe_realloc(const_table->entries,
@@ -149,7 +155,7 @@ static void add_const_to_sort(int32_t const_index,
 			      sort_table_t *sort_table){
   sort_entry_t *entry = &(sort_table->entries[sort_index]);
   if (entry->size == entry->cardinality){
-    if (MAX_SIZE(sizeof(int32_t), 0) - entry->size < entry->size/2){
+    if (MAXSIZE(sizeof(int32_t), 0) - entry->size < entry->size/2){
       out_of_memory();
     }
     entry->size += entry->size/2;
@@ -207,7 +213,7 @@ int32_t const_sort_index(int32_t const_index,
 
 void init_var_table(var_table_t *var_table){
   int32_t size = INIT_VAR_TABLE_SIZE;
-  if (size >= MAX_SIZE(sizeof(var_entry_t), 0)){
+  if (size >= MAXSIZE(sizeof(var_entry_t), 0)){
     out_of_memory();
   }
   var_table->size = size;
@@ -218,7 +224,7 @@ void init_var_table(var_table_t *var_table){
 }
 
 static void var_table_resize(var_table_t *var_table, uint32_t n){
-  if (n >= MAX_SIZE(sizeof(var_entry_t), 0)){
+  if (n >= MAXSIZE(sizeof(var_entry_t), 0)){
     out_of_memory();
   }
   var_table->entries = (var_entry_t *) safe_realloc(var_table->entries,
@@ -315,7 +321,7 @@ static char * truepred = "true"; //the true evidence predicate occupies the 0 sl
 
 void init_pred_table(pred_table_t *pred_table){
   int32_t size = INIT_PRED_TABLE_SIZE;
-  if (size >= MAX_SIZE(sizeof(pred_entry_t), 0)){
+  if (size >= MAXSIZE(sizeof(pred_entry_t), 0)){
     out_of_memory();
   }
   pred_table->evpred_tbl.size = size;
@@ -347,7 +353,7 @@ static void pred_tbl_resize(pred_tbl_t *pred_tbl){//call this extend, not resize
   int32_t size = pred_tbl->size;
   int32_t num_preds = pred_tbl->num_preds;
   if (num_preds < size) return;
-  if (MAX_SIZE(sizeof(pred_entry_t), 0) - size <= (size/2)){
+  if (MAXSIZE(sizeof(pred_entry_t), 0) - size <= (size/2)){
     out_of_memory();
   }
   size += size/2;
@@ -444,7 +450,7 @@ void init_atom_table(atom_table_t *table){
   table->size = INIT_ATOM_TABLE_SIZE;
   table->num_vars = 0; //atoms are positive
   table->num_unfixed_vars = 0;
-  if (table->size >= MAX_SIZE(sizeof(atom_entry_t), 0)){
+  if (table->size >= MAXSIZE(sizeof(atom_entry_t), 0)){
     out_of_memory();
   }
   table->atom = (samp_atom_t **) safe_malloc(table->size * sizeof(samp_atom_t *));
@@ -467,7 +473,7 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
   int32_t size = atom_table->size;
   int32_t num_vars = atom_table->num_vars;
   if (num_vars < size) return;
-  if (MAX_SIZE(sizeof(atom_entry_t), 0) - size <= (size/2)){
+  if (MAXSIZE(sizeof(atom_entry_t), 0) - size <= (size/2)){
     out_of_memory();
   }
   size += size/2;
@@ -479,7 +485,7 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
 					       size * sizeof(int32_t));
   atom_table->size = size;
 
-  if (MAX_SIZE(sizeof(samp_clause_t *), 0) - size <= size){
+  if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= size){
     out_of_memory();
   }
   clause_table->watched = (samp_clause_t **) safe_realloc(clause_table->watched,
@@ -490,7 +496,7 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
 void init_clause_table(clause_table_t *table){
   table->size = INIT_CLAUSE_TABLE_SIZE;
   table->num_clauses = 0;
-    if (table->size >= MAX_SIZE(sizeof(samp_clause_t *), 0)){
+    if (table->size >= MAXSIZE(sizeof(samp_clause_t *), 0)){
     out_of_memory();
   }
   table->samp_clauses =
@@ -511,7 +517,7 @@ void clause_table_resize(clause_table_t *clause_table){
   int32_t size = clause_table->size;
   int32_t num_clauses = clause_table->num_clauses;
   if (num_clauses < size) return;
-  if (MAX_SIZE(sizeof(samp_clause_t *), 0) - size <= (size/2)){
+  if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= (size/2)){
     out_of_memory();
   }
   size += size/2;
@@ -582,7 +588,7 @@ void print_atoms(samp_table_t *table){
   for (i = 0; i < nvars; i++){
     samp_truth_value_t tv = atom_table->assignment[i];
     printf("| %-*u | %-4s | % 5.3f | ", nwdth, i, samp_truth_value_string(tv),
-	   (double) (atom_table->pmodel[i]/(double) num_samples));
+	   ((double) atom_table->pmodel[i])/num_samples);
     print_atom(atom_table->atom[i], table);
     printf("\n");
   }
@@ -598,7 +604,7 @@ void clause_buffer_resize (int32_t length){
   }
   int32_t size = clause_buffer.size;
   if (size < length){
-    if (MAX_SIZE(sizeof(int32_t), 0) - size <= size/2){
+    if (MAXSIZE(sizeof(int32_t), 0) - size <= size/2){
       out_of_memory();
     }
     size += size/2;
@@ -700,7 +706,7 @@ void print_state(samp_table_t *table, uint32_t round){
 void init_rule_table(rule_table_t *table){
   table->size = INIT_RULE_TABLE_SIZE;
   table->num_rules = 0;
-  if (table->size >= MAX_SIZE(sizeof(samp_rule_t *), 0)){
+  if (table->size >= MAXSIZE(sizeof(samp_rule_t *), 0)){
     out_of_memory();
   }
   table->samp_rules =
@@ -711,7 +717,7 @@ void rule_table_resize(rule_table_t *rule_table){
   int32_t size = rule_table->size;
   int32_t num_rules = rule_table->num_rules;
   if (num_rules < size) return;
-  if (MAX_SIZE(sizeof(samp_rule_t *), 0) - size <= (size/2)){
+  if (MAXSIZE(sizeof(samp_rule_t *), 0) - size <= (size/2)){
     out_of_memory();
   }
   size += size/2;
@@ -1032,7 +1038,7 @@ void substit_buffer_resize(int32_t length) {
   }
   int32_t size = substit_buffer.size;
   if (size < length){
-    if (MAX_SIZE(sizeof(substit_entry_t), 0) - size <= size/2){
+    if (MAXSIZE(sizeof(substit_entry_t), 0) - size <= size/2){
       out_of_memory();
     }
     size += size/2;

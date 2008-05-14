@@ -24,7 +24,7 @@ static void add_atom_to_pred(pred_table_t *pred_table,
       entry->size_atoms = INIT_ATOM_PRED_SIZE;
     } else {
       size = entry->size_atoms;
-      if (MAX_SIZE(sizeof(int32_t), 0) - size <= size/2){
+      if (MAXSIZE(sizeof(int32_t), 0) - size <= size/2){
 	out_of_memory();
       }
       size += size/2;
@@ -46,7 +46,7 @@ static void add_rule_to_pred(pred_table_t *pred_table,
       entry->size_rules = INIT_RULE_PRED_SIZE;
     } else {
       size = entry->size_rules;
-      if (MAX_SIZE(sizeof(int32_t), 0) - size <= size/2){
+      if (MAXSIZE(sizeof(int32_t), 0) - size <= size/2){
 	out_of_memory();
       }
       size += size/2;
@@ -119,13 +119,13 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
     if (size == 0) {
       size = INIT_CLAUSE_SIZE;
     } else {
-      if (MAX_SIZE(sizeof(int32_t), 0) - size <= size/2){
+      if (MAXSIZE(sizeof(int32_t), 0) - size <= size/2){
 	out_of_memory();
       }
       size += size/2;
     }
     if (size < arity+1) {
-      if (MAX_SIZE(sizeof(int32_t), 0) <= arity)
+      if (MAXSIZE(sizeof(int32_t), 0) <= arity)
 	out_of_memory();
       size = arity+1;
     }
@@ -182,7 +182,7 @@ int32_t add_internal_clause(samp_table_t *table,
 				    (int32_t *) clause);
   if (clause_map == NULL){
     clause_table_resize(clause_table);
-    if (MAX_SIZE(sizeof(int32_t), sizeof(samp_clause_t)) < length){
+    if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < length){
       out_of_memory();
     }
     int32_t index = clause_table->num_clauses++;
@@ -499,7 +499,7 @@ int32_t add_rule(input_clause_t *rule,
     //add to table
     if (table->size <= table->num_clauses){
       table->size += (table->size/2);
-      if (table->size >= MAX_SIZE(sizeof(samp_clause_t), 0)){
+      if (table->size >= MAXSIZE(sizeof(samp_clause_t), 0)){
 	out_of_memory();
       } else {
 	table->samp_clauses = (samp_clause_t **)
@@ -740,30 +740,46 @@ static inline double choose(){
   return ((double)random())/((double) RAND_MAX + 1.0);
 }
 
-bool kill_select_clause(double weight){
-  if (weight == DBL_MAX) return 0;
-  double expval = exp(-weight);
-  double choice = choose();
-  if (choice < expval) return 1;
-  return 0;
+/*
+ * Weight is positive here.
+ */
+static bool kill_select_clause(double weight){
+  assert(weight >= 0);
+  return (weight < DBL_MAX) && (choose() < exp(-weight));
 }
 
 void kill_clause_list(samp_clause_t **link_ptr,
 		      samp_clause_t *link,
-		      clause_table_t *clause_table){
-    while (link != NULL){
-      if (kill_select_clause(fabs(link->weight))){
-	*link_ptr = link->link;
-	link->link = clause_table->dead_clauses; //insert into dead clauses
-	clause_table->dead_clauses = link;
-	link = *link_ptr;
-      } else {
-	link_ptr = &(link->link);
-	link = link->link;
-      }
+		      clause_table_t *clause_table) {
+  samp_clause_t *next;
+  while (link != NULL){
+    if (kill_select_clause(fabs(link->weight))){
+      next = link->link;
+      link->link = clause_table->dead_clauses; //insert into dead clauses
+      clause_table->dead_clauses = link;
+      link = next;
+    } else {
+      *link_ptr = link;
+      link_ptr = &link->link;
+      link = link->link;
     }
+  }
+  *link_ptr = NULL;
 }
-		      
+
+
+/*
+ * TEMPOARRY FOR DEBUGGING.
+ */
+extern void print_clause(samp_clause_t *clause, samp_table_t *table);		      
+
+static void print_list(samp_clause_t *link, samp_table_t *table) {
+  while (link != NULL) {
+    print_clause(link, table);
+    printf("\n");
+    link = link->link;
+  }
+}
 
 void kill_clauses(samp_table_t *table){
   clause_table_t *clause_table = &(table->clause_table);
@@ -771,7 +787,7 @@ void kill_clauses(samp_table_t *table){
 
   //unsat_clauses is empty; need to only kill satisfied clauses
   //kill sat_clauses
-  kill_clause_list(&(clause_table->sat_clauses),
+  kill_clause_list(&clause_table->sat_clauses,
 		   clause_table->sat_clauses,
 		   clause_table);
   int32_t i, lit;
@@ -786,9 +802,21 @@ void kill_clauses(samp_table_t *table){
 		     clause_table->watched[lit],
 		     clause_table);
   }
+  // TEMPORARY
+  printf("Live clauses:\n");
+  print_list(clause_table->sat_clauses, table);
+  for (i = 0; i < atom_table->num_vars; i++){
+    lit = pos_lit(i);
+    print_list(clause_table->watched[lit], table);
+    lit = neg_lit(i);
+    print_list(clause_table->watched[lit], table);
+  }
+  printf("\n");
 }
 
-bool conflict; 
+
+static bool conflict; 
+
 void signal_conflict(){
   fprintf(stderr, "Hit a conflict\n");
   conflict = 1;
@@ -809,9 +837,9 @@ void fix_lit_true(samp_table_t *table, int32_t lit){
       link_propagate(table, neg_lit(var));
     } else {
       cprintf(2, "Fixing %d to false\n", var);	  
-	  table->atom_table.assignment[var] = v_fixed_false;
-	  table->atom_table.num_unfixed_vars--;
-	  link_propagate(table, pos_lit(var));
+      table->atom_table.assignment[var] = v_fixed_false;
+      table->atom_table.num_unfixed_vars--;
+      link_propagate(table, pos_lit(var));
     }
   }
 }
@@ -843,20 +871,22 @@ void negative_unit_propagate(samp_table_t *table){
   samp_clause_t *link;
   samp_clause_t **link_ptr;
   int32_t i;
-  clause_table_t *clause_table = &(table->clause_table);
-  link_ptr = &(clause_table->negative_or_unit_clauses);
+  clause_table_t *clause_table;
+
+  clause_table = &table->clause_table;
+  link_ptr = &clause_table->negative_or_unit_clauses;
   link = *link_ptr;
-  while (link != NULL){
+  while (link != NULL) {
     if (!kill_select_clause(fabs(link->weight))){
       if (link->weight >= 0){//must be a unit clause
 	fix_lit_true(table, link->disjunct[0]);
       } else { //we have a negative weight clause
 	i = 0;
-	while (i < link->numlits){
+	while (i < link->numlits) {
 	  fix_lit_false(table, link->disjunct[i++]);
-	    }
+	}
       }
-      link_ptr = &(link->link);
+      link_ptr = &link->link;
       link = link->link;
     } else {//move the clause to the dead_negative_or_unit_clauses list
       *link_ptr = link->link;
@@ -1152,22 +1182,29 @@ void restore_sat_dead_clauses(clause_table_t *clause_table,
 			      samp_truth_value_t *assignment,
 			      samp_clause_t *link,
 			      samp_clause_t **link_ptr){
-    int32_t lit, val;
-    while (link != NULL){//restore satisfied dead_clauses to watched
+  int32_t lit, val;
+  samp_clause_t *next;
+  while (link != NULL){//restore satisfied dead_clauses to watched
     val = eval_clause(assignment, link);
-    if (val != -1){
+    if (val != -1) {
+      printf("---> restoring dead clause %p (val = %"PRId32")\n", link, val);
       lit = link->disjunct[val];
       link->disjunct[val] = link->disjunct[0];
       link->disjunct[0] = lit;
-      *link_ptr = link->link;
+      //      *link_ptr = link->link;
+      next = link->link;
       link->link = clause_table->watched[lit];
       clause_table->watched[lit] = link;
-      link = *link_ptr;
+      //      link = *link_ptr;
+      link = next;
     } else {
+      printf("---> dead clause %p stays dead (val = %"PRId32")\n", link, val);
+      *link_ptr = link;
       link_ptr = &(link->link);
       link = link->link;
     }
   }
+  *link_ptr = NULL;
 }
 
 void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
@@ -1187,6 +1224,7 @@ void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
       clause_table->negative_or_unit_clauses = link;
       link = *link_ptr;
     } else {
+      *link_ptr = link;
       link_ptr = &(link->link);
       link = link->link;
     }
@@ -1208,14 +1246,12 @@ void reset_sample_sat(samp_table_t *table){
 
   restore_sat_dead_negative_unit_clauses(clause_table, assignment, link, link_ptr);
 
-  link_ptr = &(clause_table->dead_clauses);
+  link_ptr = &clause_table->dead_clauses;
   link  = *link_ptr;
-  
   restore_sat_dead_clauses(clause_table, assignment, link, link_ptr);
   
-
   //Now move all unsat clauses to the dead list; we use link_ptr from above
-  //for this purpose
+  //for this purpose: BUT THAT DOES NOT WORK.
   *link_ptr = clause_table->unsat_clauses;
   clause_table->num_unsat_clauses = 0;
   //kill selected satisfied clauses
@@ -1346,17 +1382,42 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
     }
 }
 
+
+extern void print_atom(samp_atom_t *atom, samp_table_t *table);
+
+static void print_model(samp_table_t *table) {
+  samp_truth_value_t *assignment;
+  atom_table_t *atom_table;
+  int32_t i, num_vars;
+
+  assignment = table->atom_table.assignment;
+  atom_table = &table->atom_table;
+  num_vars = atom_table->num_vars;
+  for (i=0; i<num_vars; i++) {
+    print_atom(atom_table->atom[i], table);
+    if (assigned_true(assignment[i])) {
+      printf(" true\n");
+    } else {
+      printf(" false\n");
+    }
+  }
+}
+
 void update_pmodel(samp_table_t *table){
   samp_truth_value_t *assignment = table->atom_table.assignment;
   int32_t num_vars = table->atom_table.num_vars;
-  int32_t num_samples = table->atom_table.num_samples++;
   int32_t *pmodel = table->atom_table.pmodel;
-  //  double coeff = (double) num_samples/(++num_samples);
   int32_t i; 
+
+  table->atom_table.num_samples++;
   for (i = 0; i < num_vars; i++){
     if (assigned_true(assignment[i])){
-      (pmodel[i])++;
-	}}
+      pmodel[i]++;
+    }
+  }
+
+  // HACK: TEMPROARY FOR DEBUUGGING
+  print_model(table);
 }
 
 /*     if (pmodel[i] == -1){ */
@@ -1406,23 +1467,25 @@ void sample_sat(samp_table_t *table, double sa_probability,
     sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
     num_flips--;
   }
-	 
-  if (!conflict) update_pmodel(table);
+    
+  if (!conflict) update_pmodel(table);  
 }
 
 extern void mc_sat(samp_table_t *table, double sa_probability,
-		double samp_temperature, double rvar_probability,
+		   double samp_temperature, double rvar_probability,
 		   uint32_t max_flips, uint32_t max_extra_flips,
 		   uint32_t max_samples){
   first_sample_sat(table, sa_probability, samp_temperature,
 		   rvar_probability, max_flips);
-  print_state(table);
+  //  print_state(table);  
   uint32_t i;
   assert(valid_table(table));
   for (i = 0; i < max_samples; i++){
+    printf("---- sample[%"PRIu32"] ---\n", i);    
     sample_sat(table, sa_probability, samp_temperature,
 	       rvar_probability, max_flips, max_extra_flips);
-    print_state(table);
+    //    print_state(table);
     assert(valid_table(table));
   }
+  print_atoms(table);
 }

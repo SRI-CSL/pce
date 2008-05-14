@@ -11,7 +11,6 @@
 #include "memalloc.h"
 
 bool nonstrict = 0;
-int32_t verbosity_level = 1;
 
 extern input_command_t * input_command;
 extern int yyparse ();
@@ -354,10 +353,9 @@ int main(){
 	break;
       }
       case VERBOSITY: {
-	input_verbositydecl_t *decl
-	  = (input_verbositydecl_t *) input_command->decl;
-	verbosity_level = decl->level;
-	printf("Setting verbosity to %d\n", verbosity_level);
+	input_verbositydecl_t *decl = (input_verbositydecl_t *) input_command->decl;
+	set_verbosity_level(decl->level);
+	printf("Setting verbosity to %d\n", decl->level);
 	safe_free(decl);
 	break;
       }

@@ -1,65 +1,66 @@
 #ifndef __UTILS_H
 #define __UTILS_H 1
 
-#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdarg.h>
 #include <assert.h>
+
 #include "array_hash_map.h"
 #include "symbol_tables.h"
 #include "integer_stack.h"
 
-extern int32_t verbosity_level;
+
+/*
+ * Missing comment: what does this do?
+ * FIX: MAX_SIZE is used already. We need a different name
+ */
+#define MAXSIZE(size, offset) ((UINT32_MAX - (offset))/(size))
+
+
+/*
+ * min and max of two integers
+ */
 extern int32_t imax(int32_t i, int32_t j);
 extern int32_t imin(int32_t i, int32_t j);
 
 
+/*
+ * - A verbosity_level controls the amount of output produced
+ *   it's set to 1 by default. Can be changed via set_verbosity_level
+ * - cprintf is a replacement for printf:
+ *   cprintf(level, <format>, ...) does nothing if level > verbosity_level
+ *   otherwise, it's the same as printf(<format>, ...)
+ */
+extern void set_verbosity_level(int32_t level);
 extern void cprintf(int32_t level, const char *fmt, ...);
-extern char * str_copy(char *name);
-  
-//from simplexstructures.h
-#define MAX_SIZE(size, offset) ((UINT32_MAX - offset)/size)
 
-//The representation of Boolean variables and literals is taken from
-//dpll.h 
-
-//The active clauses are represented in an array.  
-/* #define WEIGHT_MAX INT32_MAX >> 2 */
-/* #define ALIVE_MASK 1 */
-/* #define ACTIVE_MASK 2 */
-
-/* int32_t get_alive(int32_t weight){ */
-/*   return (weight & ALIVE_MASK); */
-/* } */
-
-/* int32_t get_active(int32_t weight){ */
-/*   return (weight & ACTIVE_MASK); */
-/* } */
-
-/* int32_t get_weight(int32_t weight){ */
-/*   return (weight/4); */
-/* } */
-
-//From dpll.h
-
-/***************************************
- *    BOOLEAN VARIABLES AND LITERALS   *
- **************************************/
 
 /*
- * Boolean variables: integers between 0 and nvars - 1
- * Literals: integers between 0 and 2nvar - 1.
- *
+ * Return a freshly allocated copy of string s.
+ * - the result must be deleted by calling safe_free later
+ */
+extern char *str_copy(char *s);
+  
+
+
+
+
+/*
+ * MCSAT MAIN DATA STRUCTURES
+ */
+
+/*
+ * TODO: Everything from here to the end of this file should be moved
+ * to a different file. This stuff is specific to mcsat, putting it
+ * into a file called utils.h is not a great idea.
+ */
+
+/*
+ * Boolean variables are repressented by 32bit integers.
  * For a variable x, the positive literal is 2x, the negative
  * literal is 2x + 1.
  *
  * -1 is a special marker for both variables and literals
- *
- * Optionally, two literals representing true/false can be created
- * when the solver is initialized.
- * - if this is done, variable 0 = the constant
- * - literal 0 == true, literal 1 == false
  */
 typedef int32_t samp_bvar_t;
 typedef int32_t samp_literal_t;
@@ -67,54 +68,7 @@ typedef int32_t samp_literal_t;
 enum {
   null_samp_bvar = -1,
   null_literal = -1,
-
-  // constants
-  bool_const = 0, // bool variable
-  true_literal = 0,
-  false_literal = 1,
 };
-
-typedef enum {
-  v_undef = -1,
-  v_false = 0,
-  v_true = 1,
-  v_fixed_false = 2,
-  v_fixed_true = 3,
-  v_db_false = 4,
-  v_db_true = 5,
-} samp_truth_value_t;
-
-static inline bool db_tval(samp_truth_value_t v){
-  return (v == v_db_true || v == v_db_false);
-}
-
-static inline bool fixed_tval(samp_truth_value_t v){
-  return (v == v_fixed_true || v == v_fixed_false);
-}
-
-static inline bool unfixed_tval(samp_truth_value_t v){
-  return (v == v_true || v == v_false);
-}
-
-static inline samp_truth_value_t negate_tval(samp_truth_value_t v){
-  switch (v){
-  case v_true:
-    return v_false;
-  case v_false:
-    return v_true;
-  case v_db_true:
-    return v_db_false;
-  case v_db_false:
-    return v_db_true;
-  case v_fixed_true:
-    return v_fixed_false;
-  case v_fixed_false:
-    return v_fixed_true;
-  default:
-    return v_undef;
-      }
-}
-  
 
 
 /*
@@ -170,6 +124,59 @@ static inline bool is_neg(samp_literal_t l) {
 }
 
 
+/*
+ * Truth values: explain??
+ */
+typedef enum {
+  v_undef = -1,
+  v_false = 0,
+  v_true = 1,
+  v_fixed_false = 2,
+  v_fixed_true = 3,
+  v_db_false = 4,
+  v_db_true = 5,
+} samp_truth_value_t;
+
+
+static inline bool db_tval(samp_truth_value_t v){
+  return (v == v_db_true || v == v_db_false);
+}
+
+static inline bool fixed_tval(samp_truth_value_t v){
+  return (v == v_fixed_true || v == v_fixed_false);
+}
+
+static inline bool unfixed_tval(samp_truth_value_t v){
+  return (v == v_true || v == v_false);
+}
+
+
+/*
+ * This function is too large to be inlined
+ */
+static inline samp_truth_value_t negate_tval(samp_truth_value_t v){
+  switch (v){
+  case v_true:
+    return v_false;
+  case v_false:
+    return v_true;
+  case v_db_true:
+    return v_db_false;
+  case v_db_false:
+    return v_db_true;
+  case v_fixed_true:
+    return v_fixed_false;
+  case v_fixed_false:
+    return v_fixed_true;
+  default:
+    return v_undef;
+  }
+}
+  
+
+/*
+ * 
+ */
 #define SAMP_INIT_CLAUSE_SIZE 8
 
 //A clause has weight/status and a -1-terminated array of literals
@@ -182,35 +189,6 @@ typedef struct samp_clause_s {
   samp_literal_t disjunct[0];//array of literals 
 } samp_clause_t;
 
-/*
-#define ALIVE_MASK ((samp_clause_t *) 1)
-
-bool alive_clause(samp_clause_t *clause){
-  return (clause->link & ALIVE_MASK); //will this cast to bool?
-}
-
-samp_clause_t *link_link(samp_clause_t *link){//is this correct? 
-  return (link &  ~ALIVE_MASK);
-}
-*/
-
-/*A predicate symbol uses its least ARITY_BITS (6) bits
-#define ARITY_BITS 6
-#define ARITY_MASK ((1 << ARITY_BITS) - 1)
-#define EPRED_BIT 7
-#define EPRED_MASK (1 << ARITY_BITS)
-#define PRED_MAX (INT32_MAX >> EPRED_BIT)
-  
-extern int32_t  pred_index(int32_t predicate);
-
-
-extern int32_t pred_epred(int32_t predicate);
-
-extern int32_t pred_arity(int32_t predicate);
-*/
-
-//Constants will be encoded as positive integers and
-//variables as negative integers.  
 
 //An atom has a predicate symbol and an array of the corresponding arity. 
 typedef struct samp_atom_s {
@@ -236,29 +214,6 @@ typedef struct input_clause_s {
   input_literal_t **literals;
 } input_clause_t;
 
-//A samp_atomlit is a literal that contains a pointer to the atom (NS: Not used)
-/*
-typedef (samp_atom_t *) samp_atomlit_t;
-//the low-order bit is one for negated literal
-
-#define NEG_TAG ((intptr_t) 0x1)
-
-samp_atomlit_t negate_samp_atom(samp_atomlit_t lit){
-  return ((samp_atomlit_t)(((intptr_t) lit) ^ NEG_TAG));
-}
-
-bool is_neg_samp_atomlit(samp_atomlit_t lit){
-  return ((((intptr_t) lit) & NEG_TAG) == 1);
-}
-
-samp_atomlit_t get_samp_atomlit_atom(samp_atomlit_t lit){
-  return ((samp_atomlit_t)(((intptr_t) lit) & ~NEG_TAG));
-}
-*/
-
-
-//To check for clause equality, we sort the literals and calculate a
-//hash: a hashmap maps the clause to its index in the clause table
 
 
 //Each sort has a name (string), and a cardinality.  Each element is also assigned
@@ -276,13 +231,6 @@ typedef  struct sort_table_s {
   stbl_t sort_name_index;//table giving index for sort name
   sort_entry_t *entries;//maps sort index to cardinality and name
 } sort_table_t;
-
-extern void init_sort_table(sort_table_t *sort_table);
-
-extern void reset_sort_table(sort_table_t *sort_table);
-
-extern void add_sort(sort_table_t *sort_table, char *name);
-
 
 #define INIT_SORT_TABLE_SIZE 64
 #define INIT_CONST_TABLE_SIZE 64
@@ -429,87 +377,106 @@ typedef struct substit_buffer_s {
   substit_entry_t *entries;
 } substit_buffer_t;
 
-int32_t sort_name_index(char *name, sort_table_t *sort_table);
 
-int32_t *sort_signature(char **in_signature, int32_t arity, sort_table_t *sort_table);
 
-void init_const_table(const_table_t *const_table);
+/*
+ * Explain these functions: what do they do?
+ */
+extern void init_sort_table(sort_table_t *sort_table);
 
-int32_t const_index(char *name, const_table_t *const_table);
+extern void reset_sort_table(sort_table_t *sort_table);
 
-int32_t const_sort_index(int32_t const_index, const_table_t *const_table);
+extern void add_sort(sort_table_t *sort_table, char *name);
 
-int32_t var_index(char *name, var_table_t *var_table);
+extern int32_t sort_name_index(char *name, sort_table_t *sort_table);
 
-void init_pred_table(pred_table_t *pred_table);
+extern int32_t *sort_signature(char **in_signature, int32_t arity, sort_table_t *sort_table);
 
-void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table);
+extern void init_const_table(const_table_t *const_table);
 
-bool pred_epred(int32_t predicate);
+extern int32_t const_index(char *name, const_table_t *const_table);
 
-int32_t pred_val_to_index(int32_t val);
+extern int32_t const_sort_index(int32_t const_index, const_table_t *const_table);
 
-bool atom_eatom(int32_t atom_id, pred_table_t *pred_table, atom_table_t *atom_table);
+extern int32_t var_index(char *name, var_table_t *var_table);
 
-pred_entry_t *pred_entry(pred_table_t *pred_table, int32_t predicate);
+extern void init_pred_table(pred_table_t *pred_table);
 
-int32_t pred_arity(int32_t predicate, pred_table_t *pred_table);
+extern void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table);
 
-int32_t pred_index(char * in_predicate, pred_table_t *pred_table);
+extern bool pred_epred(int32_t predicate);
 
-char *pred_name(int32_t pred, pred_table_t *pred_table);
+extern int32_t pred_val_to_index(int32_t val);
 
-void init_atom_table(atom_table_t *table);
+extern bool atom_eatom(int32_t atom_id, pred_table_t *pred_table, atom_table_t *atom_table);
 
-void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table);
+extern pred_entry_t *pred_entry(pred_table_t *pred_table, int32_t predicate);
 
-samp_atom_t *atom_copy(samp_atom_t *atom, int32_t arity);
+extern int32_t pred_arity(int32_t predicate, pred_table_t *pred_table);
 
-void init_clause_table(clause_table_t *table);
+extern int32_t pred_index(char * in_predicate, pred_table_t *pred_table);
 
-void clause_table_resize(clause_table_t *clause_table);
+extern char *pred_name(int32_t pred, pred_table_t *pred_table);
 
+extern void init_atom_table(atom_table_t *table);
+
+extern void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table);
+
+extern samp_atom_t *atom_copy(samp_atom_t *atom, int32_t arity);
+
+extern void init_clause_table(clause_table_t *table);
+
+extern void clause_table_resize(clause_table_t *clause_table);
+
+
+/*
+ * Is there a need to make this extern?
+ */
 extern clause_buffer_t clause_buffer;
 
-void clause_buffer_resize (int32_t length);
+extern void clause_buffer_resize(int32_t length);
 
-void init_rule_table(rule_table_t *table);
 
-void rule_table_resize(rule_table_t *rule_table);
+extern void init_rule_table(rule_table_t *table);
 
-void init_samp_table(samp_table_t *table);
+extern void rule_table_resize(rule_table_t *rule_table);
 
-void print_atoms(samp_table_t *samp_table);
+extern void init_samp_table(samp_table_t *table);
 
-void print_clauses(samp_table_t *samp_table);
+extern void print_atoms(samp_table_t *samp_table);
 
-void print_clause_table(samp_table_t *table, int32_t num_vars);
+extern void print_clauses(samp_table_t *samp_table);
 
-void print_rules(rule_table_t *rule_table);
+extern void print_clause_table(samp_table_t *table, int32_t num_vars);
 
-void print_state(samp_table_t *table, uint32_t round);
+extern void print_rules(rule_table_t *rule_table);
 
-substit_buffer_t substit_buffer;
+extern void print_state(samp_table_t *table, uint32_t round);
 
-void substit_buffer_resize(int32_t length);
+/*
+ * Same question?
+ */
+extern substit_buffer_t substit_buffer;
 
-bool assigned_undef(samp_truth_value_t value);
-bool assigned_true(samp_truth_value_t value);
-bool assigned_false(samp_truth_value_t value);
-bool assigned_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
-bool assigned_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
-bool assigned_fixed_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
-bool assigned_fixed_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
+extern void substit_buffer_resize(int32_t length);
 
-bool valid_atom_table(atom_table_t *atom_table,
-		      pred_table_t *pred_table,
-		      const_table_t *const_table,
-		      sort_table_t *sort_table);
 
-int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
+extern bool assigned_undef(samp_truth_value_t value);
+extern bool assigned_true(samp_truth_value_t value);
+extern bool assigned_false(samp_truth_value_t value);
+extern bool assigned_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
+extern bool assigned_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
+extern bool assigned_fixed_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
+extern bool assigned_fixed_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
 
-int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
+extern int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
+extern int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
 
 extern bool valid_table(samp_table_t *table);
+extern bool valid_atom_table(atom_table_t *atom_table,
+			     pred_table_t *pred_table,
+			     const_table_t *const_table,
+			     sort_table_t *sort_table);
+
 
 #endif /* __UTILS_H */     
