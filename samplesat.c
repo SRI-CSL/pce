@@ -9,6 +9,7 @@
 #include "int_array_sort.h"
 #include "array_hash_map.h"
 #include "gcd.h"
+#include "utils.h"
 #include "samplesat.h"
 
 
