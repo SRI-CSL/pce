@@ -87,8 +87,11 @@ int32_t add_internal_atom(samp_table_t *table,
 				   (int32_t *) current_atom);
     atom_map->val = current_atom_index;
     
-    if (pred_epred(predicate)) //closed world assumption
+    if (pred_epred(predicate)){ //closed world assumption
       atom_table->assignment[current_atom_index] = v_fixed_false;
+    } else {//set pmodel to 0
+      atom_table->pmodel[current_atom_index] = 0;
+    }
     add_atom_to_pred(pred_table, predicate, current_atom_index);
     clause_table->watched[pos_lit(current_atom_index)] = NULL;
     clause_table->watched[neg_lit(current_atom_index)] = NULL;
