@@ -12,6 +12,10 @@
 /*  These copy operations assume that size input to safe_malloc can't 
  *  overflow since there are existing structures of the given size. 
  */
+
+int32_t imax(int32_t i, int32_t j) {return i<j ? j : i;}
+int32_t imin(int32_t i, int32_t j) {return i>j ? j : i;}
+
 char * str_copy(char *name){
   int32_t len = strlen(name);
   char * new_name = safe_malloc(++len * sizeof(char));
