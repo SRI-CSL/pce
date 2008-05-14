@@ -330,7 +330,8 @@ int main(){
 		printf(" max_flips = %d\n", decl->max_extra_flips);
 	printf(" max_samples = %d\n", decl->max_samples);
 	mc_sat(&table, decl->sa_probability, decl->samp_temperature,
-	       decl->rvar_probability, decl->max_flips, decl->max_samples);
+	       decl->rvar_probability, decl->max_flips,
+	       decl->max_extra_flips, decl->max_samples);
 	safe_free(decl);
 	break;
       }
