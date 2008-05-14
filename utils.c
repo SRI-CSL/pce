@@ -450,7 +450,7 @@ void init_atom_table(atom_table_t *table){
   table->atom = (samp_atom_t **) safe_malloc(table->size * sizeof(samp_atom_t *));
   table->assignment = (samp_truth_value_t *)
     safe_malloc(table->size * sizeof(samp_truth_value_t));
-  table->pmodel = (double *) safe_malloc(table->size * sizeof(double));
+  table->pmodel = (double *) safe_malloc(table->size * sizeof(int32_t));
   uint32_t i;
   for (i = 0; i < table->size; i++)
     table->pmodel[i] = -1;
@@ -475,8 +475,8 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
 					     size * sizeof(samp_atom_t *));
   atom_table->assignment = (samp_truth_value_t *) safe_realloc(atom_table->assignment,
 					     size * sizeof(samp_truth_value_t));
-  atom_table->pmodel = (double *) safe_realloc(atom_table->pmodel,
-					       size * sizeof(double));
+  atom_table->pmodel = (int32_t *) safe_realloc(atom_table->pmodel,
+					       size * sizeof(int32_t));
   atom_table->size = size;
 
   if (MAX_SIZE(sizeof(samp_clause_t *), 0) - size <= size){
@@ -575,13 +575,14 @@ void print_atoms(samp_table_t *table){
   char d[10];
   uint32_t nwdth = sprintf(d, "%d", nvars);
   uint32_t i;
+  int32_t num_samples = atom_table->num_samples;
   printf("--------------------------------------------------------------------------------\n");
   printf("| %*s | tval | prob   | %-*s |\n", nwdth, "i", 57-nwdth, "atom");
   printf("--------------------------------------------------------------------------------\n");
   for (i = 0; i < nvars; i++){
     samp_truth_value_t tv = atom_table->assignment[i];
     printf("| %-*u | %-4s | % 5.3f | ", nwdth, i, samp_truth_value_string(tv),
-	   atom_table->pmodel[i]);
+	   (double) (atom_table->pmodel[i]/(double) num_samples));
     print_atom(atom_table->atom[i], table);
     printf("\n");
   }
