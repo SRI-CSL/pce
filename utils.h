@@ -11,6 +11,10 @@
 #include "integer_stack.h"
 
 extern int32_t verbosity_level;
+extern int32_t imax(int32_t i, int32_t j);
+extern int32_t imin(int32_t i, int32_t j);
+
+
 extern void cprintf(int32_t level, const char *fmt, ...);
 extern char * str_copy(char *name);
   
