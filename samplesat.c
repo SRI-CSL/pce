@@ -1351,21 +1351,26 @@ void update_pmodel(samp_table_t *table){
   double coeff = (double) num_samples/(++num_samples);
   int32_t i; 
   for (i = 0; i < num_vars; i++){
-    if (pmodel[i] == -1){
-      if (assigned_false(assignment[i])){
-	pmodel[i] = 0;
-      } else {
-	pmodel[i] = 1;
-      }
-    } else {
-      if (assigned_false(assignment[i])){
-	  pmodel[i] = (coeff * pmodel[i]);
-	} else {
-	  pmodel[i] = (coeff * pmodel[i]) + (1.0/num_samples);
-	}
-    }
-  }
+    if (assigned_true(assignment[i])){
+      (pmodel[i])++
+	}}
 }
+
+/*     if (pmodel[i] == -1){ */
+/*       if (assigned_false(assignment[i])){ */
+/* 	pmodel[i] = 0; */
+/*       } else { */
+/* 	pmodel[i] = 1; */
+/*       } */
+/*     } else { */
+/*       if (assigned_false(assignment[i])){ */
+/* 	(pmodel[i] = (coeff * pmodel[i]); */
+/* 	} else { */
+/* 	  pmodel[i] = (coeff * pmodel[i]) + (1.0/num_samples); */
+/* 	} */
+/*     } */
+/*   } */
+/* } */
 
 void first_sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
