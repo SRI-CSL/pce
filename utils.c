@@ -683,12 +683,18 @@ void print_clause_table(samp_table_t *table, int32_t num_vars){
 }
 
 
-void print_state(samp_table_t *table){
+void print_state(samp_table_t *table, uint32_t round){
   atom_table_t *atom_table = &(table->atom_table);
-  printf("==============================================================\n");
-  print_atoms(table);
-  printf("==============================================================\n");
-  print_clause_table(table, atom_table->num_vars);
+  if (verbosity_level > 2) {
+    printf("==============================================================\n");
+    print_atoms(table);
+    printf("==============================================================\n");
+    print_clause_table(table, atom_table->num_vars);
+  } else if (verbosity_level > 1) {
+    printf("Generated sample %d...\n", round);
+  } else if (verbosity_level > 0) {
+    printf(".");
+  }
 }
 
 void init_rule_table(rule_table_t *table){
