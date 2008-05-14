@@ -360,7 +360,7 @@ typedef struct atom_table_s {
   samp_atom_t **atom; // atom_entry_t *entries;
   samp_truth_value_t *assignment;
   int32_t num_samples;
-  double *pmodel;
+  int32_t *pmodel;
   array_hmap_t atom_var_hash; //maps atoms to variables
 } atom_table_t;
 
