@@ -487,7 +487,7 @@ void print_clause_table(samp_table_t *table, int32_t num_vars);
 
 void print_rules(rule_table_t *rule_table);
 
-void print_state(samp_table_t *table);
+void print_state(samp_table_t *table, uint32_t round);
 
 substit_buffer_t substit_buffer;
 
