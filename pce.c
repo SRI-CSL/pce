@@ -22,8 +22,6 @@ extern input_command_t * input_command;
 extern int yyparse ();
 //extern int yydebug;
 
-int32_t imax(int32_t i, int32_t j) {return i<j ? j : i;}
-int32_t imin(int32_t i, int32_t j) {return i>j ? j : i;}
 
 void dump_sort_table (samp_table_t *table) {
   sort_table_t *sort_table = &(table->sort_table);
