@@ -83,7 +83,7 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
 
 void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
-		uint32_t max_flips, uint32_t max_flips);
+		uint32_t max_flips, uint32_t max_extra_flips);
 
 void mc_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
