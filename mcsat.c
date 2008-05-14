@@ -327,6 +327,7 @@ int main(){
 	printf(" samp_temperature = %f\n", decl->samp_temperature);
 	printf(" rvar_probability = %f\n", decl->rvar_probability);
 	printf(" max_flips = %d\n", decl->max_flips);
+		printf(" max_flips = %d\n", decl->max_extra_flips);
 	printf(" max_samples = %d\n", decl->max_samples);
 	mc_sat(&table, decl->sa_probability, decl->samp_temperature,
 	       decl->rvar_probability, decl->max_flips, decl->max_samples);
@@ -387,6 +388,7 @@ int main(){
 	printf("  samp_temperature - double\n");
 	printf("  rvar_probability - double\n");
 	printf("  max_flips - int\n");
+	printf("  max_extra_flips - int\n");
 	printf("  max_samples - int\n");
 	break;
       }
