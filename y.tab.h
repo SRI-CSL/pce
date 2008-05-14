@@ -95,7 +95,7 @@ typedef union YYSTYPE
   input_literal_t *lit;
   input_atom_t *atom;
 }
-/* Line 1529 of yacc.c.  */
+/* Line 1489 of yacc.c.  */
 #line 100 "y.tab.h"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */

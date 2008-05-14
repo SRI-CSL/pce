@@ -6,7 +6,7 @@ CFLAGS = -I /homes/owre/src/oaa2.3.2/src/oaalib/c/include \
          -I /homes/owre/src/oaa2.3.2/lib/x86-linux/glib-2.0/include \
          -I /homes/owre/src/oaa2.3.2/src/oaalib/c/external/glib/glib-2.10.1 \
          -Wall -g # -Wextra
-LD = ld
+LD = ld 
 XCFLAGS =
 
 # pceobj = array_hash_map.o hash_functions.o int_array_sort.o int_stack.o \
@@ -27,10 +27,10 @@ pceobj = pce.o $(commonobj)
 all: mcsat #pce
 
 mcsat: $(mcsatobj)
-	$(CC) -o mcsat -lm $^
+	$(CC) -g -o mcsat -lm $^
 
 pce: $(pceobj)
-	$(CC) -o pce -lm $^
+	$(CC) -g -o pce -lm $^
 
 mcsat.o : mcsat.c y.tab.h samplesat.h utils.h
 pce.o : pce.c y.tab.h samplesat.h

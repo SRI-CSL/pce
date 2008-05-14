@@ -400,15 +400,15 @@ int32_t add_pred(pred_table_t *pred_table,
     pred_tbl->entries[n].atoms = NULL;
     pred_tbl->num_preds++;
     stbl_add(&(pred_table->pred_name_index), name, index);//note index is never -1
-    //printf("\nAdded predicate index %d with name %s, hashindex %d, arity %d, and signature:",
+    //printf("\nAdded predicate index %"PRId32" with name %s, hashindex %"PRId32", arity %"PRId32", and signature:",
     //   n, name, index, arity);
-    //printf("\nhashindex[%s] = %d",
+    //printf("\nhashindex[%s] = %"PRId32"",
     //   pred_tbl->entries[n].name,
     //   pred_index(pred_tbl->entries[n].name, pred_table));
     //printf("\n(");
     //int32_t i;
     //for (i=0; i < arity; i++){
-    //printf("%d", signature[i]);
+    //printf("%"PRId32"", signature[i]);
     //}
     //printf(")");
     return 0;
@@ -420,11 +420,11 @@ int32_t add_pred(pred_table_t *pred_table,
 void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
   char *buffer;
   int32_t i, j; 
-   printf("num of evpreds: %d\n", pred_table->evpred_tbl.num_preds);
+   printf("num of evpreds: %"PRId32"\n", pred_table->evpred_tbl.num_preds);
    for (i = 0; i < pred_table->evpred_tbl.num_preds; i++){
-     printf("evpred[%d] = ", i);
+     printf("evpred[%"PRId32"] = ", i);
       buffer = pred_table->evpred_tbl.entries[i].name;
-      printf("index(%d); ", pred_index(buffer, pred_table));
+      printf("index(%"PRId32"); ", pred_index(buffer, pred_table));
       printf( "%s(", buffer);
       for (j = 0; j < pred_table->evpred_tbl.entries[i].arity; j++){
 	if (j != 0) printf(", ");
@@ -432,11 +432,11 @@ void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
       }
       printf(")\n");
   }
-   printf("num of preds: %d\n", pred_table->pred_tbl.num_preds);
+   printf("num of preds: %"PRId32"\n", pred_table->pred_tbl.num_preds);
    for (i = 0; i < pred_table->pred_tbl.num_preds; i++){
-     printf("\n pred[%d] = ", i);
+     printf("\n pred[%"PRId32"] = ", i);
      buffer = pred_table->pred_tbl.entries[i].name;
-     printf("index(%d); ", pred_index(buffer, pred_table));
+     printf("index(%"PRId32"); ", pred_index(buffer, pred_table));
      printf("%s(", buffer);
     for (j = 0; j < pred_table->pred_tbl.entries[i].arity; j++){
       if (j != 0) printf(", ");
@@ -579,8 +579,8 @@ void print_atoms(samp_table_t *table){
   atom_table_t *atom_table = &(table->atom_table);
   uint32_t nvars = atom_table->num_vars;
   char d[10];
-  uint32_t nwdth = sprintf(d, "%d", nvars);
-  uint32_t i;
+  int nwdth = sprintf(d, "%"PRId32"", nvars);
+  int i;
   int32_t num_samples = atom_table->num_samples;
   printf("--------------------------------------------------------------------------------\n");
   printf("| %*s | tval | prob   | %-*s |\n", nwdth, "i", 57-nwdth, "atom");
@@ -629,7 +629,7 @@ void print_clauses(samp_table_t *table){
   clause_table_t *clause_table = &(table->clause_table);
   int32_t nclauses = clause_table->num_clauses;
   char d[20];
-  uint32_t nwdth = sprintf(d, "%d", nclauses);
+  int nwdth = sprintf(d, "%"PRId32"", nclauses);
   uint32_t i;
   printf("\n-------------------------------------------------------------------------------\n");
   printf("| %-*s | weight    | %-*s|\n", nwdth, "i", 62-nwdth, "clause");
@@ -669,11 +669,11 @@ void print_clause_table(samp_table_t *table, int32_t num_vars){
   int32_t i, lit;
   for (i = 0; i < num_vars; i++){
     lit = pos_lit(i);
-    printf("lit[%d]: ", lit);
+    printf("lit[%"PRId32"]: ", lit);
     link = clause_table->watched[lit];
     print_clause_list(link, table);
     lit = neg_lit(i);
-    printf("lit[%d]: ", lit);
+    printf("lit[%"PRId32"]: ", lit);
     link = clause_table->watched[lit];
     print_clause_list(link, table);
   }
@@ -697,7 +697,7 @@ void print_state(samp_table_t *table, uint32_t round){
     printf("==============================================================\n");
     print_clause_table(table, atom_table->num_vars);
   } else if (verbosity_level > 1) {
-    printf("Generated sample %d...\n", round);
+    printf("Generated sample %"PRId32"...\n", round);
   } else if (verbosity_level > 0) {
     printf(".");
   }

@@ -405,13 +405,16 @@ int yylex (void) {
   int c;
   char str[300];
   /* skip white space  */
-  while ((c = getchar()) == ' ' || c == '\t' || c == '\n')
-    ;
+  do {
+    c = getchar();
+  } while (isspace(c));
+
   int i = 0;
   /* process numbers - note that we process for as long as it could be a
      legitimate number, but return the string, so that numbers may be used
      as arguments, but treated as names.  Number is of the form
-     ['+'|'-']d*'.'d* */
+     ['+'|'-']d*'.'d* 
+  */
   if (c == '.' || c == '-' || c == '+' || isdigit(c)) {
     int have_digit = 0;
     int have_dot = 0;

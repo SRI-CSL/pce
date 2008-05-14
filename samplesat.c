@@ -199,7 +199,7 @@ int32_t add_internal_clause(samp_table_t *table,
 				      length,
 				      (int32_t *) entry->disjunct);
     clause_map->val = index;
-    // printf("\nAdded clause %d", index);
+    // printf("\nAdded clause %"PRId32"\n", index);
     return index;
   } else {//add the weight to the existing clause
     if (DBL_MAX - weight >= samp_clauses[clause_map->val]->weight){
@@ -315,7 +315,7 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
     arglen++;
   }
   if (pred_entry.arity != arglen) {
-    fprintf(stderr, "Predicate %s has arity %d\n", pred, pred_entry.arity);
+    fprintf(stderr, "Predicate %s has arity %"PRId32"\n", pred, pred_entry.arity);
     return (samp_atom_t *) NULL;
   }
   int argidx;
@@ -684,7 +684,7 @@ void scan_unsat_clauses(samp_table_t *table){
 void flip_unfixed_variable(samp_table_t *table,
 			   int32_t var){
   //  double dcost = 0;   //dcost seems unnecessary
-  printf("Flipping variable %d\n", var);
+  printf("Flipping variable %"PRId32"\n", var);
   if (assigned_true(table->atom_table.assignment[var])){
     table->atom_table.assignment[var] = v_false;
     link_propagate(table,
@@ -831,12 +831,12 @@ void fix_lit_true(samp_table_t *table, int32_t lit){
     }
   } else {
     if (is_pos(lit)){
-      cprintf(2, "Fixing %d to true\n", var);
+      cprintf(2, "Fixing %"PRId32" to true\n", var);
       table->atom_table.assignment[var] = v_fixed_true;
       table->atom_table.num_unfixed_vars--;
       link_propagate(table, neg_lit(var));
     } else {
-      cprintf(2, "Fixing %d to false\n", var);	  
+      cprintf(2, "Fixing %"PRId32" to false\n", var);	  
       table->atom_table.assignment[var] = v_fixed_false;
       table->atom_table.num_unfixed_vars--;
       link_propagate(table, pos_lit(var));
@@ -852,12 +852,12 @@ void fix_lit_false(samp_table_t *table, int32_t lit){
                            //since it is fixed true
   } else {
     if (is_pos(lit)){
-      cprintf(2, "Fixing %d to true\n", var);
+      cprintf(2, "Fixing %"PRId32" to true\n", var);
       table->atom_table.assignment[var] = v_fixed_false;
       table->atom_table.num_unfixed_vars--;
       link_propagate(table, pos_lit(var));
     } else {
-      cprintf(2, "Fixing %d to false\n", var);	  
+      cprintf(2, "Fixing %"PRId32" to false\n", var);	  
       table->atom_table.assignment[var] = v_fixed_true;
       table->atom_table.num_unfixed_vars--;
       link_propagate(table, neg_lit(var)); 
@@ -1049,20 +1049,20 @@ int32_t substit(samp_rule_t *rule,
   int32_t i;
   for(i=0; i<rule->num_vars; i++){
     if (substs[i].const_index == -1) {
-      fprintf(stderr, "substit: Not enough constants - %d given, %d required\n",
+      fprintf(stderr, "substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
 	      i, rule->num_vars);
       return -1;
     }
     int32_t vsort = rule->vars[i]->sort_index;
     int32_t csort = const_sort_index(substs[i].const_index, const_table);
     if (vsort != csort) {
-      fprintf(stderr, "substit: Constant/variable sorts do not match at %d\n",
+      fprintf(stderr, "substit: Constant/variable sorts do not match at %"PRId32"\n",
 	      i);
       return -1;
     }
   }
   if(substs[i].const_index != -1) {
-    fprintf(stderr, "substit: Too many constants - %d given, %d required\n",
+    fprintf(stderr, "substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
 	    i, rule->num_vars);
       return -1;
   }

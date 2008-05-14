@@ -21,7 +21,7 @@ void dump_sort_table (samp_table_t *table) {
   const_table_t *const_table = &(table->const_table);
   // First get the sort length
   int i, j;
-  int32_t slen = 4;
+  int slen = 4;
   for (i=0; i<sort_table->num_sorts; i++) {
     slen = imax(slen, strlen(sort_table->entries[i].name));
   }
@@ -105,7 +105,7 @@ void dump_clause_table (samp_table_t *table) {
   print_clauses(table);
 }
 
-void print_rule (samp_rule_t *rule, samp_table_t *table, int32_t indent) {
+void print_rule (samp_rule_t *rule, samp_table_t *table, int indent) {
   pred_table_t *pred_table = &(table->pred_table);
   const_table_t *const_table = &(table->const_table);  
   int32_t j;
@@ -142,7 +142,7 @@ void dump_rule_table (samp_table_t *samp_table) {
   rule_table_t *rule_table = &(samp_table->rule_table);
   uint32_t nrules = rule_table->num_rules;
   char d[10];
-  uint32_t nwdth = sprintf(d, "%d", nrules);
+  int nwdth = sprintf(d, "%"PRIu32, nrules);
   int32_t i;
   printf("Rule Table:\n");
   printf("--------------------------------------------------------------------------------\n");
@@ -302,7 +302,7 @@ int main(){
 	  if (wt == DBL_MAX) {
 	    printf("Adding rule with MAX weight\n");
 	  } else {
-	    printf("Adding rule with weight %lf\n", wt);
+	    printf("Adding rule with weight %f\n", wt);
 	  }
 	  int32_t ruleidx = add_rule(decl->clause, decl->weight, &table);
 	  // Create instances here rather than add_rule, as this is eager
@@ -322,9 +322,9 @@ int main(){
 	printf(" sa_probability = %f\n", decl->sa_probability);
 	printf(" samp_temperature = %f\n", decl->samp_temperature);
 	printf(" rvar_probability = %f\n", decl->rvar_probability);
-	printf(" max_flips = %d\n", decl->max_flips);
-		printf(" max_flips = %d\n", decl->max_extra_flips);
-	printf(" max_samples = %d\n", decl->max_samples);
+	printf(" max_flips = %"PRId32"\n", decl->max_flips);
+	printf(" max_flips = %"PRId32"\n", decl->max_extra_flips);
+	printf(" max_samples = %"PRId32"\n", decl->max_samples);
 	mc_sat(&table, decl->sa_probability, decl->samp_temperature,
 	       decl->rvar_probability, decl->max_flips,
 	       decl->max_extra_flips, decl->max_samples);
@@ -355,7 +355,7 @@ int main(){
       case VERBOSITY: {
 	input_verbositydecl_t *decl = (input_verbositydecl_t *) input_command->decl;
 	set_verbosity_level(decl->level);
-	printf("Setting verbosity to %d\n", decl->level);
+	printf("Setting verbosity to %"PRId32"\n", decl->level);
 	safe_free(decl);
 	break;
       }
