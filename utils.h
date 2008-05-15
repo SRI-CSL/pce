@@ -389,6 +389,9 @@ extern void reset_sort_table(sort_table_t *sort_table);
 
 extern void add_sort(sort_table_t *sort_table, char *name);
 
+extern int32_t add_pred(pred_table_t *pred_table, char *name, bool evidence,
+			int32_t arity, sort_table_t *sort_table, char **in_signature);
+
 extern int32_t sort_name_index(char *name, sort_table_t *sort_table);
 
 extern int32_t *sort_signature(char **in_signature, int32_t arity, sort_table_t *sort_table);

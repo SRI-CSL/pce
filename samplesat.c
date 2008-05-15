@@ -177,21 +177,21 @@ int32_t add_internal_clause(samp_table_t *table,
 			    int32_t length,
 			    double weight){
   uint32_t i;
-  int_array_sort(clause, length);
-  clause_table_t *clause_table = &(table->clause_table);
-  samp_clause_t **samp_clauses = clause_table->samp_clauses;
+  clause_table_t *clause_table;
+  samp_clause_t **samp_clauses;
   array_hmap_pair_t *clause_map;
-  clause_map = array_size_hmap_find(&(clause_table->clause_hash),
-				    length,
-				    (int32_t *) clause);
+
+  clause_table = &table->clause_table;
+  int_array_sort(clause, length);
+  clause_map = array_size_hmap_find(&(clause_table->clause_hash), length, (int32_t *) clause);
   if (clause_map == NULL){
     clause_table_resize(clause_table);
     if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < length){
       out_of_memory();
     }
     int32_t index = clause_table->num_clauses++;
-    samp_clause_t *entry = (samp_clause_t *) 
-      safe_malloc(sizeof(samp_clause_t) + length * sizeof(int32_t));
+    samp_clause_t *entry = (samp_clause_t *) safe_malloc(sizeof(samp_clause_t) + length * sizeof(int32_t));
+    samp_clauses = clause_table->samp_clauses;
     samp_clauses[index] = entry;
     entry->numlits = length;
     entry->weight = weight;
@@ -199,13 +199,12 @@ int32_t add_internal_clause(samp_table_t *table,
     for (i=0; i < length; i++){
       entry->disjunct[i] = clause[i];
     }
-    clause_map = array_size_hmap_get(&(clause_table->clause_hash),
-				      length,
-				      (int32_t *) entry->disjunct);
+    clause_map = array_size_hmap_get(&clause_table->clause_hash, length, (int32_t *) entry->disjunct);
     clause_map->val = index;
     // printf("\nAdded clause %"PRId32"\n", index);
     return index;
   } else {//add the weight to the existing clause
+    samp_clauses = clause_table->samp_clauses;
     if (DBL_MAX - weight >= samp_clauses[clause_map->val]->weight){
       samp_clauses[clause_map->val]->weight += weight;
     } else {
@@ -324,9 +323,9 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
     return (samp_atom_t *) NULL;
   }
   int argidx;
-  int32_t size = pred_entry.arity * sizeof(int32_t);
+  //  int32_t size = pred_entry.arity * sizeof(int32_t);
   // Create a new atom - note that we will need to free it if there is an error
-  samp_atom_t * new_atom = (samp_atom_t *) safe_malloc(size);
+  samp_atom_t * new_atom = (samp_atom_t *) safe_malloc(sizeof(samp_atom_t) + pred_entry.arity * sizeof(int32_t));
   new_atom->pred = pred_idx;
   for (argidx=0; argidx<arglen; argidx++) {
     int32_t varidx = -1;
@@ -1131,7 +1130,7 @@ int32_t substit(samp_rule_t *rule,
 void all_ground_instances_rec(int32_t vidx,
 			      samp_rule_t *rule,
 			      samp_table_t *table) {
-  if(substit_buffer.entries[vidx].fixed){
+  if(substit_buffer.entries[vidx].fixed) {
     // Simply do the substitution, or go to the next var
     if (vidx == rule->num_vars - 1) {
       substit_buffer.entries[vidx+1].const_index = -1;
@@ -1324,28 +1323,28 @@ void restore_sat_dead_clauses(clause_table_t *clause_table,
 			      samp_clause_t *link,
 			      samp_clause_t **link_ptr){
   int32_t lit, val;
-  samp_clause_t *next;
+  samp_clause_t *next; //BD
   while (link != NULL){//restore satisfied dead_clauses to watched
     val = eval_clause(assignment, link);
     if (val != -1) {
-      printf("---> restoring dead clause %p (val = %"PRId32")\n", link, val);
+      printf("---> restoring dead clause %p (val = %"PRId32")\n", link, val); //BD
       lit = link->disjunct[val];
       link->disjunct[val] = link->disjunct[0];
       link->disjunct[0] = lit;
-      //      *link_ptr = link->link;
-      next = link->link;
+      //      *link_ptr = link->link;  // commented that out
+      next = link->link; // BD
       link->link = clause_table->watched[lit];
       clause_table->watched[lit] = link;
       //      link = *link_ptr;
-      link = next;
+      link = next;  // BD
     } else {
-      printf("---> dead clause %p stays dead (val = %"PRId32")\n", link, val);
-      *link_ptr = link;
+      printf("---> dead clause %p stays dead (val = %"PRId32")\n", link, val);  //BD 
+      *link_ptr = link;        // BD
       link_ptr = &(link->link);
       link = link->link;
     }
   }
-  *link_ptr = NULL;
+  *link_ptr = NULL; // BD
 }
 
 void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
@@ -1368,7 +1367,6 @@ void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
       link = next;
       //link = *link_ptr;
     } else {
-      *link_ptr = link;
       link_ptr = &(link->link);
       link = link->link;
     }

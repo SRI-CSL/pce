@@ -363,11 +363,11 @@ static void pred_tbl_resize(pred_tbl_t *pred_tbl){//call this extend, not resize
 }
 
 int32_t add_pred(pred_table_t *pred_table,
-	      char *name,
-	      bool evidence,
-	      int32_t arity,
-	      sort_table_t *sort_table,
-	      char **in_signature){
+		 char *name,
+		 bool evidence,
+		 int32_t arity,
+		 sort_table_t *sort_table,
+		 char **in_signature){
   int32_t * signature = sort_signature(in_signature, arity, sort_table);
   if (signature == NULL && in_signature != NULL){
     printf("\nInput signature contains undeclared sort.");
@@ -379,8 +379,8 @@ int32_t add_pred(pred_table_t *pred_table,
     printf("\nEmpty predicate name is not allowed.");
     return -1;
   }
-  if (index == -1){//pred is not in the symbol table  (Change to stbl_rec_t *)
-    if (evidence){
+  if (index == -1) { //pred is not in the symbol table  (Change to stbl_rec_t *)
+    if (evidence) {
       pred_tbl = &(pred_table->evpred_tbl);
       index = 2 * pred_tbl->num_preds;
     } else {
@@ -398,8 +398,11 @@ int32_t add_pred(pred_table_t *pred_table,
     pred_tbl->entries[n].size_atoms = 0;
     pred_tbl->entries[n].num_atoms = 0;
     pred_tbl->entries[n].atoms = NULL;
+    pred_tbl->entries[n].size_rules = 0;
+    pred_tbl->entries[n].num_rules = 0;
+    pred_tbl->entries[n].rules = NULL;
     pred_tbl->num_preds++;
-    stbl_add(&(pred_table->pred_name_index), name, index);//note index is never -1
+    stbl_add(&(pred_table->pred_name_index), name, index); //note index is never -1
     //printf("\nAdded predicate index %"PRId32" with name %s, hashindex %"PRId32", arity %"PRId32", and signature:",
     //   n, name, index, arity);
     //printf("\nhashindex[%s] = %"PRId32"",
@@ -447,6 +450,8 @@ void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
 }
 
 void init_atom_table(atom_table_t *table){
+  uint32_t i;
+
   table->size = INIT_ATOM_TABLE_SIZE;
   table->num_vars = 0; //atoms are positive
   table->num_unfixed_vars = 0;
@@ -461,41 +466,46 @@ void init_atom_table(atom_table_t *table){
   table->current_assignment = 0;
   table->pmodel = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
   
-  uint32_t i;
-  for (i = 0; i < table->size; i++)
+  for (i = 0; i < table->size; i++) {
     table->pmodel[i] = 0;//was -1
+  }
   table->num_samples = 0;
   init_array_hmap(&(table->atom_var_hash), ARRAY_HMAP_DEFAULT_SIZE);
   //  table->entries[0].atom = (samp_atom_t *) safe_malloc(sizeof(samp_atom_t));
   //  table->entries[0].atom->pred = 0;
 }
 
+
 /*
  * When atom_table is resized, the watched literals must also be resized. 
  */
 void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
-  int32_t size = atom_table->size;
-  int32_t num_vars = atom_table->num_vars;
+  int32_t size, num_vars, i;
+
+  num_vars = atom_table->num_vars;
+  size = atom_table->size;
   if (num_vars < size) return;
+
   if (MAXSIZE(sizeof(atom_entry_t), 0) - size <= (size/2)){
     out_of_memory();
   }
   size += size/2;
-  atom_table->atom = (samp_atom_t **) safe_realloc(atom_table->atom,
-					     size * sizeof(samp_atom_t *));
-  atom_table->assignment[0] = (samp_truth_value_t *) safe_realloc(atom_table->assignment[0],
-					     size * sizeof(samp_truth_value_t));
-  atom_table->assignment[1] = (samp_truth_value_t *) safe_realloc(atom_table->assignment[1],
-					     size * sizeof(samp_truth_value_t));
-  atom_table->pmodel = (int32_t *) safe_realloc(atom_table->pmodel,
-					       size * sizeof(int32_t));
-  atom_table->size = size;
+  atom_table->atom = (samp_atom_t **) safe_realloc(atom_table->atom, size * sizeof(samp_atom_t *));
+  atom_table->assignment[0] = (samp_truth_value_t *) 
+    safe_realloc(atom_table->assignment[0], size * sizeof(samp_truth_value_t));
+  atom_table->assignment[1] = (samp_truth_value_t *) 
+    safe_realloc(atom_table->assignment[1], size * sizeof(samp_truth_value_t));
+  atom_table->pmodel = (int32_t *) safe_realloc(atom_table->pmodel, size * sizeof(int32_t));
 
   if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= size){
     out_of_memory();
   }
-  clause_table->watched = (samp_clause_t **) safe_realloc(clause_table->watched,
-							  2*size*sizeof(samp_clause_t *));
+  clause_table->watched = (samp_clause_t **) safe_realloc(clause_table->watched, 2*size*sizeof(samp_clause_t *));
+
+  for (i = atom_table->size; i < size; i++) {
+    atom_table->pmodel[i] = 0;//was -1
+  }
+  atom_table->size = size;
 }
 
 
@@ -519,17 +529,20 @@ void init_clause_table(clause_table_t *table){
   table->num_unsat_clauses = 0;
 }
 
+/*
+ * Check whether there's room for one more clause in clause_table.
+ * - if not, make the table larger
+ */
 void clause_table_resize(clause_table_t *clause_table){
   int32_t size = clause_table->size;
   int32_t num_clauses = clause_table->num_clauses;
-  if (num_clauses < size) return;
+  if (num_clauses + 1 < size) return;
   if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= (size/2)){
     out_of_memory();
   }
   size += size/2;
-  clause_table->samp_clauses = (samp_clause_t **)
-    safe_realloc(clause_table->samp_clauses,
-		 size * sizeof(samp_clause_t *));
+  clause_table->samp_clauses = 
+    (samp_clause_t **) safe_realloc(clause_table->samp_clauses, size * sizeof(samp_clause_t *));
   clause_table->size = size; 
 }
 
