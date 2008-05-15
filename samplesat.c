@@ -91,7 +91,7 @@ int32_t add_internal_atom(samp_table_t *table,
       atom_table->assignment[0][current_atom_index] = v_fixed_false;
       atom_table->assignment[1][current_atom_index] = v_fixed_false;
     } else {//set pmodel to 0
-      atom_table->pmodel[current_atom_index] = 0;
+      atom_table->pmodel[current_atom_index] = atom_table->num_samples/2;
       atom_table->assignment[0][current_atom_index] = v_false;
       atom_table->assignment[1][current_atom_index] = v_false;
     }
