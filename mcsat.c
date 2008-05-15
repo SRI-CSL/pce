@@ -12,8 +12,8 @@
 
 bool nonstrict = 0;
 
-extern input_command_t * input_command;
 extern int yyparse ();
+extern void free_parse_data();
 //extern int yydebug;
 
 void dump_sort_table (samp_table_t *table) {
@@ -172,6 +172,7 @@ void test (samp_table_t *table) {
   dump_clause_table(table);
 }
 
+
 int main(){
   samp_table_t table;
   init_samp_table(&table);
@@ -191,16 +192,16 @@ int main(){
     printf("mcsat> ");
     // yyparse returns 0 and sets input_command if no syntax errors
     if (yyparse() == 0)
-      switch (input_command->kind) {
+      switch (input_command.kind) {
       case PREDICATE: {
 	int err = 0;
-	input_preddecl_t * decl = (input_preddecl_t *) input_command->decl;
-	char * pred = decl->atom->pred;
+	input_preddecl_t decl = input_command.decl.preddecl;
+	char * pred = decl.atom->pred;
 	// First the sorts - those we don't find, we add to the sort list
 	// if nonstrict is set.
 	int32_t i = 0;
 	do {
-	  char * sort = decl->atom->args[i];
+	  char * sort = decl.atom->args[i];
 	  if (sort_name_index(sort, sort_table) == -1) {
 	    if (nonstrict)
 	      add_sort(sort_table, sort);
@@ -210,101 +211,101 @@ int main(){
 	    }
 	  }
 	  i += 1;
-	} while (decl->atom->args[i] != NULL);
+	} while (decl.atom->args[i] != NULL);
 	int32_t arity = i;
 
 	if (err)
 	  fprintf(stderr, "Predicate %s not added\n", pred);
 	else {
 	  printf("Adding predicate %s\n", pred);
-	  add_pred(pred_table, pred, decl->witness, arity,
-		   sort_table, decl->atom->args);
+	  add_pred(pred_table, pred, decl.witness, arity,
+		   sort_table, decl.atom->args);
 	}
 	break;
       }
       case SORT: {
-	input_sortdecl_t * decl
-	  = (input_sortdecl_t *) input_command->decl; 
-	printf("Adding sort %s\n", decl->name);
-	add_sort(sort_table, decl->name);
+	input_sortdecl_t decl = input_command.decl.sortdecl;
+	printf("Adding sort %s\n", decl.name);
+	add_sort(sort_table, decl.name);
 	break;
       }
       case CONST: {
-	input_constdecl_t * decl
-	  = (input_constdecl_t *) input_command->decl;
-	if (sort_name_index(decl->sort, sort_table) == -1) {
+	input_constdecl_t decl = input_command.decl.constdecl;
+	if (sort_name_index(decl.sort, sort_table) == -1) {
 	    if (nonstrict)
-	      add_sort(sort_table, decl->sort);
+	      add_sort(sort_table, decl.sort);
 	    else {
-	      fprintf(stderr, "Sort %s has not been declared\n", decl->sort);
+	      fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
 	      break;
 	    }
 	}
 	int32_t i;
-	for (i = 0; i<decl->num_names; i++) {
+	for (i = 0; i<decl.num_names; i++) {
 	  // Need to see if name in var_table
-	  if (var_index(decl->name[i], var_table) == -1) {
-	    cprintf(1,"Adding const %s\n", decl->name[i]);
-	    if(add_const(const_table, decl->name[i],
-			 sort_table, decl->sort) != -1){
-	      int32_t cidx = const_index(decl->name[i], const_table);
+	  if (var_index(decl.name[i], var_table) == -1) {
+	    cprintf(1,"Adding const %s\n", decl.name[i]);
+	    if(add_const(const_table, decl.name[i],
+			 sort_table, decl.sort) != -1){
+	      int32_t cidx = const_index(decl.name[i], const_table);
 	      // We don't invoke this in add_const, as this is eager.
 	      create_new_const_rule_instances(cidx, &table);
 	    }
 	  }
 	  else
 	    fprintf(stderr, "%s is a variable, cannot be redeclared a constant\n",
-		    decl->name[i]);
+		    decl.name[i]);
 	}
 	break;
       }
       case VAR: {
-	input_vardecl_t * decl
-	  = (input_vardecl_t *) input_command->decl;
-	if (sort_name_index(decl->sort, sort_table) == -1) {
+	input_vardecl_t decl = input_command.decl.vardecl;
+	if (sort_name_index(decl.sort, sort_table) == -1) {
 	    if (nonstrict)
-	      add_sort(sort_table, decl->sort);
+	      add_sort(sort_table, decl.sort);
 	    else {
-	      fprintf(stderr, "Sort %s has not been declared\n", decl->sort);
+	      fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
 	      break;
 	    }
 	}
-	// Need to see if name in const_table
-	printf("Adding var %s\n", decl->name);
-	add_var(var_table, decl->name, sort_table, decl->sort);
+	int32_t i;
+	for (i=0; i<decl.num_names; i++) {
+	  // Need to see if name in const_table
+	  printf("Adding var %s\n", decl.name[i]);
+	  add_var(var_table, decl.name[i], sort_table, decl.sort);
+	}
 	break;
       }
       case ATOM: {
 	// invoke add_atom
-	input_atomdecl_t * decl = (input_atomdecl_t *) input_command->decl;
-	add_atom(&table, decl->atom);
+	input_atomdecl_t decl = input_command.decl.atomdecl;
+	add_atom(&table, decl.atom);
 	break;
       }
       case ASSERT: {
 	// Need to check that the predicate is a witness predicate,
 	// then invoke assert_atom.
-	input_assertdecl_t * decl = (input_assertdecl_t *) input_command->decl;
-	assert_atom(&table, decl->atom);
+	input_assertdecl_t decl = input_command.decl.assertdecl;
+	assert_atom(&table, decl.atom);
 	break;
       }
       case ADD: {
-	input_adddecl_t * decl = (input_adddecl_t *) input_command->decl;
-	if (decl->clause->varlen == 0) {
+	input_adddecl_t decl = input_command.decl.adddecl;
+	if (decl.clause->varlen == 0) {
 	  // No variables - adding a clause
 	  printf("Adding clause\n");
 	  add_clause(&table,
-		     decl->clause->literals,
-		     decl->weight);
+		     decl.clause->literals,
+		     decl.weight);
 	}
 	else {
 	  // Have variables - adding a rule
-	  double wt = decl->weight;
+	  double wt = decl.weight;
 	  if (wt == DBL_MAX) {
 	    printf("Adding rule with MAX weight\n");
 	  } else {
 	    printf("Adding rule with weight %f\n", wt);
 	  }
-	  int32_t ruleidx = add_rule(decl->clause, decl->weight, &table);
+	  int32_t ruleidx = add_rule(decl.clause, decl.weight, &table);
 	  // Create instances here rather than add_rule, as this is eager
 	  if (ruleidx != -1) {
 	    all_ground_instances_of_rule(ruleidx, &table);
@@ -313,22 +314,24 @@ int main(){
 	break;
       }
       case ASK: {
-	printf("Got ask\n");
+	input_askdecl_t decl = input_command.decl.askdecl;
+	assert(decl.clause->litlen == 1);
+	query_clause(decl.clause, decl.threshold, decl.all, &table);
 	break;
       }
       case MCSAT: {
-	input_mcsatdecl_t *decl = (input_mcsatdecl_t *) input_command->decl;
+	input_mcsatdecl_t decl = input_command.decl.mcsatdecl;
 	printf("Calling MCSAT with parameters:\n");
-	printf(" sa_probability = %f\n", decl->sa_probability);
-	printf(" samp_temperature = %f\n", decl->samp_temperature);
-	printf(" rvar_probability = %f\n", decl->rvar_probability);
-	printf(" max_flips = %"PRId32"\n", decl->max_flips);
-	printf(" max_flips = %"PRId32"\n", decl->max_extra_flips);
-	printf(" max_samples = %"PRId32"\n", decl->max_samples);
-	mc_sat(&table, decl->sa_probability, decl->samp_temperature,
-	       decl->rvar_probability, decl->max_flips,
-	       decl->max_extra_flips, decl->max_samples);
-	safe_free(decl);
+	printf(" sa_probability = %f\n", decl.sa_probability);
+	printf(" samp_temperature = %f\n", decl.samp_temperature);
+	printf(" rvar_probability = %f\n", decl.rvar_probability);
+	printf(" max_flips = %d\n", decl.max_flips);
+	printf(" max_extra_flips = %d\n", decl.max_extra_flips);
+	printf(" max_samples = %d\n", decl.max_samples);
+	mc_sat(&table, decl.sa_probability, decl.samp_temperature,
+	       decl.rvar_probability, decl.max_flips,
+	       decl.max_extra_flips, decl.max_samples);
+	printf("\n");
 	break;
       }
       case RESET: {
@@ -353,10 +356,9 @@ int main(){
 	break;
       }
       case VERBOSITY: {
-	input_verbositydecl_t *decl = (input_verbositydecl_t *) input_command->decl;
-	set_verbosity_level(decl->level);
-	printf("Setting verbosity to %"PRId32"\n", decl->level);
-	safe_free(decl);
+	input_verbositydecl_t decl = input_command.decl.verbositydecl;
+	set_verbosity_level(decl.level);
+	printf("Setting verbosity to %"PRId32"\n", decl.level);
 	break;
       }
       case TEST: {
@@ -391,6 +393,7 @@ int main(){
       case QUIT:
 	exit(0);
       };
+    free_parse_data();
   } while (true);
   return 0;
 }

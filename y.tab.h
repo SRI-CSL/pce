@@ -42,12 +42,13 @@
      MCSAT = 268,
      RESET = 269,
      DUMPTABLES = 270,
-     VERBOSITY = 271,
-     TEST = 272,
-     HELP = 273,
-     QUIT = 274,
-     NAME = 275,
-     NUM = 276
+     LOAD = 271,
+     VERBOSITY = 272,
+     TEST = 273,
+     HELP = 274,
+     QUIT = 275,
+     NAME = 276,
+     NUM = 277
    };
 #endif
 /* Tokens.  */
@@ -64,28 +65,30 @@
 #define MCSAT 268
 #define RESET 269
 #define DUMPTABLES 270
-#define VERBOSITY 271
-#define TEST 272
-#define HELP 273
-#define QUIT 274
-#define NAME 275
-#define NUM 276
+#define LOAD 271
+#define VERBOSITY 272
+#define TEST 273
+#define HELP 274
+#define QUIT 275
+#define NAME 276
+#define NUM 277
 
 
 
 
 #if ! defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
-#line 317 "yacc.y"
+#line 358 "yacc.y"
 typedef union YYSTYPE {
   bool bval;
   char *str;
   char **strs;
   input_clause_t *clause;
   input_literal_t *lit;
+  input_literal_t **lits;
   input_atom_t *atom;
 } YYSTYPE;
 /* Line 1447 of yacc.c.  */
-#line 89 "y.tab.h"
+#line 92 "y.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

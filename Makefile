@@ -15,7 +15,7 @@ XCFLAGS =
 
 commonobj = samplesat.o symbol_tables.o array_hash_map.o \
          int_stack.o memalloc.o hash_functions.o int_array_sort.o \
-         integer_stack.o utils.o gcd.o
+         integer_stack.o utils.o gcd.o vectors.o input.o string_heap.o
 
 mcsatobj = yacc.o mcsat.o $(commonobj)
 

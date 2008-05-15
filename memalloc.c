@@ -7,14 +7,14 @@
 #include <assert.h>
 
 #include "memalloc.h"
-#include "yices_exit_codes.h"
+#include "pce_exit_codes.h"
 
 /*
  * Fatal error: out of memory
  */
 void out_of_memory() {
   fprintf(stderr, "Out of memory\n");
-  exit(YICES_EXIT_OUT_OF_MEMORY);
+  exit(PCE_EXIT_OUT_OF_MEMORY);
 }
 
 

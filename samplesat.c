@@ -151,7 +151,7 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
 
 int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom){
   pred_table_t *pred_table = &(table->pred_table);
-  char * in_predicate = current_atom->pred;
+  char *in_predicate = current_atom->pred;
   int32_t pred_id = pred_index(in_predicate, pred_table);
   if (pred_id == -1) return -1;
   pred_id = pred_val_to_index(pred_id);
@@ -319,7 +319,8 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
     arglen++;
   }
   if (pred_entry.arity != arglen) {
-    fprintf(stderr, "Predicate %s has arity %"PRId32"\n", pred, pred_entry.arity);
+    fprintf(stderr, "Predicate %s has arity %"PRId32", but given %"PRId32" args\n",
+	    pred, pred_entry.arity, arglen);
     return (samp_atom_t *) NULL;
   }
   int argidx;
@@ -1194,7 +1195,92 @@ void create_new_const_rule_instances(int32_t constidx, samp_table_t *table) {
     }
   }
 }
+
+/* query_match compares the atom from the samplesat table to the pattern
+   atom patom.  They match if the predicates match, and if the variables
+   represented by bindings can be consistently bound.
+ */
+static bool query_match(samp_atom_t *atom, samp_atom_t *patom,
+			int32_t *bindings, samp_table_t *table) {
+  //pred_table_t *pred_table = &(table->pred_table);
+  //const_table_t *const_table = &(table->const_table);
+
+  printf("Not yet finished\n");
+  return false;
+}
+
+/* Loop through the atom table, looking for atoms matching the query clause
+   (which may have variables), that are also higher probability than the
+   threshold.  Negated literals use 1 - probability for comparison.
+   If all is true, then all matching atoms are listed, in probability order.
+   Otherwise just the highest probability match is given.
+ */
+extern void query_clause(input_clause_t *clause, double threshold, bool all,
+			 samp_table_t *table) {
+  atom_table_t *atom_table = &(table->atom_table);
+  uint32_t nvars;
+  int32_t i;
+  double prob;
+  samp_atom_t *best_atom;
+  double best_prob;
+  int32_t num_samples;
+  int32_t *bindings;
+  input_literal_t *lit;
+  samp_rule_t *samp_clause;
+  samp_atom_t *patom;
+
+  nvars = atom_table->num_vars;
+  num_samples = atom_table->num_samples;
+  best_atom = NULL;
+
+  // We preprocess the clause, to create a samp_clause and typecheck it
+  // We've already checked that there is only one literal
+  lit = clause->literals[0];
+  if (clause->varlen > 0) {
+    samp_clause = new_samp_rule(clause);
+    patom = typecheck_atom(lit->atom, samp_clause, table);
+    if (patom == NULL) {
+      // Had a type error
+      return;
+    }
+  } else {
+    // Just your basic atom - need to create patom, but don't want to
+    // enter it into the atom_table, so we can't call add_atom.
+    printf("Not yet written\n");
+    return;
+  }
+  // The bindings will be filled with the corresponding constants
+  // This allows matching, e.g., p(x, x) to p(a, a) but not p(a, b)
+  bindings = (int32_t *) safe_malloc(clause->varlen * sizeof(int32_t));
   
+  i = 0;
+  for (i = 0; i < nvars; i++) {
+    if (query_match(atom_table->atom[i], patom, bindings, table)) {
+      // Found a match, now check the threshold
+      prob = (double) (atom_table->pmodel[i]/(double) num_samples);
+      if (clause->literals[0]->neg) {prob = 1 - prob;}
+      if (prob >= threshold) {
+	if (best_atom == NULL) {
+	  best_atom = atom_table->atom[i];
+	  best_prob = prob;
+	} else if (all) {
+	  printf("ask: all not yet supported\n");
+	} else if (best_prob < prob) {
+	  best_atom = atom_table->atom[i];
+	  best_prob = prob;
+	}
+      }
+    }
+  }
+  if (best_atom == NULL) {
+    printf("No atoms found matching your query");
+  } else {
+    printf("The atom ");
+    print_atom(atom_table->atom[i], table);
+    printf(" has probability %f", best_prob);
+  }
+}
+
 
 /* Like init_sample_sat, but takes an existing state and sets it up for a
    second round of sampling
@@ -1589,14 +1675,14 @@ extern void mc_sat(samp_table_t *table, double sa_probability,
     printf("Found conflict in initialization.\n");
     return;
   }
-  //  print_state(table);  
+  //  print_state(table, 0);  
   uint32_t i;
   assert(valid_table(table));
   for (i = 0; i < max_samples; i++){
     printf("---- sample[%"PRIu32"] ---\n", i);    
     sample_sat(table, sa_probability, samp_temperature,
 	       rvar_probability, max_flips, max_extra_flips);
-    //    print_state(table);
+    //    print_state(table, i+1);
     assert(valid_table(table));
   }
   print_atoms(table);

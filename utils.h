@@ -198,7 +198,7 @@ typedef struct samp_atom_s {
 
 typedef struct input_atom_s {
   char *pred;
-  char *args[0];
+  char **args;
 } input_atom_t;
 
 typedef struct input_literal_s {
@@ -445,6 +445,8 @@ extern void rule_table_resize(rule_table_t *rule_table);
 extern void init_samp_table(samp_table_t *table);
 
 extern void print_atoms(samp_table_t *samp_table);
+
+extern void print_atom(samp_atom_t *atom, samp_table_t *table);
 
 extern void print_clauses(samp_table_t *samp_table);
 

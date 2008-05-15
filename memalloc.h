@@ -11,7 +11,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "yices_exit_codes.h"
+#include "pce_exit_codes.h"
 
 /*
  * Print an error message then call exit(YICES_EXIT_OUT_OF_MEMORY)
