@@ -306,7 +306,8 @@ typedef struct atom_table_s {
   int32_t num_vars;  //number of bvars
   int32_t num_unfixed_vars;
   samp_atom_t **atom; // atom_entry_t *entries;
-  samp_truth_value_t *assignment;
+  uint32_t current_assignment; //which of two assignment arrays is current
+  samp_truth_value_t *assignment[2];//maps atom ids to samp_truth_value_t
   int32_t num_samples;
   int32_t *pmodel;
   array_hmap_t atom_var_hash; //maps atoms to variables
