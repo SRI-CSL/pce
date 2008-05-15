@@ -1198,15 +1198,38 @@ void create_new_const_rule_instances(int32_t constidx, samp_table_t *table) {
 
 /* query_match compares the atom from the samplesat table to the pattern
    atom patom.  They match if the predicates match, and if the variables
-   represented by bindings can be consistently bound.
+   represented by bindings (initially all -1) can be consistently bound.
+   Note that this modifies the bindings.
  */
 static bool query_match(samp_atom_t *atom, samp_atom_t *patom,
 			int32_t *bindings, samp_table_t *table) {
-  //pred_table_t *pred_table = &(table->pred_table);
-  //const_table_t *const_table = &(table->const_table);
+  pred_table_t *pred_table = &(table->pred_table);
+  int32_t i;
+  int32_t vidx;
 
-  printf("Not yet finished\n");
-  return false;
+  if (atom->pred != patom->pred) {
+    return false;
+  }
+  i = 0;
+  for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
+    if (atom->args[i] != patom->args[i]) {
+      if (patom->args[i] >= 0) {
+	// It's a different constant - no match
+	return false;
+      } else {
+	// See if the variable is bound - the index is -(arg + 1)
+	vidx = -(patom->args[i] + 1);
+	if (bindings[vidx] >= 0) {
+	  if (bindings[vidx] != atom->args[i]) {
+	    return false;
+	  }
+	} else {
+	  bindings[vidx] = atom->args[i];
+	}
+      }
+    }
+  }
+  return true;
 }
 
 /* Loop through the atom table, looking for atoms matching the query clause

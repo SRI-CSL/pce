@@ -226,7 +226,11 @@ int yylex (void);
  */
 void yy_mcsatdecl (char **params) {
   int32_t arglen = 0;
-  while (arglen <= 6 && (params[arglen] != NULL)) {arglen++;}
+  if (params != NULL) {
+    while (arglen <= 6 && (params[arglen] != NULL)) {
+      arglen++;
+    }
+  }
   if (arglen > 6) {
     yyerror("mcsat: too many args");
   }
@@ -567,14 +571,25 @@ int yylex (void) {
 
 void free_strings (char **string) {
   int32_t i;
-  while (string[i] != NULL) {safe_free(string[i]); i++;}
+
+  i = 0;
+  if (string != NULL) {
+    while (string[i] != NULL) {
+      safe_free(string[i]);
+      i++;
+    }
+  }
 }
 
 void free_atom(input_atom_t *atom) {
   int32_t i;
-  
+
+  i = 0;
   safe_free(atom->pred);
-  while (atom->args[i] != NULL) {safe_free(atom->args[i]); i++;}
+  while (atom->args[i] != NULL) {
+    safe_free(atom->args[i]);
+    i++;
+  }
   safe_free(atom);
 }
 
@@ -585,7 +600,12 @@ void free_literal(input_literal_t *lit) {
 
 void free_literals (input_literal_t **lit) {
   int32_t i;
-  while (lit[i] != NULL) {free_literal(lit[i]); i++;}
+
+  i = 0;
+  while (lit[i] != NULL) {
+    free_literal(lit[i]);
+    i++;
+  }
   safe_free(lit);
 }
 
