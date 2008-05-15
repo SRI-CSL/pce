@@ -79,7 +79,9 @@ input_clause_t *yy_clause(char **vars, input_literal_t **lits) {
   int32_t litlen = 0;
 
   clause = (input_clause_t *) safe_malloc(sizeof(input_clause_t));
-  while (vars[varlen] != NULL) {varlen++;}
+  if (vars != NULL) {
+    while (vars[varlen] != NULL) {varlen++;}
+  }
   clause->varlen = varlen;
   clause->variables = vars;
   while (lits[litlen] != NULL) {litlen++;}
