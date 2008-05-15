@@ -62,12 +62,12 @@ extern int32_t get_fixable_literal(samp_truth_value_t *assignment,
 
 extern void scan_unsat_clauses(samp_table_t *table);
 
-extern void negative_unit_propagate(samp_table_t *table);
+extern int32_t negative_unit_propagate(samp_table_t *table);
   
 extern void init_random_assignment(samp_truth_value_t *assignment, int32_t num_vars,
 				   int32_t *num_unfixed_vars);
 
-extern void init_sample_sat(samp_table_t *table);
+extern int32_t init_sample_sat(samp_table_t *table);
 
 bool valid_atom_table(atom_table_t *atom_table,
 		      pred_table_t *pred_table,
@@ -76,7 +76,7 @@ bool valid_atom_table(atom_table_t *atom_table,
 
 bool valid_table(samp_table_t *table);
 
-void reset_sample_sat(samp_table_t *table);
+int32_t reset_sample_sat(samp_table_t *table);
 
 void sample_sat_body(samp_table_t *table, double sa_probability,
 		     double samp_temperature, double rvar_probability);
