@@ -1265,15 +1265,15 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
       // Had a type error
       return;
     }
+    // The bindings will be filled with the corresponding constants
+    // This allows matching, e.g., p(x, x) to p(a, a) but not p(a, b)
+    bindings = (int32_t *) safe_malloc(clause->varlen * sizeof(int32_t));
   } else {
     // Just your basic atom - need to create patom, but don't want to
     // enter it into the atom_table, so we can't call add_atom.
     printf("Not yet written\n");
     return;
   }
-  // The bindings will be filled with the corresponding constants
-  // This allows matching, e.g., p(x, x) to p(a, a) but not p(a, b)
-  bindings = (int32_t *) safe_malloc(clause->varlen * sizeof(int32_t));
   
   i = 0;
   for (i = 0; i < nvars; i++) {
@@ -1297,9 +1297,13 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
   if (best_atom == NULL) {
     printf("No atoms found matching your query");
   } else {
-    printf("The atom ");
-    print_atom(atom_table->atom[i], table);
-    printf(" has probability %f", best_prob);
+    printf("atom ");
+    print_atom(best_atom, table);
+    printf(" has probability % 5.3f\n", best_prob);
+  }
+  if (clause->varlen > 0) {
+    safe_free(bindings);
+    safe_free(patom);
   }
 }
 
