@@ -454,9 +454,13 @@ void init_atom_table(atom_table_t *table){
     out_of_memory();
   }
   table->atom = (samp_atom_t **) safe_malloc(table->size * sizeof(samp_atom_t *));
-  table->assignment = (samp_truth_value_t *)
+  table->assignment[0] = (samp_truth_value_t *)
     safe_malloc(table->size * sizeof(samp_truth_value_t));
+  table->assignment[1] = (samp_truth_value_t *)
+    safe_malloc(table->size * sizeof(samp_truth_value_t));
+  table->current_assignment = 0;
   table->pmodel = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
+  
   uint32_t i;
   for (i = 0; i < table->size; i++)
     table->pmodel[i] = 0;//was -1
@@ -479,7 +483,9 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
   size += size/2;
   atom_table->atom = (samp_atom_t **) safe_realloc(atom_table->atom,
 					     size * sizeof(samp_atom_t *));
-  atom_table->assignment = (samp_truth_value_t *) safe_realloc(atom_table->assignment,
+  atom_table->assignment[0] = (samp_truth_value_t *) safe_realloc(atom_table->assignment[0],
+					     size * sizeof(samp_truth_value_t));
+  atom_table->assignment[1] = (samp_truth_value_t *) safe_realloc(atom_table->assignment[1],
 					     size * sizeof(samp_truth_value_t));
   atom_table->pmodel = (int32_t *) safe_realloc(atom_table->pmodel,
 					       size * sizeof(int32_t));
@@ -586,7 +592,7 @@ void print_atoms(samp_table_t *table){
   printf("| %*s | tval | prob   | %-*s |\n", nwdth, "i", 57-nwdth, "atom");
   printf("--------------------------------------------------------------------------------\n");
   for (i = 0; i < nvars; i++){
-    samp_truth_value_t tv = atom_table->assignment[i];
+    samp_truth_value_t tv = atom_table->assignment[atom_table->current_assignment][i];
     printf("| %-*u | %-4s | % 5.3f | ", nwdth, i, samp_truth_value_string(tv),
 	   ((double) atom_table->pmodel[i])/num_samples);
     print_atom(atom_table->atom[i], table);
@@ -787,29 +793,29 @@ bool assigned_fixed_false_lit(samp_truth_value_t *assignment,
  */
 bool valid_sort_table(sort_table_t *sort_table){
   if (sort_table->size < 0 || sort_table->num_sorts > sort_table->size)
-    return 0;
+    return false;
   uint32_t i = 0;
   while (i < sort_table->num_sorts &&
 	 i == stbl_find(&(sort_table->sort_name_index),
 			sort_table->entries[i].name))
     i++;
-  if (i < sort_table->num_sorts) return 0;
-  return 1;
+  if (i < sort_table->num_sorts) return false;
+  return true;
 }
 
 /* Checks that the const names are hashed to the right index.
  */
 bool valid_const_table(const_table_t *const_table, sort_table_t *sort_table){
   if (const_table->size < 0 || const_table->num_consts > const_table->size)
-    return 0;
+    return false;
   uint32_t i = 0;
   while (i < const_table->num_consts &&
 	 i == stbl_find(&(const_table->const_name_index),
 			const_table->entries[i].name) &&
 	 const_table->entries[i].sort_index < sort_table->num_sorts)
     i++;
-  if (i < const_table->num_consts) return 0;
-  return 1;
+  if (i < const_table->num_consts) return false;
+  return true;
 }
 
 /* Checks that evpred and pred names are hashed to the right index, and
@@ -822,27 +828,27 @@ bool valid_pred_table(pred_table_t *pred_table,
   pred_tbl_t *evpred_tbl = &(pred_table->evpred_tbl);
   if (evpred_tbl->size < 0 ||
       evpred_tbl->num_preds > evpred_tbl->size)
-    return 0;
+    return false;
   uint32_t i = 0;
   uint32_t j;
   pred_entry_t *entry;
   while (i < evpred_tbl->num_preds){
     entry = &(evpred_tbl->entries[i]);
     if (-i != pred_val_to_index(pred_index(entry->name, pred_table)))
-      return 0;
-    if (entry->arity < 0) return 0;
+      return false;
+    if (entry->arity < 0) return false;
     for (j = 0; j < entry->arity; j ++){
       if (entry->signature[j] < 0 ||
 	  entry->signature[j] >= sort_table->num_sorts)
-	return 0;
+	return false;
     }
     if (entry->size_atoms < 0 || entry->num_atoms > entry-> size_atoms)
-      return 0;
+      return false;
     for (j = 0; j < entry->num_atoms; j++){
       if (entry->atoms[j] < 0 ||
 	  entry->atoms[j] >= atom_table->num_vars ||
 	  atom_table->atom[entry->atoms[j]]->pred != -i)
-	return 0;
+	return false;
     }
     i++;
   }
@@ -850,29 +856,29 @@ bool valid_pred_table(pred_table_t *pred_table,
   pred_tbl_t *pred_tbl = &(pred_table->pred_tbl);
   if (pred_tbl->size < 0 ||
       pred_tbl->num_preds > pred_tbl->size)
-    return 0;
+    return false;
   i = 0;
   while (i < pred_tbl->num_preds){
     entry = &(pred_tbl->entries[i]);
     if (i != pred_val_to_index(pred_index(entry->name, pred_table)))
-      return 0;
-    if (entry->arity < 0) return 0;
+      return false;
+    if (entry->arity < 0) return false;
     for (j = 0; j < entry->arity; j ++){
       if (entry->signature[j] < 0 ||
 	  entry->signature[j] >= sort_table->num_sorts)
-	return 0;
+	return false;
     }
     if (entry->size_atoms < 0 || entry->num_atoms > entry-> size_atoms)
-      return 0;
+      return false;
     for (j = 0; j < entry->num_atoms; j++){
       if (entry->atoms[j] < 0 ||
 	  entry->atoms[j] >= atom_table->num_vars ||
 	  atom_table->atom[entry->atoms[j]]->pred != i)
-	return 0;
+	return false;
     }
     i++;
   }
-    return 1;
+    return true;
 }
 
 /* Checks that each atom is well-formed. 
@@ -883,7 +889,7 @@ bool valid_atom_table(atom_table_t *atom_table,
 		      sort_table_t *sort_table){
   if (atom_table->size < 0 ||
       atom_table->num_vars > atom_table->size)
-    return 0;
+    return false;
   uint32_t i = 0;
   uint32_t j;
   int32_t pred, arity;
@@ -895,7 +901,7 @@ bool valid_atom_table(atom_table_t *atom_table,
     for (j = 0; j < arity; j++){
       if (const_table->entries[atom_table->atom[i]->args[j]].sort_index !=
 	  sig[j])
-	return 0;
+	return false;
     }
     array_hmap_pair_t *hmap_pair;
     hmap_pair = array_size_hmap_find(&(atom_table->atom_var_hash),
@@ -903,10 +909,10 @@ bool valid_atom_table(atom_table_t *atom_table,
 				     (int32_t *) atom_table->atom[i]);
     if (hmap_pair == NULL ||
 	hmap_pair->val != i)
-      return 0;
+      return false;
     i++;
   }
-  return 1;
+  return true;
 }
 
 
@@ -935,29 +941,29 @@ int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
 
 bool valid_clause_table(clause_table_t *clause_table,
 			atom_table_t *atom_table){
-  samp_truth_value_t *assignment = atom_table->assignment;
+  samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
   //check that every clause in the unsat list is unsat
   samp_clause_t *link;
   int32_t lit;
   uint32_t i, j;
-  if (clause_table->size < 0) return 0;
+  if (clause_table->size < 0) return false;
   if (clause_table->num_clauses < 0 || clause_table->num_clauses > clause_table->size)
-    return 0;
+    return false;
   link = clause_table->unsat_clauses;
   i = 0;
   while (link !=NULL){
     if (eval_clause(assignment, link) != -1)
-      return 0;
+      return false;
     i++;
     link = link->link;
   }
-  if (i != clause_table->num_unsat_clauses) return 0;
+  if (i != clause_table->num_unsat_clauses) return false;
 
   //check negative_or_unit_clauses
   link = clause_table->negative_or_unit_clauses;
   while (link != NULL){
     if (link->weight >= 0 &&
-	link->numlits != 1) return 0;
+	link->numlits != 1) return false;
     link = link->link;
   }
 
@@ -965,7 +971,7 @@ bool valid_clause_table(clause_table_t *clause_table,
   link = clause_table->dead_negative_or_unit_clauses;
   while (link != NULL){
     if (link->weight >= 0 &&
-	link->numlits != 1) return 0;
+	link->numlits != 1) return false;
     link = link->link;
   }
 
@@ -976,17 +982,17 @@ bool valid_clause_table(clause_table_t *clause_table,
     lit = pos_lit(i);
     link = clause_table->watched[lit];
     if (link != NULL && !assigned_true(assignment[i]))
-      return 0;
+      return false;
     while (link != NULL){
-      if (link->disjunct[0] != lit) return 0;
+      if (link->disjunct[0] != lit) return false;
       link = link->link;
     }
     lit = neg_lit(i);
     link = clause_table->watched[lit];
     if (link != NULL && !assigned_false(assignment[i]))
-      return 0;
+      return false;
     while (link != NULL){
-      if (link->disjunct[0] != lit) return 0;
+      if (link->disjunct[0] != lit) return false;
       link = link->link;
     }
   }
@@ -995,21 +1001,21 @@ bool valid_clause_table(clause_table_t *clause_table,
   link = clause_table->sat_clauses;
   while (link != NULL){
     if (!assigned_fixed_true_lit(assignment, link->disjunct[0]))
-      return 0;
+      return false;
     link = link->link;
   }
   samp_clause_t *clause;
   //check all the clauses to see if they are properly indexed
   for (i = 0; i < clause_table->num_clauses; i++){
     clause = clause_table->samp_clauses[i];
-    if (clause->numlits < 0) return 0;
+    if (clause->numlits < 0) return false;
     for (j = 0; j < clause->numlits; j++){
       if (var_of(clause->disjunct[j]) < 0 ||
 	  var_of(clause->disjunct[j]) >= atom_table->num_vars)
-	return 0;
+	return false;
     }
   }
-  return 1;
+  return true;
 }
 
 bool valid_table(samp_table_t *table){
@@ -1019,12 +1025,12 @@ bool valid_table(samp_table_t *table){
   pred_table_t *pred_table = &(table->pred_table);
   clause_table_t *clause_table = &(table->clause_table);
 
-  if (!valid_sort_table(sort_table)) return 0;
-  if (!valid_const_table(const_table, sort_table)) return 0;
-  if (!valid_pred_table(pred_table, sort_table, atom_table)) return 0;
-  if (!valid_atom_table(atom_table, pred_table, const_table, sort_table)) return 0;
-  if (!valid_clause_table(clause_table, atom_table)) return 0;
-  return 1;
+  if (!valid_sort_table(sort_table)) return false;
+  if (!valid_const_table(const_table, sort_table)) return false;
+  if (!valid_pred_table(pred_table, sort_table, atom_table)) return false;
+  if (!valid_atom_table(atom_table, pred_table, const_table, sort_table)) return false;
+  if (!valid_clause_table(clause_table, atom_table)) return false;
+  return true;
 }
 
 substit_buffer_t substit_buffer = {0, NULL};
