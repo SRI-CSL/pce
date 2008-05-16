@@ -1,0 +1,80 @@
+sort File_t;
+sort Email_t;
+sort Task_t;
+
+const fi8, fi22, fi23, fi25, fi29, fi34,
+      fi42, fi48, fi54, fi56, fi57, fi60, fi75: File_t;
+const em15, em21, em26, em28, em31, em33, em38, em45,
+      em47, em49, em53, em58, em80, em95, em99, em101: Email_t;
+const ta1, ta2, ta3: Task_t;
+
+predicate attached(File_t, Email_t) direct;
+predicate fileHasTask(File_t, Task_t) indirect;
+predicate emailHasTask(Email_t, Task_t) indirect;
+
+add (File, Email, Task)
+    ~fileHasTask(File, Task) | ~attached(File, Email)
+      | emailHasTask(Email, Task)
+    2.1972245773362196;
+add (File, Email, Task)
+    ~emailHasTask(Email, Task) | ~attached(File, Email)
+      | fileHasTask(File, Task)
+    2.1972245773362196;
+
+assert attached(fi57, em45);
+assert attached(fi56, em49);
+assert attached(fi54, em38);
+assert attached(fi42, em58);
+assert attached(fi34, em31);
+assert attached(fi29, em28);
+assert attached(fi25, em26);
+assert attached(fi23, em21);
+assert attached(fi22, em21);
+assert attached(fi60, em15);
+assert attached(fi8, em33);
+assert attached(fi48, em47);
+assert attached(fi42, em53);
+assert fileHasTask(fi8, ta1);
+assert fileHasTask(fi60, ta1);
+assert fileHasTask(fi61, ta1);
+assert fileHasTask(fi77, ta2);
+
+add fileHasTask(fi22, ta1)  1.2862111090030799;
+add fileHasTask(fi22, ta2)  -2.0871274664181048;
+add fileHasTask(fi22, ta3)  -2.1307845256555384;
+add fileHasTask(fi23, ta1)  0.5693234193738367;
+add fileHasTask(fi23, ta2)  -1.4830860916744948;
+add fileHasTask(fi23, ta3)  -1.5407159479549797;
+add fileHasTask(fi42, ta1)  -3.849130452004954;
+add fileHasTask(fi42, ta2)  3.4077582529467834;
+add fileHasTask(fi42, ta3)  -4.480597688285065;
+add fileHasTask(fi48, ta1)  -9.5;
+add fileHasTask(fi48, ta2)  9.5;
+add fileHasTask(fi48, ta3)  -9.5;
+add fileHasTask(fi57, ta1)  -9.5;
+add fileHasTask(fi57, ta2)  9.5;
+add fileHasTask(fi57, ta3)  -9.5;
+add fileHasTask(fi75, ta1)  -9.5;
+add fileHasTask(fi75, ta2)  9.5;
+add fileHasTask(fi75, ta3)  -9.5;
+add emailHasTask(em38, ta1)  1.5668742272438896;
+add emailHasTask(em38, ta2)  -1.6903692459508781;
+add emailHasTask(em38, ta3)  -4.061282835744317;
+add emailHasTask(em58, ta1)  9.5;
+add emailHasTask(em58, ta2)  -9.5;
+add emailHasTask(em58, ta3)  -9.5;
+add emailHasTask(em80, ta1)  1.4628828144401778;
+add emailHasTask(em80, ta2)  -1.569578998455429;
+add emailHasTask(em80, ta3)  -4.135014723969557;
+add emailHasTask(em95, ta1)  2.6347091839627526;
+add emailHasTask(em95, ta2)  -2.898299392438496;
+add emailHasTask(em95, ta3)  -4.205096320495012;
+add emailHasTask(em99, ta1)  6.244719378787958;
+add emailHasTask(em99, ta2)  -6.279004838729199;
+add emailHasTask(em99, ta3)  -9.5;
+add emailHasTask(em101, ta1)  1.8366658457553626;
+add emailHasTask(em101, ta2)  -2.071734936910472;
+add emailHasTask(em101, ta3)  -3.6403705675259888;
+
+mcsat;
+dumptables;
