@@ -463,41 +463,61 @@ int32_t add_rule(input_clause_t *rule,
 //delta cost.  The clauses containing the negation of the literal must be
 //reevaluated and assigned true if previously false.
 
-void link_propagate(samp_table_t *table,
-		    samp_literal_t lit){
+void link_propagate(samp_table_t *table, samp_literal_t lit){
   int32_t numlits, i;
   samp_literal_t tmp;
   samp_clause_t *new_link; 
   samp_clause_t *link;
   samp_literal_t *disjunct;
-  samp_truth_value_t *assignment = table->atom_table.assignment[table->atom_table.current_assignment];
+  samp_truth_value_t *assignment;
+
+  assignment = table->atom_table.assignment[table->atom_table.current_assignment];
+
+  assert(assigned_false_lit(assignment, lit));
+
   link = table->clause_table.watched[lit];
   while (link != NULL){
     numlits = link->numlits;
     disjunct = link->disjunct;
+
+    assert(disjunct[0] == lit && numlits > 1);
+
     i = 1;
-    while (i<numlits && assigned_false_lit(assignment, disjunct[i]))
+    while (i<numlits && assigned_false_lit(assignment, disjunct[i])) {
       i++;
-     //either i=numlits or disjunct[i] is true
-    if (i < numlits){//disjunct[i] is true; swap it into disjunct[0]
-	tmp = disjunct[i];
-	disjunct[i] = disjunct[0];
-	disjunct[0] = tmp;
-	new_link = link->link;  //push the new watched literal into its watched list
-	link->link = table->clause_table.watched[disjunct[0]];
-	table->clause_table.watched[disjunct[0]] = link;
-	link = new_link;//restore invariant 
-    } else {//the clause is unsatisfied as indicated by truthvalue of watched lit
-      //      *dcost += link->weight; //removed dcost
+    }
+
+    if (i < numlits) { 
+      /*
+       * the clause is still true: make tmp = disjunct[i] the new watched literal
+       */
+      tmp = disjunct[i];
+
+      // swap lit and tmp
+      disjunct[i] = lit;
+      disjunct[0] = tmp;
+
+      // add the clause to the head of watched[tmp]
       new_link = link->link;
-      link->link = table->clause_table.unsat_clauses; //push link_ptr into unsat_clauses list
+      link->link = table->clause_table.watched[tmp];
+      table->clause_table.watched[tmp] = link;
+      link = new_link;
+
+    } else {
+      /*
+       * move the clause to the unsat_clause list
+       */
+      new_link = link->link;
+      link->link = table->clause_table.unsat_clauses;
       table->clause_table.unsat_clauses = link;
       table->clause_table.num_unsat_clauses++;
       link = new_link;
     }
   }
+
   table->clause_table.watched[lit] = NULL;//since there are no clauses where it is true
 }
+
 
 //returns a literal index corresponding to a fixed true literal or a
 //unique non-fixed implied literal
@@ -821,6 +841,9 @@ int32_t negative_unit_propagate(samp_table_t *table){
   while (link != NULL) {
     abs_weight = fabs(link->weight);
     if (abs_weight == DBL_MAX || choose() > exp(- abs_weight)) {
+      /*
+       * This clause is considered alive from now on
+       */
       if (link->weight >= 0){ //must be a unit clause
 	conflict = fix_lit_true(table, link->disjunct[0]);
 	if (conflict == -1) return -1;
@@ -834,7 +857,10 @@ int32_t negative_unit_propagate(samp_table_t *table){
       link_ptr = &link->link;
       link = link->link;
 
-    } else {//move the clause to the dead_negative_or_unit_clauses list
+    } else {
+      /*
+       * Move the clause to the dead_negative_or_unit_clauses list
+       */
       *link_ptr = link->link;
       link->link = clause_table->dead_negative_or_unit_clauses;
       clause_table->dead_negative_or_unit_clauses = link;
@@ -889,12 +915,13 @@ void push_unsat_clause(clause_table_t *clause_table, uint32_t i){
 
 static integer_stack_t clause_var_stack;
 
-/* Sets all the clause lists in clause_table to NULL.  
+/* 
+ * Sets all the clause lists in clause_table to NULL.  
  */
-
 void empty_clause_lists(samp_table_t *table){
   clause_table_t *clause_table = &(table->clause_table);
   atom_table_t *atom_table = &(table->atom_table);
+
   clause_table->sat_clauses = NULL;
   clause_table->unsat_clauses = NULL;
   clause_table->negative_or_unit_clauses = NULL;
@@ -908,7 +935,8 @@ void empty_clause_lists(samp_table_t *table){
 }
 
 
-/* Pushes each of the hard clauses into either negative_or_unit_clauses
+/*
+ * Pushes each of the hard clauses into either negative_or_unit_clauses
  * if weight is negative or numlits is 1, or into unsat_clauses if weight
  * is non-negative.  Non-hard clauses go into dead_negative_or_unit_clauses
  * or dead_clauses, respectively.  
@@ -1131,7 +1159,7 @@ int32_t reset_sample_sat(samp_table_t *table){
    * kill selected satisfied clauses: select which clauses will
    * be live in this round.
    *
-   * This is partial: live unit/or negative weight clauses are 
+   * This is partial: live unit or negative weight clauses are 
    * selected within negative_unit_propagate
    */
   kill_clauses(table);
@@ -1253,12 +1281,17 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
   atom_table_t *atom_table = &(table->atom_table);
   samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
   int32_t dcost;
-  double choice = choose();
+  double choice; 
   int32_t var;
   uint32_t clause_position;
   samp_clause_t *link;
-  if (clause_table->num_unsat_clauses <= 0 ||
-      choice < sa_probability){//choose and flip an unfixed variable
+
+
+  choice = choose();
+  if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
+    /*
+     * Simulated annealing step
+     */
     var = choose_unfixed_variable(assignment, atom_table->num_vars,
 				  atom_table->num_unfixed_vars);
     if (var == -1) return;
@@ -1267,19 +1300,26 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
       flip_unfixed_variable(table, var);
     } else {
       choice = choose();
-      if (choice < exp(-dcost/samp_temperature))
+      if (choice < exp(-dcost/samp_temperature)) {
 	flip_unfixed_variable(table, var);
+      }
     }
-  } else {//choose an unsat clause
+
+  } else {
+    /*
+     * Walksat step
+     */
+    //choose an unsat clause
     clause_position = random_uint(clause_table->num_unsat_clauses);
     link = clause_table->unsat_clauses;
     while (clause_position != 0){
       link = link->link;
       clause_position--;
-    } //link points to chosen clause
+    } 
+    //link points to chosen clause
     var = choose_clause_var(table, link, assignment, rvar_probability);
     flip_unfixed_variable(table, var);
-    }
+  }
 }
 
 
@@ -1343,6 +1383,10 @@ int32_t first_sample_sat(samp_table_t *table, double sa_probability,
   return 0;
 }
 
+
+/*
+ * This function is not used??
+ */
 void move_unsat_to_dead_clauses(clause_table_t *clause_table){
   samp_clause_t **link_ptr = &(clause_table->dead_clauses);
   samp_clause_t *link = clause_table->dead_clauses;
@@ -1416,8 +1460,8 @@ void sample_sat(samp_table_t *table, double sa_probability,
  * Parameters for sample sat:
  * - sa_probability = probability of a simulated annealing step
  * - samp_temperature = temperature for simulated annealing
- * - rvar_probability = probability used by a maxsat step:
- *   a maxsat step selects an unsat clause and flips one of its variables
+ * - rvar_probability = probability used by a Walksat step:
+ *   a Walksat step selects an unsat clause and flips one of its variables
  *   - with probability rvar_probability, that variable is chosen randomly
  *   - with probability 1(-rvar_probability), that variable is the one that
  *     results in minimal increase of the number of unsat clauses.

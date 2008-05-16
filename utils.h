@@ -441,7 +441,6 @@ extern clause_buffer_t clause_buffer;
 
 extern void clause_buffer_resize(int32_t length);
 
-
 extern void init_rule_table(rule_table_t *table);
 
 extern void rule_table_resize(rule_table_t *rule_table);
