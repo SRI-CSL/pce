@@ -473,7 +473,7 @@ void link_propagate(samp_table_t *table, samp_literal_t lit){
 
   assignment = table->atom_table.assignment[table->atom_table.current_assignment];
 
-  assert(assigned_false_lit(assignment, lit));
+  assert(assigned_false_lit(assignment, lit)); // ?? this assertion fails!
 
   link = table->clause_table.watched[lit];
   while (link != NULL){
@@ -624,12 +624,10 @@ void flip_unfixed_variable(samp_table_t *table,
   printf("Flipping variable %"PRId32"\n", var);
   if (assigned_true(assignment[var])){
     assignment[var] = v_false;
-    link_propagate(table,
-		   pos_lit(var));
+    link_propagate(table, pos_lit(var));
   } else {
     assignment[var] = v_true;
-    link_propagate(table,
-		   neg_lit(var));
+    link_propagate(table, neg_lit(var));
   }
   scan_unsat_clauses(table);
 }
