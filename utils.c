@@ -29,6 +29,10 @@ void set_verbosity_level(int32_t v) {
   verbosity_level = v;
 }
 
+extern int32_t get_verbosity_level() {
+  return verbosity_level;
+}
+
 // Conditional print - only prints if level <= verbosity_level
 void cprintf(int32_t level, const char *fmt, ...){
   if(level <= verbosity_level){

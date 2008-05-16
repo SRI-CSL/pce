@@ -32,6 +32,7 @@ extern int32_t imin(int32_t i, int32_t j);
  *   otherwise, it's the same as printf(<format>, ...)
  */
 extern void set_verbosity_level(int32_t level);
+extern int32_t get_verbosity_level();
 extern void cprintf(int32_t level, const char *fmt, ...);
 
 

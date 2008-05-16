@@ -735,15 +735,17 @@ void kill_clauses(samp_table_t *table){
   }
 
   // TEMPORARY
-  printf("Live clauses:\n");
-  print_list(clause_table->sat_clauses, table);
-  for (i = 0; i < atom_table->num_vars; i++){
-    lit = pos_lit(i);
-    print_list(clause_table->watched[lit], table);
-    lit = neg_lit(i);
-    print_list(clause_table->watched[lit], table);
+  if (get_verbosity_level() > 0){
+    printf("Live clauses:\n");
+    print_list(clause_table->sat_clauses, table);
+    for (i = 0; i < atom_table->num_vars; i++){
+      lit = pos_lit(i);
+      print_list(clause_table->watched[lit], table);
+      lit = neg_lit(i);
+      print_list(clause_table->watched[lit], table);
+    }
+    printf("\n");
   }
-  printf("\n");
 }
 
 
@@ -1021,7 +1023,7 @@ void restore_sat_dead_clauses(clause_table_t *clause_table, samp_truth_value_t *
   while (link != NULL){
     val = eval_clause(assignment, link);
     if (val != -1) {
-      printf("---> restoring dead clause %p (val = %"PRId32")\n", link, val); //BD
+      cprintf(1, "---> restoring dead clause %p (val = %"PRId32")\n", link, val); //BD
       lit = link->disjunct[val];
       link->disjunct[val] = link->disjunct[0];
       link->disjunct[0] = lit;
@@ -1030,7 +1032,7 @@ void restore_sat_dead_clauses(clause_table_t *clause_table, samp_truth_value_t *
       clause_table->watched[lit] = link;
       link = next;
     } else {
-      printf("---> dead clause %p stays dead (val = %"PRId32")\n", link, val);  //BD 
+      cprintf(1, "---> dead clause %p stays dead (val = %"PRId32")\n", link, val);  //BD 
       *link_ptr = link;
       link_ptr = &(link->link);
       link = link->link;
@@ -1314,8 +1316,10 @@ void update_pmodel(samp_table_t *table){
     }
   }
 
-  // HACK: TEMPROARY FOR DEBUUGGING
-  print_model(table);
+  // HACK: TEMPORARY FOR DEBUUGGING
+  if (get_verbosity_level() > 0) {
+    print_model(table);
+  }
 }
 
 
@@ -1441,7 +1445,7 @@ void mc_sat(samp_table_t *table, double sa_probability,
   //  print_state(table, 0);  
   assert(valid_table(table));
   for (i = 0; i < max_samples; i++){
-    printf("---- sample[%"PRIu32"] ---\n", i);    
+    cprintf(1, "---- sample[%"PRIu32"] ---\n", i);
     sample_sat(table, sa_probability, samp_temperature,
 	       rvar_probability, max_flips, max_extra_flips);
     //    print_state(table, i+1);
