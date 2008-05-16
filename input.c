@@ -1,5 +1,7 @@
 /* Functions for creating input structures */
 
+#include <inttypes.h>
+
 #include "memalloc.h"
 #include "utils.h"
 #include "input.h"
@@ -21,7 +23,7 @@ void input_clause_buffer_resize (){
 	out_of_memory();
       }
       capacity += capacity/2;
-      printf("Increasing clause buffer to %d\n", capacity);
+      printf("Increasing clause buffer to %"PRIu32"\n", capacity);
       input_clause_buffer.clauses = (input_clause_t *)
 	safe_realloc(input_clause_buffer.clauses,
 		     capacity * sizeof(input_clause_t));
@@ -43,7 +45,7 @@ void input_literal_buffer_resize (){
 	out_of_memory();
       }
       capacity += capacity/2;
-      printf("Increasing literal buffer to %d\n", capacity);
+      printf("Increasing literal buffer to %"PRIu32"\n", capacity);
       input_literal_buffer.literals = (input_literal_t *)
 	safe_realloc(input_literal_buffer.literals,
 		     capacity * sizeof(input_literal_t));
@@ -66,7 +68,7 @@ void input_atom_buffer_resize (){
 	out_of_memory();
       }
       capacity += capacity/2;
-      printf("Increasing atom buffer to %d\n", capacity);
+      printf("Increasing atom buffer to %"PRIu32"\n", capacity);
       input_atom_buffer.atoms = (input_atom_t *)
 	safe_realloc(input_atom_buffer.atoms, capacity * sizeof(input_atom_t));
       input_atom_buffer.capacity = capacity;

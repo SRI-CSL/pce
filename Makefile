@@ -1,13 +1,16 @@
+SHELL=/bin/sh
+
 YACC = bison
 YFLAGS = -y -d -t
 CC = gcc
-CFLAGS = -I /homes/owre/src/oaa2.3.2/src/oaalib/c/include \
-         -I /homes/owre/src/oaa2.3.2/src/oaalib/c/external/glib/glib-2.10.1/glib \
-         -I /homes/owre/src/oaa2.3.2/lib/x86-linux/glib-2.0/include \
-         -I /homes/owre/src/oaa2.3.2/src/oaalib/c/external/glib/glib-2.10.1 \
-         -Wall -g # -Wextra
+CFLAGS = -Wall -g # -Wextra
 LD = ld 
 XCFLAGS =
+
+OS=$(shell uname -s)
+ifeq ($(OS),MINGW32_NT-5.1) 
+  CFLAGS += -DMINGW
+endif
 
 # pceobj = array_hash_map.o hash_functions.o int_array_sort.o int_stack.o \
 #          memalloc.o pce.tab.o samplesat.o symbol_tables.o \
@@ -22,7 +25,8 @@ mcsatobj = yacc.o mcsat.o $(commonobj)
 pceobj = pce.o $(commonobj)
 
 .SUFFIXES: .c .o
-.c.o : ; $(CC) $(XCFLAGS) ${CFLAGS} -c $< -o $@
+.c.o :
+	 $(CC) $(XCFLAGS) $(CFLAGS) -c $< -o $@
 
 all: mcsat #pce
 

@@ -12,6 +12,18 @@
 #include "utils.h"
 #include "samplesat.h"
 
+#ifdef MINGW
+
+/*
+ * Need some version of random()
+ * rand() exists on mingw but random() does not
+ */
+static inline int random(void) {
+  return rand();
+}
+
+#endif
+
 
 static void add_atom_to_pred(pred_table_t *pred_table,
 			     int32_t predicate,

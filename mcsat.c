@@ -190,6 +190,7 @@ int main(){
   //yydebug = 1;
   do {
     printf("mcsat> ");
+    fflush(stdout);
     // yyparse returns 0 and sets input_command if no syntax errors
     if (yyparse() == 0)
       switch (input_command.kind) {
@@ -325,9 +326,9 @@ int main(){
 	printf(" sa_probability = %f\n", decl.sa_probability);
 	printf(" samp_temperature = %f\n", decl.samp_temperature);
 	printf(" rvar_probability = %f\n", decl.rvar_probability);
-	printf(" max_flips = %d\n", decl.max_flips);
-	printf(" max_extra_flips = %d\n", decl.max_extra_flips);
-	printf(" max_samples = %d\n", decl.max_samples);
+	printf(" max_flips = %"PRId32"\n", decl.max_flips);
+	printf(" max_extra_flips = %"PRId32"\n", decl.max_extra_flips);
+	printf(" max_samples = %"PRId32"\n", decl.max_samples);
 	mc_sat(&table, decl.sa_probability, decl.samp_temperature,
 	       decl.rvar_probability, decl.max_flips,
 	       decl.max_extra_flips, decl.max_samples);
