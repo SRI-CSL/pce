@@ -11,6 +11,7 @@
 #include "gcd.h"
 #include "utils.h"
 #include "samplesat.h"
+#include "vectors.h"
 
 #ifdef MINGW
 
@@ -1243,6 +1244,8 @@ static bool query_match(samp_atom_t *atom, samp_atom_t *patom,
   return true;
 }
 
+static inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
+
 /* Loop through the atom table, looking for atoms matching the query clause
    (which may have variables), that are also higher probability than the
    threshold.  Negated literals use 1 - probability for comparison.
@@ -1253,10 +1256,14 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
 			 samp_table_t *table) {
   atom_table_t *atom_table = &(table->atom_table);
   uint32_t nvars;
-  int32_t i;
+  int32_t i, j;
   double prob;
-  samp_atom_t *best_atom;
-  double best_prob;
+  // The following two are used when all == false
+  int32_t best_atom; // Index in atom_table to best atom
+  double best_prob;  // Probability associated with best atom
+  // These are used when all == true
+  ivector_t *atoms;  // Indices in atom_table to atoms over the threshold
+  dvector_t *probs;  // Corresponding probabilities
   int32_t num_samples;
   int32_t *bindings;
   input_literal_t *lit;
@@ -1265,7 +1272,12 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
 
   nvars = atom_table->num_vars;
   num_samples = atom_table->num_samples;
-  best_atom = NULL;
+  if (all) {
+    init_ivector(atoms, 10);
+    init_dvector(probs, 10);
+  } else {
+    best_atom = -1;
+  }
 
   // We preprocess the clause, to create a samp_clause and typecheck it
   // We've already checked that there is only one literal
@@ -1275,6 +1287,7 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
     patom = typecheck_atom(lit->atom, samp_clause, table);
     if (patom == NULL) {
       // Had a type error
+      safe_free(samp_clause);
       return;
     }
     // The bindings will be filled with the corresponding constants
@@ -1286,39 +1299,131 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
     printf("Not yet written\n");
     return;
   }
-  
-  i = 0;
+  // Loop through all the atoms in the atom table
   for (i = 0; i < nvars; i++) {
+    // Initialize the bindings array
+    if (bindings != NULL) {
+      for (j = 0; j < clause->varlen; j++) {
+	bindings[j] = -1;
+      }
+    }
     if (query_match(atom_table->atom[i], patom, bindings, table)) {
       // Found a match, now check the threshold
       prob = (double) (atom_table->pmodel[i]/(double) num_samples);
       if (clause->literals[0]->neg) {prob = 1 - prob;}
       if (prob >= threshold) {
-	if (best_atom == NULL) {
-	  best_atom = atom_table->atom[i];
+	if (all) {
+	  ivector_push(atoms, i);
+	  dvector_push(probs, prob);
+	} else if (best_atom == -1) {
+	  best_atom = i;
 	  best_prob = prob;
-	} else if (all) {
-	  printf("ask: all not yet supported\n");
 	} else if (best_prob < prob) {
-	  best_atom = atom_table->atom[i];
+	  best_atom = i;
 	  best_prob = prob;
 	}
       }
     }
   }
-  if (best_atom == NULL) {
+  if (all ? atoms->size == 0 : best_atom == -1) {
     printf("No atoms found matching your query");
+  } else if (all) {
+    assert(atoms->size == probs->size);
+    // Sort the atoms and probs arrays in tandem, then print the results
+    sort_query_atoms_and_probs(atoms->data, probs->data, atoms->size);
+    printf("| Prob | Atom\n__________\n");
+    for (i = 0; i < atoms->size; i++) {
+      printf("| % 5.3f | ", probs->data[i]);
+      print_atom(atom_table->atom[atoms->data[i]], table);
+      printf("\n");
+    }
   } else {
     printf("atom ");
-    print_atom(best_atom, table);
+    print_atom(atom_table->atom[best_atom], table);
     printf(" has probability % 5.3f\n", best_prob);
   }
+  // Now cleanup
   if (clause->varlen > 0) {
     safe_free(bindings);
+    safe_free(samp_clause);
     safe_free(patom);
+  }
+  if (all) {
+    delete_ivector(atoms);
+    delete_dvector(probs);
   }
 }
 
+// Based on Bruno's sort_int_array - works on two arrays in parallel
+static void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
+
+// insertion sort
+static void isort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
+  uint32_t i, j;
+  int32_t x, y;
+  double u, v;
+
+  for (i=1; i<n; i++) {
+    x = a[i]; u = p[i];
+    j = 0;
+    while (p[j] < u) j ++;
+    while (j < i) {
+      y = a[j];  v = p[j];
+      a[j] = x;  p[j] = u;
+      x = y;     u = v;
+      j ++;
+    }
+    a[j] = x;  p[j] = u;
+  }
+}
+
+static inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
+  if (n <= 10) {
+    isort_query_atoms_and_probs(a, p, n);
+  } else {
+    qsort_query_atoms_and_probs(a, p, n);
+  }
+}
+
+// quick sort: requires n > 1
+static void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
+  uint32_t i, j;
+  int32_t x, y;
+  double u, v;
+
+  // u = random pivot
+  i = random_uint(n);
+  x = a[i];     u = p[i];
+
+  // swap x and a[0], u and p[0]
+  a[i] = a[0];  p[i] = p[0];
+  a[0] = x;     p[0] = u;
+
+  i = 0;
+  j = n;
+
+  do { j--; } while (p[j] > u);
+  do { i++; } while (i <= j && p[i] < u);
+
+  while (i < j) {
+    y = a[i];    v = p[i];
+    a[i] = a[j]; p[i] = p[j];
+    a[j] = y;    p[j] = v;
+
+    do { j--; } while (p[j] > u);
+    do { i++; } while (p[i] < u);
+  }
+
+  // pivot goes into a[j]
+  a[0] = a[j];  p[0] = p[j];
+  a[j] = x;     p[j] = u;
+
+  // sort a[0...j-1] and a[j+1 .. n-1]
+  sort_query_atoms_and_probs(a, p, j);
+  j++;
+  sort_query_atoms_and_probs(a + j, p + j, n - j);
+}
+  
 
 /* Like init_sample_sat, but takes an existing state and sets it up for a
    second round of sampling

@@ -122,3 +122,50 @@ void resize_pvector(pvector_t *v, uint32_t n) {
   }
 }
 
+
+/*
+ * Double vectors
+ */
+void init_dvector(dvector_t *v, uint32_t n) {
+  if (n >= MAX_VECTOR_SIZE) {
+    out_of_memory();
+  }
+  v->capacity = n;
+  v->size = 0;
+  v->data = NULL;
+  if (n > 0) {
+    v->data = (double *) safe_malloc(n * sizeof(double));
+  }
+}
+
+void delete_dvector(dvector_t *v) {
+  safe_free(v->data);
+  v->data = NULL;
+}
+
+void  extend_dvector(dvector_t *v) {
+  uint32_t n;
+
+  n = v->capacity + 1;
+  n += n >> 1;
+  if (n >= MAX_VECTOR_SIZE) {
+    out_of_memory();
+  }
+  v->data = (double *) safe_realloc(v->data, n * sizeof(double));
+  v->capacity = n;
+}
+
+void resize_dvector(dvector_t *v, uint32_t n) {
+  if (n > v->capacity) {
+    if (n >= MAX_VECTOR_SIZE) {
+      out_of_memory();
+    }
+    v->data = (double *) safe_realloc(v->data, n * sizeof(double));
+    v->capacity = n;
+  }
+}
+
+/*
+ * Sort and remove duplicates not here - need double equivalent of
+ * int_array_sort
+ */

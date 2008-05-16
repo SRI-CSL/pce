@@ -233,12 +233,12 @@ int main(){
       case CONST: {
 	input_constdecl_t decl = input_command.decl.constdecl;
 	if (sort_name_index(decl.sort, sort_table) == -1) {
-	    if (nonstrict)
-	      add_sort(sort_table, decl.sort);
-	    else {
-	      fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
-	      break;
-	    }
+	  if (nonstrict)
+	    add_sort(sort_table, decl.sort);
+	  else {
+	    fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
+	    break;
+	  }
 	}
 	int32_t i;
 	for (i = 0; i<decl.num_names; i++) {
@@ -261,12 +261,12 @@ int main(){
       case VAR: {
 	input_vardecl_t decl = input_command.decl.vardecl;
 	if (sort_name_index(decl.sort, sort_table) == -1) {
-	    if (nonstrict)
-	      add_sort(sort_table, decl.sort);
-	    else {
-	      fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
-	      break;
-	    }
+	  if (nonstrict)
+	    add_sort(sort_table, decl.sort);
+	  else {
+	    fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
+	    break;
+	  }
 	}
 	int32_t i;
 	for (i=0; i<decl.num_names; i++) {

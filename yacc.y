@@ -24,6 +24,7 @@ static void free_clause(input_clause_t *clause);
   
 void yyerror (char *str) {
   printf("pce: %s\n", str);
+  input_command.kind = 0;
   yyerrflg = true;
 };
 

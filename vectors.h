@@ -31,6 +31,16 @@ typedef struct pvector_s {
 
 
 /*
+ * Vector of doubles
+ */
+typedef struct dvector_s {
+  uint32_t capacity;
+  uint32_t size;
+  double *data;
+} dvector_t;
+
+
+/*
  * Default initial size and max size
  */
 #define DEFAULT_VECTOR_SIZE 10
@@ -119,5 +129,36 @@ static inline void pvector_shrink(pvector_t *v, uint32_t n) {
   v->size = n;
 }
 
+/*
+ * Double vectors
+ */
+
+extern void init_dvector(dvector_t *v, uint32_t n);
+
+extern void delete_dvector(dvector_t *v);
+
+extern void extend_dvector(dvector_t *v);
+
+extern void resize_dvector(dvector_t *v, uint32_t n);
+
+static inline void dvector_push(dvector_t *v, double x) {
+  uint32_t i;
+
+  i = v->size;
+  if (i >= v->capacity) {
+    extend_dvector(v);
+  }
+  v->data[i] = x;
+  v->size = i+1;
+}
+
+static inline void dvector_reset(dvector_t *v) {
+  v->size = 0;
+}
+
+static inline void dvector_shrink(dvector_t *v, uint32_t n) {
+  assert(n <= v->size);
+  v->size = n;
+}
 
 #endif /* __VECTORS_H */
