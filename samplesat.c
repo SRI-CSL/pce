@@ -1637,8 +1637,8 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
   int32_t best_atom; // Index in atom_table to best atom
   double best_prob;  // Probability associated with best atom
   // These are used when all == true
-  ivector_t *atoms;  // Indices in atom_table to atoms over the threshold
-  dvector_t *probs;  // Corresponding probabilities
+  ivector_t atoms;  // Indices in atom_table to atoms over the threshold
+  dvector_t probs;  // Corresponding probabilities
   int32_t num_samples;
   int32_t *bindings;
   input_literal_t *lit;
@@ -1648,8 +1648,8 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
   nvars = atom_table->num_vars;
   num_samples = atom_table->num_samples;
   if (all) {
-    init_ivector(atoms, 10);
-    init_dvector(probs, 10);
+    init_ivector(&atoms, 10);
+    init_dvector(&probs, 10);
   } else {
     best_atom = -1;
   }
@@ -1657,22 +1657,17 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
   // We preprocess the clause, to create a samp_clause and typecheck it
   // We've already checked that there is only one literal
   lit = clause->literals[0];
+  samp_clause = new_samp_rule(clause);
+  patom = typecheck_atom(lit->atom, samp_clause, table);
+  if (patom == NULL) {
+    // Had a type error
+    safe_free(samp_clause);
+    return;
+  }
   if (clause->varlen > 0) {
-    samp_clause = new_samp_rule(clause);
-    patom = typecheck_atom(lit->atom, samp_clause, table);
-    if (patom == NULL) {
-      // Had a type error
-      safe_free(samp_clause);
-      return;
-    }
     // The bindings will be filled with the corresponding constants
     // This allows matching, e.g., p(x, x) to p(a, a) but not p(a, b)
     bindings = (int32_t *) safe_malloc(clause->varlen * sizeof(int32_t));
-  } else {
-    // Just your basic atom - need to create patom, but don't want to
-    // enter it into the atom_table, so we can't call add_atom.
-    printf("Not yet written\n");
-    return;
   }
   // Loop through all the atoms in the atom table
   for (i = 0; i < nvars; i++) {
@@ -1688,8 +1683,8 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
       if (clause->literals[0]->neg) {prob = 1 - prob;}
       if (prob >= threshold) {
 	if (all) {
-	  ivector_push(atoms, i);
-	  dvector_push(probs, prob);
+	  ivector_push(&atoms, i);
+	  dvector_push(&probs, prob);
 	} else if (best_atom == -1) {
 	  best_atom = i;
 	  best_prob = prob;
@@ -1700,16 +1695,16 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
       }
     }
   }
-  if (all ? atoms->size == 0 : best_atom == -1) {
-    printf("No atoms found matching your query");
+  if (all ? atoms.size == 0 : best_atom == -1) {
+    printf("No atoms found matching your query\n");
   } else if (all) {
-    assert(atoms->size == probs->size);
+    assert(atoms.size == probs.size);
     // Sort the atoms and probs arrays in tandem, then print the results
-    sort_query_atoms_and_probs(atoms->data, probs->data, atoms->size);
-    printf("| Prob | Atom\n__________\n");
-    for (i = 0; i < atoms->size; i++) {
-      printf("| % 5.3f | ", probs->data[i]);
-      print_atom(atom_table->atom[atoms->data[i]], table);
+    sort_query_atoms_and_probs(atoms.data, probs.data, atoms.size);
+    printf("|  Prob  | Atom\n-------------------\n");
+    for (i = 0; i < atoms.size; i++) {
+      printf("| % 5.3f | ", probs.data[i]);
+      print_atom(atom_table->atom[atoms.data[i]], table);
       printf("\n");
     }
   } else {
@@ -1724,8 +1719,8 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
     safe_free(patom);
   }
   if (all) {
-    delete_ivector(atoms);
-    delete_dvector(probs);
+    delete_ivector(&atoms);
+    delete_dvector(&probs);
   }
 }
 
@@ -1741,7 +1736,7 @@ static void isort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
   for (i=1; i<n; i++) {
     x = a[i]; u = p[i];
     j = 0;
-    while (p[j] < u) j ++;
+    while (p[j] > u) j ++;
     while (j < i) {
       y = a[j];  v = p[j];
       a[j] = x;  p[j] = u;
@@ -1777,16 +1772,16 @@ static void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
   i = 0;
   j = n;
 
-  do { j--; } while (p[j] > u);
-  do { i++; } while (i <= j && p[i] < u);
+  do { j--; } while (p[j] < u);
+  do { i++; } while (i <= j && p[i] > u);
 
   while (i < j) {
     y = a[i];    v = p[i];
     a[i] = a[j]; p[i] = p[j];
     a[j] = y;    p[j] = v;
 
-    do { j--; } while (p[j] > u);
-    do { i++; } while (p[i] < u);
+    do { j--; } while (p[j] < u);
+    do { i++; } while (p[i] > u);
   }
 
   // pivot goes into a[j]
