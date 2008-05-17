@@ -1,0 +1,11 @@
+sort A;
+sort B;
+const a, b: A;
+const x, y: B;
+predicate P(A, B) indirect;
+predicate Q(A);
+predicate R(B);
+add (X, Y) ~Q(X)|~R(Y)|P(X,Y) 3;
+assert Q(a);
+assert R(x);
+mcsat;

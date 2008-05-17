@@ -1,0 +1,8 @@
+sort s;
+const a, c, b: s;
+predicate p(s, s);
+predicate q(s) indirect;
+add q(a) .1;
+add q(b) 1.3;
+add (x) ~p(x, x) | q(x);
+mcsat;
