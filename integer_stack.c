@@ -1,3 +1,5 @@
+#include <inttypes.h>
+
 #include "memalloc.h"
 #include "integer_stack.h"
 
@@ -65,10 +67,10 @@ int32_t length_integer_stack(integer_stack_t *istack){
 
 void print_integer_stack(integer_stack_t *istack){
   int32_t i;
-  printf("[size: %d, top: %d, (", istack->size, istack->top);
+  printf("[size: %"PRId32", top: %"PRId32", (", istack->size, istack->top);
   for (i = 0; i < istack->top; i++){
     if (i != 0) printf(", ");
-    printf("%d", istack->elems[i]);
+    printf("%"PRId32, istack->elems[i]);
   }
   printf(")]\n");
 }
