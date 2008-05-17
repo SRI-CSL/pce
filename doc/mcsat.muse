@@ -1,22 +1,29 @@
 #author Shankar Natarajan, Bruno Dutertre, and Sam Owre
-#desc The Manual for using mcsat
-#title MCSAT
+#desc User Manual for mcsat
+#title MCSAT User Manual
+
+#bibsource mcsat
 
 * Introduction
 
-MCSAT is an implementation of the MCSAT algorithm.  It is both a library
-and a standalone system.  Currently it is an alpha release, not yet ready
-to be used as a library.
+MCSAT is an implementation of the MCSAT algorithm described in
+<cite>Poon&Domingos2006</cite>.  It is intended to be usable as a library,
+a standalone system, or as an OAA agent, but currently it is an alpha
+release and only the standalone version is supported.
 
-The basic algorithm is described in <cite>Poon&Domingos2006</cite>.
+* Installation
+
+MCSAT is distributed as a tar file =mcsat-alpha.tgz=.  Simply untar the
+file, which creates an =mcsat= subdirectory.  Prebuilt binaries for Windows
+and Linux are in the =mcsat/bin= subdirectory.  If you want to build for
+other platforms, you will need to edit the =Makefile= and run =make=.
 
 * Running MCSAT
 
-MCSAT is intended to be a library in the long run; for now it is easiest
-to run the interactive form.  Simply type =mcsat= (assuming path, etc. are
-set properly).  Commands are then entered at the =mcsat>= prompt, followed
-by a semicolon.  =quit;= quits, and =help;= displays a brief description of
-the available commands.
+The interactive system is called =mcsat= (or =mcsat.exe=) in the =bin=
+subdirectory.  It is run with no arguments.  Commands are then entered at
+the =mcsat>= prompt, followed by a semicolon.  =quit;= quits, and =help;=
+displays a brief description of the available commands.
 
 ** Syntax
 
@@ -69,15 +76,17 @@ Commands are case-insensitive, and terminated with a semicolon.
   Example ::
     =predicate fileHasTask(File, Task) indirect;=
 
+<comment>
 *** atom
 
   Description ::
     The atom command simply introduces an atom into MCSAT, without any
-    associated truth value or weight.
+    associated truth value or weight.  
   Syntax ::
     =atom ATOM ;=
   Example ::
     =atom attached(fi42, em58);=
+</comment>
 
 *** assert
 
@@ -94,18 +103,29 @@ Commands are case-insensitive, and terminated with a semicolon.
   Description ::
     Add is used to introduce weighted clauses and rules.  Rules include
     variables, which are introduced before the clauses.
-  Syntax ::
-    =add CLAUSE WT ;=
-    =add ( NAMES ) CLAUSE WT ;=
+  Syntax :: <example>
+add CLAUSE WT ;
+add ( VARIABLES ) CLAUSE WT ;
+</example>
 
-    where =WT= is an optional number, defaulting to the maximum double value
-    (effectively infinity).
+    where =WT= is an optional floating point weight.  If weight is missing,
+    the clause or rule is considered as a "hard" clause or rule. (This is
+    the same as having infinite weight).
   Example :: <example>
 add fileHasTask(fi22, ta1)  1.286;
+</example>
+    adds a weighted ground clause.
+    <example>
 add (File, Email, Task)
     ~fileHasTask(File, Task) | ~attached(File, Email)
       | emailHasTask(Email, Task);
 </example>
+    adds a rule with infinite weight.  This is essentially asserting the
+    axiom
+
+    <math>\forall F, E, T: fileHasTask(F, T) \,\wedge\,
+attached(F, E) \Rightarrow emailHasTask(E, T)</math>
+
 
 *** mcsat
 
@@ -116,13 +136,20 @@ add (File, Email, Task)
 
     where NUMS is a comma-separated list of numbers, representing, in order:
 
-    Parameter || Type || Default
-    =sa_probability= | 0.0 .. 1.0 | 0.5
-    =samp_temperature= | > 0.0 | 0.91
-    =rvar_probability= | 0.0 .. 1.0 | 0.2
-    =max_flips= | nat | 1000
-    =max_extra_flips= | nat | 10
-    =max_samples= | nat | 1000
+    Parameter || Type || Dflt || Description
+    =sa_probability= | 0.0 .. 1.0 | 0.5 | probability of a simulated annealing step
+    =samp_temperature= | > 0.0 | 0.91 | temperature for simulated annealing
+    =rvar_probability= | 0.0 .. 1.0 | 0.2 | probability used by a Walksat step (see Note)
+    =max_flips= | nat | 1000 | bound on the number of sample_sat steps
+    =max_extra_flips= | nat | 10 | number of samplesat steps performed
+       |  |  | after a model is found
+    =max_samples= | nat | 1000 | number of samples generated
+       |  |  |  
+
+    **Note**: A walksat step selects an unsat clause and flips one of its variables
+    with probability rvar_probability, that variable is chosen randomly
+    with probability 1(-rvar_probability), that variable is the one that
+    results in minimal increase of the number of unsat clauses.
 
     Parameters may be omitted, but to set one all preceding ones must also
     be given.
@@ -130,21 +157,31 @@ add (File, Email, Task)
 *** ask
 
   Description ::
-    Ask allows MCSAT to be queried.  The mcsat command generates
-    probabilities for all atoms, and ask returns atoms matching a literal
-    that are above a threshold probability.  As with =add=, variables may be
-    given.
+    The mcsat command generates probabilities for all atoms, and the =ask=
+    command returns ground atoms that match a literal pattern and whose
+    probabilities are above a threshold.  Example literal patterns are: <example>
+    emailHasTask(em38, ta2)
+    ~emailHasTask(em38, ta2)
+    (X) emailHasTask(X, ta2)
+    (X, Y) ~P(X, Y)
+    (X) P(X, X) </example>
   Syntax :: <example>
 ask LITERAL THRESHOLD OPTION ;
-ask ( NAMES ) LITERAL THRESHOLD OPTION ;
+ask ( VARIABLES ) LITERAL THRESHOLD OPTION ;
 </example>
 
-    where =THRESHOLD= is a number between 0.0 and 1.0, and =OPTION= is
-    omitted, "=best=" (returns the highest probability match over the
-    threshold), or "=all=" (returns all matches over the threshold, sorted
-    by probability).
-  Example ::
-    =ask (T) emailHasTask(em38, T) .7 all=
+    where =THRESHOLD= is a number between 0.0 and 1.0.  =OPTION= can be
+    either "=best=", which prints match with the highest probability over the
+    threshold, or "=all=" which prints all matches over the threshold, 
+    in decreasing probability order.  If no =OPTION= is given, "=best=" is assumed.
+  Example :: <example>
+ask emailHasTask(em38, ta2) 0.1;
+</example>
+    checks if the probability of the atom is above 0.1, and prints 
+    the atom and its probability if it is.<example>
+ask (T) emailHasTask(em38, T) .7 all
+</example>
+    prints all matching atoms whose probability is greater than .7.
 
 *** reset
 
