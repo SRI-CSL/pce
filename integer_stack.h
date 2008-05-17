@@ -28,6 +28,8 @@ void pop_integer_stack(integer_stack_t *istack);
 
 int32_t top_integer_stack(integer_stack_t *istack);
 
+void clear_integer_stack(integer_stack_t *istack);
+
 bool empty_integer_stack(integer_stack_t *istack);
 
 int32_t length_integer_stack(integer_stack_t *istack);
