@@ -468,6 +468,7 @@ void link_propagate(samp_table_t *table, samp_literal_t lit){
   samp_literal_t tmp;
   samp_clause_t *new_link; 
   samp_clause_t *link;
+  samp_clause_t **link_ptr;
   samp_literal_t *disjunct;
   samp_truth_value_t *assignment;
 
@@ -475,6 +476,7 @@ void link_propagate(samp_table_t *table, samp_literal_t lit){
 
   assert(assigned_false_lit(assignment, lit)); // ?? this assertion fails!
 
+  link_ptr = &(table->clause_table.watched[lit]);
   link = table->clause_table.watched[lit];
   while (link != NULL){
     numlits = link->numlits;
@@ -496,18 +498,21 @@ void link_propagate(samp_table_t *table, samp_literal_t lit){
       // swap lit and tmp
       disjunct[i] = lit;
       disjunct[0] = tmp;
-
+      
       // add the clause to the head of watched[tmp]
       new_link = link->link;
+      *link_ptr = new_link;
       link->link = table->clause_table.watched[tmp];
       table->clause_table.watched[tmp] = link;
       link = new_link;
-
+      assert(assigned_true_lit(assignment,
+				 table->clause_table.watched[tmp]->disjunct[0]));
     } else {
       /*
        * move the clause to the unsat_clause list
        */
       new_link = link->link;
+      *link_ptr = new_link;
       link->link = table->clause_table.unsat_clauses;
       table->clause_table.unsat_clauses = link;
       table->clause_table.num_unsat_clauses++;
@@ -584,6 +589,7 @@ void scan_unsat_clauses(samp_table_t *table){
 	table->clause_table.watched[lit] = unsat_clause;
 	table->clause_table.num_unsat_clauses--;
 	unsat_clause = *unsat_clause_ptr;
+	assert(assigned_true_lit(assignment, table->clause_table.watched[lit]->disjunct[0]));
       } else {
 	unsat_clause_ptr = &(unsat_clause->link);  //move to next unsat clause
 	unsat_clause = unsat_clause->link;
@@ -593,7 +599,7 @@ void scan_unsat_clauses(samp_table_t *table){
       unsat_clause->disjunct[fixable] = unsat_clause->disjunct[0];
       unsat_clause->disjunct[0] = lit;
       if (!fixed_tval(assignment[var_of(lit)])){
-	if (pos_lit(lit)){
+	if (is_pos(lit)){
 	  assignment[var_of(lit)] = v_fixed_true;
 	} else {
 	  assignment[var_of(lit)] = v_fixed_false;
@@ -606,9 +612,22 @@ void scan_unsat_clauses(samp_table_t *table){
       *unsat_clause_ptr = unsat_clause->link;
       unsat_clause->link = table->clause_table.sat_clauses;
       table->clause_table.sat_clauses = unsat_clause;
+      assert(assigned_fixed_true_lit(assignment, table->clause_table.sat_clauses->disjunct[0]));
       unsat_clause = *unsat_clause_ptr;
       table->clause_table.num_unsat_clauses--;
     }
+  }
+}
+
+void process_fixable_stack(samp_table_t *table){
+  samp_literal_t lit;
+  while (!empty_integer_stack(&(table->fixable_stack))){
+    while (!empty_integer_stack(&(table->fixable_stack))){
+      lit = top_integer_stack(&(table->fixable_stack));
+      pop_integer_stack(&(table->fixable_stack));
+      link_propagate(table, not(lit));
+    }
+    scan_unsat_clauses(table);
   }
 }
 
@@ -630,6 +649,7 @@ void flip_unfixed_variable(samp_table_t *table,
     link_propagate(table, neg_lit(var));
   }
   scan_unsat_clauses(table);
+  process_fixable_stack(table);
 }
 
 //computes the cost of flipping an unfixed variable without the actual flip
@@ -922,6 +942,7 @@ void empty_clause_lists(samp_table_t *table){
 
   clause_table->sat_clauses = NULL;
   clause_table->unsat_clauses = NULL;
+  clause_table->num_unsat_clauses = 0; 
   clause_table->negative_or_unit_clauses = NULL;
   clause_table->dead_negative_or_unit_clauses = NULL;
   clause_table->dead_clauses = NULL;
@@ -985,15 +1006,7 @@ int32_t  init_sample_sat(samp_table_t *table){
   init_random_assignment(assignment, atom_table->num_vars, &num_unfixed_vars);
   atom_table->num_unfixed_vars = num_unfixed_vars;
   scan_unsat_clauses(table);
-  samp_literal_t lit;
-  while (!empty_integer_stack(&(table->fixable_stack))){
-    while (!empty_integer_stack(&(table->fixable_stack))){
-      lit = top_integer_stack(&(table->fixable_stack));
-      pop_integer_stack(&(table->fixable_stack));
-      link_propagate(table, lit);
-    }
-    scan_unsat_clauses(table);
-  }
+  process_fixable_stack(table);
   return 0;
 }
 
@@ -1057,6 +1070,7 @@ void restore_sat_dead_clauses(clause_table_t *clause_table, samp_truth_value_t *
       link->link = clause_table->watched[lit];
       clause_table->watched[lit] = link;
       link = next;
+      assert(assigned_true_lit(assignment, clause_table->watched[lit]->disjunct[0]));
     } else {
       cprintf(1, "---> dead clause %p stays dead (val = %"PRId32")\n", link, val);  //BD 
       *link_ptr = link;
@@ -1138,13 +1152,15 @@ int32_t reset_sample_sat(samp_table_t *table){
   pred_table_t *pred_table;
   samp_truth_value_t *assignment, *new_assignment;
   uint32_t i, choice;
-  int32_t lit, num_unfixed_vars;
+  int32_t num_unfixed_vars;
   int32_t conflict = 0;
 
   clause_table = &table->clause_table;
   atom_table = &table->atom_table;
   pred_table = &table->pred_table;
   assignment = atom_table->assignment[atom_table->current_assignment];
+
+  clear_integer_stack(&(table->fixable_stack)); //clear fixable_stack
 
   /* 
    * move dead clauses that are satisfied into appropriate lists
@@ -1206,14 +1222,7 @@ int32_t reset_sample_sat(samp_table_t *table){
   move_sat_to_unsat_clauses(clause_table);
 
   scan_unsat_clauses(table);
-  while (!empty_integer_stack(&(table->fixable_stack))){
-    while (!empty_integer_stack(&(table->fixable_stack))){
-      lit = top_integer_stack(&(table->fixable_stack));
-      pop_integer_stack(&(table->fixable_stack));
-      link_propagate(table, lit);
-    }
-    scan_unsat_clauses(table);
-  }
+  process_fixable_stack(table);
   return 0;
 }
 
@@ -1243,7 +1252,7 @@ int32_t choose_clause_var(samp_table_t *table,
 			  double rvar_probability){
 			  
   uint32_t i, var;
-  empty_integer_stack(&clause_var_stack);
+  clear_integer_stack(&clause_var_stack);
   for (i = 0; i < link->numlits; i++){
     if (!fixed_tval(assignment[var_of(link->disjunct[i])]))
       push_integer_stack(i, &clause_var_stack);
