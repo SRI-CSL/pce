@@ -76,5 +76,5 @@ add emailHasTask(em101, ta1)  1.8366658457553626;
 add emailHasTask(em101, ta2)  -2.071734936910472;
 add emailHasTask(em101, ta3)  -3.6403705675259888;
 
+verbosity 0;
 mcsat;
-dumptables;
