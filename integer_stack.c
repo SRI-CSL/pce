@@ -45,6 +45,10 @@ int32_t top_integer_stack(integer_stack_t *istack){
   }
 }
 
+void clear_integer_stack(integer_stack_t *istack){
+  istack->top = 0;
+}
+
 int32_t nth_integer_stack(uint32_t n, integer_stack_t *istack){
   if (n <= istack->top)
     return istack->elems[n];
