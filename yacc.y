@@ -305,7 +305,7 @@ void yy_mcsatdecl (char **params) {
     input_command.kind = DUMPTABLES;
   };
   void yy_reset (char *name) {
-    if (strcasecmp(name, "PROBABILITIES") == 0) {
+    if (name == NULL || strcasecmp(name, "PROBABILITIES") == 0) {
       input_command.kind = RESET;
     } else {
       yyerror("Can only reset 'probabilities' at the moment");
@@ -415,7 +415,7 @@ decl: SORT NAME {yy_sortdecl($2);}
     | ADD clause addwt {yy_adddecl($2, $3);}
     | ASK clause NUM oarg {yy_askdecl($2, $3, $4);}
     | MCSAT oarguments {yy_mcsatdecl($2);}
-    | RESET NAME {yy_reset($2);}
+    | RESET oarg {yy_reset($2);}
     | DUMPTABLES {yy_dumptables();}
     | LOAD NAME {yy_load($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
