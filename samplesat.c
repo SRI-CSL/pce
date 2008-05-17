@@ -640,7 +640,7 @@ void flip_unfixed_variable(samp_table_t *table,
   //  double dcost = 0;   //dcost seems unnecessary
   atom_table_t *atom_table = &(table->atom_table);
   samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment]; 
-  printf("Flipping variable %"PRId32"\n", var);
+  cprintf(1,"Flipping variable %"PRId32"\n", var);
   if (assigned_true(assignment[var])){
     assignment[var] = v_false;
     link_propagate(table, pos_lit(var));
@@ -1444,9 +1444,9 @@ void sample_sat(samp_table_t *table, double sa_probability,
      * restore the earlier assignment
      */
     if (conflict == -1){
-      printf("Hit a conflict.\n");
+      cprintf(1, "Hit a conflict.\n");
     } else {
-      printf("Failed to find a model.\n");
+      cprintf(1, "Failed to find a model.\n");
     }
 
     // Flip current_assignment (restore the saved assignment)
