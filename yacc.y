@@ -305,10 +305,13 @@ void yy_mcsatdecl (char **params) {
     input_command.kind = DUMPTABLES;
   };
   void yy_reset (char *name) {
-    if (name == NULL || strcasecmp(name, "PROBABILITIES") == 0) {
-      input_command.kind = RESET;
+    input_command.kind = RESET;
+    if (name == NULL || strcasecmp(name, "ALL") ==0) {
+      input_command.decl.resetdecl.kind = ALL;
+    } else if (strcasecmp(name, "PROBABILITIES") == 0) {
+      input_command.decl.resetdecl.kind = PROBABILITIES;      
     } else {
-      yyerror("Can only reset 'probabilities' at the moment");
+      yyerror("Reset must be omitted, 'all', or 'probabilities'");
     }
     safe_free(name);
   };
@@ -746,3 +749,8 @@ void free_parse_data () {
   }
   }
 }
+
+
+// Local variables:
+// c-electric-flag: nil
+// End:
