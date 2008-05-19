@@ -14,7 +14,7 @@
 #include "pce_exit_codes.h"
 
 /*
- * Print an error message then call exit(YICES_EXIT_OUT_OF_MEMORY)
+ * Print an error message then call exit(MCSAT_EXIT_OUT_OF_MEMORY)
  */
 extern void out_of_memory(void) __attribute__ ((noreturn));
 
