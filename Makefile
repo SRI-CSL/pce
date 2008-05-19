@@ -67,7 +67,7 @@ tarfile: mcsat mcsat.exe
 	mkdir $(tmpdir)/doc
 	mkdir $(tmpdir)/tests
 	cp *.h *.c *.y Makefile $(tmpdir)
-	cp ./doc/mcsat.muse ./doc/mcsat.pdf $(tmpdir)/doc
+	cp ./doc/mcsat.muse ./doc/mcsat.pdf ./doc/mcsat.html $(tmpdir)/doc
 	cp ./tests/* $(tmpdir)/tests
 	cp mcsat mcsat.exe $(tmpdir)/bin
 	chmod -R og+rX $(tmpdir)
