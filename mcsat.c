@@ -336,12 +336,38 @@ int main(){
 	break;
       }
       case RESET: {
-	// Simply resets the probabilities of the atom table to -1.0
-	printf("Resetting probabilities of atoms to -1.0\n");
-	int32_t i;
-	atom_table->num_samples = 0;
-	for (i=0; i<atom_table->num_vars; i++) {
-	  atom_table->pmodel[i] = -1;
+	input_resetdecl_t decl = input_command.decl.resetdecl;
+	switch (decl.kind) {
+	case ALL: {
+	  // Resets the sample tables
+	  reset_sort_table(sort_table);
+	  // Need to do more here - like free up space.
+	  init_samp_table(&table);
+	  break;
+	}
+	case PROBABILITIES: {
+	  // Simply resets the probabilities of the atom table to -1.0
+	  printf("Resetting probabilities of atoms to -1.0\n");
+	  int32_t i;
+	  atom_table->num_samples = 0;
+	  for (i=0; i<atom_table->num_vars; i++) {
+	    atom_table->pmodel[i] = -1;
+	  }
+	  break;
+	}
+	}
+	break;
+      }
+      case LOAD: {
+	input_loaddecl_t decl = input_command.decl.loaddecl;
+	FILE *fp = fopen(decl.file, "r");
+	if (fp != NULL) {
+	  // Now we need to read the file
+	  // Set up yylex so that it reads from *fp, then call
+	  //yyparse();
+	  printf("Load not yet implemented");
+	} else {
+	  fprintf(stderr, "File %s caould not be opened\n", decl.file);
 	}
 	break;
       }
