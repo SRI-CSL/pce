@@ -910,11 +910,15 @@ bool valid_atom_table(atom_table_t *atom_table,
   uint32_t i = 0;
   uint32_t j;
   int32_t pred, arity;
+  int32_t num_unfixed = 0;
   int32_t *sig;
   while (i < atom_table->num_vars){
     pred = atom_table->atom[i]->pred;
     arity  = pred_arity(pred, pred_table);
     sig = pred_signature(pred, pred_table);
+    if (!fixed_tval(atom_table->assignment[atom_table->current_assignment][i])){
+      num_unfixed++;
+    }
     for (j = 0; j < arity; j++){
       if (const_table->entries[atom_table->atom[i]->args[j]].sort_index !=
 	  sig[j])
@@ -929,6 +933,7 @@ bool valid_atom_table(atom_table_t *atom_table,
       return false;
     i++;
   }
+  if (num_unfixed != atom_table->num_unfixed_vars) return false;
   return true;
 }
 
