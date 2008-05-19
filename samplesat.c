@@ -947,7 +947,12 @@ void empty_clause_lists(samp_table_t *table){
   clause_table->dead_negative_or_unit_clauses = NULL;
   clause_table->dead_clauses = NULL;
   uint32_t i;
+  int32_t num_unfixed = 0;
   for (i = 0; i < atom_table->num_vars; i++){
+    if (!fixed_tval(atom_table->assignment[atom_table->current_assignment][i])){
+      num_unfixed++;
+    }
+    atom_table->num_unfixed_vars = num_unfixed;
     clause_table->watched[pos_lit(i)] = NULL;
     clause_table->watched[neg_lit(i)] = NULL;
   }
@@ -1202,6 +1207,8 @@ int32_t reset_sample_sat(samp_table_t *table){
     }
   }
 
+  atom_table->num_unfixed_vars = num_unfixed_vars;
+
   for (i = 0; i < atom_table->num_vars; i++){
     if (assigned_true(assignment[i]) &&
 	assigned_false(new_assignment[i])){
@@ -1218,7 +1225,6 @@ int32_t reset_sample_sat(samp_table_t *table){
 
   //move all sat_clauses to unsat_clauses for rescanning
   
-  atom_table->num_unfixed_vars = num_unfixed_vars;
   move_sat_to_unsat_clauses(clause_table);
 
   scan_unsat_clauses(table);
