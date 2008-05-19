@@ -63,6 +63,10 @@ typedef struct input_mcsatdecl_s {
   int32_t max_samples;
 } input_mcsatdecl_t;
 
+typedef struct input_resetdecl_s {
+  enum {ALL, PROBABILITIES} kind;
+} input_resetdecl_t;
+
 typedef struct input_loaddecl_s {
   char *file;
 } input_loaddecl_t;
@@ -81,6 +85,7 @@ typedef union input_decl_s {
   input_adddecl_t adddecl;
   input_askdecl_t askdecl;
   input_mcsatdecl_t mcsatdecl;
+  input_resetdecl_t resetdecl;
   input_loaddecl_t loaddecl;
   input_verbositydecl_t verbositydecl;
 } input_decl_t;
