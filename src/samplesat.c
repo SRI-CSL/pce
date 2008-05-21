@@ -1336,8 +1336,6 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
 }
 
 
-extern void print_atom(samp_atom_t *atom, samp_table_t *table);
-
 static void print_model(samp_table_t *table) {
   samp_truth_value_t *assignment;
   atom_table_t *atom_table;

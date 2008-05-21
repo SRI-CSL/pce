@@ -29,12 +29,12 @@ extern int32_t add_var(var_table_t *var_table,
 		      sort_table_t *sort_table,
 		      char * sort_name);
 
-extern int32_t add_pred(pred_table_t *pred_table,
-		     char *name,
-		     bool evidence,
-		     int32_t arity,
-		     sort_table_t *sort_table,
-		     char **in_signature);
+/* extern int32_t add_pred(pred_table_t *pred_table, */
+/* 		     char *name, */
+/* 		     bool evidence, */
+/* 		     int32_t arity, */
+/* 		     sort_table_t *sort_table, */
+/* 		     char **in_signature); */
 
 extern int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
 
@@ -72,12 +72,12 @@ extern int32_t init_sample_sat(samp_table_t *table);
 extern void query_clause(input_clause_t *clause, double threshold, bool all,
 			 samp_table_t *table);
 
-bool valid_atom_table(atom_table_t *atom_table,
-		      pred_table_t *pred_table,
-		      const_table_t *const_table,
-		      sort_table_t *sort_table);
+/* bool valid_atom_table(atom_table_t *atom_table, */
+/* 		      pred_table_t *pred_table, */
+/* 		      const_table_t *const_table, */
+/* 		      sort_table_t *sort_table); */
 
-bool valid_table(samp_table_t *table);
+/* bool valid_table(samp_table_t *table); */
 
 int32_t reset_sample_sat(samp_table_t *table);
 
