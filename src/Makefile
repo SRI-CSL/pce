@@ -59,8 +59,9 @@ bin_src_c :=
 #
 # list of exported symbols for dynamic library
 # this is used on cygwin/mingw only
+# (We don't use this. It's simpler to export all symbols)
+## mcsat_exports := mcsat_exports.def
 #
-mcsat_exports := mcsat_exports.def
 
 # dependencies and object files to build
 dep := $(src_c:%.c=$(objdir)/%.d)
@@ -270,10 +271,10 @@ $(libmcsat_so): $(libmcsat_obj)
 # copy cygmcsat.dll in /bin (or /usr/bin)
 # link the code using the flags -lmcsat
 #
-$(libmcsat_dll): $(libmcsat_obj) $(mcsat_exports)
+$(libmcsat_dll): $(libmcsat_obj)
 	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $(libmcsat_dll) \
 	-Wl,--out-implib=$(libmcsat_implib) --no-whole-archive $(libmcsat_obj) \
-	$(LIBS) $(mcsat_exports)
+	$(LIBS)
 	$(STRIP) $(libmcsat_dll)
 
 #
@@ -288,7 +289,7 @@ $(libmcsat_dll): $(libmcsat_obj) $(mcsat_exports)
 $(libmcsat_mingw_dll): $(libmcsat_obj)
 	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $(libmcsat_mingw_dll) \
 	-Wl,--out-implib=$(libmcsat_implib) -Wl,--output-def,$(libmcsat_def) \
-	$(libmcsat_obj) $(LIBS) $(mcsat_exports)
+	$(libmcsat_obj) $(LIBS)
 	$(STRIP) $(libmcsat_mingw_dll)
 
 

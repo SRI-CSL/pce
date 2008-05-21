@@ -1704,13 +1704,15 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
   samp_rule_t *samp_clause;
   samp_atom_t *patom;
 
+  bindings = NULL;
+  best_prob = 0.0;
+  best_atom = -1;    
+
   nvars = atom_table->num_vars;
   num_samples = atom_table->num_samples;
   if (all) {
     init_ivector(&atoms, 10);
     init_dvector(&probs, 10);
-  } else {
-    best_atom = -1;
   }
 
   // We preprocess the clause, to create a samp_clause and typecheck it
@@ -1739,7 +1741,9 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
     if (query_match(atom_table->atom[i], patom, bindings, table)) {
       // Found a match, now check the threshold
       prob = (double) (atom_table->pmodel[i]/(double) num_samples);
-      if (clause->literals[0]->neg) {prob = 1 - prob;}
+      if (clause->literals[0]->neg) {
+	prob = 1 - prob;
+      }
       if (prob >= threshold) {
 	if (all) {
 	  ivector_push(&atoms, i);
