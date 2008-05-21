@@ -244,7 +244,7 @@ $(libmcsat): $(obj)
 # from allmcsat.o
 #
 $(libmcsat_obj): $(obj)
-	$(LD) -r $(LDFLAGS) -o $(libmcsat_obj) $(obj) $(LIBS)
+	$(LD) -r $(LDFLAGS) -o $(libmcsat_obj) $(obj)
 
 
 #
