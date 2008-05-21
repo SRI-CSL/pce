@@ -1,0 +1,149 @@
+#
+# Build Makefile:
+# 
+# Must be invoked with the following variables set
+#
+#   MCSAT_TOP_DIR = top-level directory for Mcsat
+#   MCSAT_MODE = build mode
+#   MCSAT_MAKE_INCLUDE = configuration file to include
+#   ARCH = architecture (e.g, i686-pc-linux-gnu)
+#   POSIXOS = OS (e.g., linux)
+#
+# Config variables are imported by including the file
+#   $(MCSAT_TOP_DIR)/$(MCSAT_MAKE_INCLUDE)
+#
+# This file is constructed by running configure on the
+# host and it defines the compilation tools and flags.
+#
+
+SHELL=/bin/sh
+
+include $(MCSAT_TOP_DIR)/$(MCSAT_MAKE_INCLUDE)
+
+
+#
+# source directories
+#
+srcdir = src
+testdir = tests
+satsolverdir = sat_solver
+
+#
+# Build directories
+#
+build_dir = build/$(ARCH)-$(MCSAT_MODE)
+
+objdir = $(build_dir)/obj
+libdir = $(build_dir)/lib
+bindir = $(build_dir)/bin
+
+#
+# Compilation
+# 
+objects: build_dir
+	@ echo "=== Building objects ==="
+	@ $(MAKE) -C $(srcdir) BUILD=../$(build_dir) objects
+
+lib: build_dir
+	@ echo "=== Building libraries ==="
+	@ $(MAKE) -C $(srcdir) BUILD=../$(build_dir) lib
+
+bin: build_dir
+	@ echo "=== Building binaries ==="
+	@ $(MAKE) -C $(srcdir) BUILD=../$(build_dir) bin
+
+test: build_dir lib
+	@ echo "=== Building tests ==="
+	@ $(MAKE) -C $(testdir) BUILD=../$(build_dir) all
+
+satsolver: build_dir objects
+	@ echo "=== Building satsolver ==="
+	@ $(MAKE) -C $(satsolverdir) BUILD=../$(build_dir) bin
+
+
+#
+# Create build directories if not present
+#
+build_dir: $(objdir) $(libdir) $(bindir)
+
+$(objdir):
+	$(MKDIR_P) $(objdir)
+
+$(libdir):
+	$(MKDIR_P) $(libdir)
+
+$(bindir):
+	$(MKDIR_P) $(bindir)
+
+
+#
+# Basic clean: delete objects/libraries/binary files
+# (some tools construct sub-directories in bin)
+#
+clean:
+	rm -rf $(objdir)/*
+	rm -rf $(libdir)/*
+	rm -rf $(bindir)/*
+
+
+#
+# Deep clean: delete build sub-directories for arch + mode
+#
+build-clean: build_clean
+
+build_clean:
+	rm -rf $(objdir)
+	rm -rf $(libdir)
+	rm -rf $(bindir)
+
+
+#
+# Arch clean: delete all build subdirectories for an architecture
+#
+arch-clean: arch_clean
+
+arch_clean:
+	rm -rf build/$(ARCH)-*
+
+
+#
+# All clean delete all build directories
+#
+all-clean: all_clean
+
+all_clean:
+	rm -rf build/*
+
+
+
+.PHONY: recheck build_dir build_clean clean build-clean arch-clean arch_clean \
+	all_clean all-clean
+
+recheck:
+	@ echo
+	@ echo "*** Recursive Makefile ***"
+	@ echo
+	@ echo "target is $@"
+	@ echo
+	@ echo "ARCH is $(ARCH)"
+	@ echo "POSIXOS is $(POSIXOS)"
+	@ echo "MCSAT_TOP_DIR is $(MCSAT_TOP_DIR)"
+	@ echo "MCSAT_MAKE_INCLUDE is $(MCSAT_MAKE_INCLUDE)"
+	@ echo "MCSAT_MODE is $(MCSAT_MODE)"
+	@ echo
+	@ echo "Configuration"
+	@ echo "  EXEEXT   = $(EXEEXT)"
+	@ echo "  SED      = $(SED)"
+	@ echo "  LN_S     = $(LN_S)"
+	@ echo "  MKDIR_P  = $(MKDIR_P)"
+	@ echo "  CC       = $(CC)"
+	@ echo "  CPPFLAGS = $(CPPFLAGS)"
+	@ echo "  LIBS     = $(LIBS)"
+	@ echo "  LDFLAGS  = $(LDFLAGS)"
+	@ echo "  LD       = $(LD)"
+	@ echo "  AR       = $(AR)"
+	@ echo "  RANLIB   = $(RANLIB)"
+	@ echo "  GPERF    = $(GPERF)"
+	@ echo "  STRIP    = $(STRIP)"
+	@ echo
+
