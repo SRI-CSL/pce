@@ -4,7 +4,6 @@ Content and Directory Structure
 The source subdirectories include
 
 ./src:	       source code for MCSAT
-./tests:       source code for test programs
 ./doc:	       documentation
 ./examples:    example input files for testing
 
@@ -39,9 +38,7 @@ make.include.<platform>.
 
 The rationale for this organization is to support parallel compilation
 on several machines from the same source directory (i.e., without
-having to run ./configure every time on each machine). mcsat 1.0.xx
-does not allow this and that's a pain whenever we release a new
-version.
+having to run ./configure every time on each machine).
  
 The Makefile in the top-level directory determines the architecture and OS, 
 and checks the compilation mode. It sets five variables that are passed
@@ -94,16 +91,6 @@ To use this configuration, add the option ABI=32 when invoking make.
 
 
 
-Building a tarfile with all source files
-----------------------------------------
-
-Type 'make source-distribution' in the top-level directory.
-
-this build a tarfile ./distributions/mcsat-src.tar.gz
-
-
-
-
 Compilation
 -----------
 
@@ -111,14 +98,9 @@ Compilation
 
    make MODE=<compilation mode> bin
 
-To compile all the tests, type
-
-   make MODE=<compilation mode> test
-
 The resulting executables are in ./build/<platform>-<mode>/bin
 
-
-The possible compilation modes are defined in src/Makefile and test/Makefile.
+The possible compilation modes are defined in src/Makefile.
 Currently the possible compilation modes are:
   
   release
@@ -141,7 +123,7 @@ If nothing is specified, the default MODE is release.
 The objects are in ./build/<platform>-<mode>/obj
 
 
-3) To compile only libmcsat.a:
+3) To compile only the libraries (e.g., libmcsat.a)
 
    make MODE=<compilation mode> lib
 
@@ -201,4 +183,21 @@ To remove all build directories: ./build/*
 
    make all-clean
    make all_clean
+
+
+
+
+
+Building a tarfile with all source files + common binaries
+----------------------------------------------------------
+
+Type 'make distribution' in the top-level directory.
+
+this build a tarfile ./distributions/mcsat-src.tar.gz
+
+The tarfile should contain a full source distribution plus 
+precompiled binaries for linux, Mac/intel, and Window XG.
+
+
+
 

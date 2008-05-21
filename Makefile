@@ -98,7 +98,6 @@ endif
 distdir=./distributions
 tmpdir=./mcsat
 srctarfile=$(distdir)/mcsat-src.tar.gz
-timestamp=./distributions/timestamp
 
 #
 # Just print configuration
@@ -134,23 +133,25 @@ checkgmake:
 #
 # Build the tar file
 #
-source-distribution:
+distribution:
 	rm -f -r $(tmpdir)
 	mkdir $(tmpdir)
 	mkdir $(tmpdir)/autoconf
 	mkdir $(tmpdir)/configs
 	mkdir $(tmpdir)/src
-	mkdir $(tmpdir)/tests
-	mkdir $(tmpdir)/doc
 	mkdir $(tmpdir)/examples
+	mkdir $(tmpdir)/doc
+	mkdir -p $(tmpdir)/bin/windows $(tmpdir)/bin/linux $(tmpdir)/bin/linux64 $(tmpdir)/bin/macos10.5
 	cp install-sh config.guess configure configure.ac config.sub gmaketest $(tmpdir)
 	cp README Makefile Makefile.build make.include.in $(tmpdir)
 	cp autoconf/* $(tmpdir)/autoconf
-	cp src/Makefile src/*.h src/*.c src/mcsat_keywords.txt src/smt_keywords.txt $(tmpdir)/src
-	cp tests/Makefile tests/*.c $(tmpdir)/tests
-	cp doc/NOTES doc/SMT-LIB-LANGUAGE doc/smt_parser.txt doc/mcsat_parser.txt doc/table_builder.c \
-	  doc/smt-grammar $(tmpdir)/doc
-	cp examples/*.ys $(tmpdir)/examples
+	cp src/Makefile src/*.h src/*.c src/*.y $(tmpdir)/src
+	cp doc/*.muse doc/*.pdf doc/*.html $(tmpdir)/doc
+	cp examples/* $(tmpdir)/examples
+	cp build/i686-pc-linux-gnu-release/bin/* $(tmpdir)/bin/linux
+	cp build/x86_64-unknown-linux-gnu-release/bin/* $(tmpdir)/bin/linux64
+	cp build/i386-apple-darwin9.2.2-release/bin/* $(tmpdir)/bin/macos10.5
+	cp build/i686-pc-mingw32-release/bin/* $(tmpdir)/bin/windows
 	chmod -R og+rX $(tmpdir)
 	mkdir -p $(distdir)
 	tar -czf $(srctarfile) $(tmpdir)
@@ -158,4 +159,4 @@ source-distribution:
 	rm -f -r $(tmpdir)
 
 
-.PHONY: checkgmake check source-distribution
+.PHONY: checkgmake check distribution bin

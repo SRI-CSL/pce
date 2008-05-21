@@ -25,8 +25,6 @@ include $(MCSAT_TOP_DIR)/$(MCSAT_MAKE_INCLUDE)
 # source directories
 #
 srcdir = src
-testdir = tests
-satsolverdir = sat_solver
 
 #
 # Build directories
@@ -51,14 +49,6 @@ lib: build_dir
 bin: build_dir
 	@ echo "=== Building binaries ==="
 	@ $(MAKE) -C $(srcdir) BUILD=../$(build_dir) bin
-
-test: build_dir lib
-	@ echo "=== Building tests ==="
-	@ $(MAKE) -C $(testdir) BUILD=../$(build_dir) all
-
-satsolver: build_dir objects
-	@ echo "=== Building satsolver ==="
-	@ $(MAKE) -C $(satsolverdir) BUILD=../$(build_dir) bin
 
 
 #
