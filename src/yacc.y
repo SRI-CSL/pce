@@ -8,19 +8,19 @@
 #include "samplesat.h"
 #include "mcsat.h"
 #include "input.h"
+#include "parser.h"
 #include "vectors.h"
 #define YYDEBUG 1
 
 extern void free_parse_data();
+
 static bool yyerrflg = false;
 
 // These are buffers for holding things until they are malloc'ed
 static char yystrbuf[1000];
 static pvector_t yyargs;
 static pvector_t yylits;
-static void free_strings (char **string);
-static void free_atom(input_atom_t *atom);
-static void free_clause(input_clause_t *clause);
+FILE *parse_input;
   
 void yyerror (char *str) {
   printf("pce: %s\n", str);
@@ -92,51 +92,50 @@ input_clause_t *yy_clause(char **vars, input_literal_t **lits) {
 }
   
 int yylex (void);
+input_command_t input_command;
 
-  input_command_t input_command;
+bool yy_check_int(char *str){
+  int32_t i;
+  for(i=0; str[i] != '\0'; i++){
+    if (! isdigit(str[i])) {
+      yyerror("Integer expected");
+      return false;
+    }
+  }
+  return true;
+}
 
-  bool yy_check_int(char *str){
-    int32_t i;
-    for(i=0; str[i] != '\0'; i++){
-      if (! isdigit(str[i])) {
-	yyerror("Integer expected");
+bool yy_check_float(char *str) {
+  bool have_digit = false;
+  bool have_dot = false;
+  int32_t i;
+  if (str[0] == '.' || str[0] == '+' || str[0] == '-' || isdigit(str[0])) {
+    if (str[0] == '.') {
+      have_dot = true;
+    } else if (isdigit(str[0])) {
+      have_digit = true;
+    }
+    for(i=1; str[i] != '\0'; i++){
+      if (isdigit(str[i])){
+	have_digit = true;
+      } else if (str[i] == '.') {
+	if (have_dot) {
+	  yyerror("Number has two decimal points");
+	  return false;
+	}
+	else
+	  have_dot = true;
+      } else {
+	yyerror("Invalid floating point number");
 	return false;
       }
     }
-    return true;
+  } else {
+    yyerror("Invalid floating point number");
+    return false;
   }
-
-  bool yy_check_float(char *str){
-    bool have_digit = false;
-    bool have_dot = false;
-    int32_t i;
-    if (str[0] == '.' || str[0] == '+' || str[0] == '-' || isdigit(str[0])) {
-      if (str[0] == '.') {
-	have_dot = true;
-      } else if (isdigit(str[0])) {
-	have_digit = true;
-      }
-      for(i=1; str[i] != '\0'; i++){
-	if (isdigit(str[i])){
-	  have_digit = true;
-	} else if (str[i] == '.') {
-	  if (have_dot) {
-	    yyerror("Number has two decimal points");
-	    return false;
-	  }
-	  else
-	    have_dot = true;
-	} else {
-	  yyerror("Invalid floating point number");
-	  return false;
-	}
-      }
-    } else {
-      yyerror("Invalid floating point number");
-      return false;
-    }
-    return true;
-  }
+  return true;
+}
 
   void yy_command(int kind, input_decl_t *decl) {
     input_command.kind = kind;
@@ -363,6 +362,7 @@ void yy_mcsatdecl (char **params) {
 
 %token NAME
 %token NUM
+%token STRING
 
 %union
 {
@@ -375,7 +375,7 @@ void yy_mcsatdecl (char **params) {
   input_atom_t *atom;
 }
 
-%type <str> arg NAME NUM addwt oarg
+%type <str> arg NAME NUM STRING addwt oarg
 %type <strs> arguments variables oarguments
 %type <clause> clause
 %type <lit> literal 
@@ -420,7 +420,7 @@ decl: SORT NAME {yy_sortdecl($2);}
     | MCSAT oarguments {yy_mcsatdecl($2);}
     | RESET oarg {yy_reset($2);}
     | DUMPTABLES {yy_dumptables();}
-    | LOAD NAME {yy_load($2);}
+    | LOAD STRING {yy_load($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
     | TEST {yy_test();}
     | HELP {yy_help();}
@@ -480,7 +480,7 @@ int yylex (void) {
   
   /* skip white space  */
   do {
-    c = getchar();
+    c = getc(parse_input);
   } while (isspace(c));
 
   /* process numbers - note that we process for as long as it could be a
@@ -502,10 +502,10 @@ int yylex (void) {
 	  have_dot = 1;
       };
       yystrbuf[i++] = c;
-      c = getchar();
+      c = getc(parse_input);
     } while (c != EOF && (isdigit(c) || c == '.'));
     yystrbuf[i] = '\0';
-    ungetc(c, stdin);
+    ungetc(c, parse_input);
     yylval.str = yystrbuf;
     if (! have_digit)
       yyerror("Malformed number - '.', '+', '-' must have following digits");
@@ -517,10 +517,10 @@ int yylex (void) {
   if (isalpha(c)) {
     do {
       yystrbuf[i++] = c;
-      c = getchar();
+      c = getc(parse_input);
     } while (c != EOF && isidentchar(c));
     yystrbuf[i] = '\0';
-    ungetc(c, stdin);
+    ungetc(c, parse_input);
     yylval.str = yystrbuf;
     if (strcasecmp(yylval.str, "PREDICATE") == 0)
       return PREDICATE;
@@ -560,9 +560,21 @@ int yylex (void) {
       return QUIT;
     else
       nstr = (char *) safe_malloc((strlen(yylval.str)+1) * sizeof(char));
-      strcpy(nstr, yylval.str);
-      yylval.str = nstr;
-      return NAME;
+    strcpy(nstr, yylval.str);
+    yylval.str = nstr;
+    return NAME;
+  }
+  if (c == '\"') {
+    // At the moment, escapes not recognized
+    do {
+      c = getc(parse_input);
+      if (c == '\"' || c == EOF) {
+        break;
+      } else {
+        yystrbuf[i++] = c;
+      }
+    } while (true);
+    return STRING;
   }
   /* return end-of-file  */
   if (c == EOF) return QUIT;
@@ -572,51 +584,6 @@ int yylex (void) {
 
 
 /* Free the memory allocated for the declaration */
-
-void free_strings (char **string) {
-  int32_t i;
-
-  i = 0;
-  if (string != NULL) {
-    while (string[i] != NULL) {
-      safe_free(string[i]);
-      i++;
-    }
-  }
-}
-
-void free_atom(input_atom_t *atom) {
-  int32_t i;
-
-  i = 0;
-  safe_free(atom->pred);
-  while (atom->args[i] != NULL) {
-    safe_free(atom->args[i]);
-    i++;
-  }
-  safe_free(atom);
-}
-
-void free_literal(input_literal_t *lit) {
-  free_atom(lit->atom);
-  safe_free(lit);
-}
-
-void free_literals (input_literal_t **lit) {
-  int32_t i;
-
-  i = 0;
-  while (lit[i] != NULL) {
-    free_literal(lit[i]);
-    i++;
-  }
-  safe_free(lit);
-}
-
-void free_clause(input_clause_t *clause) {
-  free_strings(clause->variables);
-  free_literals(clause->literals);
-}
   
 
 void free_preddecl_data() {

@@ -42,7 +42,11 @@ bindir := $(BUILD)/bin
 #
 src_c := array_hash_map.c gcd.c hash_functions.c input.c int_array_sort.c \
 	 integer_stack.c int_stack.c mcsat.c memalloc.c samplesat.c \
-	 string_heap.c symbol_tables.c utils.c vectors.c yacc.tab.c
+	 string_heap.c tables.c symbol_tables.c utils.c vectors.c parser.c \
+         print.c yacc.tab.c
+ifneq ($(OAACFLAGS), "")
+src_c := $(src_c) pce.c
+endif
 
 
 #
@@ -87,7 +91,9 @@ libmcsat_def=$(libdir)/libmcsat.def
 
 # binaries
 binaries := $(bindir)/mcsat$(EXEEXT)
-
+ifneq ($(OAACFLAGS), "")
+binaries := $(binaries) $(bindir)/pce$(EXEEXT)
+endif
 
 
 #
@@ -233,6 +239,9 @@ yacc.tab.c yacc.tab.h: yacc.y
 $(objdir)/%.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
+$(objdir)/pce.o: pce.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) -c $< -o $@
+
 # static Library
 $(libmcsat): $(obj)
 	@ rm -f $(libmcsat)
@@ -317,6 +326,11 @@ $(libmcsat_dylib): $(libmcsat_obj)
 #	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(mcsat_version_o) $(libmcsat) $(LIBS)
 $(bindir)/%$(EXEEXT): $(objdir)/%.o $(libmcsat)
 	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS)
+
+ifneq ($(OAALDFLAGS),"")
+$(bindir)/pce$(EXEEXT): $(objdir)/pce.o $(libmcsat)
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) $(OAALDFLAGS) -o $@ $< $(libmcsat) $(LIBS)
+endif
 
 
 #

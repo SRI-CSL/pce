@@ -19,11 +19,6 @@
 #define DEFAULT_MAX_EXTRA_FLIPS 10
 #define DEFAULT_MAX_SAMPLES 1000
 
-extern int32_t add_const(const_table_t *const_table,
-		      char *name,
-		      sort_table_t *sort_table,
-		      char * sort_name);
-
 extern int32_t add_var(var_table_t *var_table,
 		      char *name,
 		      sort_table_t *sort_table,
@@ -36,7 +31,11 @@ extern int32_t add_var(var_table_t *var_table,
 /* 		     sort_table_t *sort_table, */
 /* 		     char **in_signature); */
 
+extern void atom_buffer_resize(int32_t arity);
+
 extern int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
+
+extern int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom);
 
 extern int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom);
 
@@ -44,14 +43,24 @@ extern int32_t add_clause(samp_table_t *table,
 			  input_literal_t **in_clause,
 			  double weight);
 
+extern int32_t add_internal_clause(samp_table_t *table,
+				   int32_t *clause,
+				   int32_t length,
+				   double weight);
+
 extern int32_t add_rule(input_clause_t *in_rule,
 			double weight,
 			samp_table_t *samp_table);
 
+extern void add_rule_to_pred(pred_table_t *pred_table,
+			     int32_t predicate,
+			     int32_t current_rule_index);
+
 extern void all_ground_instances_of_rule(int32_t rule, samp_table_t *table);
 
 extern void create_new_const_rule_instances(int32_t constidx,
-					    samp_table_t *table);
+					    samp_table_t *table,
+					    bool lazy, int32_t atom_index);
 
 extern void link_propagate(samp_table_t *table,
 		    samp_literal_t lit);
@@ -91,6 +100,9 @@ void sample_sat(samp_table_t *table, double sa_probability,
 void mc_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 	    uint32_t max_flips, uint32_t max_extra_flips, uint32_t max_samples);
+
+bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
+			     int32_t arity);
 
 #endif /* __SAMPLESAT_H */     
 

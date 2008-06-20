@@ -1,5 +1,5 @@
 dnl
-dnl Configure for MCSAT
+dnl Configure for MCSAT and PCE
 dnl
 dnl This builds a platform-dependent configuration
 dnl file stored in configs/Makefile.$ARCH
@@ -49,6 +49,46 @@ AC_CHECK_PROG(LD,ld,ld)
 AC_CHECK_PROG(AR,ar,ar)
 AC_CHECK_PROG(STRIP,strip,strip)
 AC_PROG_YACC
+
+dnl
+dnl OAA Libraries (optional, but needed for PCE)
+dnl --------------------------------------------
+liboaa=""
+AC_ARG_WITH([oaa],
+   [AS_HELP_STRING([--with-oaa=<path>],[Full path to OAA])],
+   [if test "x$withval" == x; then
+      AC_MSG_WARN([--with-oaa was used but no path was given.])
+    else
+      liboaa=$withval
+    fi
+   ])
+
+if test "x$liboaa" == x; then
+    AC_MSG_WARN([OAA not provided, pce will not be built (use --with-oaa if desired).])
+  else
+    if test -f $liboaa/src/oaalib/c/include/liboaa.h; then
+      if test $build == x86_64-unknown-linux-gnu; then
+        oaalibdir=$liboaa/lib/x86-linux
+      else if test $build == i686-pc-linux-gnu; then
+        oaalibdir=$liboaa/lib/x86-linux
+      else if test $build == i386-apple-darwin9-3.0; then
+        oaalibdir=$liboaa/lib/mac-os-x
+      else if test $build == sparc-sun-solaris2.9; then
+        oaalibdir=$liboaa/lib/sparc-solaris
+      else AC_MSG_WARN([$build platform not supported])
+      fi fi fi fi
+      if test ! -f $oaalibdir/liboaa2.a; then
+        AC_MSG_WARN([$aalibdir/liboaa2.a not found])
+      fi
+      OAACFLAGS="-I$liboaa/src/oaalib/c/include -I$oaalibdir/glib-2.0/include -I$liboaa/src/oaalib/c/external/glib/glib-2.10.1 -I$liboaa/src/oaalib/c/external/glib/glib-2.10.1/glib"
+      OAALDFLAGS="-L$oaalibdir -loaa2"
+   else
+      AC_MSG_ERROR([*** liboaa.h not found in $liboaa (should be in $liboaa/src/oaalib/c/include/). Check --with-oaa option ***])
+   fi
+fi
+
+AC_SUBST(OAACFLAGS)
+AC_SUBST(OAALDFLAGS)
 
 #
 # Restore CFLAGS
