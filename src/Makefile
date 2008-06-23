@@ -221,7 +221,7 @@ lib: $(lib_targets)
 # Dependency files
 $(objdir)/%.d: %.c
 	@ echo Building dependency file $@
-	@ $(CC) -MM -MG $(CPPFLAGS) $< > $@.tmp
+	@ $(CC) -MM -MG $(CPPFLAGS) $(OAACFLAGS) $< > $@.tmp
 	@ $(SED) 's,\($*\).o[ :]*,$(objdir)/\1.o $@ : , g' < $@.tmp > $@
 	@ rm -f $@.tmp
 
@@ -329,7 +329,7 @@ $(bindir)/%$(EXEEXT): $(objdir)/%.o $(libmcsat)
 
 ifneq ($(OAALDFLAGS),"")
 $(bindir)/pce$(EXEEXT): $(objdir)/pce.o $(libmcsat)
-	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) $(OAALDFLAGS) -o $@ $< $(libmcsat) $(LIBS)
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(OAALDFLAGS) 
 endif
 
 

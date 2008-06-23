@@ -118,15 +118,15 @@ checkgmake:
 #
 # Invoke submake that will do the real work
 #
-.DEFAULT: checkgmake
+.DEFAULT bin lib test : checkgmake
 	@ echo "Mode:     $(MCSAT_MODE)"
 	@ echo "Platform: $(ARCH)"
 	@ $(MAKE) -f Makefile.build \
 	MCSAT_MODE=$(MCSAT_MODE) \
 	ARCH=$(ARCH) \
 	POSIXOS=$(POSIXOS) \
-	MCSAT_TOP_DIR=$(MCSAT_TOP_DIR) \
-	MCSAT_MAKE_INCLUDE=$(MCSAT_MAKE_INCLUDE) \
+	MCSAT_TOP_DIR="$(MCSAT_TOP_DIR)" \
+	MCSAT_MAKE_INCLUDE="$(MCSAT_MAKE_INCLUDE)" \
 	$@
 
 
