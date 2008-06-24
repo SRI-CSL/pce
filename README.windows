@@ -1,0 +1,73 @@
+The following instructions explain how to compile the package for
+Windows. For UNIX systems, please check the generic README file.
+
+Building pce.exe on Windows
+---------------------------
+
+Unless you have a good reason to build pce.exe or mcsat.exe
+from the source, just get the precompiled versions. Otherwise,
+here is how to proceed:
+
+To compile a pce or mcsat for Windows, you must use MinGW:
+
+1) intall mingw and msys (both can be downloaded at http://www.mingw.org/)
+
+2) create a working directory accessible from msys
+   (e.g., c:\msys\1.0\home\pce)
+   IMPORTANT: make sure there are no blanks in the directory name.
+
+3) copy the full pce distribution into c:\msys\1.0\home\pce
+   make sure
+     c:\msys\1.0\home\pce\src contains the files 'yacc.tab.c' and 'yacc.tab.h'
+     c:\msys\1.0\home\pce contains the file 'configure'
+
+Then if you want to build only mcsat.exe:
+
+4) open the 'msys' console by clicking on the Msys icon
+   from the console type
+     cd /home/pce
+     ./configure
+     make bin 
+
+   This will compile mcsat and build the executable
+      /home/pce/build/i386-mingw32-release/bin/mcsat.exe
+
+   Outside of 'msys', the executable is in directory
+      c:\msys\1.0\home\pce\build\i386-mingw32-release\bin
+
+   You can then move or copy mcsat.exe to a directory in your Windows
+   path. This should run under Windows.
+
+
+
+If you want to build pce.exe:
+
+5) download the OAA distribution from http://www.ai.sri.com/~oaa
+   (Get the latest version. You need the Windows code distribution)
+
+   unzip the distribution into c:\msys\1.0\home\pce\
+   this should create a directory c:\msys\1.0\home\pce\oaa2.3.2\
+
+6) open the 'msys' console by clicking on the Msys icon
+   from the msys console type
+     cd /home/pce
+     ./configure --with-oaa=/home/pce/oaa2.3.2
+     make bin
+
+   This will compile both mcsat.exe and pce.exe. Both
+   are located in the directory
+   
+     /home/pce/build/i386-mingw32-release/bin
+
+   which is accessible from Windows as
+   
+      c:\msys\1.0\home\pce\build\i386-mingw32-release\bin
+
+   To run pce.exe from Windows, you need to copy the executable
+   ('pce.exe') and all the OAA DLLs in your path. The OAA DLLs
+   are located in
+
+      c:\msys\1.0\home\pce\oaa2.3.2\lib\win32
+
+
+
