@@ -105,7 +105,8 @@ typedef struct samp_clause_s {
 } samp_clause_t;
 
 
-//An atom has a predicate symbol and an array of the corresponding arity. 
+// An atom has a predicate symbol and an array of the corresponding arity.
+// Note that to get the arity, the pred_table must be available.
 typedef struct samp_atom_s {
   int32_t pred;
   int32_t args[0];
@@ -154,6 +155,8 @@ typedef  struct sort_table_s {
 #define INIT_ATOM_PRED_SIZE 16
 #define INIT_RULE_PRED_SIZE 16
 #define INIT_ATOM_TABLE_SIZE 64
+#define INIT_QUERY_TABLE_SIZE 16
+#define INIT_QUERY_INSTANCE_TABLE_SIZE 64
 #define INIT_CLAUSE_TABLE_SIZE 64
 #define INIT_RULE_TABLE_SIZE 64
 #define INIT_SORT_CONST_SIZE 16
@@ -211,22 +214,25 @@ typedef struct var_table_s {
   stbl_t var_name_index; //table mapping var name to index
 } var_table_t;
 
-typedef struct atom_entry_s {
-  samp_atom_t *atom;
-  samp_truth_value_t assignment; 
-} atom_entry_t;
+// typedef struct atom_entry_s {
+//   samp_atom_t *atom;
+//   samp_truth_value_t assignment; 
+// } atom_entry_t;
 
 typedef struct atom_table_s {
   int32_t size; //size of the var_atom array (double for watched)
   int32_t num_vars;  //number of bvars
   int32_t num_unfixed_vars;
   samp_atom_t **atom; // atom_entry_t *entries;
+  int32_t *sampling_nums; // Keeps track of number of samplings when atom was
+                      // introduced - used for more accurate probs.
   uint32_t current_assignment; //which of two assignment arrays is current
   samp_truth_value_t *assignment[2];//maps atom ids to samp_truth_value_t
   int32_t num_samples;
   int32_t *pmodel;
   array_hmap_t atom_var_hash; //maps atoms to variables
 } atom_table_t;
+
 
 typedef struct clause_table_s {
   int32_t size;   //size of the samp_clauses array
@@ -267,6 +273,42 @@ typedef struct rule_table_s {
   samp_rule_t **samp_rules; //array of pointers to samp_rules
 } rule_table_t;
 
+
+// Queries involve two tables; the query_table_t keeps the uninstantiated
+// form of the query, to be instantiated as new constants come in.  The
+// query_instance_table_t keeps the instantiated form, along with the
+// sampling numbers and pmodels as for the atom_table_t.
+
+// Similar to rules, but we can't separate the clauses, so the literals
+// array is one level deeper.
+typedef struct samp_query_s {
+  int32_t *source_index; // The source of this query, e.g., formula, learner id
+  int32_t num_clauses;
+  int32_t num_vars;
+  var_entry_t **vars;
+  rule_literal_t ***literals;
+} samp_query_t;
+
+typedef struct query_table_s {
+  int32_t size; //size of the query array
+  int32_t num_queries;
+  samp_query_t **query;
+} query_table_t;
+
+typedef struct samp_query_instance_s {
+  int32_t query_index; // Index to the query from which this was generated
+  int32_t sampling_num; // The num_samples when this instance was created
+  int32_t pmodel; // The nimber of samples for which this instance was true
+  int32_t *subst; // Holds the mapping from vars to consts
+  samp_literal_t **lit; // The instance - a conjunction of disjunctions of lits
+} samp_query_instance_t;
+
+typedef struct query_instance_table_s {
+  int32_t size; //size of the lit array
+  int32_t num_queries;
+  samp_query_instance_t **query_inst;
+} query_instance_table_t;
+
 typedef struct samp_table_s {
   sort_table_t sort_table;
   const_table_t const_table;
@@ -275,6 +317,8 @@ typedef struct samp_table_s {
   atom_table_t atom_table;
   clause_table_t clause_table;
   rule_table_t rule_table;
+  query_table_t query_table;
+  query_instance_table_t query_instance_table;
   integer_stack_t fixable_stack;
 } samp_table_t;
 
@@ -333,6 +377,14 @@ extern void clause_table_resize(clause_table_t *clause_table);
 extern void init_rule_table(rule_table_t *table);
 
 extern void rule_table_resize(rule_table_t *rule_table);
+
+extern void init_query_table(query_table_t *table);
+
+extern void query_table_resize(query_table_t *table);
+
+extern void init_query_instance_table(query_instance_table_t *table);
+
+extern void query_instance_table_resize(query_instance_table_t *table);
 
 extern void init_samp_table(samp_table_t *table);
 

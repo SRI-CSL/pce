@@ -20,9 +20,9 @@
 #define DEFAULT_MAX_SAMPLES 1000
 
 extern int32_t add_var(var_table_t *var_table,
-		      char *name,
-		      sort_table_t *sort_table,
-		      char * sort_name);
+		       char *name,
+		       sort_table_t *sort_table,
+		       char * sort_name);
 
 /* extern int32_t add_pred(pred_table_t *pred_table, */
 /* 		     char *name, */
@@ -56,11 +56,17 @@ extern void add_rule_to_pred(pred_table_t *pred_table,
 			     int32_t predicate,
 			     int32_t current_rule_index);
 
-extern void all_ground_instances_of_rule(int32_t rule, samp_table_t *table);
+extern void all_rule_instances(int32_t rule, samp_table_t *table);
+
+extern void all_query_instances(samp_query_t *query, samp_table_t *table);
 
 extern void create_new_const_rule_instances(int32_t constidx,
 					    samp_table_t *table,
 					    bool lazy, int32_t atom_index);
+
+extern void create_new_const_query_instances(int32_t constidx,
+					     samp_table_t *table,
+					     bool lazy, int32_t atom_index);
 
 extern void link_propagate(samp_table_t *table,
 		    samp_literal_t lit);

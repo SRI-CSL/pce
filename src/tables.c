@@ -156,7 +156,6 @@ int32_t add_const_internal (char *name, int32_t sort_index,
 // simply prints a message, but does not check that the signature is correct.
 int32_t add_const(char *name, char *sort_name, samp_table_t *table) {
   sort_table_t *sort_table = &table->sort_table;
-  const_table_t *const_table = &table->const_table;
   int32_t res;
   
   int32_t sort_index = sort_name_index(sort_name, sort_table);
@@ -165,7 +164,7 @@ int32_t add_const(char *name, char *sort_name, samp_table_t *table) {
     return -1;
   }
   
-  int32_t index = stbl_find(&(const_table->const_name_index), name);
+  //int32_t index = stbl_find(&(const_table->const_name_index), name);
   res = add_const_internal(name, sort_index, table);
   if (res == 1) {
     return 0;
@@ -182,7 +181,7 @@ int32_t const_index(char *name,
   return stbl_find(&(const_table->const_name_index), name);
 }
 
-extern char *const_name(int32_t const_index, const_table_t *const_table) {
+char *const_name(int32_t const_index, const_table_t *const_table) {
   return const_table->entries[const_index].name;
 }
 
@@ -403,13 +402,13 @@ int32_t add_pred(pred_table_t *pred_table,
   }
 }
 
-void init_atom_table(atom_table_t *table){
+void init_atom_table(atom_table_t *table) {
   uint32_t i;
 
   table->size = INIT_ATOM_TABLE_SIZE;
   table->num_vars = 0; //atoms are positive
   table->num_unfixed_vars = 0;
-  if (table->size >= MAXSIZE(sizeof(atom_entry_t), 0)){
+  if (table->size >= MAXSIZE(sizeof(samp_atom_t *), 0)){
     out_of_memory();
   }
   table->atom = (samp_atom_t **) safe_malloc(table->size * sizeof(samp_atom_t *));
@@ -419,6 +418,7 @@ void init_atom_table(atom_table_t *table){
     safe_malloc(table->size * sizeof(samp_truth_value_t));
   table->current_assignment = 0;
   table->pmodel = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
+  table->sampling_nums = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
   
   for (i = 0; i < table->size; i++) {
     table->pmodel[i] = 0;//was -1
@@ -440,16 +440,20 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
   size = atom_table->size;
   if (num_vars < size) return;
 
-  if (MAXSIZE(sizeof(atom_entry_t), 0) - size <= (size/2)){
+  if (MAXSIZE(sizeof(samp_atom_t *), 0) - size <= (size/2)){
     out_of_memory();
   }
   size += size/2;
-  atom_table->atom = (samp_atom_t **) safe_realloc(atom_table->atom, size * sizeof(samp_atom_t *));
+  atom_table->atom = (samp_atom_t **)
+    safe_realloc(atom_table->atom, size * sizeof(samp_atom_t *));
+  atom_table->sampling_nums = (int32_t *)
+    safe_realloc(atom_table->sampling_nums, size * sizeof(int32_t));
   atom_table->assignment[0] = (samp_truth_value_t *) 
     safe_realloc(atom_table->assignment[0], size * sizeof(samp_truth_value_t));
   atom_table->assignment[1] = (samp_truth_value_t *) 
     safe_realloc(atom_table->assignment[1], size * sizeof(samp_truth_value_t));
-  atom_table->pmodel = (int32_t *) safe_realloc(atom_table->pmodel, size * sizeof(int32_t));
+  atom_table->pmodel = (int32_t *)
+    safe_realloc(atom_table->pmodel, size * sizeof(int32_t));
 
   if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= size){
     out_of_memory();
@@ -500,6 +504,51 @@ void clause_table_resize(clause_table_t *clause_table){
   clause_table->size = size; 
 }
 
+void init_query_table(query_table_t *table) {
+  table->size = INIT_QUERY_TABLE_SIZE;
+  table->num_queries = 0;
+    if (table->size >= MAXSIZE(sizeof(samp_query_t *), 0)){
+    out_of_memory();
+  }
+  table->query =
+    (samp_query_t **) safe_malloc(table->size * sizeof(samp_query_t *));
+}
+
+void query_table_resize(query_table_t *table) {
+  int32_t size = table->size;
+  int32_t num_queries = table->num_queries;
+  if (num_queries + 1 < size) return;
+  if (MAXSIZE(sizeof(samp_query_t *), 0) - size <= (size/2)){
+    out_of_memory();
+  }
+  size += size/2;
+  table->query = (samp_query_t **)
+    safe_realloc(table->query, size * sizeof(samp_query_t *));
+  table->size = size; 
+}
+
+void init_query_instance_table(query_instance_table_t *table) {
+  table->size = INIT_QUERY_INSTANCE_TABLE_SIZE;
+  table->num_queries = 0;
+  if (table->size >= MAXSIZE(sizeof(samp_query_instance_t *), 0)) {
+    out_of_memory();
+  }
+  table->query_inst = (samp_query_instance_t **)
+    safe_malloc(table->size * sizeof(samp_query_instance_t *));
+}
+
+void query_instance_table_resize(query_instance_table_t *table) {
+  int32_t size = table->size;
+  int32_t num_queries = table->num_queries;
+  if (num_queries + 1 < size) return;
+  if (MAXSIZE(sizeof(samp_query_instance_t *), 0) - size <= (size/2)) {
+    out_of_memory();
+  }
+  size += size/2;
+  table->query_inst = (samp_query_instance_t **)
+    safe_realloc(table->query_inst, size * sizeof(samp_query_instance_t *));
+  table->size = size; 
+}
 
 void init_samp_table(samp_table_t *table){
   init_sort_table(&(table->sort_table));
@@ -509,6 +558,8 @@ void init_samp_table(samp_table_t *table){
   init_atom_table(&(table->atom_table));
   init_clause_table(&(table->clause_table));
   init_rule_table(&(table->rule_table));
+  init_query_table(&(table->query_table));
+  init_query_instance_table(&(table->query_instance_table));
   init_integer_stack(&(table->fixable_stack), 0);
 }
 

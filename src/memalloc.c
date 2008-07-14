@@ -21,7 +21,7 @@ void out_of_memory() {
 /*
  * Local malloc: abort if out of memory.
  *
- * Special case: is size = 0, malloc(size) may
+ * Special case: if size = 0, malloc(size) may
  * return NULL on some systems, but that does not
  * mean we're out of memory.
  */

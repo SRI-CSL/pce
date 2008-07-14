@@ -90,14 +90,15 @@ void print_atoms(samp_table_t *table){
   char d[10];
   int nwdth = sprintf(d, "%"PRId32"", nvars);
   int i;
-  int32_t num_samples = atom_table->num_samples;
+  
   printf("--------------------------------------------------------------------------------\n");
   printf("| %*s | tval | prob   | %-*s |\n", nwdth, "i", 57-nwdth, "atom");
   printf("--------------------------------------------------------------------------------\n");
   for (i = 0; i < nvars; i++){
     samp_truth_value_t tv = atom_table->assignment[atom_table->current_assignment][i];
-    printf("| %-*u | %-4s | % 5.3f | ", nwdth, i, samp_truth_value_string(tv),
-	   ((double) atom_table->pmodel[i])/num_samples);
+    printf("| %-*u | %-4s | % 5.3f | ",
+	   nwdth, i, samp_truth_value_string(tv),
+	   atom_probability(i, table));
     print_atom(atom_table->atom[i], table);
     printf("\n");
   }
@@ -337,4 +338,32 @@ extern void dump_rule_table (samp_table_t *samp_table) {
     printf("\n");
   }
   printf("-------------------------------------------------------------------------------\n");
+}
+
+double atom_probability(int32_t atom_index, samp_table_t *table) {
+  atom_table_t *atom_table = &table->atom_table;
+  double diff;
+
+  diff = (double)
+    (atom_table->num_samples - atom_table->sampling_nums[atom_index]);
+  if (diff > 0) {
+    return (double) (atom_table->pmodel[atom_index]/diff);
+  } else {
+    // No samples - we know nothing
+    return .5;
+  }
+}
+
+double query_probability(samp_query_instance_t *qinst, samp_table_t *table) {
+  atom_table_t *atom_table = &table->atom_table;
+  double diff;
+
+  // diff subtracts off the sampling number when the query was introduced
+  diff = (double) (atom_table->num_samples - qinst->sampling_num);
+  if (diff > 0) {
+    return (double) (qinst->pmodel/diff);
+  } else {
+    // No samples - we know nothing
+    return .5;
+  }
 }

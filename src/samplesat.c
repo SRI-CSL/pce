@@ -25,10 +25,6 @@ static inline int random(void) {
 }
 
 #endif
-
-bool check_clause_instance(samp_table_t *table,
-			   samp_rule_t *rule,
-			   int32_t atom_index);
   
 static void add_atom_to_pred(pred_table_t *pred_table,
 			     int32_t predicate,
@@ -98,6 +94,9 @@ int32_t add_internal_atom(samp_table_t *table,
       current_atom->args[i] = atom->args[i];
     }
     atom_table->atom[current_atom_index] = current_atom;
+    // Keep track of the number of samples when atom was introduced - these
+    // will be subtracted in computing probs
+    atom_table->sampling_nums[current_atom_index] = atom_table->num_samples;
 
     atom_map = array_size_hmap_get(&(atom_table->atom_var_hash),
 				   arity+1,
@@ -108,7 +107,7 @@ int32_t add_internal_atom(samp_table_t *table,
       atom_table->assignment[0][current_atom_index] = v_fixed_false;
       atom_table->assignment[1][current_atom_index] = v_fixed_false;
     } else {//set pmodel to 0
-      atom_table->pmodel[current_atom_index] = atom_table->num_samples/2;
+      atom_table->pmodel[current_atom_index] = 0; //atom_table->num_samples/2;
       atom_table->assignment[0][current_atom_index] = v_false;
       atom_table->assignment[1][current_atom_index] = v_false;
     }
@@ -1364,6 +1363,45 @@ static void print_model(samp_table_t *table) {
   }
 }
 
+void update_query_pmodel(samp_table_t *table) {
+  query_instance_table_t *qinst_table;
+  samp_query_instance_t *qinst;
+  samp_truth_value_t *assignment;
+  int32_t num_queries, *apmodel, i, j, k;
+  bool fval;
+
+  qinst_table = &table->query_instance_table;
+  assignment
+    = table->atom_table.assignment[table->atom_table.current_assignment];
+  num_queries = qinst_table->num_queries;
+  apmodel = table->atom_table.pmodel;
+  
+  for (i = 0; i < num_queries; i++) {
+    // Each query instance is an array of array of literals
+    qinst = qinst_table->query_inst[i];
+    fval = false;
+    // First loop through the conjuncts
+    for (j = 0; qinst->lit[j] != NULL; j++) {
+      // Now the disjuncts
+      for (k = 0; qinst->lit[j][k] != -1; k++) {
+	// If any literal is true, skip the rest
+	if (assigned_true_lit(assignment, qinst->lit[j][k])) {
+	  goto cont;
+	}
+      }
+      // None was true, kick out
+      goto done;
+    cont: continue;
+    }
+    // Each conjunct was true, so the assignment is a model - increase the
+    // pmodel counter
+    if (qinst->lit[j] == NULL) {
+	qinst->pmodel++;
+    }
+  done: continue;
+  }
+}
+
 void update_pmodel(samp_table_t *table){
   samp_truth_value_t *assignment = table->atom_table.assignment[table->atom_table.current_assignment];
   int32_t num_vars = table->atom_table.num_vars;
@@ -1376,6 +1414,8 @@ void update_pmodel(samp_table_t *table){
       pmodel[i]++;
     }
   }
+
+  update_query_pmodel(table);
 
   // HACK: TEMPORARY FOR DEBUUGGING
   if (get_verbosity_level() > 0) {
@@ -1428,7 +1468,7 @@ void move_unsat_to_dead_clauses(clause_table_t *clause_table){
  */
 void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
-		uint32_t max_flips, uint32_t max_extra_flips){
+		uint32_t max_flips, uint32_t max_extra_flips) {
   int32_t conflict;
   assert(valid_table(table));
   conflict = reset_sample_sat(table);
@@ -1520,19 +1560,13 @@ void mc_sat(samp_table_t *table, double sa_probability,
   print_atoms(table);
 }
 
-
-
-
-/*
- * DEAL WITH QUERIES
- */
 // Given a rule, a -1 terminated array of constants corresponding to the
 // variables of the rule, and a samp_table, returns the substituted clause.
 // Checks that the constants array is the right length, and the sorts match.
 // Returns -1 if there is a problem.
-int32_t substit(samp_rule_t *rule,
-		substit_entry_t *substs,
-		samp_table_t *table){
+int32_t substit_rule(samp_rule_t *rule,
+		     substit_entry_t *substs,
+		     samp_table_t *table){
   const_table_t *const_table = &(table->const_table);
   pred_table_t *pred_table = &(table->pred_table);
   int32_t i;
@@ -1558,7 +1592,7 @@ int32_t substit(samp_rule_t *rule,
   // Everything is OK, do the sustitution
   // We just use the clause_buffer - first make sure it's big enough
   clause_buffer_resize(rule->num_lits);
-  for(i=0; i<rule->num_lits; i++){
+  for(i=0; i<rule->num_lits; i++) {
     rule_literal_t *lit = rule->literals[i];
     int32_t arity = pred_arity(lit->atom->pred, pred_table);
     samp_atom_t *new_atom = atom_copy(lit->atom, arity);
@@ -1575,16 +1609,91 @@ int32_t substit(samp_rule_t *rule,
       // This shouldn't happen, but if it does, we need to free up space
       printf("substit: Bad atom\n");
       return -1;
-      }
+    }
     clause_buffer.data[i] = lit->neg ? neg_lit(added_atom) : pos_lit(added_atom);
   }
-  return add_internal_clause(table, clause_buffer.data, rule->num_lits, rule->weight);
+  return add_internal_clause(table, clause_buffer.data, rule->num_lits,
+			     rule->weight);
 }
 
-// all_ground_instances takes a rule and generates all ground instances
+
+static clause_buffer_t rule_atom_buffer = {0, NULL}; 
+
+void rule_atom_buffer_resize(int32_t length){
+    if (rule_atom_buffer.data == NULL){
+    rule_atom_buffer.data = (int32_t *) safe_malloc(INIT_CLAUSE_SIZE * sizeof(int32_t));
+    rule_atom_buffer.size = INIT_CLAUSE_SIZE;
+  }
+  int32_t size = rule_atom_buffer.size;
+  if (size < length){
+    if (MAXSIZE(sizeof(int32_t), 0) - size <= size/2){
+      out_of_memory();
+    }
+    size += size/2;
+    rule_atom_buffer.data =
+      (int32_t  *) safe_realloc(rule_atom_buffer.data, size * sizeof(int32_t));
+    rule_atom_buffer.size = size;
+  }
+}
+
+/*
+ * Given an atom (index), checks if the given possible rule instances should
+ * be added to the clauses.  Called from all_rule_instances_rec when lazy
+ * flag is set.
+ */
+bool check_clause_instance(samp_table_t *table,
+			   samp_rule_t *rule,
+			   int32_t atom_index){//index of atom being activated
+  //Use a local buffer to build the literals and check
+  //if they are active and not fixed true.
+  pred_table_t *pred_table = &(table->pred_table);
+  //pred_tbl_t *pred_tbl = &(pred_table->pred_tbl);
+  atom_table_t *atom_table = &(table->atom_table);
+  int32_t predicate, arity, i, j;
+  samp_atom_t *atom;
+  samp_atom_t *rule_atom; 
+  array_hmap_pair_t *atom_map;
+  
+  for (i = 0; i < rule->num_lits; i++){//for each literal
+    if (i != atom_index){//if literal is not the one being activated
+      atom = rule->literals[i]->atom;
+      predicate = atom->pred; 
+      arity = pred_arity(predicate, pred_table);
+      rule_atom_buffer_resize(arity);
+      rule_atom = (samp_atom_t *) &(rule_atom_buffer.data);
+      rule_atom->pred = predicate; 
+      for (j = 0; j < arity; j++){//copy each instantiated argument
+	if (atom->args[j] < 0){
+	  rule_atom->args[j]
+	    = substit_buffer.entries[-(atom->args[j]) - 1].const_index;
+	} else {
+	  rule_atom->args[j] = atom->args[j];
+	}
+      }
+      //find the index of the atom
+      atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
+				  arity + 1,
+				  (int32_t *) rule_atom);
+      if (atom_map == NULL) return false;//atom is inactive
+      if (rule->literals[i]->neg &&
+	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
+	  == v_fixed_false){
+	return false;//literal is fixed true
+      }
+      if (!rule->literals[i]->neg &&
+	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
+	  == v_fixed_true){
+	return false;//literal is fixed true
+      }
+    }
+  }
+  return true;
+}
+
+// all_rule_instances takes a rule and generates all ground instances
 // based on the predicate and its sorts
 
-void all_ground_instances_rec(int32_t vidx,
+void all_rule_instances_rec(int32_t vidx,
 			      samp_rule_t *rule,
 			      samp_table_t *table,
 			      bool lazy,
@@ -1593,9 +1702,9 @@ void all_ground_instances_rec(int32_t vidx,
     // Simply do the substitution, or go to the next var
     if (vidx == rule->num_vars - 1) {
       substit_buffer.entries[vidx+1].const_index = -1;
-      substit(rule, substit_buffer.entries, table);
+      substit_rule(rule, substit_buffer.entries, table);
     } else {
-      all_ground_instances_rec(vidx+1, rule, table, lazy, atom_index);
+      all_rule_instances_rec(vidx+1, rule, table, lazy, atom_index);
     }
   } else {
     sort_table_t *sort_table = &(table->sort_table);
@@ -1607,17 +1716,17 @@ void all_ground_instances_rec(int32_t vidx,
       if (vidx == rule->num_vars - 1) {
 	substit_buffer.entries[vidx+1].const_index = -1;
 	if (!lazy || check_clause_instance(table, rule, atom_index)) {
-	  substit(rule, substit_buffer.entries, table);
+	  substit_rule(rule, substit_buffer.entries, table);
 	}
       } else {
-	all_ground_instances_rec(vidx+1, rule, table, lazy, atom_index);
+	all_rule_instances_rec(vidx+1, rule, table, lazy, atom_index);
       }
     }
   }
 }
 
 // Eager - called by MCSAT when a new rule is added.
-void all_ground_instances_of_rule(int32_t rule_index, samp_table_t *table) {
+void all_rule_instances(int32_t rule_index, samp_table_t *table) {
   rule_table_t *rule_table = &(table->rule_table);
   samp_rule_t *rule = rule_table->samp_rules[rule_index];
   substit_buffer_resize(rule->num_vars);
@@ -1625,14 +1734,13 @@ void all_ground_instances_of_rule(int32_t rule_index, samp_table_t *table) {
   for(i=0; i<substit_buffer.size; i++){
     substit_buffer.entries[i].fixed = false;
   }
-  all_ground_instances_rec(0, rule, table, false, -1);
+  all_rule_instances_rec(0, rule, table, false, -1);
 }
 
 // Note that substit_buffer.entries has been set up already
-void fixed_const_ground_instances(samp_rule_t *rule,
-				  samp_table_t *table,
-				  bool lazy, int32_t atom_index) {
-  all_ground_instances_rec(0, rule, table, lazy, atom_index);
+void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
+				bool lazy, int32_t atom_index) {
+  all_rule_instances_rec(0, rule, table, lazy, atom_index);
 }
 
 // Called by MCSAT when a new constant is added.
@@ -1659,7 +1767,203 @@ void create_new_const_rule_instances(int32_t constidx, samp_table_t *table,
 	    substit_buffer.entries[j].fixed = false;
 	  }
 	}
-	fixed_const_ground_instances(rule, table, lazy, atom_index);
+	fixed_const_rule_instances(rule, table, lazy, atom_index);
+      }
+    }
+  }
+}
+
+
+// Queries are not like rules, as rules are simpler (can treat as separate
+// clauses), and have a weight.  substit on rules updates the clause_table,
+// whereas substit_query updates the query_instance_table.
+
+int32_t add_query_instance(samp_literal_t **litinst, substit_entry_t *substs,
+			   samp_query_t *query, samp_table_t *table) {
+  query_instance_table_t *query_instance_table;
+  query_table_t *query_table;
+  samp_query_instance_t *qinst;
+  int32_t i, qindex;
+  
+  query_table = &table->query_table;
+  query_instance_table = &table->query_instance_table;
+  for (i = 0; i < query_instance_table->num_queries; i++) {
+    if (eql_query_instance_lits(litinst, query_instance_table->query_inst[i])) {
+	break;
+    }
+  }
+  qindex = i;
+  if (i < query_instance_table->num_queries) {
+    // Already have this instance - just associate it with the query
+  } else {
+    query_instance_table_resize(query_instance_table);
+    qinst = (samp_query_instance_t *) safe_malloc(sizeof(samp_query_instance_t));
+    query_instance_table->query_inst[qindex] = qinst;
+    query_instance_table->num_queries += 1;
+    for (i = 0; i < query_table->num_queries; i++) {
+      if (query_table->query[i] == query) {
+	break;
+      }
+    }
+    qinst->query_index = i;
+    qinst->sampling_num = table->atom_table.num_samples;
+    qinst->pmodel = 0;
+    // Copy the substs - used to return the OAA formula instances
+    qinst->subst = (int32_t *) safe_malloc(query->num_vars * sizeof(int32_t));
+    for (i = 0; i < query->num_vars; i++) {
+      qinst->subst[i] = substs[i].const_index;
+    }
+    qinst->lit = litinst;
+  }
+  return qindex;
+}
+
+int32_t substit_query(samp_query_t *query,
+		      substit_entry_t *substs,
+		      samp_table_t *table) {
+  const_table_t *const_table = &(table->const_table);
+  pred_table_t *pred_table = &(table->pred_table);
+  samp_atom_t *new_atom;
+  int32_t i, j, k, vsort, csort, arity, argidx, added_atom;
+  rule_literal_t ***lit;
+  samp_literal_t **litinst;
+  
+  for(i = 0; i < query->num_vars; i++) {
+    if (substs[i].const_index == -1) {
+      fprintf(stderr, "substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
+	      i, query->num_vars);
+      return -1;
+    }
+    vsort = query->vars[i]->sort_index;
+    csort = const_sort_index(substs[i].const_index, const_table);
+    if (vsort != csort) {
+      fprintf(stderr, "substit: Constant/variable sorts do not match at %"PRId32"\n",
+	      i);
+      return -1;
+    }
+  }
+  if (substs[i].const_index != -1) {
+    fprintf(stderr, "substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
+	    i, query->num_vars);
+      return -1;
+  }
+  // Everything is OK, do the sustitution
+  lit = query->literals;
+  litinst = (samp_literal_t **)
+    safe_malloc((query->num_clauses + 1) * sizeof(samp_literal_t *));
+  for (i = 0; i < query->num_clauses; i++) {
+    for (j = 0; lit[i][j] != NULL; j++) {}
+    litinst[i] = (samp_literal_t *)
+      safe_malloc((j + 1) * sizeof(samp_literal_t));
+    for (j = 0; lit[i][j] != NULL; j++) {
+      arity = pred_arity(lit[i][j]->atom->pred, pred_table);
+      new_atom = atom_copy(lit[i][j]->atom, arity);
+      for (k = 0; k < arity; k++) {
+	argidx = new_atom->args[k];
+	if (argidx < 0) {
+	  // Have a var, index to var (and hence, const) array is -(argidx + 1)
+	  new_atom->args[k] = substs[-(argidx + 1)].const_index;
+	}
+      }
+      added_atom = add_internal_atom(table, new_atom);
+      if (added_atom == -1){
+	// This shouldn't happen, but if it does, we need to free up space
+	printf("substit: Bad atom\n");
+	return -1;
+      }
+      litinst[i][j] = lit[i][j]->neg ? neg_lit(added_atom) : pos_lit(added_atom);
+    }
+    litinst[i][j] = -1; // end-marker - NULL doesn't work
+  }
+  litinst[i] = NULL;
+  return add_query_instance(litinst, substs, query, table);
+}
+
+bool check_query_instance(samp_query_t *query, int32_t atom_index,
+			  samp_table_t *table) {
+  return true;
+}
+
+void all_query_instances_rec(int32_t vidx, samp_query_t *query,
+			     samp_table_t *table, bool lazy,
+			     int32_t atom_index) {
+  sort_table_t *sort_table;
+  sort_entry_t entry;
+  int32_t vsort;
+  
+  if(substit_buffer.entries[vidx].fixed) {
+    // Simply do the substitution, or go to the next var
+    if (vidx == query->num_vars - 1) {
+      substit_buffer.entries[vidx+1].const_index = -1;
+      substit_query(query, substit_buffer.entries, table);
+    } else {
+      all_query_instances_rec(vidx+1, query, table, lazy, atom_index);
+    }
+  } else {
+    sort_table = &(table->sort_table);
+    vsort = query->vars[vidx]->sort_index;
+    entry = sort_table->entries[vsort];
+    int32_t i;
+    for(i=0; i<entry.cardinality; i++){
+      substit_buffer.entries[vidx].const_index = entry.constants[i];
+      if (vidx == query->num_vars - 1) {
+	substit_buffer.entries[vidx+1].const_index = -1;
+	if (!lazy || check_query_instance(query, atom_index, table)) {
+	  substit_query(query, substit_buffer.entries, table);
+	}
+      } else {
+	all_query_instances_rec(vidx+1, query, table, lazy, atom_index);
+      }
+    }
+  }
+}
+
+// Similar to all_rule_instances, but updates query_instance_table
+// instead of clause_table
+void all_query_instances(samp_query_t *query, samp_table_t *table) {
+  
+  substit_buffer_resize(query->num_vars);
+  int32_t i;
+  for(i=0; i<substit_buffer.size; i++){
+    substit_buffer.entries[i].fixed = false;
+  }
+  all_query_instances_rec(0, query, table, false, -1);
+}
+  
+
+// Note that substit_buffer.entries has been set up already
+void fixed_const_query_instances(samp_query_t *query,
+				 samp_table_t *table,
+				 bool lazy, int32_t atom_index) {
+  all_query_instances_rec(0, query, table, lazy, atom_index);
+}
+
+void create_new_const_query_instances(int32_t constidx, samp_table_t *table,
+				      bool lazy, int32_t atom_index) {
+  const_table_t *const_table = &(table->const_table);
+  query_table_t *query_table = &(table->query_table);
+  samp_query_t *query;
+  const_entry_t centry;
+  int32_t i, j, k, csort;
+
+  centry = const_table->entries[constidx];
+  csort = centry.sort_index;
+  for(i=0; i<query_table->num_queries; i++){
+    query = query_table->query[i];
+    for (j=0; j<query->num_vars; j++) {
+      if (query->vars[j]->sort_index == csort) {
+	// Set the substit_buffer - first resize if necessary
+	substit_buffer_resize(query->num_vars);
+	substit_buffer.entries[j].const_index = constidx;
+	substit_buffer.entries[j].fixed = true;
+	// Make sure all other entries are empty
+	for (k=0; k<query->num_vars; k++) {
+	  if (k != j) {
+	    substit_buffer.entries[j].const_index = -1;
+	    substit_buffer.entries[j].fixed = false;
+	  }
+	}
+	fixed_const_query_instances(query, table, lazy, atom_index);
       }
     }
   }
@@ -1686,7 +1990,7 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
     for (j = 0; j < rule_entry->num_lits; j++) {
       if (match_atom_in_rule_atom(atom, rule_entry->literals[j], arity)) {
 	//then substit_buffer contains the matching substitution
-	fixed_const_ground_instances(rule_entry, table, true, atom_index);
+	fixed_const_rule_instances(rule_entry, table, true, atom_index);
       }
     }
   }
@@ -1743,79 +2047,6 @@ extern bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
   return true;
 }
 
-
-static clause_buffer_t rule_atom_buffer = {0, NULL}; 
-
-void rule_atom_buffer_resize(int32_t length){
-    if (rule_atom_buffer.data == NULL){
-    rule_atom_buffer.data = (int32_t *) safe_malloc(INIT_CLAUSE_SIZE * sizeof(int32_t));
-    rule_atom_buffer.size = INIT_CLAUSE_SIZE;
-  }
-  int32_t size = rule_atom_buffer.size;
-  if (size < length){
-    if (MAXSIZE(sizeof(int32_t), 0) - size <= size/2){
-      out_of_memory();
-    }
-    size += size/2;
-    rule_atom_buffer.data =
-      (int32_t  *) safe_realloc(rule_atom_buffer.data, size * sizeof(int32_t));
-    rule_atom_buffer.size = size;
-  }
-}
-
-/*
- * Given an atom (index), checks if the given possible rule instances should
- * be added to the clauses.  Called from all_ground_instances_rec when lazy
- * flag is set.
- */
-bool check_clause_instance(samp_table_t *table,
-			   samp_rule_t *rule,
-			   int32_t atom_index){//index of atom being activated
-  //Use a local buffer to build the literals and check
-  //if they are active and not fixed true.
-  pred_table_t *pred_table = &(table->pred_table);
-  //pred_tbl_t *pred_tbl = &(pred_table->pred_tbl);
-  atom_table_t *atom_table = &(table->atom_table);
-  int32_t predicate, arity, i, j;
-  samp_atom_t *atom;
-  samp_atom_t *rule_atom; 
-  array_hmap_pair_t *atom_map;
-  
-  for (i = 0; i < rule->num_lits; i++){//for each literal
-    if (i != atom_index){//if literal is not the one being activated
-      atom = rule->literals[i]->atom;
-      predicate = atom->pred; 
-      arity = pred_arity(predicate, pred_table);
-      rule_atom_buffer_resize(arity);
-      rule_atom = (samp_atom_t *) &(rule_atom_buffer.data);
-      rule_atom->pred = predicate; 
-      for (j = 0; j < arity; j++){//copy each instantiated argument
-	if (atom->args[j] < 0){
-	  rule_atom->args[j]
-	    = substit_buffer.entries[-(atom->args[j]) - 1].const_index;
-	} else {
-	  rule_atom->args[j] = atom->args[j];
-	}
-      }
-      //find the index of the atom
-      atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
-				  arity + 1,
-				  (int32_t *) rule_atom);
-      if (atom_map == NULL) return false;//atom is inactive
-      if (rule->literals[i]->neg &&
-	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
-	  == v_fixed_false){
-	return false;//literal is fixed true
-      }
-      if (!rule->literals[i]->neg &&
-	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
-	  == v_fixed_true){
-	return false;//literal is fixed true
-      }
-    }
-  }
-  return true;
-}
   
 
 /* query_match compares the atom from the samplesat table to the pattern
@@ -1918,7 +2149,8 @@ extern void query_clause(input_clause_t *clause, double threshold, bool all,
     }
     if (query_match(atom_table->atom[i], patom, bindings, table)) {
       // Found a match, now check the threshold
-      prob = (double) (atom_table->pmodel[i]/(double) num_samples);
+      
+      prob = atom_probability(i, table);
       if (clause->literals[0]->neg) {
 	prob = 1 - prob;
       }
@@ -2034,7 +2266,3 @@ static void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
   j++;
   sort_query_atoms_and_probs(a + j, p + j, n - j);
 }
-  
-
-
-

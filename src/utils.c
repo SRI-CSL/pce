@@ -151,7 +151,7 @@ substit_buffer_t substit_buffer = {0, NULL};
 
 // Fill this in later
 void substit_buffer_resize(int32_t length) {
-  if (substit_buffer.entries == NULL){
+  if (substit_buffer.entries == NULL) {
     substit_buffer.entries = (substit_entry_t *)
       safe_malloc(INIT_SUBSTIT_TABLE_SIZE * sizeof(substit_entry_t));
     substit_buffer.size = INIT_SUBSTIT_TABLE_SIZE;

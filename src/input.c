@@ -174,6 +174,7 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	      // We don't invoke this in add_const, as this is eager.
 	      // Last arg says this is not lazy.
 	      create_new_const_rule_instances(cidx, table, false, 0);
+	      create_new_const_query_instances(cidx, table, false, 0);
 	    }
 	  }
 	  else
@@ -233,7 +234,7 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	  int32_t ruleidx = add_rule(decl.clause, decl.weight, table);
 	  // Create instances here rather than add_rule, as this is eager
 	  if (ruleidx != -1) {
-	    all_ground_instances_of_rule(ruleidx, table);
+	    all_rule_instances(ruleidx, table);
 	  }
 	}
 	break;
@@ -364,7 +365,7 @@ void test (samp_table_t *table) {
   rule_table_t *rule_table = &(table->rule_table);
   int32_t i;
   for (i = 0; i<rule_table->num_rules; i++) {
-    all_ground_instances_of_rule(i, table);
+    all_rule_instances(i, table);
   }
   dump_rule_table(table);
   dump_clause_table(table);
