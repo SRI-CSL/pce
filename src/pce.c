@@ -75,7 +75,6 @@ static const char *const pce_callbacks[] = {
 
 static names_buffer_t names_buffer = {0, 0, NULL};
 static names_buffer_t learner_ids = {0, 0, NULL};
-static subscription_buffer_t subscription_buffer = {0, 0, NULL};
 
 // There are two rules_vars_buffers - as a formula is clausified by cnf,
 // variables are added to the rules_vars_buffer.  At the end,
@@ -95,7 +94,6 @@ static rule_literal_t ***cnf_union(rule_literal_t ***c1,
 static rule_literal_t *** icl_to_cnf_literal(ICLTerm *formula, bool neg);
 static rule_literal_t *icl_to_rule_literal(ICLTerm *formula, bool neg);
 static void names_buffer_resize(names_buffer_t *nbuf);
-static void subscription_buffer_resize();
 static void rule_vars_buffer_resize(rule_vars_buffer_t *buf);
 static var_entry_t **rule_vars_buffer_copy(rule_vars_buffer_t *buf);
 static char **names_buffer_copy(names_buffer_t *nbuf);
@@ -344,8 +342,7 @@ bool eql_query_entries(rule_literal_t ***lits, samp_query_t *query,
 }
 
       
-int32_t add_to_query_table(char *lid, ICLTerm *Formula,
-			   rule_vars_buffer_t *vars, rule_literal_t ***lits,
+int32_t add_to_query_table(rule_vars_buffer_t *vars, rule_literal_t ***lits,
 			   samp_table_t *table) {
   query_table_t *query_table = &table->query_table;
   samp_query_t *query;
@@ -353,44 +350,22 @@ int32_t add_to_query_table(char *lid, ICLTerm *Formula,
   
   for (i = 0; i < query_table->num_queries; i++) {
     if (eql_query_entries(lits, query_table->query[i], &samp_table)) {
-      if (lid != 0) {
-	// Need to set this up for the new learner id
-	
-      }
-      break;
+      return i;
     }
   }
+  // Now save the query in the query_table
+  query_index = query_table->num_queries;
+  query_table_resize(query_table);
+  query = (samp_query_t *) safe_malloc(sizeof(samp_query_t));
+  query_table->query[query_table->num_queries++] = query;
+  for (i = 0; lits[i] != NULL; i++) {}
+  query->num_clauses = i;
+  query->num_vars = rules_vars_buffer.size;
+  query->literals = lits;
+  query->vars = rule_vars_buffer_copy(&rules_vars_buffer);
 
-  // i is an index to the query table
-  if (i < query_table->num_queries) {
-    query_index = i;
-    query = query_table->query[i];
-  } else {
-    // Now save the query in the query_table
-    if (i > 2) {
-      printf("Something's wrong\n");
-    }
-    query_index = query_table->num_queries;
-    query_table_resize(query_table);
-    query = (samp_query_t *) safe_malloc(sizeof(samp_query_t));
-    query_table->query[query_table->num_queries++] = query;
-    // Update subscription buffer
-    subscription_buffer_resize();
-    query->source_index = subscription_buffer.size;
-    subscr = subscription_buffer.subscription[subscription_buffer.size++];
-    subscr->lid = add_learner_name(lid, &learner_name_buffer);
-    subscr->query_index = query_index;
-    subscr->id = subscrid;
-    subscr->formula = icl_CopyTerm(Formula);
-    for (i = 0; lits[i] != NULL; i++) {}
-    query->num_clauses = i;
-    query->num_vars = rules_vars_buffer.size;
-    query->literals = lits;
-    query->vars = rule_vars_buffer_copy(&rules_vars_buffer);
-
-    // Need to create all instances and add to query_instance_table
-    all_query_instances(query, &samp_table);
-  }
+  // Need to create all instances and add to query_instance_table
+  all_query_instances(query, &samp_table);
   return query_index;
 }
     
@@ -614,6 +589,8 @@ int pce_learner_assert_list_callback(ICLTerm *goal, ICLTerm *params,
     Weight = icl_NthTerm(Elt, 2);
     pce_learner_assert(Lid, Formula, Weight);
   }
+  printf("pce_learner_assert_list: processed %d assertions\n",
+	 icl_NumTerms(List));
   return TRUE;
 }
 
@@ -711,8 +688,7 @@ int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   }
   // cnf has side effect of setting rules_vars_buffer
   lits = cnf(QueryFormula);
-  query_index = add_to_query_table("", QueryFormula,
-				   &rules_vars_buffer, lits, &samp_table);
+  query_index = add_to_query_table(&rules_vars_buffer, lits, &samp_table);
 
   for (i = 0; i < query_instance_table->num_queries; i++) {
     if (query_instance_table->query_inst[i]->query_index == query_index) {
@@ -780,14 +756,47 @@ static void subscriptions_resize() {
   }
 }
 
-int pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
-			   ICLTerm *solutions) {
-  ICLTerm *Lid, *Formula, *Who, *Condition, *Id, *NId;
+int32_t add_learner_name(char *lid) {
+  int32_t i, size;
+
+  size = learner_ids.size;
+  for (i = 0; i < size; i++) {
+    if (strcmp(learner_ids.name[i], lid) == 0) {
+      return i;
+    }
+  }
+  learner_ids.name[learner_ids.size++] = str_copy(lid);
+  return size;
+}
+
+void add_subscription_source_to_query(int32_t query_index,
+				      int32_t subscr_index) {
+  samp_query_t *query;
+  int32_t i;
+
+  query = samp_table.query_table.query[query_index];
+  if (query->source_index == NULL) {
+    query->source_index = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+    query->source_index[0] = subscr_index;
+    query->source_index[1] = -1;
+  } else {
+    for (i = 0; query->source_index[i] != -1; i++) {}
+    query->source_index = (int32_t *)
+      safe_realloc(query->source_index, (i + 1) * sizeof(int32_t));
+    query->source_index[i] = subscr_index;
+    query->source_index[i+1] = -1;
+  }
+}
+
+
+int32_t pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
+			       ICLTerm *solutions) {
+  ICLTerm *Lid, *Formula, *Who, *Condition, *Id, *Sid;
   rule_literal_t ***lits;
-  char idstr[30];
-  char *id;
+  char *sid, *lid, idstr[20];
   ICLTerm *solution;
-  int32_t query_index, size;
+  subscription_t *subscr;
+  int32_t i, query_index, subscr_index;
   
   if (icl_NumTerms(goal) == 3) {
     Lid       = icl_CopyTerm(icl_NthTerm(goal, 1));
@@ -806,14 +815,24 @@ int pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
     pce_error("pce_subscribe: Lid should be a string");
     return FALSE;
   }
+  lid = icl_Str(Lid);
+  // sid / Sid is the subscription id - derived from Id if not a var
   if (!icl_IsVar(Id)) {
-    id = icl_Str(Id);
-    NId = Id;
+    // See if we have this subscription id already
+    sid = str_copy(icl_Str(Id));
+    for (i = 0; i < subscriptions.size; i++) {
+      if (strcmp(subscriptions.subscription[i]->id, sid) == 0) {
+	safe_free(sid);
+	pce_error("pce_subscribe: Id is already in use");
+	return FALSE;
+      }
+    }
+    Sid = Id;
   } else {
+    // TBD - See if we already have a subscription for this formula
     sprintf(idstr, "%d", subscriptions.size);
-    id = (char *) safe_malloc((strlen(idstr) + 1) * sizeof(char));
-    strcpy(id, idstr);
-    NId = icl_NewStr(id);
+    sid = str_copy(idstr);
+    Sid = icl_NewStr(sid);
   }
   // Convert the Formula to rule_literal_t's - side effects rules_vars_buffer
   lits = cnf(Formula);
@@ -821,22 +840,27 @@ int pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
     return 1;
   }
 
-  // Add to query_table
-  query_index = add_to_query_table(id, Formula, &rules_vars_buffer,
-				   lits, &samp_table);
-
-  names_buffer_resize(&learner_ids);
-  size = learner_ids.size;
-  learner_ids.name[learner_ids.size++] = icl_Str(Lid);
+  // Update subscription buffer
+  subscr = (subscription_t *) safe_malloc(sizeof(subscription_t));
+  subscr->lid = add_learner_name(lid);
+  subscr->id = sid;
+  subscr->formula = Formula;
   subscriptions_resize();
-  subscriptions.subscription[subscriptions.size]->lid = size;
-  subscriptions.subscription[subscriptions.size]->query_index = query_index;
-  subscriptions.subscription[subscriptions.size]->id = id;
+  subscriptions.subscription[subscriptions.size++] = subscr;
+
+  // Add to query_table
+  query_index = add_to_query_table(&rules_vars_buffer, lits, &samp_table);
+
+  // Now have the query and subscription point to each other
+  subscr->query_index = query_index;
+  add_subscription_source_to_query(query_index, subscr_index);
+
+  // Instantiate with the (possibly new) Sid
   if (icl_NumTerms(goal) == 3) {
-    solution = icl_NewStruct("pce_subscribe", 3, Lid, Formula, NId);
+    solution = icl_NewStruct("pce_subscribe", 3, Lid, Formula, Sid);
   } else {
     solution = icl_NewStruct("pce_subscribe", 5,
-			     Lid, Formula, Who, Condition, NId);
+			     Lid, Formula, Who, Condition, Sid);
   }
   icl_AddToList(solutions, solution, TRUE);
   return TRUE;
@@ -849,8 +873,8 @@ void process_subscription(subscription_t *subscription) {
   query_instance_table_t *query_instance_table;
   samp_query_instance_t *qinst;
   query_table_t *query_table;
-  int32_t i, formula_index;
-  ICLTerm *QueryFormula, *callback, *callbacklist;
+  int32_t i;
+  ICLTerm *callback, *callbacklist;
 
   if (pce_SubscriptionParams == NULL) {
     pce_SubscriptionParams =
@@ -861,6 +885,7 @@ void process_subscription(subscription_t *subscription) {
   atom_table = &samp_table.atom_table;
   query_instance_table = &samp_table.query_instance_table;
   query_table = &samp_table.query_table;
+  
   // Find all query instances for the given subscription, and add them to
   // the solution.
   for (i = 0; i < query_instance_table->num_queries; i++) {
@@ -874,9 +899,7 @@ void process_subscription(subscription_t *subscription) {
 	   DEFAULT_MAX_EXTRA_FLIPS, 50);
       }
       // Now add to query answer
-      source_index = query_table->query[qinst->query_index]->source_index;
-      QueryFormula = subscription_buffer.formula[source_index];
-      add_query_instance_to_solution(callback, QueryFormula,
+      add_query_instance_to_solution(callback, subscription->formula,
 				     query_instance_table->query_inst[i], true);
     }
   }
@@ -1258,25 +1281,6 @@ static char **names_buffer_copy(names_buffer_t *nbuf) {
   return names;
 }
 
-static void formula_buffer_resize() {
-  if (formula_buffer.formula == NULL) {
-    formula_buffer.formula = (ICLTerm **)
-      safe_malloc(INIT_NAMES_BUFFER_SIZE * sizeof(ICLTerm *));
-    formula_buffer.capacity = INIT_NAMES_BUFFER_SIZE;
-  }
-  int32_t capacity = formula_buffer.capacity;
-  int32_t size = formula_buffer.size;
-  if (capacity < size + 1){
-    if (MAXSIZE(sizeof(ICLTerm *), 0) - capacity <= capacity/2){
-      out_of_memory();
-    }
-    capacity += capacity/2;
-    formula_buffer.formula = (ICLTerm **)
-      safe_realloc(formula_buffer.formula, capacity * sizeof(ICLTerm *));
-    formula_buffer.capacity = capacity;
-  }
-}
-
 // Need to figure out error handling in OAA
 static void pce_error(const char *fmt, ...) {
   va_list argp;
@@ -1313,7 +1317,19 @@ int setup_oaa_connection(int argc, char *argv[]) {
 		icl_NewTermFromString("solvable(pce_learner_assert(Lid,Formula,Weight),[callback(pce_learner_assert)])"),
 		TRUE);
   icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_learner_assert_list(Lid,List),[callback(pce_learner_assert_list)])"),
+		TRUE);
+  icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_queryp(Q,P),[callback(pce_queryp)])"),
+		TRUE);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_subscribe(Lid,Formula,Id),[callback(pce_subscribe)])"),
+		TRUE);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_subscribe(Lid,Formula,Who,Condition,Id),[callback(pce_subscribe)])"),
+		TRUE);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_process_subscriptions(X),[callback(pce_process_subscriptions)])"),
 		TRUE);
 
   // Register solvables with the Facilitator.
@@ -1341,6 +1357,10 @@ int setup_oaa_connection(int argc, char *argv[]) {
   }
   if (!oaa_RegisterCallback("pce_queryp", pce_queryp_callback)) {
     printf("Could not register pce_queryp callback\n");
+    return FALSE;
+  }
+  if (!oaa_RegisterCallback("pce_subscribe", pce_subscribe_callback)) {
+    printf("Could not register pce_subscribe callback\n");
     return FALSE;
   }
   if (!oaa_RegisterCallback("pce_process_subscriptions",

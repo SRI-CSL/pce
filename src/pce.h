@@ -32,7 +32,7 @@ typedef struct subscription_s {
   int32_t query_index;
   // who_t who; // Not used - one of 'all' or 'notme'
   // condition_t condition; //Not used - one of 'in_to_out' or 'out_to_in'
-  char *id; // normally the subscription table index
+  char *id; // normally the subscription table index converted to a string
   ICLTerm *formula;
 } subscription_t;
 

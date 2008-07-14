@@ -1773,6 +1773,30 @@ void create_new_const_rule_instances(int32_t constidx, samp_table_t *table,
   }
 }
 
+bool eql_query_instance_lits(samp_literal_t **lit1, samp_literal_t **lit2) {
+  int32_t i, j;
+
+  for (i = 0; lit1[i] != NULL; i++) {
+    if (lit2[i] == NULL) {
+      return false;
+    }
+    for (j = 0; lit1[i][j] != -1; j++) {
+      // Note there is no need to test lit2 != -1
+      if (lit2[i][j] != lit1[i][j]) {
+	return false;
+      }
+    }
+    // Check if lit2 has more lits
+    if (lit2[i][j] != -1) {
+      return false;
+    }
+  }
+  // Check if lit2 has more clauses
+  if (lit2[i] != NULL) {
+    return false;
+  }
+  return true;
+}
 
 // Queries are not like rules, as rules are simpler (can treat as separate
 // clauses), and have a weight.  substit on rules updates the clause_table,
