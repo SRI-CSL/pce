@@ -1064,6 +1064,9 @@ static rule_literal_t ***cnf_product(rule_literal_t ***c1,
   rule_literal_t ***productcnf;
   rule_literal_t **conjunct;
 
+  if (c1 == NULL || c2 == NULL) {
+    return NULL;
+  }
   for (cnflen1 = 0; c1[cnflen1] != 0; cnflen1++) {}
   for (cnflen2 = 0; c1[cnflen2] != 0; cnflen2++) {}
   productcnf = (rule_literal_t ***)
@@ -1105,6 +1108,9 @@ static rule_literal_t ***cnf_union(rule_literal_t ***c1,
   int32_t i, cnflen1, cnflen2;
   rule_literal_t ***unioncnf;
   
+  if (c1 == NULL || c2 == NULL) {
+    return NULL;
+  }
   for (cnflen1 = 0; c1[cnflen1] != 0; cnflen1++) {}
   for (cnflen2 = 0; c1[cnflen2] != 0; cnflen2++) {}
   unioncnf = (rule_literal_t ***)
