@@ -577,22 +577,18 @@ int yylex (void) {
     return STRING;
   }
   if (c == '\'') {
-    yystrbuf[i++] = c;
     // At the moment, escapes not recognized
     do {
       c = getc(parse_input);
-      if (c == EOF) {
+      if (c == '\'' || c == EOF) {
         break;
-      } else if (c == '\'') {
-	yystrbuf[i++] = c;
-	break;
       } else {
         yystrbuf[i++] = c;
       }
     } while (true);
     if (c == EOF) {
       yyerror ("EOF reached while expecting '");
-      return NULL;
+      return 0;
     }
     nstr = (char *) safe_malloc((strlen(yylval.str)+1) * sizeof(char));
     strcpy(nstr, yylval.str);
