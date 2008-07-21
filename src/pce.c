@@ -1729,6 +1729,7 @@ void create_log_file(char *curdir) {
     printf("Log file not generated: strftime returned 0\n");
     return;
   }
+  printf("Attempting to open log file %s\n", logfile);
   pce_log_fp = fopen(logfile, "w");
   if (pce_log_fp == NULL) {
     perror("Could not open log file");
