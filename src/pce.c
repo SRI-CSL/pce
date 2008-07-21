@@ -1725,7 +1725,7 @@ void create_log_file(char *curdir) {
     perror("Log file not generated");
     return;
   }
-  if (strftime(logfile, 28, "pce_%FT%T.log", tmp) == 0) {
+  if (strftime(logfile, 28, "pce_%FT%H-%M-%S.log", tmp) == 0) {
     printf("Log file not generated: strftime returned 0\n");
     return;
   }
