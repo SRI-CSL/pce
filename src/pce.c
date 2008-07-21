@@ -101,8 +101,8 @@ static void rule_vars_buffer_resize(rule_vars_buffer_t *buf);
 static var_entry_t **rule_vars_buffer_copy(rule_vars_buffer_t *buf);
 static char **names_buffer_copy(names_buffer_t *nbuf);
 
-static char *pce_init_file = "pce_init.pce";
-static char *pce_save_file = "pce_save.pce";
+static char *pce_init_file = "pce.init";
+static char *pce_save_file = "pce.persist";
 static FILE *pce_save_fp;
 static FILE *pce_log_fp = NULL;
 
