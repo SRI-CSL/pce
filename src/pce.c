@@ -73,7 +73,10 @@ static const char *const pce_callbacks[] = {
   "app_done"
 };
 
+// names_buffer is temporary storage for names
 static names_buffer_t names_buffer = {0, 0, NULL};
+
+// Stores learner ids
 static names_buffer_t learner_ids = {0, 0, NULL};
 
 // There are two rules_vars_buffers - as a formula is clausified by cnf,
@@ -98,6 +101,184 @@ static void rule_vars_buffer_resize(rule_vars_buffer_t *buf);
 static var_entry_t **rule_vars_buffer_copy(rule_vars_buffer_t *buf);
 static char **names_buffer_copy(names_buffer_t *nbuf);
 
+static char *pce_init_file = "pce_init.pce";
+static char *pce_save_file = "pce_save.pce";
+static FILE *pce_save_fp;
+static FILE *pce_log_fp = NULL;
+
+// Would like to use icl_NewStringFromTerm, but it doesn't properly quote
+// things, and icl_ForcedQuotedStringFromStr returns NULL (no explanation)
+// So this replaces those
+void icl_stAppend(char **str1, char *str2)
+{
+  char *p;
+  int str2len = strlen(str2);
+
+  if (!str2 || !*str2) return;
+
+  if (*str1 == NULL) {
+
+    *str1 = (char*)malloc(sizeof(char) * (str2len + 1));
+    *str1 = strdup(str2);
+    (*str1)[str2len] = '\0';
+  }
+  else {
+    p = malloc(strlen(*str1) + strlen(str2)+1);
+    strcpy(p, *str1);
+    strcat(p, str2);
+    icl_stFree(*str1);
+    *str1 = p;
+  }
+}
+
+char *icl_TermToString(ICLTerm *t) {
+  char *res = NULL;
+  char* tmp = NULL;
+  int tmpBufSz = 0;
+
+  if (t==NULL)
+    return NULL;
+
+  /* Make sure the term is OK */
+  if (!icl_IsValid(t))
+    return NULL;
+
+  if (icl_IsVar(t)) {
+    res = strdup(icl_Str(t));
+  }
+  else if (icl_IsInt(t)) {
+    tmpBufSz = snprintf(tmp, 0, get64BitFormat(), icl_Int(t));
+    if(tmpBufSz < 0) {
+      tmpBufSz = 128;
+    }
+    ++tmpBufSz;
+    tmp = (char*)malloc(tmpBufSz * sizeof(char));
+    (void)memset(tmp, 0, tmpBufSz);
+    snprintf(tmp, tmpBufSz, get64BitFormat(), icl_Int(t));
+    res = tmp;
+  }
+  else if (icl_IsFloat(t)) {
+    tmpBufSz = snprintf(tmp, 0, "%f", icl_Float(t));
+    if(tmpBufSz < 0) {
+      tmpBufSz = 128;
+    }
+    ++tmpBufSz;
+    tmp = (char*)malloc(tmpBufSz * sizeof(char));
+    (void)memset(tmp, 0, tmpBufSz);
+    snprintf(tmp, tmpBufSz, "%f", icl_Float(t));
+    res = tmp;
+  }
+  else if (icl_IsStr(t)) {
+    res = strdup(icl_ForcedQuotedStringFromStr(t));
+  }
+  else if(icl_IsDataQ(t)) {
+    /* icldataq("") */
+    res = (char*)malloc(icl_Len(t) + 1);
+    res = memcpy(res, icl_DataQ(t), icl_Len(t));
+    res[icl_Len(t)] = '\0';
+  }
+  else if (icl_IsStruct(t)) {
+    int first = TRUE;
+    ICLListType *args;
+
+    /* Checks for struct that are operators */
+    res = strdup("'");
+    icl_stAppend(&res, strdup(icl_Functor(t)));
+    icl_stAppend(&res, "'");
+    args = icl_Arguments(t);
+    icl_stAppend(&res, "(");
+    while (args) {
+      char *arg;
+      arg = icl_TermToString(icl_ListElt(args));
+      if (first) {
+	first = FALSE;
+      }
+      else {
+	icl_stAppend(&res, ",");
+      }
+      icl_stAppend(&res, arg);
+      icl_stFree(arg);
+      args = icl_ListNext(args);
+    }
+    icl_stAppend(&res, ")");
+  }
+  else if (icl_IsList(t)) {
+    int first = TRUE;
+    ICLListType *args;
+    args = icl_List(t);
+    res = strdup("[");
+    while (args) {
+      char *arg;
+      arg = icl_TermToString(icl_ListElt(args));
+      if (first)
+        first = FALSE;
+      else icl_stAppend(&res, ",");
+      icl_stAppend(&res, arg);
+      icl_stFree(arg);
+      args = icl_ListNext(args);
+    }
+    icl_stAppend(&res, "]");
+  }
+  else if (icl_IsGroup(t)) {
+    int first = TRUE;
+    ICLListType *args;
+    char start;
+    char *separator;
+
+    icl_GetGroupChars(t, &start, &separator);
+    args = icl_List(t);
+    res = strdup("[");
+    res[0] = start;
+    while (args) {
+      char *arg;
+      arg = icl_TermToString(icl_ListElt(args));
+      if (first)
+        first = FALSE;
+      else icl_stAppend(&res, separator);
+      icl_stAppend(&res, arg);
+      icl_stFree(arg);
+      args = icl_ListNext(args);
+    }
+    icl_stAppend(&res, "]");
+    if (start == '(')
+      res[strlen(res)-1] = start + 1;  /* () */
+    else
+      res[strlen(res)-1] = start + 2;  /* {|} and [\] */
+
+    icl_stFree(separator);
+  }
+  else {
+    fprintf(stderr, "Unknown term type for icl_TermToString: \n");
+  }
+
+  return (res);
+}
+
+// Saves the given goal, which is then repeated when PCE starts up
+void pce_save(ICLTerm *goal) {
+  char *str;
+
+  str = icl_TermToString(goal);
+  fprintf(pce_save_fp, "%s\n", str);
+  icl_stFree(str);
+  fflush(pce_save_fp);
+  fsync(fileno(pce_save_fp));
+}
+
+// Logs a message, along with a term if not null
+void pce_log(const char *fmt, ...) {
+  va_list argp;
+
+  if (pce_log_fp != NULL) {
+    va_start(argp, fmt);
+    vfprintf(pce_log_fp, fmt, argp);
+    va_end(argp);
+    fprintf(pce_log_fp, "\n");
+    fflush(pce_log_fp);
+    fsync(fileno(pce_log_fp));
+  }
+}
+
 // Check that the Term is a simple atom, i.e., p(a, b, c, ...) where a, b,
 // c, ... are all constants or variables.  Also check for free variables if
 // vars_allowed is false.
@@ -107,7 +288,7 @@ static bool icl_IsAtomStruct(ICLTerm *icl_term, bool vars_allowed) {
   char *icl_string;
 
   if (!icl_IsStruct(icl_term)) {
-    icl_string = icl_NewStringStructFromTerm(icl_term);
+    icl_string = icl_TermToString(icl_term);
     pce_error("%s is not an atom", icl_string);
     icl_stFree(icl_string);
     return false;
@@ -116,13 +297,13 @@ static bool icl_IsAtomStruct(ICLTerm *icl_term, bool vars_allowed) {
     icl_arg = icl_NthTerm(icl_term, i+1);
     if (icl_IsVar(icl_arg)) {
       if (!vars_allowed) {
-	icl_string = icl_NewStringStructFromTerm(icl_arg);
+	icl_string = icl_TermToString(icl_arg);
 	pce_error("Variable %s is not allowed here", icl_string);
 	icl_stFree(icl_string);
 	return false;
       }
     } else if (!icl_IsStr(icl_arg)) {
-      icl_string = icl_NewStringStructFromTerm(icl_arg);
+      icl_string = icl_TermToString(icl_arg);
       pce_error("%s is not a constant or variable", icl_string);
       icl_stFree(icl_string);
       return false;
@@ -212,44 +393,38 @@ input_atom_t *icl_term_to_atom(ICLTerm *icl_atom, bool vars_allowed,
 
 /* Memory for pce_fact_args */
 
-
-/* Callback for pce_fact
-   
- * This takes a Source (i.e., learner id), and a Formula, and adds the
- * formula as a fact.  The Source is currently ignored.  The Formula must be
- * an atom.  The predicate must have been previously declared (generally in
- * pce-init.pce), and its sorts are used to declare any new constants.
- */
-int pce_fact_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
+bool pce_fact(ICLTerm *goal) {
   // The "goal" struct is in the form "pce_fact(Source,Formula)".
   pred_table_t *pred_table = &(samp_table.pred_table);
-  //const_table_t *const_table = &(samp_table.const_table);
-  //sort_table_t *sort_table = &(samp_table.sort_table);
   ICLTerm *Source = icl_CopyTerm(icl_NthTerm(goal, 1));
   ICLTerm *Formula = icl_CopyTerm(icl_NthTerm(goal, 2));
   ICLTerm *Arg;
-  char *source;
+  char *source, *iclstr;
   input_atom_t *atom;
   char *pred;
   int32_t pred_val, pred_idx;
   int32_t i, num_args;
   int32_t *psig;
 
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+  
   if (!icl_IsStr(Source)) {
     printf("pce_fact: Source should be a string");
-    return FALSE;
+    return false;
   }
-  source = icl_Str(Source);
   if (!icl_IsStruct(Formula)) {
     pce_error("pce_fact must be an atom");
   }
+  source = icl_Str(Source);
   pred = icl_Functor(Formula);
   num_args = icl_NumTerms(Formula);
   // check if we've seen the predicate before and complain if not.
   pred_val = pred_index(pred, pred_table);
   if (pred_val == -1) {
     pce_error("Predicate %s not declared", pred);
-    return FALSE;
+    return false;
   }
   // Check that pred is direct, and arities match
   pred_idx = pred_val_to_index(pred_val);
@@ -257,11 +432,11 @@ int pce_fact_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
     // It is direct - check the arity
     if (pred_arity(pred_idx, pred_table) != num_args) {
       pce_error("Wrong number of args");
-      return FALSE;
+      return false;
     }
   } else {
     pce_error("Indirect predicate used in pce_fact");
-    return FALSE;
+    return false;
   }
   psig = pred_signature(pred_idx, pred_table);
   for(i=0; i < num_args; i++) {
@@ -269,7 +444,7 @@ int pce_fact_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
     if(!icl_IsStr(Arg)) {
       // Each Arg must be a string, not a Struct or Var.
       pce_error("Args to Formula must be simple strings, not Variables");
-      return FALSE;
+      return false;
     }
     names_buffer_resize(&names_buffer);
     names_buffer.name[i] = icl_Str(Arg);
@@ -290,7 +465,23 @@ int pce_fact_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   //dump_sort_table(&samp_table);
   //dump_atom_table(&samp_table);
   //free_atom(&atom);
-  return TRUE;
+  return true;
+}
+
+/* Callback for pce_fact
+   
+ * This takes a Source (i.e., learner id), and a Formula, and adds the
+ * formula as a fact.  The Source is currently ignored.  The Formula must be
+ * an atom.  The predicate must have been previously declared (generally in
+ * pce-init.pce), and its sorts are used to declare any new constants.
+ */
+int pce_fact_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
+  if (pce_fact(goal)) {
+    pce_save(goal);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool eql_samp_atom(samp_atom_t *atom1, samp_atom_t *atom2,
@@ -466,29 +657,23 @@ samp_rule_t **rules_buffer_copy(rules_buffer_t *buf) {
 
 // The main body of pce_learner_assert
 
-int pce_learner_assert(ICLTerm *Lid, ICLTerm *Formula, ICLTerm *Weight) {
+bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
   rule_table_t *rule_table = &(samp_table.rule_table);
   pred_table_t *pred_table = &(samp_table.pred_table);
-  char *lid;
   samp_rule_t *clause, **clauses;
   rule_literal_t *lit, ***lits;
   double weight;
   int32_t i, j, litlen, atom_idx, ruleidx;
 
   // First check that the args are OK
-  if (!icl_IsStr(Lid)) {
-    pce_error("pce_learner_assert: Lid should be a string");
-    return FALSE;
-  }
   if (!icl_IsFloat(Weight)) {
     pce_error("pce_learner_assert: Weight should be a float");
-    return FALSE;
+    return false;
   }
   if (!icl_IsStruct(Formula)) {
     pce_error("pce_learner_assert: Formula should be a struct");
-    return FALSE;
+    return false;
   }
-  lid = icl_Str(Lid);
   weight = icl_Float(Weight);
   // cnf has side effect of setting rules_vars_buffer
   lits = cnf(Formula);
@@ -536,9 +721,32 @@ int pce_learner_assert(ICLTerm *Lid, ICLTerm *Formula, ICLTerm *Weight) {
   }
   //dump_clause_table(&samp_table);
   //dump_rule_table(&samp_table);
-  return TRUE;
+  return true;
 }
 
+bool pce_learner_assert(ICLTerm *goal) {
+    ICLTerm *Lid, *Formula, *Weight;
+  char *lid, *iclstr;
+
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+
+  Lid = icl_CopyTerm(icl_NthTerm(goal, 1));
+  Formula = icl_CopyTerm(icl_NthTerm(goal, 2));
+  Weight = icl_CopyTerm(icl_NthTerm(goal, 3));
+  if (!icl_IsStr(Lid)) {
+    pce_error("pce_learner_assert: Lid should be a string");
+    return false;
+  }
+  lid = icl_Str(Lid);
+  if (pce_learner_assert_internal(lid, Formula, Weight)) {
+    pce_save(goal);
+    return true;
+  } else {
+    return false;
+  }
+}
 
 // goal of form: pce_learner_assert(Lid,Formula,Weight)
 //
@@ -551,13 +759,50 @@ int pce_learner_assert(ICLTerm *Lid, ICLTerm *Formula, ICLTerm *Weight) {
 //
 int pce_learner_assert_callback(ICLTerm *goal, ICLTerm *params,
 				ICLTerm *solutions) {
-  ICLTerm *Lid = icl_CopyTerm(icl_NthTerm(goal, 1));
-  ICLTerm *Formula = icl_CopyTerm(icl_NthTerm(goal, 2));
-  ICLTerm *Weight = icl_CopyTerm(icl_NthTerm(goal, 3));
-  // ICLTerm *Arg;
-
-  return pce_learner_assert(Lid, Formula, Weight);
+  return pce_learner_assert(goal);
 }
+
+
+bool pce_learner_assert_list(ICLTerm *goal) {
+  ICLTerm *Elt, *List, *Lid, *Formula, *Weight;
+  int32_t i;
+  char *iclstr, *lid;
+
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+
+  Lid = icl_CopyTerm(icl_NthTerm(goal, 1));
+  if (!icl_IsStr(Lid)) {
+    pce_error("pce_learner_assert: Lid should be a string");
+    return false;
+  }
+  lid = icl_Str(Lid);
+  List = icl_CopyTerm(icl_NthTerm(goal, 2));
+  if (! icl_IsList(List)) {
+    pce_error("pce_learner_assert_list: List expected");
+    return false;
+  }
+  for(i = 1; i <= icl_NumTerms(List); i++) {
+    Elt = icl_NthTerm(List, i);
+    if (!icl_IsStruct(Elt)) {
+      pce_error("pce_learner_assert_list: List element should be a struct");
+      return false;
+    }
+    if (icl_NumTerms(Elt) != 2) {
+      pce_error("pce_learner_assert_list: List element should have two args");
+      return false;
+    }
+    Formula = icl_NthTerm(Elt, 1);
+    Weight = icl_NthTerm(Elt, 2);
+    if (!pce_learner_assert_internal(lid, Formula, Weight)) {
+      return false;
+    }
+  }
+  printf("pce_learner_assert_list: processed %d assertions\n",
+	 icl_NumTerms(List));
+  return true;
+}  
 
 // goal of form: pce_learner_assert_list(Lid,List)
 //
@@ -566,32 +811,12 @@ int pce_learner_assert_callback(ICLTerm *goal, ICLTerm *params,
 //
 int pce_learner_assert_list_callback(ICLTerm *goal, ICLTerm *params,
 				     ICLTerm *solutions) {
-  ICLTerm *Elt, *List, *Lid, *Formula, *Weight;
-  int32_t i;
-
-  Lid = icl_CopyTerm(icl_NthTerm(goal, 1));
-  List = icl_CopyTerm(icl_NthTerm(goal, 2));
-  if (! icl_IsList(List)) {
-    pce_error("pce_learner_assert_list: List expected");
-    return FALSE;
+  if (pce_learner_assert_list(goal)) {
+    pce_save(goal);
+    return true;
+  } else {
+    return false;
   }
-  for(i = 1; i <= icl_NumTerms(List); i++) {
-    Elt = icl_NthTerm(List, i);
-    if (!icl_IsStruct(Elt)) {
-      pce_error("pce_learner_assert_list: List element should be a struct");
-      return FALSE;
-    }
-    if (icl_NumTerms(Elt) != 2) {
-      pce_error("pce_learner_assert_list: List element should have two args");
-      return FALSE;
-    }
-    Formula = icl_NthTerm(Elt, 1);
-    Weight = icl_NthTerm(Elt, 2);
-    pce_learner_assert(Lid, Formula, Weight);
-  }
-  printf("pce_learner_assert_list: processed %d assertions\n",
-	 icl_NumTerms(List));
-  return TRUE;
 }
 
 // Substitutes constants for variables, using the subst field of qinst
@@ -647,7 +872,7 @@ void add_query_instance_to_solution(ICLTerm *solutions,
   } else {
     solution = icl_NewStruct("pce_queryp", 2, InstForm, Prob);
   }
-  icl_AddToList(solutions, solution, TRUE);
+  icl_AddToList(solutions, solution, true);
 }
 
 
@@ -665,6 +890,11 @@ int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   pred_entry_t *pred_e;
   rule_literal_t ***lits;
   bool result;
+  char *iclstr;
+
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
 
   if (!icl_IsVar(Probability)) {
     pce_error("pce_queryp: Probability must be a variable");
@@ -705,6 +935,8 @@ int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 				     false);
     }
   }
+  // For now, queries are not saved
+  // pce_save(goal);
   return result;
 }
 
@@ -797,7 +1029,12 @@ int32_t pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
   ICLTerm *solution;
   subscription_t *subscr;
   int32_t i, query_index, subscr_index;
-  
+  char *iclstr;
+
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+
   if (icl_NumTerms(goal) == 3) {
     Lid       = icl_CopyTerm(icl_NthTerm(goal, 1));
     Formula   = icl_CopyTerm(icl_NthTerm(goal, 2));
@@ -813,7 +1050,7 @@ int32_t pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
   }
   if (!icl_IsStr(Lid)) {
     pce_error("pce_subscribe: Lid should be a string");
-    return FALSE;
+    return false;
   }
   lid = icl_Str(Lid);
   // sid / Sid is the subscription id - derived from Id if not a var
@@ -824,7 +1061,7 @@ int32_t pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
       if (strcmp(subscriptions.subscription[i]->id, sid) == 0) {
 	safe_free(sid);
 	pce_error("pce_subscribe: Id is already in use");
-	return FALSE;
+	return false;
       }
     }
     Sid = Id;
@@ -862,8 +1099,11 @@ int32_t pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
     solution = icl_NewStruct("pce_subscribe", 5,
 			     Lid, Formula, Who, Condition, Sid);
   }
-  icl_AddToList(solutions, solution, TRUE);
-  return TRUE;
+  icl_AddToList(solutions, solution, true);
+  // Currently not saved - if we do save subscriptions, how do we get the
+  // saved subscription ID back to the original subscriber?
+  // pce_save(goal);
+  return true;
 }
 
 static ICLTerm *pce_SubscriptionParams = NULL;
@@ -913,16 +1153,28 @@ void process_subscription(subscription_t *subscription) {
 int pce_process_subscriptions_callback(ICLTerm *goal, ICLTerm *params,
 				       ICLTerm *solutions) {
   int32_t i;
+  char *iclstr;
+
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
 
   for (i = 0; i < subscriptions.size; i++) {
     process_subscription(subscriptions.subscription[i]);
   }
-  return TRUE;
+  // pce_save(goal);
+  return true;
 }
 
 int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
 			     ICLTerm *solutions) {
+  char *iclstr;
+
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
   // Currently a stub
+  // pce_save(goal);
   return 0;
 }
 
@@ -934,11 +1186,16 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 
   curtime = time(&curtime);
   if (difftime(curtime, idle_timer) > pce_timeout) {
-    mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
-	   DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
-	   DEFAULT_MAX_EXTRA_FLIPS, 50);
+    if (samp_table.atom_table.num_vars > 0) {
+      pce_log("pce_idle_callback generating %d samples", 50);
+      mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
+	     DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
+	     DEFAULT_MAX_EXTRA_FLIPS, 50);
+    }
     time(&idle_timer);
   }
+  // Should these be saved?
+  // pce_save(goal);
   return 0;
 }
 
@@ -1159,7 +1416,7 @@ static rule_literal_t *icl_to_rule_literal(ICLTerm *formula, bool neg) {
   rule_literal_t *lit;
   
   if (!icl_IsAtomStruct(formula, true)) {
-    icl_string = icl_NewStringStructFromTerm(formula);
+    icl_string = icl_TermToString(formula);
     printf("Cannot convert %s to a literal\n", icl_string);
     icl_stFree(icl_string);
     return NULL;
@@ -1301,7 +1558,7 @@ static void pce_error(const char *fmt, ...) {
  * and the facilitator.
  * @param argc passed in but not used in this implementation
  * @param argv passed in but not used in this implementation
- * @return TRUE if successful
+ * @return true if successful
  */
 int setup_oaa_connection(int argc, char *argv[]) {
   ICLTerm *pceSolvables;
@@ -1309,7 +1566,7 @@ int setup_oaa_connection(int argc, char *argv[]) {
   printf("Setting up OAA connection\n");
   if (!oaa_SetupCommunication(AGENT_NAME)) {
     printf("Could not connect\n");
-    return FALSE;
+    return false;
   }
 
   // Prepare a list of solvables that this agent is capable of
@@ -1318,69 +1575,69 @@ int setup_oaa_connection(int argc, char *argv[]) {
   pceSolvables = icl_NewList(NULL); 
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_fact(Source,Formula),[callback(pce_fact)])"),
-		TRUE);
+		true);
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_learner_assert(Lid,Formula,Weight),[callback(pce_learner_assert)])"),
-		TRUE);
+		true);
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_learner_assert_list(Lid,List),[callback(pce_learner_assert_list)])"),
-		TRUE);
+		true);
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_queryp(Q,P),[callback(pce_queryp)])"),
-		TRUE);
+		true);
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_subscribe(Lid,Formula,Id),[callback(pce_subscribe)])"),
-		TRUE);
+		true);
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_subscribe(Lid,Formula,Who,Condition,Id),[callback(pce_subscribe)])"),
-		TRUE);
+		true);
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_process_subscriptions(X),[callback(pce_process_subscriptions)])"),
-		TRUE);
+		true);
 
   // Register solvables with the Facilitator.
   // The string "parent" represents the Facilitator.
   printf("Registering solvables\n");
   if (!oaa_Register("parent", AGENT_NAME, pceSolvables)) {
     printf("Could not register\n");
-    return FALSE;
+    return false;
   }
 
   // Register the callbacks.
   if (!oaa_RegisterCallback("pce_fact", pce_fact_callback)) {
     printf("Could not register pce_fact callback\n");
-    return FALSE;
+    return false;
   }
   if (!oaa_RegisterCallback("pce_learner_assert",
 			    pce_learner_assert_callback)) {
     printf("Could not register pce_learner_assert callback\n");
-    return FALSE;
+    return false;
   }
   if (!oaa_RegisterCallback("pce_learner_assert_list",
 			    pce_learner_assert_list_callback)) {
     printf("Could not register pce_learner_assert_list callback\n");
-    return FALSE;
+    return false;
   }
   if (!oaa_RegisterCallback("pce_queryp", pce_queryp_callback)) {
     printf("Could not register pce_queryp callback\n");
-    return FALSE;
+    return false;
   }
   if (!oaa_RegisterCallback("pce_subscribe", pce_subscribe_callback)) {
     printf("Could not register pce_subscribe callback\n");
-    return FALSE;
+    return false;
   }
   if (!oaa_RegisterCallback("pce_process_subscriptions",
 			    pce_process_subscriptions_callback)) {
     printf("Could not register pce_process_subscriptions callback\n");
-    return FALSE;
+    return false;
   }
   if (!oaa_RegisterCallback("pce_reset_cache", pce_reset_cache_callback)) {
     printf("Could not register pce_reset_cache callback\n");
-    return FALSE;
+    return false;
   }
   if (!oaa_RegisterCallback("app_idle", pce_idle_callback)) {
     pce_error("Could not register idle callback\n");
-    return FALSE;
+    return false;
   }
 
   // This seems to be ignored
@@ -1391,11 +1648,97 @@ int setup_oaa_connection(int argc, char *argv[]) {
   icl_Free(pceSolvables);
 
   printf("Returning from setup_oaa_connection\n");
-  return TRUE;
+  return true;
+}
+
+void process_save_file_cmd(char *goal) {
+  ICLTerm *Goal;
+  int32_t len;
+
+  len = strlen(goal);
+  Goal = icl_NewTermFromData(goal, len);
+  
+  // We assume the Goal is well-formed
+  if (strcmp(icl_Functor(Goal), "pce_fact") == 0) {
+    pce_fact(Goal);
+  } else if (strcmp(icl_Functor(Goal), "pce_learner_assert") == 0) {
+    pce_learner_assert(Goal);
+  } else if (strcmp(icl_Functor(Goal), "pce_learner_assert_list") == 0) {
+    pce_learner_assert_list(Goal);
+  } else {
+    fprintf(stderr, "Something's wrong: save file contains\n  %s\n", goal);
+  }
+}
+
+bool load_save_file() {
+  char *curdir;
+  bool save_file_exists;
+  int32_t i;
+  int32_t readbufsize;
+  char *readbuf;
+  char c;
+
+  readbufsize = 80;
+  readbuf = (char *) safe_malloc(readbufsize * sizeof(char));
+  
+  // Open the save file, and restore previous sessions
+  save_file_exists = (access(pce_save_file, F_OK) == 0);
+  pce_save_fp = fopen(pce_save_file, "a+");
+  if (pce_save_fp == NULL) {
+    char* err = (char *)
+      safe_malloc((strlen(curdir) + strlen(pce_save_file) + 15) * sizeof(char));
+    strncpy(err, "Error opening ", 15);
+    strcat(err, getenv("PWD"));
+    strcat(err, pce_save_file);
+    perror(err);
+    safe_free(err);
+    return false;
+  }
+  if (save_file_exists) {
+    i = 0;
+    while ((c = fgetc(pce_save_fp)) != EOF) {
+      if (c == '\n') {
+	readbuf[i] = '\0';
+	process_save_file_cmd(str_copy(readbuf));
+	i = 0;
+      } else {
+	if (i + 1 >= readbufsize) {
+	  readbufsize += readbufsize/2;
+	  readbuf = (char *)
+	    safe_realloc(readbuf, readbufsize * sizeof(char));
+	}
+	readbuf[i++] = c;
+      }
+    }
+  }
+  return true;
+}
+
+void create_log_file(char *curdir) {
+  time_t t;
+  struct tm *tmp;
+  char logfile[28];
+
+  t = time(NULL);
+  tmp = localtime(&t);
+  if (tmp == NULL) {
+    perror("Log file not generated");
+    return;
+  }
+  if (strftime(logfile, 28, "pce_%FT%T.log", tmp) == 0) {
+    printf("Log file not generated: strftime returned 0\n");
+    return;
+  }
+  pce_log_fp = fopen(logfile, "w");
+  if (pce_log_fp == NULL) {
+    perror("Could not open log file");
+  } else {
+    printf("Created Log file %s/%s\n", curdir, logfile);
+  }
 }
 
 int main(int argc, char *argv[]){
-  char init_file[256];
+  char *curdir;
 
   // Initialize OAA
   printf("Initializing OAA\n");
@@ -1404,13 +1747,18 @@ int main(int argc, char *argv[]){
     printf("Could not set up OAA connections...exiting\n");
     return EXIT_FAILURE;
   }
-
+  
   init_samp_table(&samp_table);
-  //sprintf(init_file, "%s/pce_init.pce", getenv("HOME"));
-  printf("Loading %s/pce_init.pce\n", getenv("PWD"));
-  sprintf(init_file, "pce_init.pce");
-  load_mcsat_file(init_file, &samp_table);
-  fprintf(stderr, "Entering MainLoop\n");
-  oaa_MainLoop(TRUE);
+
+  curdir = getenv("PWD");
+  printf("Loading %s/pce_init.pce\n", curdir);
+  load_mcsat_file(pce_init_file, &samp_table);
+  if (!load_save_file()) {
+    return EXIT_FAILURE;
+  }
+  create_log_file(curdir);
+  
+  printf("Entering MainLoop\n");
+  oaa_MainLoop(true);
   return EXIT_SUCCESS;
 }
