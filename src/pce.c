@@ -106,6 +106,20 @@ static char *pce_save_file = "pce.persist";
 static FILE *pce_save_fp;
 static FILE *pce_log_fp = NULL;
 
+// Logs a message, along with a term if not null
+void pce_log(const char *fmt, ...) {
+  va_list argp;
+
+  if (pce_log_fp != NULL) {
+    va_start(argp, fmt);
+    vfprintf(pce_log_fp, fmt, argp);
+    va_end(argp);
+    fprintf(pce_log_fp, "\n");
+    fflush(pce_log_fp);
+    fsync(fileno(pce_log_fp));
+  }
+}
+
 // Would like to use icl_NewStringFromTerm, but it doesn't properly quote
 // things, and icl_ForcedQuotedStringFromStr returns NULL (no explanation)
 // So this replaces those
@@ -248,6 +262,7 @@ char *icl_TermToString(ICLTerm *t) {
     icl_stFree(separator);
   }
   else {
+    pce_log("*** Unknown term type for icl_TermToString: \n");
     fprintf(stderr, "Unknown term type for icl_TermToString: \n");
   }
 
@@ -263,20 +278,6 @@ void pce_save(ICLTerm *goal) {
   icl_stFree(str);
   fflush(pce_save_fp);
   fsync(fileno(pce_save_fp));
-}
-
-// Logs a message, along with a term if not null
-void pce_log(const char *fmt, ...) {
-  va_list argp;
-
-  if (pce_log_fp != NULL) {
-    va_start(argp, fmt);
-    vfprintf(pce_log_fp, fmt, argp);
-    va_end(argp);
-    fprintf(pce_log_fp, "\n");
-    fflush(pce_log_fp);
-    fsync(fileno(pce_log_fp));
-  }
 }
 
 // Check that the Term is a simple atom, i.e., p(a, b, c, ...) where a, b,
@@ -411,7 +412,7 @@ bool pce_fact(ICLTerm *goal) {
   icl_stFree(iclstr);
   
   if (!icl_IsStr(Source)) {
-    printf("pce_fact: Source should be a string");
+    pce_error("pce_fact: Source should be a string");
     return false;
   }
   if (!icl_IsStruct(Formula)) {
@@ -799,6 +800,8 @@ bool pce_learner_assert_list(ICLTerm *goal) {
       return false;
     }
   }
+  pce_log("pce_learner_assert_list: processed %d assertions\n",
+	  icl_NumTerms(List));
   printf("pce_learner_assert_list: processed %d assertions\n",
 	 icl_NumTerms(List));
   return true;
@@ -1166,6 +1169,14 @@ int pce_process_subscriptions_callback(ICLTerm *goal, ICLTerm *params,
   return true;
 }
 
+int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
+				 ICLTerm *solutions) {
+}
+
+int32_t pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
+				 ICLTerm *solutions) {
+}
+
 int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
 			     ICLTerm *solutions) {
   char *iclstr;
@@ -1267,7 +1278,7 @@ rule_literal_t ***cnf_pos(ICLTerm *formula) {
       return icl_to_cnf_literal(formula, false);
     }
   } else {
-    printf("Expect a struct here");
+    pce_error("cnf_pos: Expect a struct here");
     return NULL;
   }
 }
@@ -1302,7 +1313,7 @@ rule_literal_t ***cnf_neg(ICLTerm *formula) {
       return icl_to_cnf_literal(formula, true);
     }
   } else {
-    printf("Expect a struct here");
+    pce_error("cnf_neg: Expect a struct here");
     return NULL;
   }
 }
@@ -1379,7 +1390,6 @@ static rule_literal_t ***cnf_union(rule_literal_t ***c1,
     unioncnf[cnflen1+i] = c2[i];
   }
   unioncnf[cnflen1+i] = NULL;
-  printf("cnf_union: length is %d\n", cnflen1+i);
   //safe_free(c1);
   //safe_free(c2);
   return unioncnf;
@@ -1417,7 +1427,7 @@ static rule_literal_t *icl_to_rule_literal(ICLTerm *formula, bool neg) {
   
   if (!icl_IsAtomStruct(formula, true)) {
     icl_string = icl_TermToString(formula);
-    printf("Cannot convert %s to a literal\n", icl_string);
+    pce_error("Cannot convert %s to a literal\n", icl_string);
     icl_stFree(icl_string);
     return NULL;
   }
@@ -1549,6 +1559,9 @@ static void pce_error(const char *fmt, ...) {
   va_list argp;
   va_start(argp, fmt);
   vprintf(fmt, argp);
+  if (pce_log_fp != NULL) {
+    vfprintf(pce_log_fp, fmt, argp);
+  }
   va_end(argp);
   printf("\n");
 }
@@ -1594,6 +1607,18 @@ int setup_oaa_connection(int argc, char *argv[]) {
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_process_subscriptions(X),[callback(pce_process_subscriptions)])"),
 		true);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_unsubscribe(Lid,F),[callback(pce_unsubscribe)])"),
+		true);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_unsubscribe(Lid,F,Who,Condition),[callback(pce_unsubscribe)])"),
+		true);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_unsubscribe(SubscriptionId),[callback(pce_unsubscribe)])"),
+		true);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_unsubscribe_learner(Lid),[callback(pce_unsubscribe_learner)])"),
+		true);
 
   // Register solvables with the Facilitator.
   // The string "parent" represents the Facilitator.
@@ -1629,6 +1654,14 @@ int setup_oaa_connection(int argc, char *argv[]) {
   if (!oaa_RegisterCallback("pce_process_subscriptions",
 			    pce_process_subscriptions_callback)) {
     printf("Could not register pce_process_subscriptions callback\n");
+    return false;
+  }
+  if (!oaa_RegisterCallback("pce_unsubscribe", pce_unsubscribe_callback)) {
+    printf("Could not register pce_unsubscribe callback\n");
+    return false;
+  }
+  if (!oaa_RegisterCallback("pce_unsubscribe_learner", pce_unsubscribe_learner_callback)) {
+    printf("Could not register pce_unsubscribe_learner callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_reset_cache", pce_reset_cache_callback)) {
@@ -1741,24 +1774,28 @@ void create_log_file(char *curdir) {
 int main(int argc, char *argv[]){
   char *curdir;
 
+  create_log_file(curdir);
+  
   // Initialize OAA
+  pce_log("Initializing OAA\n");
   printf("Initializing OAA\n");
   oaa_Init(argc, argv);
   if (!setup_oaa_connection(argc, argv)) {
-    printf("Could not set up OAA connections...exiting\n");
+    pce_error("Could not set up OAA connections...exiting\n");
     return EXIT_FAILURE;
   }
   
   init_samp_table(&samp_table);
 
   curdir = getenv("PWD");
-  printf("Loading %s/pce_init.pce\n", curdir);
+  pce_log("Loading %s/%s\n", curdir, pce_init_file);
+  printf("Loading %s/%s\n", curdir, pce_init_file);
   load_mcsat_file(pce_init_file, &samp_table);
   if (!load_save_file()) {
     return EXIT_FAILURE;
   }
-  create_log_file(curdir);
   
+  pce_log("Entering MainLoop\n");
   printf("Entering MainLoop\n");
   oaa_MainLoop(true);
   return EXIT_SUCCESS;
