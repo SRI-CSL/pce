@@ -177,6 +177,7 @@ void free_atom(input_atom_t *atom) {
     safe_free(atom->args[i]);
     i++;
   }
+  safe_free(atom->args);
   safe_free(atom);
 }
 
