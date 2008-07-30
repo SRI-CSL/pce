@@ -615,6 +615,7 @@ void free_sortdecl_data() {
 
 void free_constdecl_data() {
   free_strings(input_command.decl.constdecl.name);
+  safe_free(input_command.decl.constdecl.name);
   safe_free(input_command.decl.constdecl.sort);
 }
 
