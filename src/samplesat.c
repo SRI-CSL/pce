@@ -940,7 +940,7 @@ void push_unsat_clause(clause_table_t *clause_table, uint32_t i){
   clause_table->num_unsat_clauses++;
 }
 
-static integer_stack_t clause_var_stack;
+static integer_stack_t clause_var_stack = {0, 0, NULL};
 
 /* 
  * Sets all the clause lists in clause_table to NULL.  
@@ -1009,7 +1009,11 @@ int32_t  init_sample_sat(samp_table_t *table){
   clause_table_t *clause_table = &(table->clause_table);
   atom_table_t *atom_table = &(table->atom_table);
   int32_t conflict = 0;
-  init_integer_stack(&(clause_var_stack), 0);
+  if (clause_var_stack.size = 0) {
+    init_integer_stack(&(clause_var_stack), 0);
+  } else {
+    clause_var_stack.top = 0;
+  }
   
   empty_clause_lists(table);
   init_clause_lists(clause_table);
