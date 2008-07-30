@@ -183,7 +183,7 @@ char *icl_TermToString(ICLTerm *t) {
     res = tmp;
   }
   else if (icl_IsStr(t)) {
-    res = strdup(icl_ForcedQuotedStringFromStr(t));
+    res = icl_ForcedQuotedStringFromStr(t);
   }
   else if(icl_IsDataQ(t)) {
     /* icldataq("") */
@@ -197,7 +197,7 @@ char *icl_TermToString(ICLTerm *t) {
 
     /* Checks for struct that are operators */
     res = strdup("'");
-    icl_stAppend(&res, strdup(icl_Functor(t)));
+    icl_stAppend(&res, icl_Functor(t));
     icl_stAppend(&res, "'");
     args = icl_Arguments(t);
     icl_stAppend(&res, "(");
@@ -688,6 +688,7 @@ bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
     rules_buffer_resize(&rules_buffer);
     rules_buffer.rules[rules_buffer.size++] = clause;
   }
+  safe_free(lits);
   
   // Make a NULL-terminated copy
   clauses = rules_buffer_copy(&rules_buffer);
@@ -702,6 +703,7 @@ bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
       }
       add_internal_clause(&samp_table, clause_buffer.data,
 			  clauses[i]->num_lits, weight);
+      safe_free(clauses[i]);
     } else {
       int32_t current_rule = rule_table->num_rules;
       samp_rule_t *new_rule = clauses[i];
@@ -720,6 +722,8 @@ bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
       }
     }
   }
+  
+  safe_free(clauses);
   //dump_clause_table(&samp_table);
   //dump_rule_table(&samp_table);
   return true;
@@ -773,13 +777,13 @@ bool pce_learner_assert_list(ICLTerm *goal) {
   pce_log("%s", iclstr);
   icl_stFree(iclstr);
 
-  Lid = icl_CopyTerm(icl_NthTerm(goal, 1));
+  Lid = icl_NthTerm(goal, 1);
   if (!icl_IsStr(Lid)) {
     pce_error("pce_learner_assert: Lid should be a string");
     return false;
   }
   lid = icl_Str(Lid);
-  List = icl_CopyTerm(icl_NthTerm(goal, 2));
+  List = icl_NthTerm(goal, 2);
   if (! icl_IsList(List)) {
     pce_error("pce_learner_assert_list: List expected");
     return false;
@@ -1169,12 +1173,214 @@ int pce_process_subscriptions_callback(ICLTerm *goal, ICLTerm *params,
   return true;
 }
 
-int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
-				 ICLTerm *solutions) {
+void free_subscription(subscription_t *subscr) {
+  safe_free(subscr->id);
+  safe_free(subscr);
 }
 
-int32_t pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
+int32_t get_learner_index(char *lid) {
+  int32_t i;
+  for (i = 0; i < learner_ids.size; i++) {
+    if (strcmp(learner_ids.name[i], lid) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void remove_query(int32_t query_index, samp_table_t *table) {
+  query_table_t *query_table;
+  query_instance_table_t *qinst_table;
+  samp_query_t *query;
+  samp_query_instance_t *qinst;
+  int32_t i, j, cnt;
+
+  query_table = &table->query_table;
+  qinst_table = &table->query_instance_table;
+  query = query_table->query[query_index];
+
+  // First find and free all instances of this query
+
+  cnt = 0;
+  for (i = 0; i < qinst_table->size; i++) {
+    if (qinst_table->query_inst[i]->query_index == query_index) {
+      qinst = qinst_table->query_inst[i];
+      safe_free(qinst->subst);
+      for (j = 0; qinst->lit[j] != NULL; j++) {
+	safe_free(qinst->lit[j]);
+      }
+      safe_free(qinst->lit);
+      safe_free(qinst);
+      cnt++;
+    } else if (cnt > 0) {
+      // move this pointer down to the next available slot in the array,
+      // past the cnt empty slots
+      qinst_table->query_inst[i - cnt] = qinst_table->query_inst[i];
+    }
+  }
+  qinst_table->size -= cnt;
+}
+
+bool pce_unsubscribe(int32_t subscr_index) {
+  subscription_t *subscr;
+  int32_t i, j, k, qidx, si_size;
+  samp_query_t *query;
+  
+  subscr = subscriptions.subscription[subscr_index];
+  qidx = subscr->query_index;
+  query = samp_table.query_table.query[qidx];
+  // The source_index is an array of subscription indices
+  // terminated with -1
+  for (si_size = 0; query->source_index[si_size] != -1; si_size++) {}
+  for (j = 0; j < si_size; j++) {
+    if (query->source_index[j] == i) {
+      break;
+    }
+  }
+  if (j == si_size) {
+    pce_error("pce_unsubscribe: something's wrong - couldn't find index");
+    return false;
+  }
+  if (si_size == 1) {
+    // This query is only pointed to by this subscription - can
+    // remove the query as well as the subscription
+    remove_query(qidx, &samp_table);
+  } else {
+    // Simply remove this source index from the array
+    for (k = j; k < si_size; k++) {
+      query->source_index[k] = query->source_index[j+1];
+    }
+    query->source_index = (int32_t *)
+      safe_realloc(query->source_index,
+		   (si_size - 1) * sizeof(int32_t));
+  }
+  // Now remove the subscription
+  for (i = subscr_index; i < subscriptions.size; i++) {
+    subscriptions.subscription[i] = subscriptions.subscription[i+1];
+  }
+  subscriptions.size--;
+  free_subscription(subscr);
+  return true;
+}
+
+// Goal is in one of 3 forms - the arity tells them apart
+//  pce_unsubscribe(Lid,F)
+//  pce_unsubscribe(Lid,F,Who,Condition)
+//  pce_unsubscribe(SubscriptionId)
+
+int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
 				 ICLTerm *solutions) {
+  ICLTerm *Lid, *Formula, *Who, *Condition, *Sid;
+  char *sid, *lid;
+  subscription_t *subscr;
+  int32_t i, lidx, subscr_index;
+  char *iclstr;
+
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+  Lid = NULL;
+  Who = NULL;
+  if (icl_NumTerms(goal) == 2) {
+    Lid       = icl_CopyTerm(icl_NthTerm(goal, 1));
+    Formula   = icl_CopyTerm(icl_NthTerm(goal, 2));
+  } else if (icl_NumTerms(goal) == 4) {
+    Lid       = icl_CopyTerm(icl_NthTerm(goal, 1));
+    Formula   = icl_CopyTerm(icl_NthTerm(goal, 2));
+    Who       = icl_CopyTerm(icl_NthTerm(goal, 3));
+    Condition = icl_CopyTerm(icl_NthTerm(goal, 4));
+  } else if (icl_NumTerms(goal) == 1) {
+    Sid       = icl_CopyTerm(icl_NthTerm(goal, 1));
+  } else {
+    pce_error("pce_unsubscribe: Wrong number of arguments");
+    return false;
+  }
+  if (Lid != NULL) {
+    // Find subscription based on learner id and formula
+    if (!icl_IsStr(Lid)) {
+      pce_error("pce_subscribe: Lid should be a string");
+      return false;
+    }
+    lid = icl_Str(Lid);
+    // Currently ignoring Who and Condition
+    lidx = get_learner_index(lid);
+    if (lidx == -1) {
+      pce_error("pce_unsubscribe: Learner %s not found", lid);
+      return false;
+    }
+    for (subscr_index = 0;
+	 subscr_index < subscriptions.size;
+	 subscr_index++) {
+      if (subscriptions.subscription[i]->lid == lidx) {
+	if (icl_match_terms(subscr->formula, Formula, NULL)) {
+	  break;
+	}
+      }
+    }
+    if (subscr_index == subscriptions.size) {
+      pce_error("pce_unsubscribe: subscription not found");
+      return false;
+    }
+  } else {
+    // Find subscription based on subscription ID
+    if (!icl_IsStr(Sid)) {
+      pce_error("pce_subscribe: Sid should be a string");
+      return false;
+    }
+    sid = icl_Str(Sid);
+    for (subscr_index = 0;
+	 subscr_index < subscriptions.size;
+	 subscr_index++) {
+      if (strcmp(subscriptions.subscription[i]->id, sid) == 0) {
+	break;
+      }
+    }
+    if (subscr_index == subscriptions.size) {
+      pce_error("pce_unsubscribe: subscription not found");
+      return false;
+    }
+  }
+  // Found a match - call pce_unsubscribe
+  pce_unsubscribe(subscr_index);
+  return true;
+}
+
+// goal of the form pce_unsubscribe_learner(Lid)
+int32_t pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
+                                         ICLTerm *solutions) {
+  ICLTerm *Lid;
+  char *lid;
+  int32_t i, lidx, subscr_index;
+  char *iclstr;
+
+  iclstr = icl_TermToString(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+  Lid = icl_CopyTerm(icl_NthTerm(goal, 1));
+  // Find subscriptions based on learner id
+  if (!icl_IsStr(Lid)) {
+    pce_error("pce_subscribe_learner: Lid should be a string");
+    return false;
+  }
+  lid = icl_Str(Lid);
+  lidx = get_learner_index(lid);
+  if (lidx == -1) {
+    pce_error("pce_unsubscribe_learner: Learner %s not found", lid);
+    return false;
+  }
+  i = 0;
+  for (subscr_index = 0;
+       subscr_index < subscriptions.size;
+       subscr_index++) {
+    if (subscriptions.subscription[i]->lid == lidx) {
+      if (pce_unsubscribe(subscr_index)) {
+	i++;
+      }
+    }
+  }
+  printf("%d subscriptions removed", i);
+  pce_log("%d subscriptions removed", i);
+  return true;
 }
 
 int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
@@ -1189,7 +1395,7 @@ int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
   return 0;
 }
 
-time_t pce_timeout = 60;
+time_t pce_timeout = 1;
 static time_t idle_timer = 0;
 
 int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
@@ -1354,16 +1560,17 @@ static rule_literal_t ***cnf_product(rule_literal_t ***c1,
       }
       conjunct[len1+len2] = NULL;
       productcnf[idx++] = conjunct;
-      //safe_free(c2[j]);
     }
   }
   productcnf[idx] = NULL;
-//   for (i = 0; c1[i] != NULL; i++) {
-//     safe_free(c1[i]);
-//   }
-//   for (j = 0; c2[j] != NULL; j++) {
-//     safe_free(c2[j]);
-//   }
+  for (i = 0; c1[i] != NULL; i++) {
+    safe_free(c1[i]);
+  }
+  safe_free(c1);
+  for (j = 0; c2[j] != NULL; j++) {
+    safe_free(c2[j]);
+  }
+  safe_free(c2);
   return productcnf;
 }
 
@@ -1390,8 +1597,8 @@ static rule_literal_t ***cnf_union(rule_literal_t ***c1,
     unioncnf[cnflen1+i] = c2[i];
   }
   unioncnf[cnflen1+i] = NULL;
-  //safe_free(c1);
-  //safe_free(c2);
+  safe_free(c1);
+  safe_free(c2);
   return unioncnf;
 }
 
@@ -1559,10 +1766,12 @@ static void pce_error(const char *fmt, ...) {
   va_list argp;
   va_start(argp, fmt);
   vprintf(fmt, argp);
-  if (pce_log_fp != NULL) {
-    vfprintf(pce_log_fp, fmt, argp);
-  }
   va_end(argp);
+  if (pce_log_fp != NULL) {
+    va_start(argp, fmt);
+    vfprintf(pce_log_fp, fmt, argp);
+    va_end(argp);
+  }
   printf("\n");
 }
 
@@ -1688,10 +1897,17 @@ void process_save_file_cmd(char *goal) {
   ICLTerm *Goal;
   int32_t len;
 
+  if (goal == NULL) {
+    return;
+  }
   len = strlen(goal);
   Goal = icl_NewTermFromData(goal, len);
   
   // We assume the Goal is well-formed
+  if (Goal == NULL) {
+    pce_error("pce.persist: %s not parseable", goal);
+    return;
+  }
   if (strcmp(icl_Functor(Goal), "pce_fact") == 0) {
     pce_fact(Goal);
   } else if (strcmp(icl_Functor(Goal), "pce_learner_assert") == 0) {
@@ -1701,6 +1917,7 @@ void process_save_file_cmd(char *goal) {
   } else {
     fprintf(stderr, "Something's wrong: save file contains\n  %s\n", goal);
   }
+  icl_Free(Goal);
 }
 
 bool load_save_file() {
@@ -1708,7 +1925,8 @@ bool load_save_file() {
   bool save_file_exists;
   int32_t i;
   int32_t readbufsize;
-  char *readbuf;
+  static char *readbuf;
+  char *copy;
   char c;
 
   readbufsize = 80;
@@ -1732,7 +1950,9 @@ bool load_save_file() {
     while ((c = fgetc(pce_save_fp)) != EOF) {
       if (c == '\n') {
 	readbuf[i] = '\0';
-	process_save_file_cmd(str_copy(readbuf));
+	copy = str_copy(readbuf);
+	process_save_file_cmd(copy);
+	safe_free(copy);
 	i = 0;
       } else {
 	if (i + 1 >= readbufsize) {
@@ -1774,6 +1994,7 @@ void create_log_file(char *curdir) {
 int main(int argc, char *argv[]){
   char *curdir;
 
+  curdir = getenv("PWD");
   create_log_file(curdir);
   
   // Initialize OAA
@@ -1787,7 +2008,6 @@ int main(int argc, char *argv[]){
   
   init_samp_table(&samp_table);
 
-  curdir = getenv("PWD");
   pce_log("Loading %s/%s\n", curdir, pce_init_file);
   printf("Loading %s/%s\n", curdir, pce_init_file);
   load_mcsat_file(pce_init_file, &samp_table);
