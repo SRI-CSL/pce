@@ -1395,7 +1395,7 @@ int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
   return 0;
 }
 
-time_t pce_timeout = 1;
+time_t pce_timeout = 60;
 static time_t idle_timer = 0;
 
 int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
