@@ -887,14 +887,11 @@ void add_query_instance_to_solution(ICLTerm *solutions,
 // is not in the formula table then samples must be generated to get a
 // probability.
 int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
-  pred_table_t *pred_table = &samp_table.pred_table;
   atom_table_t *atom_table = &samp_table.atom_table;
   query_instance_table_t *query_instance_table = &samp_table.query_instance_table;
   ICLTerm *QueryFormula = icl_CopyTerm(icl_NthTerm(goal, 1));
   ICLTerm *Probability = icl_CopyTerm(icl_NthTerm(goal, 2));
-  char *pred_str;
-  int32_t pred_val, pred_idx, i, query_index;
-  pred_entry_t *pred_e;
+  int32_t i, query_index;
   rule_literal_t ***lits;
   bool result;
   char *iclstr;
@@ -911,18 +908,7 @@ int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
     pce_error("pce_queryp: QueryFormula must be an atom");
     return false;
   }
-  pred_str = icl_Functor(QueryFormula);
-  pred_val = pred_index(pred_str, pred_table);
-  if (pred_val == -1) {
-    pce_error("pce_queryp: Predicate %s is not declared", pred_str);
-    return false;
-  }
-  pred_idx = pred_val_to_index(pred_val);
-  pred_e = pred_entry(pred_table, pred_idx);
-  if (icl_NumTerms(QueryFormula) != pred_e->arity) {
-    pce_error("pce_queryp: Wrong arity");
-    return false;
-  }
+  
   // cnf has side effect of setting rules_vars_buffer
   lits = cnf(QueryFormula);
   query_index = add_to_query_table(&rules_vars_buffer, lits, &samp_table);
