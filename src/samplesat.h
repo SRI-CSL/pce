@@ -17,7 +17,7 @@
 #define DEFAULT_RVAR_PROBABILITY .2
 #define DEFAULT_MAX_FLIPS 1000
 #define DEFAULT_MAX_EXTRA_FLIPS 10
-#define DEFAULT_MAX_SAMPLES 1000
+#define DEFAULT_MAX_SAMPLES 100
 
 extern int32_t add_var(var_table_t *var_table,
 		       char *name,
@@ -30,6 +30,8 @@ extern int32_t add_var(var_table_t *var_table,
 /* 		     int32_t arity, */
 /* 		     sort_table_t *sort_table, */
 /* 		     char **in_signature); */
+
+extern clause_buffer_t atom_buffer;
 
 extern void atom_buffer_resize(int32_t arity);
 
@@ -58,8 +60,35 @@ extern void add_rule_to_pred(pred_table_t *pred_table,
 
 extern void all_rule_instances(int32_t rule, samp_table_t *table);
 
+extern int32_t samp_query_to_query_instance(samp_query_t *query,
+					    samp_table_t *table);
+
+extern void all_query_instances_rec(int32_t vidx, samp_query_t *query,
+				    samp_table_t *table, bool lazy,
+				    int32_t atom_index);
+  
 extern void all_query_instances(samp_query_t *query, samp_table_t *table);
 
+extern double choose();
+
+extern void cost_flip_unfixed_variable(samp_table_t *table,
+				       int32_t *dcost, 
+				       int32_t var);
+
+extern void flip_unfixed_variable(samp_table_t *table,
+				  int32_t var);
+
+extern int32_t choose_clause_var(samp_table_t *table,
+				 samp_clause_t *link,
+				 samp_truth_value_t *assignment,
+				 double rvar_probability);
+
+extern void update_pmodel(samp_table_t *table);
+
+extern void empty_clause_lists(samp_table_t *table);
+
+extern void init_clause_lists(clause_table_t *clause_table);
+  
 extern void create_new_const_rule_instances(int32_t constidx,
 					    samp_table_t *table,
 					    bool lazy, int32_t atom_index);
@@ -67,6 +96,8 @@ extern void create_new_const_rule_instances(int32_t constidx,
 extern void create_new_const_query_instances(int32_t constidx,
 					     samp_table_t *table,
 					     bool lazy, int32_t atom_index);
+
+extern int32_t activate_atom(samp_table_t *table, samp_atom_t *atom);
 
 extern void link_propagate(samp_table_t *table,
 		    samp_literal_t lit);

@@ -574,6 +574,10 @@ int yylex (void) {
         yystrbuf[i++] = c;
       }
     } while (true);
+    yystrbuf[i] = '\0';
+    nstr = (char *) safe_malloc((strlen(yystrbuf)+1) * sizeof(char));
+    strcpy(nstr, yystrbuf);
+    yylval.str = nstr;
     return STRING;
   }
   if (c == '\'') {
@@ -590,8 +594,9 @@ int yylex (void) {
       yyerror ("EOF reached while expecting '");
       return 0;
     }
-    nstr = (char *) safe_malloc((strlen(yylval.str)+1) * sizeof(char));
-    strcpy(nstr, yylval.str);
+    yystrbuf[i] = '\0';
+    nstr = (char *) safe_malloc((strlen(yystrbuf)+1) * sizeof(char));
+    strcpy(nstr, yystrbuf);
     yylval.str = nstr;
     return NAME;
   }

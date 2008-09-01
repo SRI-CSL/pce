@@ -70,7 +70,7 @@ void add_rule_to_pred(pred_table_t *pred_table,
   entry->rules[entry->num_rules++] = current_rule_index;
 }
 
-static clause_buffer_t atom_buffer = {0, NULL}; 
+clause_buffer_t atom_buffer = {0, NULL}; 
 
 int32_t add_internal_atom(samp_table_t *table,
 			  samp_atom_t *atom){
@@ -649,7 +649,7 @@ void flip_unfixed_variable(samp_table_t *table,
   //  double dcost = 0;   //dcost seems unnecessary
   atom_table_t *atom_table = &(table->atom_table);
   samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment]; 
-  cprintf(1,"Flipping variable %"PRId32"\n", var);
+  cprintf(2,"Flipping variable %"PRId32"\n", var);
   if (assigned_true(assignment[var])){
     assignment[var] = v_false;
     link_propagate(table, pos_lit(var));
@@ -726,9 +726,9 @@ static void print_list(samp_clause_t *link, samp_table_t *table) {
 
 /*
  * Random number generator:
- * - returns a floating point number in the internal [0.0, 1.0)
+ * - returns a floating point number in the interval [0.0, 1.0)
  */
-static inline double choose(){
+double choose(){
   return ((double) random()) /((double) RAND_MAX + 1.0);
 }
 
@@ -782,7 +782,7 @@ void kill_clauses(samp_table_t *table){
   }
 
   // TEMPORARY
-  if (get_verbosity_level() > 0){
+  if (get_verbosity_level() > 1){
     printf("Live clauses:\n");
     print_list(clause_table->sat_clauses, table);
     for (i = 0; i < atom_table->num_vars; i++){
@@ -1009,7 +1009,7 @@ int32_t  init_sample_sat(samp_table_t *table){
   clause_table_t *clause_table = &(table->clause_table);
   atom_table_t *atom_table = &(table->atom_table);
   int32_t conflict = 0;
-  if (clause_var_stack.size = 0) {
+  if (clause_var_stack.size == 0) {
     init_integer_stack(&(clause_var_stack), 0);
   } else {
     clause_var_stack.top = 0;
@@ -1302,16 +1302,15 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
 		     double samp_temperature, double rvar_probability){
   //Assumed that table is in a valid state with a random assignment.
   //We first decide on simulated annealing vs. walksat.
-
   clause_table_t *clause_table = &(table->clause_table);
   atom_table_t *atom_table = &(table->atom_table);
-  samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
+  samp_truth_value_t *assignment =
+    atom_table->assignment[atom_table->current_assignment];
   int32_t dcost;
   double choice; 
   int32_t var;
   uint32_t clause_position;
   samp_clause_t *link;
-
 
   choice = choose();
   if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
@@ -1330,7 +1329,6 @@ void sample_sat_body(samp_table_t *table, double sa_probability,
 	flip_unfixed_variable(table, var);
       }
     }
-
   } else {
     /*
      * Walksat step
@@ -1354,8 +1352,8 @@ static void print_model(samp_table_t *table) {
   atom_table_t *atom_table;
   int32_t i, num_vars;
 
-  assignment = table->atom_table.assignment[table->atom_table.current_assignment];
   atom_table = &table->atom_table;
+  assignment = atom_table->assignment[atom_table->current_assignment];
   num_vars = atom_table->num_vars;
   for (i=0; i<num_vars; i++) {
     print_atom(atom_table->atom[i], table);
@@ -1422,7 +1420,7 @@ void update_pmodel(samp_table_t *table){
   update_query_pmodel(table);
 
   // HACK: TEMPORARY FOR DEBUUGGING
-  if (get_verbosity_level() > 0) {
+  if (get_verbosity_level() > 1) {
     print_model(table);
   }
 }
@@ -1551,10 +1549,10 @@ void mc_sat(samp_table_t *table, double sa_probability,
     return;
   }
 
-  //  print_state(table, 0);  
+  //  print_state(table, 0);
   assert(valid_table(table));
   for (i = 0; i < max_samples; i++){
-    cprintf(1, "---- sample[%"PRIu32"] ---\n", i);
+    cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
     sample_sat(table, sa_probability, samp_temperature,
 	       rvar_probability, max_flips, max_extra_flips);
     //    print_state(table, i+1);
@@ -1678,6 +1676,7 @@ bool check_clause_instance(samp_table_t *table,
       atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
 				  arity + 1,
 				  (int32_t *) rule_atom);
+      // check for witness predicate - fixed false if NULL atom_map
       if (atom_map == NULL) return false;//atom is inactive
       if (rule->literals[i]->neg &&
 	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
@@ -1816,7 +1815,8 @@ int32_t add_query_instance(samp_literal_t **litinst, substit_entry_t *substs,
   query_table = &table->query_table;
   query_instance_table = &table->query_instance_table;
   for (i = 0; i < query_instance_table->num_queries; i++) {
-    if (eql_query_instance_lits(litinst, query_instance_table->query_inst[i])) {
+    if (eql_query_instance_lits(litinst,
+				query_instance_table->query_inst[i]->lit)) {
 	break;
     }
   }
@@ -1848,9 +1848,11 @@ int32_t add_query_instance(samp_literal_t **litinst, substit_entry_t *substs,
 
 int32_t substit_query(samp_query_t *query,
 		      substit_entry_t *substs,
+		      bool lazy,
 		      samp_table_t *table) {
   const_table_t *const_table = &(table->const_table);
   pred_table_t *pred_table = &(table->pred_table);
+  atom_table_t *atom_table = &(table->atom_table);
   samp_atom_t *new_atom;
   int32_t i, j, k, vsort, csort, arity, argidx, added_atom;
   rule_literal_t ***lit;
@@ -1870,7 +1872,7 @@ int32_t substit_query(samp_query_t *query,
       return -1;
     }
   }
-  if (substs[i].const_index != -1) {
+  if (substs != NULL && substs[i].const_index != -1) {
     fprintf(stderr, "substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
 	    i, query->num_vars);
       return -1;
@@ -1893,7 +1895,19 @@ int32_t substit_query(samp_query_t *query,
 	  new_atom->args[k] = substs[-(argidx + 1)].const_index;
 	}
       }
-      added_atom = add_internal_atom(table, new_atom);
+      if (lazy) {
+	array_hmap_pair_t *atom_map;
+	atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
+					arity+1, //+1 for pred
+					(int32_t *) new_atom);
+	if (atom_map != NULL) {
+	  added_atom = atom_map->val;
+	} else {
+	  added_atom = -1;
+	}
+      } else {
+	added_atom = add_internal_atom(table, new_atom);
+      }
       if (added_atom == -1){
 	// This shouldn't happen, but if it does, we need to free up space
 	printf("substit: Bad atom\n");
@@ -1923,7 +1937,7 @@ void all_query_instances_rec(int32_t vidx, samp_query_t *query,
     // Simply do the substitution, or go to the next var
     if (vidx == query->num_vars - 1) {
       substit_buffer.entries[vidx+1].const_index = -1;
-      substit_query(query, substit_buffer.entries, table);
+      substit_query(query, substit_buffer.entries, lazy, table);
     } else {
       all_query_instances_rec(vidx+1, query, table, lazy, atom_index);
     }
@@ -1937,7 +1951,7 @@ void all_query_instances_rec(int32_t vidx, samp_query_t *query,
       if (vidx == query->num_vars - 1) {
 	substit_buffer.entries[vidx+1].const_index = -1;
 	if (!lazy || check_query_instance(query, atom_index, table)) {
-	  substit_query(query, substit_buffer.entries, table);
+	  substit_query(query, substit_buffer.entries, lazy, table);
 	}
       } else {
 	all_query_instances_rec(vidx+1, query, table, lazy, atom_index);
@@ -1946,16 +1960,59 @@ void all_query_instances_rec(int32_t vidx, samp_query_t *query,
   }
 }
 
+// This is used in the simple case where the samp_query has no variables
+// So we simply convert it to a query_instance and add it to the tables.
+int32_t samp_query_to_query_instance(samp_query_t *query, samp_table_t *table) {
+  pred_table_t *pred_table = &(table->pred_table);
+  samp_atom_t *new_atom;
+  int32_t i, j, k, arity, argidx, added_atom;
+  rule_literal_t ***lit;
+  samp_literal_t **litinst;
+  
+  lit = query->literals;
+  litinst = (samp_literal_t **)
+    safe_malloc((query->num_clauses + 1) * sizeof(samp_literal_t *));
+  for (i = 0; i < query->num_clauses; i++) {
+    for (j = 0; lit[i][j] != NULL; j++) {}
+    litinst[i] = (samp_literal_t *)
+      safe_malloc((j + 1) * sizeof(samp_literal_t));
+    for (j = 0; lit[i][j] != NULL; j++) {
+      arity = pred_arity(lit[i][j]->atom->pred, pred_table);
+      new_atom = atom_copy(lit[i][j]->atom, arity);
+      for (k = 0; k < arity; k++) {
+	argidx = new_atom->args[k];
+      }
+      added_atom = add_internal_atom(table, new_atom);
+      if (added_atom == -1){
+	// This shouldn't happen, but if it does, we need to free up space
+	printf("samp_query_to_query_instance: Bad atom\n");
+	return -1;
+      }
+      litinst[i][j] = lit[i][j]->neg ? neg_lit(added_atom) : pos_lit(added_atom);
+    }
+    litinst[i][j] = -1; // end-marker - NULL doesn't work
+  }
+  litinst[i] = NULL;
+  return add_query_instance(litinst, NULL, query, table);
+}
+
 // Similar to all_rule_instances, but updates query_instance_table
 // instead of clause_table
 void all_query_instances(samp_query_t *query, samp_table_t *table) {
-  
-  substit_buffer_resize(query->num_vars);
   int32_t i;
-  for(i=0; i<substit_buffer.size; i++){
-    substit_buffer.entries[i].fixed = false;
+  
+  if (query->num_vars == 0) {
+    // Already instantiated, but needs to be converted from rule_literals to
+    // samp_clauses.  Do this here since we don't know if variables are
+    // involved earlier.
+    samp_query_to_query_instance(query, table);
+  } else {
+    substit_buffer_resize(query->num_vars);
+    for (i=0; i < substit_buffer.size; i++) {
+      substit_buffer.entries[i].fixed = false;
+    }
+    all_query_instances_rec(0, query, table, false, -1);
   }
-  all_query_instances_rec(0, query, table, false, -1);
 }
   
 

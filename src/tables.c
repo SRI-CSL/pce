@@ -166,13 +166,14 @@ int32_t add_const(char *name, char *sort_name, samp_table_t *table) {
   
   //int32_t index = stbl_find(&(const_table->const_name_index), name);
   res = add_const_internal(name, sort_index, table);
-  if (res == 1) {
+  // res is 0 if new, 1 if exists, -1 if there and different sort
+  if (res == 0) {
     return 0;
   } else {
-    if (res == 0) {
+    if (res == 1) {
       printf("Constant %s already exists\n", name);
     }
-    return -1;
+    return res;
   }
 }
 

@@ -42,8 +42,8 @@ bindir := $(BUILD)/bin
 #
 src_c := array_hash_map.c gcd.c hash_functions.c input.c int_array_sort.c \
 	 integer_stack.c int_stack.c mcsat.c memalloc.c samplesat.c \
-	 string_heap.c tables.c symbol_tables.c utils.c vectors.c parser.c \
-         print.c yacc.tab.c
+	 lazysamplesat.c string_heap.c tables.c symbol_tables.c utils.c \
+         vectors.c parser.c print.c yacc.tab.c
 ifneq ($(OAACFLAGS),)
 src_c := $(src_c) pce.c
 endif
@@ -241,7 +241,7 @@ $(objdir)/%.o: %.c
 
 $(objdir)/pce.o: pce.c
 	echo OAACFLAGS = $(OAACFLAGS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) -I/usr/include/glib-2.0 -c $< -o $@
 
 # static Library
 $(libmcsat): $(obj)
