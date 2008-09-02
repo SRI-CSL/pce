@@ -82,7 +82,7 @@ if test "x$liboaa" == x; then
       if test ! -f $oaalibdir/liboaa2.a; then
         AC_MSG_WARN([$aalibdir/liboaa2.a not found])
       fi
-      OAACFLAGS="-I$liboaa/src/oaalib/c/include -I$oaalibdir/glib-2.0/include -I$liboaa/src/oaalib/c/external/glib/glib-2.10.1 -I$liboaa/src/oaalib/c/external/glib/glib-2.10.1/glib"
+      OAACFLAGS="-I$liboaa/src/oaalib/c/include"
       OAALDFLAGS="-L$oaalibdir -loaa2"
    else
       AC_MSG_ERROR([*** liboaa.h not found in $liboaa (should be in $liboaa/src/oaalib/c/include/). Check --with-oaa option ***])
