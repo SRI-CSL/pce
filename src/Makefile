@@ -221,7 +221,7 @@ lib: $(lib_targets)
 # Dependency files
 $(objdir)/%.d: %.c
 	@ echo Building dependency file $@
-	@ $(CC) -MM -MG $(CPPFLAGS) $(OAACFLAGS) $< > $@.tmp
+	$(CC) -MM -MG $(CPPFLAGS) $(OAACFLAGS) $< > $@.tmp
 	@ $(SED) 's,\($*\).o[ :]*,$(objdir)/\1.o $@ : , g' < $@.tmp > $@
 	@ rm -f $@.tmp
 
@@ -329,8 +329,12 @@ $(bindir)/%$(EXEEXT): $(objdir)/%.o $(libmcsat)
 	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS)
 
 ifneq ($(OAALDFLAGS),)
+$(bindir)/%$(EXEEXT): $(objdir)/%.o $(libmcsat)
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS)
+
 $(bindir)/pce$(EXEEXT): $(objdir)/pce.o $(libmcsat)
-	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(OAALDFLAGS) 
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lintl -liconv  -lglib-2.0
+#	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(OAALDFLAGS) 
 endif
 
 
@@ -395,6 +399,9 @@ now := $(shell date)
 	@ echo "  CPPFLAGS = $(CPPFLAGS)"
 	@ echo "  LIBS     = $(LIBS)"
 	@ echo "  LDFLAGS  = $(LDFLAGS)"
+	@ echo "  OAACFLAGS  = $(OAACFLAGS)"
+	@ echo "  OAALDFLAGS  = $(OAALDFLAGS)"
+	@ echo "  libmcsat  = $(libmcsat)"
 	@ echo "  LD       = $(LD)"
 	@ echo "  AR       = $(AR)"
 	@ echo "  RANLIB   = $(RANLIB)"
