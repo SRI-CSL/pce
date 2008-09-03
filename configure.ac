@@ -84,6 +84,7 @@ if test "x$liboaa" == x; then
       fi
       OAACFLAGS="-I$liboaa/src/oaalib/c/include"
       OAALDFLAGS="-L$oaalibdir -loaa2"
+      LIBS="$LIBS -loaa2"
    else
       AC_MSG_ERROR([*** liboaa.h not found in $liboaa (should be in $liboaa/src/oaalib/c/include/). Check --with-oaa option ***])
    fi

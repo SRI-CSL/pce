@@ -70,4 +70,37 @@ If you want to build pce.exe:
       c:\msys\1.0\home\pce\oaa2.3.2\lib\win32
 
 
+NOTES FOR CYGWIN: If something goes wrong when compiling pce.exe this may 
+be due to conflicting libraries. OAA comes with its own copies of glibc and 
+other libraries. This causes trouble since these copies are very old versions,
+which are not compatible with better/more recent versions of the same libraries
+that are typically already present on cygwin. To fix this we have to make sure 
+pce gets compiled and linked with the libaries from cygwin not the old copies 
+from OAA. To do this, set CPPFLAGS to point to the cygwin versions of glibc:
+before you type ./configure ... and remove the offending libraries from the OAA
+directory.
+
+In summary, type this:
+
+      export CPPFLAGS='-I/usr/lib/glib-2.0/include -I/usr/include/glib-2.0'
+      ./configure  --with-oaa=/home/pce/oaa2.3.2
+      make bin
+
+That should work.
+
+
+
+
+----------
+More Notes:
+In order to compile PCE with cygwin, the following changes in src/Makefile is needed:
+Add: oaalibfile := /cygdrive/c/oaa2.3.2/lib/win32/oaalib.lib (or whatever the right path is)
+
+Modify:
+	This:	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(OAALDFLAGS) 
+	To:		$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(oaalibfile) $(LIBS) $(OAALDFLAGS) 
+
+
+
+
 
