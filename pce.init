@@ -1,0 +1,21 @@
+sort File_t;
+sort Email_t;
+sort Task_t;
+sort Project_t;
+sort Calendar_t;
+sort Slide_t;
+sort Issue_t;
+sort Webpage_t;
+sort OntolotyObject_t;
+
+predicate attached(File_t, Email_t) direct;
+predicate fileHasTask(File_t, Task_t) indirect;
+predicate emailHasTask(Email_t, Task_t) indirect;
+predicate 'http://calo.sri.com/core-plus-office#relatedProjectIs'(Email_t, Project_t) indirect;
+predicate 'iris'(OntolotyObject_t) indirect;
+predicate 'EmailMessage'(Email_t) indirect;
+predicate 'CalendarEntry'(Calendar_e) indirect;
+predicate 'DocumentFile'(File_t) indirect;
+predicate 'ElectronicPresentationSlide'(Slide_t) indirect;
+predicate 'CIssue'(Issue_t) indirect;
+predicate 'Webpage'(Webpage_t) indirect;
