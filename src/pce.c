@@ -1281,10 +1281,17 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   curtime = time(&curtime);
   if (difftime(curtime, idle_timer) > pce_timeout) {
     if (samp_table.atom_table.num_vars > 0) {
-      pce_log("pce_idle_callback generating %d samples", 50);
-      mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
-	     DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
-	     DEFAULT_MAX_EXTRA_FLIPS, 50);
+      pce_log("pce_idle_callback generating %d samples", DEFAULT_MAX_SAMPLES);
+      if (lazy_pce) {
+	lazy_mc_sat(&samp_table, DEFAULT_SA_PROBABILITY,
+		    DEFAULT_SAMP_TEMPERATURE, DEFAULT_RVAR_PROBABILITY,
+		    DEFAULT_MAX_FLIPS, DEFAULT_MAX_EXTRA_FLIPS,
+		    DEFAULT_MAX_SAMPLES);
+      } else {
+	mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
+	       DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
+	       DEFAULT_MAX_EXTRA_FLIPS, DEFAULT_MAX_SAMPLES);
+      }
     }
     time(&idle_timer);
   }

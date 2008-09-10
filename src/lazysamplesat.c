@@ -124,7 +124,7 @@ int32_t choose_random_atom(samp_table_t *table){
     
   all_card = all_atoms_cardinality(pred_tbl, sort_table);
 
-  atom_num = random_uint(card);
+  atom_num = random_uint(all_card);
 
   int32_t predicate = 0;
   card = 0;
@@ -134,6 +134,10 @@ int32_t choose_random_atom(samp_table_t *table){
     card += pred_cardinality(pred_tbl, sort_table, predicate);
     predicate++;
   }
+  // We went past the one we actually want
+  predicate--;
+  assert(valid_table(table));
+  assert(pred_cardinality(pred_tbl, sort_table, predicate) != 0);
 
   atom_num = card - atom_num; //gives the position of atom within predicate
   //Now calculate the arguments.  We represent the arguments in
@@ -151,6 +155,7 @@ int32_t choose_random_atom(samp_table_t *table){
     atom_num = atom_num/card;
     atom->args[i] = sort_table->entries[signature[i]].constants[constant];
   }
+  assert(valid_table(table));
 
   array_hmap_pair_t *atom_map;
   atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
@@ -193,23 +198,29 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
   uint32_t clause_position;
   samp_clause_t *link;
 
+  assert(valid_table(table));
   choice = choose();
   if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
     /*
      * Simulated annealing step
      */
     // choose a random atom
+    assert(valid_table(table));
     var = choose_random_atom(table);
+    assert(valid_table(table));
 //     var = choose_unfixed_variable(assignment, atom_table->num_vars,
 // 				  atom_table->num_unfixed_vars);
     if (var == -1) return;
     cost_flip_unfixed_variable(table, &dcost, var);
+    assert(valid_table(table));
     if (dcost < 0){
       flip_unfixed_variable(table, var);
+      assert(valid_table(table));
     } else {
       choice = choose();
       if (choice < exp(-dcost/samp_temperature)) {
 	flip_unfixed_variable(table, var);
+	assert(valid_table(table));
       }
     }
   } else {
@@ -223,9 +234,11 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
       link = link->link;
       clause_position--;
     } 
+    assert(valid_table(table));
     //link points to chosen clause
     var = choose_clause_var(table, link, assignment, rvar_probability);
     flip_unfixed_variable(table, var);
+    assert(valid_table(table));
   }
 }
 
