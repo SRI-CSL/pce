@@ -86,6 +86,7 @@ int32_t add_internal_atom(samp_table_t *table,
 				 arity+1, //+1 for pred
 				 (int32_t *) atom);
   if (atom_map == NULL){
+    //assert(valid_table(table));
     atom_table_resize(atom_table, clause_table);
     current_atom_index = atom_table->num_vars++;
     samp_atom_t * current_atom = (samp_atom_t *) safe_malloc((arity+1) * sizeof(int32_t));
@@ -114,6 +115,7 @@ int32_t add_internal_atom(samp_table_t *table,
     add_atom_to_pred(pred_table, predicate, current_atom_index);
     clause_table->watched[pos_lit(current_atom_index)] = NULL;
     clause_table->watched[neg_lit(current_atom_index)] = NULL;
+    //assert(valid_table(table));
     return current_atom_index;
   } else {
     return atom_map->val;
@@ -2069,8 +2071,10 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
   int32_t i, j, arity, atom_index;
 
   arity = pred_arity(predicate, pred_table);
+  assert(valid_table(table));
   atom_index = add_internal_atom(table, atom);
-  for (i = 0; i < num_rules; i++){
+  assert(valid_table(table));
+  for (i = 0; i < num_rules; i++) {
     samp_rule_t *rule_entry = rule_table->samp_rules[rules[i]];
     for (j = 0; j < rule_entry->num_lits; j++) {
       if (match_atom_in_rule_atom(atom, rule_entry->literals[j], arity)) {
@@ -2079,6 +2083,7 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
       }
     }
   }
+  assert(valid_table(table));
   return 0; // Not yet finished
 }
 

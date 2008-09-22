@@ -125,6 +125,7 @@ int32_t choose_random_atom(samp_table_t *table){
   all_card = all_atoms_cardinality(pred_tbl, sort_table);
 
   atom_num = random_uint(all_card);
+  assert(valid_table(table));
 
   int32_t predicate = 0;
   card = 0;
@@ -161,6 +162,7 @@ int32_t choose_random_atom(samp_table_t *table){
   atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
 				  arity + 1,
 				  (int32_t *) atom);
+  assert(valid_table(table));
   if (atom_map == NULL){//need to activate atom
     return activate_atom(table, atom);
   } else {

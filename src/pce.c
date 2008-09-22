@@ -27,7 +27,7 @@
 #include "memalloc.h"
 #include "pce.h"
 
-#define AGENT_NAME "PCE"
+#define AGENT_NAME "pce"
 
 #define MALLOC_CHECK_ 2
 
@@ -534,7 +534,7 @@ bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
   samp_rule_t *clause, **clauses;
   rule_literal_t *lit, ***lits;
   double weight;
-  int32_t i, j, litlen, atom_idx, ruleidx;
+  int32_t i, j, litlen, atom_idx;
 
   // First check that the args are OK
   if (!icl_IsFloat(Weight)) {
@@ -588,10 +588,8 @@ bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
 	add_rule_to_pred(pred_table, pred, current_rule);
       }
       // Create instances here rather than add_rule, as this is eager
-      if (ruleidx != -1) {
-	if (!lazy_pce) {
-	  all_rule_instances(current_rule, &samp_table);
-	}
+      if (!lazy_pce) {
+	all_rule_instances(current_rule, &samp_table);
       }
     }
   }
@@ -910,6 +908,12 @@ int32_t pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
   int32_t i, query_index, subscr_index;
   char *iclstr;
 
+  Lid       = NULL;
+  Who       = NULL;
+  Condition = NULL;
+  Formula   = NULL;
+  Id        = NULL;
+
   iclstr = icl_NewStringFromTerm(goal);  
   pce_log("%s", iclstr);
   icl_stFree(iclstr);
@@ -1021,7 +1025,7 @@ void process_subscription(subscription_t *subscription) {
 	   DEFAULT_MAX_EXTRA_FLIPS, 50);
       }
       // Now add to query answer
-      add_query_instance_to_solution(callback, subscription->formula,
+      add_query_instance_to_solution(callbacklist, subscription->formula,
 				     query_instance_table->query_inst[i], true);
     }
   }
@@ -1029,6 +1033,7 @@ void process_subscription(subscription_t *subscription) {
   // pce_subscription_callback(m(Sid, Formula, Prob), ...)
   printf("process_subscription: returning %d solutions for subscription %s\n",
 	 cnt, subscription->id);
+  fflush(stdout);
   callback = icl_NewStruct("pce_subscription_callback", 1, callbacklist);
   oaa_Solve(callback, pce_SubscriptionParams, NULL, NULL);
 }
@@ -1047,6 +1052,8 @@ int pce_process_subscriptions_callback(ICLTerm *goal, ICLTerm *params,
     process_subscription(subscriptions.subscription[i]);
   }
   // pce_save(goal);
+  printf("pce_process_subscriptions_callback called\n");
+  fflush(stdout);  
   return true;
 }
 
@@ -1110,7 +1117,7 @@ bool pce_unsubscribe(int32_t subscr_index) {
   // terminated with -1
   for (si_size = 0; query->source_index[si_size] != -1; si_size++) {}
   for (j = 0; j < si_size; j++) {
-    if (query->source_index[j] == i) {
+    if (query->source_index[j] == subscr->lid) {
       break;
     }
   }
@@ -1150,7 +1157,7 @@ int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
   ICLTerm *Lid, *Formula, *Who, *Condition, *Sid;
   char *sid, *lid;
   subscription_t *subscr;
-  int32_t i, lidx, subscr_index;
+  int32_t lidx, subscr_index;
   char *iclstr;
 
   iclstr = icl_NewStringFromTerm(goal);  
@@ -1158,6 +1165,7 @@ int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
   icl_stFree(iclstr);
   Lid = NULL;
   Who = NULL;
+  Sid = NULL;
   if (icl_NumTerms(goal) == 2) {
     Lid       = icl_CopyTerm(icl_NthTerm(goal, 1));
     Formula   = icl_CopyTerm(icl_NthTerm(goal, 2));
@@ -1188,7 +1196,8 @@ int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
     for (subscr_index = 0;
 	 subscr_index < subscriptions.size;
 	 subscr_index++) {
-      if (subscriptions.subscription[i]->lid == lidx) {
+      subscr = subscriptions.subscription[subscr_index];
+      if (subscr->lid == lidx) {
 	if (icl_match_terms(subscr->formula, Formula, NULL)) {
 	  break;
 	}
@@ -1208,7 +1217,7 @@ int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
     for (subscr_index = 0;
 	 subscr_index < subscriptions.size;
 	 subscr_index++) {
-      if (strcmp(subscriptions.subscription[i]->id, sid) == 0) {
+      if (strcmp(subscriptions.subscription[subscr_index]->id, sid) == 0) {
 	break;
       }
     }
@@ -1272,6 +1281,59 @@ int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
   return 0;
 }
 
+// Interface to query manager
+
+static void get_qm_instances(samp_table_t *table) {
+  pred_table_t *pred_table;
+  pred_tbl_t *evpred_tbl;
+  char *pred, *query, argstr[8], *inststr;
+  int32_t i, j, arity, qsize;
+  ICLTerm *callback, **Instances;
+
+  pred_table = &table->pred_table;
+  evpred_tbl = &pred_table->evpred_tbl;
+  for (i = 0; i<evpred_tbl->num_preds; i++) {
+    arity = evpred_tbl->entries[i].arity;
+    if (arity > 0) {
+      pred = evpred_tbl->entries[i].name;
+      // Now we build the query - has the form
+      //  query(query_pattern('(PRED ?x01 ?x02)'),[answer_pattern('[{?x01},{?x02}]')],Results)
+      qsize = 22 + strlen(pred) + (arity * 5) + 22 + (arity * 7) + 13;
+      query = (char *) safe_malloc(qsize * sizeof(char));
+      strcpy(query, "query(query_pattern('(");
+      strcat(query, pred);
+      for (j = 0; j < arity; j++) {
+	sprintf(argstr, " ?x%.2d", j+1);
+	strcat(query, argstr);
+      }
+      strcat(query, ")'),[answer_pattern('[");
+      for (j = 0; j < arity; j++) {
+	sprintf(argstr, "{?x%.2d}", j+1);
+	strcat(query, argstr);
+	if (j+1 < arity) {
+	  strcat(query, ",");
+	}
+      }
+      strcat(query, "]')],Results)");
+      assert(strlen(query) == qsize-1);
+      callback = icl_NewTermFromData(query, qsize);
+      Instances = NULL;
+      printf("Calling query manager with %s\n", query);
+      fflush(stdout);
+      //oaa_Solve(callback, NULL, NULL, Instances);
+      callback = icl_NewTermFromString("foo(X)");
+      oaa_Solve(callback, NULL, NULL, Instances);
+      printf("Instances for %s:\n", pred);
+      fflush(stdout);
+      // for (j = 0; Instances[j] != NULL; j++) {
+// 	inststr = icl_NewStringFromTerm(Instances[j]);
+// 	printf("  %s\n", inststr);
+// 	icl_stFree(inststr);
+      //}
+    }
+  }
+}
+
 time_t pce_timeout = 60;
 static time_t idle_timer = 0;
 
@@ -1280,6 +1342,8 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 
   curtime = time(&curtime);
   if (difftime(curtime, idle_timer) > pce_timeout) {
+    get_qm_instances(&samp_table);
+
     if (samp_table.atom_table.num_vars > 0) {
       pce_log("pce_idle_callback generating %d samples", DEFAULT_MAX_SAMPLES);
       if (lazy_pce) {
@@ -1651,6 +1715,7 @@ static char **names_buffer_copy(names_buffer_t *nbuf) {
   return names;
 }
 
+
 // Need to figure out error handling in OAA
 static void pce_error(const char *fmt, ...) {
   va_list argp;
@@ -1810,8 +1875,7 @@ void process_save_file_cmd(char *goal) {
   icl_Free(Goal);
 }
 
-bool load_save_file() {
-  char *curdir;
+bool load_save_file(char *curdir) {
   bool save_file_exists;
   int32_t i;
   int32_t readbufsize;
@@ -1901,7 +1965,7 @@ int main(int argc, char *argv[]){
   pce_log("Loading %s/%s\n", curdir, pce_init_file);
   printf("Loading %s/%s\n", curdir, pce_init_file);
   load_mcsat_file(pce_init_file, &samp_table);
-  if (!load_save_file()) {
+  if (!load_save_file(curdir)) {
     return EXIT_FAILURE;
   }
   
