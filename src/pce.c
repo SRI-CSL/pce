@@ -1283,55 +1283,151 @@ int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
 
 // Interface to query manager
 
+static qm_buffer_t qm_buffer = {0, 0, NULL};
+
+static void qm_buffer_resize() {
+  int32_t i, prevcap, capacity, size;
+  
+  if (qm_buffer.entry == NULL) {
+    qm_buffer.entry = (qm_entry_t **)
+      safe_malloc(INIT_QM_BUFFER_SIZE * sizeof(qm_entry_t *));
+    qm_buffer.capacity = INIT_QM_BUFFER_SIZE;
+    for (i = 0; i < qm_buffer.capacity; i++) {
+      qm_buffer.entry[i] =
+	(qm_entry_t *) safe_malloc(sizeof(qm_entry_t));
+    }
+  }
+  capacity = qm_buffer.capacity;
+  size = qm_buffer.size;
+  if (capacity <= size + 1){
+    if (MAXSIZE(sizeof(qm_entry_t), 0) - capacity <= capacity/2){
+      out_of_memory();
+    }
+    prevcap = capacity;
+    capacity += capacity/2;
+    qm_buffer.entry = (qm_entry_t **)
+      safe_realloc(qm_buffer.entry, capacity * sizeof(qm_entry_t *));
+    for (i = prevcap; i < capacity; i++) {
+      qm_buffer.entry[i] =
+	(qm_entry_t *) safe_malloc(sizeof(qm_entry_t));
+    }
+    qm_buffer.capacity = capacity;
+  }
+  assert(qm_buffer.size+1 < qm_buffer.capacity);
+}
+
+ICLTerm *empty_params = NULL;
+
 static void get_qm_instances(samp_table_t *table) {
   pred_table_t *pred_table;
   pred_tbl_t *evpred_tbl;
-  char *pred, *query, argstr[8], *inststr;
-  int32_t i, j, arity, qsize;
-  ICLTerm *callback, **Instances;
+  const_table_t *const_table;
+  char *pred, *query, argstr[8], *inststr, *cname;
+  int32_t i, j, k, arity, qsize, *psig, cidx, newconsts;
+  int success;
+  bool error;
+  ICLTerm *callback, *Instances;
+  time_t start_time;
 
+  start_time = time(NULL);
   pred_table = &table->pred_table;
   evpred_tbl = &pred_table->evpred_tbl;
+  const_table = &table->const_table;
   for (i = 0; i<evpred_tbl->num_preds; i++) {
+    pred = evpred_tbl->entries[i].name;
     arity = evpred_tbl->entries[i].arity;
     if (arity > 0) {
-      pred = evpred_tbl->entries[i].name;
-      // Now we build the query - has the form
-      //  query(query_pattern('(PRED ?x01 ?x02)'),[answer_pattern('[{?x01},{?x02}]')],Results)
-      qsize = 22 + strlen(pred) + (arity * 5) + 22 + (arity * 7) + 13;
-      query = (char *) safe_malloc(qsize * sizeof(char));
-      strcpy(query, "query(query_pattern('(");
-      strcat(query, pred);
-      for (j = 0; j < arity; j++) {
-	sprintf(argstr, " ?x%.2d", j+1);
-	strcat(query, argstr);
+      psig = evpred_tbl->entries[i].signature;
+      if (i >= qm_buffer.size) {
+	// Now we build the query - has the form
+	//  query(query_pattern('(PRED ?x01 ?x02)'),[answer_pattern('[{?x01},{?x02}]')],Results)
+	qsize = 22 + strlen(pred) + (arity * 5) + 22 + (arity * 7) + 13;
+	query = (char *) safe_malloc(qsize * sizeof(char));
+	strcpy(query, "query(query_pattern('(");
+	strcat(query, pred);
+	for (j = 0; j < arity; j++) {
+	  sprintf(argstr, " ?x%.2d", j+1);
+	  strcat(query, argstr);
+	}
+	strcat(query, ")'),[answer_pattern('[");
+	for (j = 0; j < arity; j++) {
+	  sprintf(argstr, "{?x%.2d}", j+1);
+	  strcat(query, argstr);
+	  if (j+1 < arity) {
+	    strcat(query, ",");
+	  }
+	}
+	strcat(query, "]')],Results)");
+	assert(strlen(query) == qsize-1);
+	callback = icl_NewTermFromData(query, qsize);
+	qm_buffer_resize();
+	assert(qm_buffer.size < qm_buffer.capacity);
+	qm_buffer.size += 1;
+	qm_buffer.entry[i]->query = callback;
+      } else {
+	callback = qm_buffer.entry[i]->query;
       }
-      strcat(query, ")'),[answer_pattern('[");
-      for (j = 0; j < arity; j++) {
-	sprintf(argstr, "{?x%.2d}", j+1);
-	strcat(query, argstr);
-	if (j+1 < arity) {
-	  strcat(query, ",");
+      if (callback != NULL) {
+	//oaa_Solve(callback, NULL, NULL, Instances);
+	//      callback = icl_NewTermFromString("foo(X)");
+	Instances = NULL;
+	cprintf(1, "Calling query manager for predicate %s", pred);
+	fflush(stdout);
+	if (empty_params == NULL) {
+	  empty_params = icl_NewTermFromString("[]");
+	}
+	success = oaa_Solve(callback, empty_params, NULL, &Instances);
+	if (success) {
+	  // inststr = icl_NewStringFromTerm(Instances);
+	  // printf("Instances for %s are %s\n", pred, inststr);
+	  // fflush(stdout);
+	  // icl_stFree(inststr);
+	  // We now have Instances in the form [query(X, Y, answer([Binding], [Params]))]
+	  //  Should be a singleton
+	  //  Binding is a list of the form '["c1", "c2"]', ...
+	  //  Params should be a list of the form [process_handle(N), status([Stat])] or [error(ErrString)]
+	  if (! icl_IsList(Instances) || icl_NumTerms(Instances) != 1) {
+	    pce_error("query: list of 1 element expected for Instances");
+	    inststr = icl_NewStringFromTerm(Instances);
+	    printf("Instances for %s are %s\n", pred, inststr);
+	    fflush(stdout);
+	    icl_stFree(inststr);
+	  } else {
+	    ICLTerm *Answer = icl_NthTerm(icl_NthTerm(Instances, 1), 3);
+	    ICLTerm *Binding = icl_NthTerm(Answer, 1);
+	    ICLTerm *Params = icl_NthTerm(Answer, 2);
+	    // Check the Params - only care about errors for now.
+	    error = false;
+	    for (j = 0; j < icl_NumTerms(Params); j++) {
+	      if (strcmp(icl_Functor(icl_NthTerm(Params,j+1)),"error") == 0) {
+		error = true;
+		break;
+	      }
+	    }
+	    if (error) {
+	      // Assume this means the predicate is unknown - set query to NULL
+	      cprintf(1, ": unknown\n");
+	      qm_buffer.entry[i]->query = NULL;
+	    } else {
+	      newconsts = 0;
+	      for (j = 0; j < icl_NumTerms(Binding); j++) {
+		for (k = 0; k < arity; k++) {
+		  cname = icl_Str(icl_NthTerm(Binding, k+1));
+		  cidx = const_index(cname, const_table);
+		  if (cidx == -1) {
+		    newconsts += 1;
+		    pce_add_const(cname, psig[k], table);
+		  }
+		}
+	      }
+	      cprintf(1, " %d instances, %d new constants\n", icl_NumTerms(Binding), newconsts);
+	    }
+	  }
 	}
       }
-      strcat(query, "]')],Results)");
-      assert(strlen(query) == qsize-1);
-      callback = icl_NewTermFromData(query, qsize);
-      Instances = NULL;
-      printf("Calling query manager with %s\n", query);
-      fflush(stdout);
-      //oaa_Solve(callback, NULL, NULL, Instances);
-      callback = icl_NewTermFromString("foo(X)");
-      oaa_Solve(callback, NULL, NULL, Instances);
-      printf("Instances for %s:\n", pred);
-      fflush(stdout);
-      // for (j = 0; Instances[j] != NULL; j++) {
-// 	inststr = icl_NewStringFromTerm(Instances[j]);
-// 	printf("  %s\n", inststr);
-// 	icl_stFree(inststr);
-      //}
     }
   }
+  cprintf(1, "Query Manager calls took %d sec\n", time(NULL) - start_time); 
 }
 
 time_t pce_timeout = 60;

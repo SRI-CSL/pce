@@ -8,6 +8,7 @@
 #define INIT_RULES_BUFFER_SIZE 8
 #define INIT_PCE_QUEUE_SIZE 16
 #define INIT_SUBSCRIPTIONS_SIZE 8
+#define INIT_QM_BUFFER_SIZE 8
 
 typedef struct names_buffer_s {
   uint32_t size;
@@ -42,4 +43,15 @@ typedef struct subscription_buffer_s {
   subscription_t **subscription;
 } subscription_buffer_t;
 
+typedef struct qm_entry_s {
+  // query caches the query - NULL means the predicate is unknown to QM
+  ICLTerm *query;
+} qm_entry_t;
+
+typedef struct qm_buffer_s {
+  uint32_t size;
+  uint32_t capacity;
+  // One per (direct) predicate
+  qm_entry_t **entry;
+} qm_buffer_t;
 #endif
