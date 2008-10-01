@@ -1524,10 +1524,10 @@ static void get_qm_instances(samp_table_t *table) {
 	}
 	success = oaa_Solve(callback, empty_params, NULL, &Instances);
 	if (success) {
-	  // inststr = icl_NewStringFromTerm(Instances);
-	  // printf("Instances for %s are %s\n", pred, inststr);
-	  // fflush(stdout);
-	  // icl_stFree(inststr);
+	  inststr = icl_NewStringFromTerm(Instances);
+	  printf("Instances for %s are %s\n", pred, inststr);
+	  fflush(stdout);
+	  icl_stFree(inststr);
 	  // We now have Instances in the form [query(X, Y, answer([Binding], [Params]))]
 	  //  Should be a singleton
 	  //  Binding is a list of the form '["c1", "c2"]', ...
@@ -1566,6 +1566,9 @@ static void get_qm_instances(samp_table_t *table) {
 		    pce_add_const(cname, psig[k], table);
 		  }
 		} else {
+		  inststr = icl_NewStringFromTerm(Arg);
+		  fprintf(stderr, "Arg is %s\n", inststr);
+		  icl_stFree(inststr);
 		  char *icltype =
 		    icl_IsList(Arg) ? "List" :
 		    icl_IsGroup(Arg) ? "Group" :
