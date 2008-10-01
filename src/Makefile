@@ -333,8 +333,8 @@ $(bindir)/%$(EXEEXT): $(objdir)/%.o $(libmcsat)
 	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS)
 
 $(bindir)/pce$(EXEEXT): $(objdir)/pce.o $(libmcsat)
-	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lintl -liconv  -lglib-2.0
-#	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(OAALDFLAGS) 
+#	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lintl -liconv  -lglib-2.0
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS)
 endif
 
 

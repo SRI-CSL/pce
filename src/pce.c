@@ -1563,6 +1563,9 @@ static void get_qm_instances(samp_table_t *table) {
 		  cidx = const_index(cname, const_table);
 		  if (cidx == -1) {
 		    newconsts += 1;
+		    inststr = icl_NewStringFromTerm(Arg);
+		    fprintf(stderr, "Adding new constant %s\n", inststr);
+		    icl_stFree(inststr);
 		    pce_add_const(cname, psig[k], table);
 		  }
 		} else {
