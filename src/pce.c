@@ -1468,11 +1468,11 @@ static void get_qm_instances(samp_table_t *table) {
   pred_table_t *pred_table;
   pred_tbl_t *evpred_tbl;
   const_table_t *const_table;
-  char *pred, *query, argstr[8], *inststr, *cname;
+  char *pred, *query, argstr[8], *inststr, *cname, *bindingstr;
   int32_t i, j, k, arity, qsize, *psig, cidx, newconsts;
   int success;
   bool error;
-  ICLTerm *callback, *Instances, *Arg;
+  ICLTerm *callback, *Instances, *Answer, *Bindings, *Params, *Binding, *Arg;
   time_t start_time;
 
   start_time = time(NULL);
@@ -1539,9 +1539,9 @@ static void get_qm_instances(samp_table_t *table) {
 	    fflush(stdout);
 	    icl_stFree(inststr);
 	  } else {
-	    ICLTerm *Answer = icl_NthTerm(icl_NthTerm(Instances, 1), 3);
-	    ICLTerm *Binding = icl_NthTerm(Answer, 1);
-	    ICLTerm *Params = icl_NthTerm(Answer, 2);
+	    Answer = icl_NthTerm(icl_NthTerm(Instances, 1), 3);
+	    Bindings = icl_NthTerm(Answer, 1);
+	    Params = icl_NthTerm(Answer, 2);
 	    // Check the Params - only care about errors for now.
 	    error = false;
 	    for (j = 0; j < icl_NumTerms(Params); j++) {
@@ -1556,40 +1556,53 @@ static void get_qm_instances(samp_table_t *table) {
 	      qm_buffer.entry[i]->query = NULL;
 	    } else {
 	      newconsts = 0;
-	      for (k = 0; k < arity; k++) {
-		Arg = icl_NthTerm(Binding, k+1);
-		if (icl_IsStr(Arg)) {
-		  cname = icl_Str(Arg);
-		  cidx = const_index(cname, const_table);
-		  if (cidx == -1) {
-		    newconsts += 1;
-		    inststr = icl_NewStringFromTerm(Arg);
-		    fprintf(stderr, "Adding new constant %s\n", inststr);
-		    icl_stFree(inststr);
-		    pce_add_const(cname, psig[k], table);
+	      for (j = 0; j < icl_NumTerms(Bindings); j++) {
+		Binding = icl_NthTerm(Bindings, j+1);
+		assert(icl_IsStr(Binding));
+		bindingstr = str_copy(icl_Str(Binding));
+		// Need to replace " with ' so we can get the term
+		for (k = 0; k < strlen(bindingstr); k++) {
+		  if (bindingstr[k] == '"') {
+		    bindingstr[k] = '\'';
 		  }
-		} else {
-		  inststr = icl_NewStringFromTerm(Arg);
-		  fprintf(stderr, "Arg is %s\n", inststr);
-		  icl_stFree(inststr);
-		  char *icltype =
-		    icl_IsList(Arg) ? "List" :
-		    icl_IsGroup(Arg) ? "Group" :
-		    icl_IsStruct(Arg) ? "Struct" :
-		    icl_IsVar(Arg) ? "Var" :
-		    icl_IsInt(Arg) ? "Int" :
-		    icl_IsFloat(Arg) ? "Float" :
-		    icl_IsDataQ(Arg) ? "DataQ" :
-		    icl_IsValid(Arg) ? "Valid" : "Invalid";
-		  fprintf(stderr, "Query Manager returned a %s for binding no. %d (0-based):\n", icltype, k);
-		  query = icl_NewStringFromTerm(callback);
-		  inststr = icl_NewStringFromTerm(Instances);
-		  fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);
-		  icl_stFree(query);
-		  icl_stFree(inststr);
+		}
+		Binding = icl_NewTermFromString(bindingstr);
+		assert(icl_IsList(Binding));
+		for (k = 0; k < arity; k++) {
+		  Arg = icl_NthTerm(Binding, k+1);
+		  if (icl_IsStr(Arg)) {
+		    cname = icl_Str(Arg);
+		    cidx = const_index(cname, const_table);
+		    if (cidx == -1) {
+		      newconsts += 1;
+		      inststr = icl_NewStringFromTerm(Arg);
+		      fprintf(stderr, "Adding new constant %s\n", inststr);
+		      icl_stFree(inststr);
+		      pce_add_const(cname, psig[k], table);
+		    }
+		  } else {
+		    inststr = icl_NewStringFromTerm(Arg);
+		    fprintf(stderr, "Arg is %s\n", inststr);
+		    icl_stFree(inststr);
+		    char *icltype =
+		      icl_IsList(Arg) ? "List" :
+		      icl_IsGroup(Arg) ? "Group" :
+		      icl_IsStruct(Arg) ? "Struct" :
+		      icl_IsVar(Arg) ? "Var" :
+		      icl_IsInt(Arg) ? "Int" :
+		      icl_IsFloat(Arg) ? "Float" :
+		      icl_IsDataQ(Arg) ? "DataQ" :
+		      icl_IsValid(Arg) ? "Valid" : "Invalid";
+		    fprintf(stderr, "Query Manager returned a %s for binding no. %d (0-based):\n", icltype, k);
+		    query = icl_NewStringFromTerm(callback);
+		    inststr = icl_NewStringFromTerm(Instances);
+		    fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);
+		    icl_stFree(query);
+		    icl_stFree(inststr);
+		  }
 		}
 	      }
-	      cprintf(1, " %d instances, %d new constants\n", icl_NumTerms(Binding), newconsts);
+	    cprintf(1, " %d instances, %d new constants\n", icl_NumTerms(Binding), newconsts);
 	    }
 	  }
 	}
