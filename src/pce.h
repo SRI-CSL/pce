@@ -9,6 +9,13 @@
 #define INIT_PCE_QUEUE_SIZE 16
 #define INIT_SUBSCRIPTIONS_SIZE 8
 #define INIT_QM_BUFFER_SIZE 8
+#define INIT_PCE_MODEL_SIZE 8
+
+typedef struct pce_model_s {
+  uint32_t size;
+  uint32_t capacity;
+  int32_t *atom;
+} pce_model_t;
 
 typedef struct names_buffer_s {
   uint32_t size;

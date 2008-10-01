@@ -1269,6 +1269,133 @@ int32_t pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
   return true;
 }
 
+pce_model_t pce_model = {0, 0, NULL};
+pce_model_t pce_new_model = {0, 0, NULL};
+
+void pce_model_resize(pce_model_t *mod) {
+  if (mod->atom == NULL) {
+    mod->atom = (int32_t *)
+      safe_malloc(INIT_PCE_MODEL_SIZE * sizeof(int32_t));
+    mod->capacity = INIT_PCE_MODEL_SIZE;
+  }
+  int32_t capacity = mod->capacity;
+  int32_t size = mod->size;
+  if (capacity <= size + 1){
+    if (MAXSIZE(sizeof(int32_t), 0) - capacity <= capacity/2){
+      out_of_memory();
+    }
+    capacity += capacity/2;
+    mod->atom = (int32_t *)
+      safe_realloc(mod->atom, capacity * sizeof(int32_t));
+    mod->capacity = capacity;
+  }
+}
+
+double pce_model_threshold = 5.1;
+
+int cmp_atom_prob(const void *a1, const void *a2) {
+  double p1, p2;
+  p1 = atom_probability(* (int32_t *) a1, &samp_table);
+  p2 = atom_probability(* (int32_t *) a2, &samp_table);
+  return p1 < p2 ? -1 : p1 > p2 ? 1 : 0;
+}
+
+// goal of the form pce_full_model(M)
+int32_t pce_full_model_callback(ICLTerm *goal, ICLTerm *params,
+				ICLTerm *solutions) {
+  atom_table_t *atom_table;
+  pred_table_t *pred_table;
+  const_table_t *const_table;
+  ICLTerm *M, *Args;
+  int32_t i, j, aidx;
+  char *iclstr;
+  samp_atom_t *atom;
+  double prob;
+
+  iclstr = icl_NewStringFromTerm(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+  M = icl_NthTerm(goal, 1);
+  atom_table = &samp_table.atom_table;
+  pred_table = &samp_table.pred_table;
+  const_table = &samp_table.const_table;
+  for (i = 0; i < atom_table->num_vars; i++) {
+    prob = atom_probability(i, &samp_table);
+    if (prob > pce_model_threshold) {
+      pce_model_resize(&pce_model);
+      pce_model.atom[pce_model.size] = i;
+      pce_model.size += 1;
+    }
+  }
+  qsort(pce_model.atom, pce_model.size, sizeof(int32_t), cmp_atom_prob);
+  for (i = 0; i < pce_model.size; i++) {
+    aidx = pce_model.atom[i];
+    atom = atom_table->atom[aidx];
+    Args = icl_NewList(NULL);
+    for (j = 0; j < pred_arity(atom->pred, pred_table); j++) {
+      icl_AddToList(Args, icl_NewStr(const_name(atom->args[j], const_table)),
+		    true);
+    }
+    icl_AddToList(solutions,
+		  icl_NewStructFromList(pred_name(atom->pred, pred_table),
+					Args),
+		  true);
+  }
+  return true;
+}
+
+int32_t pce_update_model_callback(ICLTerm *goal, ICLTerm *params,
+				  ICLTerm *solutions) {
+  atom_table_t *atom_table;
+  pred_table_t *pred_table;
+  const_table_t *const_table;
+  ICLTerm *Args;
+  int32_t i, j, aidx;
+  char *iclstr;
+  samp_atom_t *atom;
+  double prob;
+  bool old;
+
+  iclstr = icl_NewStringFromTerm(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+  atom_table = &samp_table.atom_table;
+  pred_table = &samp_table.pred_table;
+  const_table = &samp_table.const_table;
+  for (i = 0; i < atom_table->num_vars; i++) {
+    old = false;
+    for (j = 0; j < pce_model.size; j++) {
+      if (pce_model.atom[j] == i) {
+	old = true;
+	break;
+      }
+    }
+    prob = atom_probability(i, &samp_table);
+    if ((prob > pce_model_threshold && !old)
+	|| (prob <= pce_model_threshold && old)) {
+      // Flipped value - modify pce_model and 
+      pce_model_resize(&pce_model);
+      pce_model.atom[pce_model.size] = i;
+      pce_model.size += 1;
+    }
+  }
+  qsort(pce_model.atom, pce_model.size, sizeof(int32_t), cmp_atom_prob);
+  for (i = 0; i < pce_model.size; i++) {
+    aidx = pce_model.atom[i];
+    atom = atom_table->atom[aidx];
+    Args = icl_NewList(NULL);
+    for (j = 0; j < pred_arity(atom->pred, pred_table); j++) {
+      icl_AddToList(Args, icl_NewStr(const_name(atom->args[j], const_table)),
+		    true);
+    }
+    icl_AddToList(solutions,
+		  icl_NewStructFromList(pred_name(atom->pred, pred_table),
+					Args),
+		  true);
+  }
+  return true;
+}
+
 int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
 			     ICLTerm *solutions) {
   char *iclstr;
@@ -1314,6 +1441,25 @@ static void qm_buffer_resize() {
     qm_buffer.capacity = capacity;
   }
   assert(qm_buffer.size+1 < qm_buffer.capacity);
+}
+
+// Check the availablity of the Query Manager
+bool qm_available() {
+  ICLTerm *Agtdata, *Params, *Result;
+  char *icl_string;
+  int32_t i;
+
+  Params = icl_NewTermFromData("[blocking(false),reply(none)]", 29);
+  Agtdata = icl_NewTermFromString("agent_data(Address, Type, _OldStatus, Solvables, Name, Info)");
+  Result = NULL;
+  
+  oaa_Solve(Agtdata, Params, NULL, &Result);
+  for (i = 0; i < icl_NumTerms(Result); i++) {
+    icl_string = icl_NewStringFromTerm(icl_NthTerm(Result, i+1));
+    printf("agent_data = %s\n", icl_string);
+    icl_stFree(icl_string);
+  }
+  return false;
 }
 
 ICLTerm *empty_params = NULL;
@@ -1410,14 +1556,21 @@ static void get_qm_instances(samp_table_t *table) {
 	      qm_buffer.entry[i]->query = NULL;
 	    } else {
 	      newconsts = 0;
-	      for (j = 0; j < icl_NumTerms(Binding); j++) {
-		for (k = 0; k < arity; k++) {
+	      for (k = 0; k < arity; k++) {
+		if (icl_IsStr(icl_NthTerm(Binding, k+1))) {
 		  cname = icl_Str(icl_NthTerm(Binding, k+1));
 		  cidx = const_index(cname, const_table);
 		  if (cidx == -1) {
 		    newconsts += 1;
 		    pce_add_const(cname, psig[k], table);
 		  }
+		} else {
+		  fprintf(stderr, "Query Manager returned a non-string for binding no. %d (0-based):\n", k);
+		  query = icl_NewStringFromTerm(callback);
+		  inststr = icl_NewStringFromTerm(Instances);
+		  fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);
+		  icl_stFree(query);
+		  icl_stFree(inststr);
 		}
 	      }
 	      cprintf(1, " %d instances, %d new constants\n", icl_NumTerms(Binding), newconsts);
@@ -1879,6 +2032,12 @@ int setup_oaa_connection(int argc, char *argv[]) {
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_unsubscribe_learner(Lid),[callback(pce_unsubscribe_learner)])"),
 		true);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_full_model(M),[callback(pce_full_model)])"),
+		true);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_update_model(),[callback(pce_update_model)])"),
+		true);
 
   // Register solvables with the Facilitator.
   // The string "parent" represents the Facilitator.
@@ -1922,6 +2081,14 @@ int setup_oaa_connection(int argc, char *argv[]) {
   }
   if (!oaa_RegisterCallback("pce_unsubscribe_learner", pce_unsubscribe_learner_callback)) {
     printf("Could not register pce_unsubscribe_learner callback\n");
+    return false;
+  }
+  if (!oaa_RegisterCallback("pce_full_model", pce_full_model_callback)) {
+    printf("Could not register pce_full_model callback\n");
+    return false;
+  }
+  if (!oaa_RegisterCallback("pce_update_model", pce_update_model_callback)) {
+    printf("Could not register pce_update_model callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_reset_cache", pce_reset_cache_callback)) {

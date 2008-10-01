@@ -473,15 +473,30 @@ int isidentchar(int c) {
 	   || c == ',' || c == ';' || c == ':');
 }
 
+int skip_white_space_and_comments (void) {
+  int c;
+
+  do {
+    do {
+      c = getc(parse_input);
+    } while (isspace(c));
+    if (c == '#') {
+      do {
+	c = getc(parse_input);
+      } while (c != '\n' && c != EOF);
+    } else {
+      return c;
+    }
+  } while (true);
+  return c;
+}
+
 int yylex (void) {
   int c;
   int32_t i;
   char *nstr;
   
-  /* skip white space  */
-  do {
-    c = getc(parse_input);
-  } while (isspace(c));
+  c = skip_white_space_and_comments();
 
   /* process numbers - note that we process for as long as it could be a
      legitimate number, but return the string, so that numbers may be used
