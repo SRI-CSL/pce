@@ -1472,7 +1472,7 @@ static void get_qm_instances(samp_table_t *table) {
   int32_t i, j, k, arity, qsize, *psig, cidx, newconsts;
   int success;
   bool error;
-  ICLTerm *callback, *Instances;
+  ICLTerm *callback, *Instances, *Arg;
   time_t start_time;
 
   start_time = time(NULL);
@@ -1557,15 +1557,25 @@ static void get_qm_instances(samp_table_t *table) {
 	    } else {
 	      newconsts = 0;
 	      for (k = 0; k < arity; k++) {
-		if (icl_IsStr(icl_NthTerm(Binding, k+1))) {
-		  cname = icl_Str(icl_NthTerm(Binding, k+1));
+		Arg = icl_NthTerm(Binding, k+1);
+		if (icl_IsStr(Arg)) {
+		  cname = icl_Str(Arg);
 		  cidx = const_index(cname, const_table);
 		  if (cidx == -1) {
 		    newconsts += 1;
 		    pce_add_const(cname, psig[k], table);
 		  }
 		} else {
-		  fprintf(stderr, "Query Manager returned a non-string for binding no. %d (0-based):\n", k);
+		  char *icltype =
+		    icl_IsList(Arg) ? "List" :
+		    icl_IsGroup(Arg) ? "Group" :
+		    icl_IsStruct(Arg) ? "Struct" :
+		    icl_IsVar(Arg) ? "Var" :
+		    icl_IsInt(Arg) ? "Int" :
+		    icl_IsFloat(Arg) ? "Float" :
+		    icl_IsDataQ(Arg) ? "DataQ" :
+		    icl_IsValid(Arg) ? "Valid" : "Invalid";
+		  fprintf(stderr, "Query Manager returned a %s for binding no. %d (0-based):\n", icltype, k);
 		  query = icl_NewStringFromTerm(callback);
 		  inststr = icl_NewStringFromTerm(Instances);
 		  fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);
