@@ -1446,20 +1446,13 @@ static void qm_buffer_resize() {
 // Check the availablity of the Query Manager
 bool qm_available() {
   ICLTerm *Agtdata, *Params, *Result;
-  char *icl_string;
-  int32_t i;
 
-  Params = icl_NewTermFromData("[blocking(false),reply(none)]", 29);
-  Agtdata = icl_NewTermFromString("agent_data(Address, Type, _OldStatus, Solvables, Name, Info)");
+  Params = icl_NewTermFromString("[block(true)]");
+  Agtdata = icl_NewTermFromString("agent_data(Address, Type, ready, Solvables, 'QueryManagerx', Info)");
   Result = NULL;
   
   oaa_Solve(Agtdata, Params, NULL, &Result);
-  for (i = 0; i < icl_NumTerms(Result); i++) {
-    icl_string = icl_NewStringFromTerm(icl_NthTerm(Result, i+1));
-    printf("agent_data = %s\n", icl_string);
-    icl_stFree(icl_string);
-  }
-  return false;
+  return icl_NumTerms(Result) == 0 ? false : true;
 }
 
 ICLTerm *empty_params = NULL;
@@ -1474,6 +1467,11 @@ static void get_qm_instances(samp_table_t *table) {
   bool error;
   ICLTerm *callback, *Instances, *Answer, *Bindings, *Params, *Binding, *Arg;
   time_t start_time;
+
+  if (!qm_available()) {
+    printf("QueryManager not yet available\n");
+    return;
+  }
 
   start_time = time(NULL);
   pred_table = &table->pred_table;
