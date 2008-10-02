@@ -1448,7 +1448,7 @@ bool qm_available() {
   ICLTerm *Agtdata, *Params, *Result;
 
   Params = icl_NewTermFromString("[block(true)]");
-  Agtdata = icl_NewTermFromString("agent_data(Address, Type, ready, Solvables, 'QueryManagerx', Info)");
+  Agtdata = icl_NewTermFromString("agent_data(Address, Type, ready, Solvables, 'QueryManager', Info)");
   Result = NULL;
   
   oaa_Solve(Agtdata, Params, NULL, &Result);
