@@ -998,7 +998,7 @@ void process_subscription(subscription_t *subscription) {
   samp_query_instance_t *qinst;
   query_table_t *query_table;
   int32_t i, cnt;
-  ICLTerm *callback, *callbacklist;
+  ICLTerm *callback, *callbacklist, *Out, *Sol;
 
   if (pce_SubscriptionParams == NULL) {
     pce_SubscriptionParams =
@@ -1035,7 +1035,9 @@ void process_subscription(subscription_t *subscription) {
 	 cnt, subscription->id);
   fflush(stdout);
   callback = icl_NewStruct("pce_subscription_callback", 1, callbacklist);
-  oaa_Solve(callback, pce_SubscriptionParams, NULL, NULL);
+  Out = NULL;
+  Sol = NULL;
+  oaa_Solve(callback, pce_SubscriptionParams, &Out, &Sol);
 }
 
 // Goal is just a variable
@@ -1270,7 +1272,7 @@ int32_t pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
 }
 
 pce_model_t pce_model = {0, 0, NULL};
-pce_model_t pce_new_model = {0, 0, NULL};
+icl_atom_t icl_atoms = {0, 0, NULL};
 
 void pce_model_resize(pce_model_t *mod) {
   if (mod->atom == NULL) {
@@ -1291,7 +1293,53 @@ void pce_model_resize(pce_model_t *mod) {
   }
 }
 
-double pce_model_threshold = 5.1;
+void icl_atoms_resize(int32_t nsize) {
+  int32_t i;
+  
+  if (icl_atoms.size < nsize) {
+    if (MAXSIZE(sizeof(ICLTerm *), 0) - icl_atoms.size <= nsize) {
+      out_of_memory();
+    }
+    if (icl_atoms.size == 0) {
+      icl_atoms.Atom = safe_malloc(nsize * sizeof(ICLTerm *));
+      for (i = 0; i < nsize; i++) {
+	icl_atoms.Atom[i] = NULL;
+      }
+    } else {
+      icl_atoms.Atom = safe_realloc(icl_atoms.Atom, nsize * sizeof(ICLTerm *));
+      for (i = icl_atoms.size; i < nsize; i++) {
+	icl_atoms.Atom[i] = NULL;
+      }
+    }
+    icl_atoms.size = nsize;
+  }
+}
+
+ICLTerm *get_icl_atom(int32_t index) {
+  atom_table_t *atom_table;
+  pred_table_t *pred_table;
+  const_table_t *const_table;
+  samp_atom_t *atom;
+  ICLTerm *Args;
+  char *pred;
+  int32_t i;
+
+  atom_table = &samp_table.atom_table;
+  pred_table = &samp_table.pred_table;
+  const_table = &samp_table.const_table;
+  if (icl_atoms.Atom[index] == NULL) {
+    atom = atom_table->atom[index];
+    pred = pred_name(atom->pred, pred_table);
+    Args = icl_NewList(NULL);
+    for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
+      icl_AddToList(Args, icl_NewStr(const_name(atom->args[i], const_table)), true);
+    }
+    icl_atoms.Atom[index] = icl_NewStructFromList(pred, Args);
+  }
+  return icl_atoms.Atom[index];
+}
+
+double pce_model_threshold = .51;
 
 int cmp_atom_prob(const void *a1, const void *a2) {
   double p1, p2;
@@ -1327,7 +1375,6 @@ int32_t pce_full_model_callback(ICLTerm *goal, ICLTerm *params,
       pce_model.size += 1;
     }
   }
-  qsort(pce_model.atom, pce_model.size, sizeof(int32_t), cmp_atom_prob);
   for (i = 0; i < pce_model.size; i++) {
     aidx = pce_model.atom[i];
     atom = atom_table->atom[aidx];
@@ -1344,54 +1391,77 @@ int32_t pce_full_model_callback(ICLTerm *goal, ICLTerm *params,
   return true;
 }
 
+
 int32_t pce_update_model_callback(ICLTerm *goal, ICLTerm *params,
 				  ICLTerm *solutions) {
+  return true;
+}
+  
+// Updates the model, and calls
+// oaaSolve(pce_update_model_callback(Retract, BecameTrueWeights, Flag)
+// where: Retract - a list of Atoms that went from true to false
+//        BecameTrueWeights - a list of pairs (Atom, Wt) of atoms that became true
+//                            along with their weights (we use p(Atom, Wt) here).
+//        Flag - all or incremental
+// The previous model is kept in the pce_model array, which is simply an array
+// of atoms whose parobability is >= the threshold.
+int32_t pce_update_model() {
   atom_table_t *atom_table;
   pred_table_t *pred_table;
   const_table_t *const_table;
-  ICLTerm *Args;
-  int32_t i, j, aidx;
-  char *iclstr;
-  samp_atom_t *atom;
+  ICLTerm *Retract, *BecameTrueWeights, *Flag, *Pair, *Callback, *Out, *Sol;
+  int32_t i, j, cur;
   double prob;
-  bool old;
+  bool was_true;
 
-  iclstr = icl_NewStringFromTerm(goal);  
-  pce_log("%s", iclstr);
-  icl_stFree(iclstr);
   atom_table = &samp_table.atom_table;
   pred_table = &samp_table.pred_table;
   const_table = &samp_table.const_table;
+  icl_atoms_resize(atom_table->num_vars);
+  Retract = icl_NewList(NULL);
+  BecameTrueWeights = icl_NewList(NULL);
+  Flag = pce_model.size == 0 ? icl_NewStr("full") : icl_NewStr("incremental");
+  Out = NULL;
+  Sol = NULL;
   for (i = 0; i < atom_table->num_vars; i++) {
-    old = false;
+    was_true = false;
     for (j = 0; j < pce_model.size; j++) {
       if (pce_model.atom[j] == i) {
-	old = true;
+	was_true = true;
 	break;
       }
     }
     prob = atom_probability(i, &samp_table);
-    if ((prob > pce_model_threshold && !old)
-	|| (prob <= pce_model_threshold && old)) {
-      // Flipped value - modify pce_model and 
+    if (!was_true && (prob >= pce_model_threshold)) {
+      // Atom became true - add to model and to BecameTrueWeights list
       pce_model_resize(&pce_model);
       pce_model.atom[pce_model.size] = i;
       pce_model.size += 1;
+      Pair = icl_NewStruct("p", 2, get_icl_atom(i), icl_NewFloat(prob));
+      icl_AddToList(BecameTrueWeights, Pair, true);
+    } else if (was_true && prob < pce_model_threshold) {
+      // Atom became false - remove from model and add to Retract list
+      pce_model.atom[j] = -1; // Just mark it for now.
+      icl_AddToList(Retract, get_icl_atom(i), true);
     }
   }
-  qsort(pce_model.atom, pce_model.size, sizeof(int32_t), cmp_atom_prob);
+  // Now remove marked retracts from the model
+  cur = 0;
   for (i = 0; i < pce_model.size; i++) {
-    aidx = pce_model.atom[i];
-    atom = atom_table->atom[aidx];
-    Args = icl_NewList(NULL);
-    for (j = 0; j < pred_arity(atom->pred, pred_table); j++) {
-      icl_AddToList(Args, icl_NewStr(const_name(atom->args[j], const_table)),
-		    true);
+    if (pce_model.atom[i] != -1) {
+      pce_model.atom[cur] = pce_model.atom[i];
+      cur += 1;
     }
-    icl_AddToList(solutions,
-		  icl_NewStructFromList(pred_name(atom->pred, pred_table),
-					Args),
-		  true);
+  }
+  pce_model.size = cur;
+
+  if (icl_ListLen(Retract) > 0 || icl_ListLen(BecameTrueWeights) > 0) {
+    Callback = icl_NewStruct("pce_update_model_callback", 3, Retract, BecameTrueWeights, Flag);
+    oaa_Solve(Callback, icl_NewList(NULL), &Out, &Sol);
+    pce_log("pce_update_model_callback: Retract %d, BecameTrueWeights %d, Flag %s",
+	    icl_ListLen(Retract), icl_ListLen(BecameTrueWeights), icl_Str(Flag));
+    printf("pce_update_model_callback: Retract %d, BecameTrueWeights %d, Flag %s\n",
+	   icl_ListLen(Retract), icl_ListLen(BecameTrueWeights), icl_Str(Flag));
   }
   return true;
 }
@@ -1445,13 +1515,14 @@ static void qm_buffer_resize() {
 
 // Check the availablity of the Query Manager
 bool qm_available() {
-  ICLTerm *Agtdata, *Params, *Result;
+  ICLTerm *Agtdata, *Params, *Out, *Result;
 
   Params = icl_NewTermFromString("[block(true)]");
   Agtdata = icl_NewTermFromString("agent_data(Address, Type, ready, Solvables, 'QueryManager', Info)");
+  Out = NULL;
   Result = NULL;
-  
-  oaa_Solve(Agtdata, Params, NULL, &Result);
+
+  oaa_Solve(Agtdata, Params, &Out, &Result);
   return icl_NumTerms(Result) == 0 ? false : true;
 }
 
@@ -1465,7 +1536,7 @@ static void get_qm_instances(samp_table_t *table) {
   int32_t i, j, k, arity, qsize, *psig, cidx, newconsts;
   int success;
   bool error;
-  ICLTerm *callback, *Instances, *Answer, *Bindings, *Params, *Binding, *Arg;
+  ICLTerm *callback, *Instances, *Answer, *Bindings, *Params, *Binding, *Arg, *Out;
   time_t start_time;
 
   if (!qm_available()) {
@@ -1473,6 +1544,7 @@ static void get_qm_instances(samp_table_t *table) {
     return;
   }
 
+  Binding = NULL;
   start_time = time(NULL);
   pred_table = &table->pred_table;
   evpred_tbl = &pred_table->evpred_tbl;
@@ -1520,7 +1592,8 @@ static void get_qm_instances(samp_table_t *table) {
 	if (empty_params == NULL) {
 	  empty_params = icl_NewTermFromString("[]");
 	}
-	success = oaa_Solve(callback, empty_params, NULL, &Instances);
+	Out = NULL;
+	success = oaa_Solve(callback, empty_params, &Out, &Instances);
 	if (success) {
 	  inststr = icl_NewStringFromTerm(Instances);
 	  printf("Instances for %s are %s\n", pred, inststr);
@@ -1633,6 +1706,8 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 	       DEFAULT_MAX_EXTRA_FLIPS, DEFAULT_MAX_SAMPLES);
       }
     }
+    printf("Calling pce_update_model\n");
+    pce_update_model();
     time(&idle_timer);
   }
   // Should these be saved?

@@ -86,7 +86,7 @@ int32_t add_internal_atom(samp_table_t *table,
 				 arity+1, //+1 for pred
 				 (int32_t *) atom);
   if (atom_map == NULL){
-    //assert(valid_table(table));
+    assert(valid_table(table));
     atom_table_resize(atom_table, clause_table);
     current_atom_index = atom_table->num_vars++;
     samp_atom_t * current_atom = (samp_atom_t *) safe_malloc((arity+1) * sizeof(int32_t));
@@ -115,7 +115,8 @@ int32_t add_internal_atom(samp_table_t *table,
     add_atom_to_pred(pred_table, predicate, current_atom_index);
     clause_table->watched[pos_lit(current_atom_index)] = NULL;
     clause_table->watched[neg_lit(current_atom_index)] = NULL;
-    //assert(valid_table(table));
+    atom_table->num_unfixed_vars++;
+    assert(valid_table(table));
     return current_atom_index;
   } else {
     return atom_map->val;

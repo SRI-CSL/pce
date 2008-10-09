@@ -208,10 +208,10 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
      */
     // choose a random atom
     assert(valid_table(table));
-    var = choose_random_atom(table);
+    //    var = choose_random_atom(table);
+    var = choose_unfixed_variable(assignment, atom_table->num_vars,
+ 				  atom_table->num_unfixed_vars);
     assert(valid_table(table));
-//     var = choose_unfixed_variable(assignment, atom_table->num_vars,
-// 				  atom_table->num_unfixed_vars);
     if (var == -1) return;
     cost_flip_unfixed_variable(table, &dcost, var);
     assert(valid_table(table));

@@ -71,6 +71,8 @@ extern void all_query_instances(samp_query_t *query, samp_table_t *table);
 
 extern double choose();
 
+extern int32_t choose_unfixed_variable(samp_truth_value_t *assignment, int32_t num_vars, int32_t num_unfixed_vars);
+
 extern void cost_flip_unfixed_variable(samp_table_t *table,
 				       int32_t *dcost, 
 				       int32_t var);

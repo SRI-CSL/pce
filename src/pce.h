@@ -17,6 +17,13 @@ typedef struct pce_model_s {
   int32_t *atom;
 } pce_model_t;
 
+// Same size as atom_table - keeps ICL Terms
+typedef struct icl_atom_s {
+  uint32_t size;
+  uint32_t num_vars;
+  ICLTerm **Atom;
+} icl_atom_t;
+
 typedef struct names_buffer_s {
   uint32_t size;
   uint32_t capacity;
