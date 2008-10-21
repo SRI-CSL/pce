@@ -534,10 +534,17 @@ void pce_install_rule(ICLTerm *Formula, double weight) {
   samp_rule_t *clause, **clauses;
   rule_literal_t *lit, ***lits;
   int32_t i, j, litlen, atom_idx;
+  char *str;
   
   // cnf has side effect of setting rules_vars_buffer
   lits = cnf(Formula);
 
+  if (lits == NULL) {
+    str = icl_NewStringFromTerm(Formula);
+    pce_error("Could not install rule:\n  %s\n", str);
+    icl_stFree(str);
+    return;
+  }
   rules_buffer.size = 0;
   for (i = 0; lits[i] != NULL; i++) {
     clause = (samp_rule_t *) safe_malloc(sizeof(samp_rule_t));
