@@ -6,7 +6,8 @@ sort Calendar_t;
 sort Slide_t;
 sort Issue_t;
 sort Webpage_t;
-sort OntolotyObject_t;
+sort OntologyObject_t;
+sort Category_t;
 sort Person_t;
 
 predicate attached(File_t, Email_t) direct;
@@ -22,7 +23,7 @@ predicate 'CIssue'(Issue_t) indirect;
 predicate 'Webpage'(Webpage_t) indirect;
 predicate 'DocumentFile'(File_t) indirect;
 predicate 'EmailMessage'(Email_t) indirect;
-predicate 'iris'(OntolotyObject_t) indirect;
+predicate 'iris'(OntologyObject_t) indirect;
 predicate fileHasTask(File_t, Task_t) indirect;
 predicate 'CalendarEntry'(Calendar_t) indirect;
 predicate emailHasTask(Email_t, Task_t) indirect;
