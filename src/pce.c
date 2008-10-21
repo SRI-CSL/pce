@@ -528,24 +528,13 @@ samp_rule_t **rules_buffer_copy(rules_buffer_t *buf) {
 
 // The main body of pce_learner_assert
 
-bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
+void pce_install_rule(ICLTerm *Formula, double weight) {
   rule_table_t *rule_table = &(samp_table.rule_table);
   pred_table_t *pred_table = &(samp_table.pred_table);
   samp_rule_t *clause, **clauses;
   rule_literal_t *lit, ***lits;
-  double weight;
   int32_t i, j, litlen, atom_idx;
-
-  // First check that the args are OK
-  if (!icl_IsFloat(Weight)) {
-    pce_error("pce_learner_assert: Weight should be a float");
-    return false;
-  }
-  if (!icl_IsStruct(Formula)) {
-    pce_error("pce_learner_assert: Formula should be a struct");
-    return false;
-  }
-  weight = icl_Float(Weight);
+  
   // cnf has side effect of setting rules_vars_buffer
   lits = cnf(Formula);
 
@@ -599,6 +588,22 @@ bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
   safe_free(clauses);
   //dump_clause_table(&samp_table);
   //dump_rule_table(&samp_table);
+}
+
+bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
+  double weight;
+
+  // First check that the args are OK
+  if (!icl_IsFloat(Weight)) {
+    pce_error("pce_learner_assert: Weight should be a float");
+    return false;
+  }
+  if (!icl_IsStruct(Formula)) {
+    pce_error("pce_learner_assert: Formula should be a struct");
+    return false;
+  }
+  weight = icl_Float(Weight);
+  pce_install_rule(Formula, weight);
   return true;
 }
 
@@ -1466,6 +1471,199 @@ int32_t pce_update_model() {
   return true;
 }
 
+char *pce_make_lname(ICLTerm *Username) {
+  char *name;
+
+  if (icl_IsStr(Username)) {
+    // Prepend 'user:'
+    name = safe_malloc((strlen(icl_Str(Username)) + 6) * sizeof(char));
+    strcpy(name, "user:");
+    strcat(name, icl_Str(Username));
+    return name;
+  } else {
+    // PCE1 checked for a list of chars here - assume not needed.
+    return "user_defined";
+  }
+}
+
+double pce_translate_weight(ICLTerm *Strength) {
+  ICLTerm *Arg;
+  char *str;
+  
+  assert(strcmp(icl_Functor(Strength), "strength") == 0);
+  Arg = icl_NthTerm(Strength, 1);
+  if (icl_IsStr(Arg) && strcmp(icl_Str(Arg),"medium") == 0) {
+    return 10.0;
+  } else if (icl_IsStr(Arg) && strcmp(icl_Str(Arg),"high") == 0) {
+    return 20.0;
+  } else {
+    str = icl_NewStringFromTerm(Strength);
+    printf("* Note: %s defaulting to 5.0\n", str);
+    icl_stFree(str);
+    return 5.0;
+  }
+}
+
+// From calo/apps/tester/src/prolog/calo_syntax.pl
+// expansion_table('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns').
+// expansion_table('rdfs', 'http://www.w3.org/2000/01/rdf-schema').
+// expansion_table('xsd', 'http://www.w3.org/2001/XMLSchema').
+// expansion_table('owl', 'http://www.w3.org/2002/07/owl').
+// expansion_table('clib', 'http://calo.sri.com/core-plus-office').
+// expansion_table('iris', 'http://iris.sri.com/irisOntology').
+// expansion_table('msg', 'http://iris.sri.com/irisMessages').
+// expansion_table('doc', 'http://iris.sri.com/doc').
+// expansion_table('collab', 'http://calo.sri.com/collab').
+// expansion_table('ui', 'http://iris.sri.com/ui').
+// expansion_table('std', 'http://iris.sri.com/sparkTestData.owl').
+// %% expansion_table('task':'http://iris.sri.com/abstractTask').
+// %% Change for CALO Year 4:
+// expansion_table('task', 'http://calo.sri.com/tasks').
+
+char *uri_abbr[12] = {"rdf:", "rdfs:", "xsd:", "owl:", "clib:", "iris:",
+		       "msg:", "doc:", "collab:", "ui:", "std:", "task:"};
+char *uri_expn[12] = {"http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		       "http://www.w3.org/2000/01/rdf-schema#",
+		       "http://www.w3.org/2001/XMLSchema#",
+		       "http://www.w3.org/2002/07/owl#",
+		       "http://calo.sri.com/core-plus-office#",
+		       "http://iris.sri.com/irisOntology#",
+		       "http://iris.sri.com/irisMessages#",
+		       "http://iris.sri.com/doc#",
+		       "http://calo.sri.com/collab#",
+		       "http://iris.sri.com/ui#",
+		       "http://iris.sri.com/sparkTestData.owl#",
+		       "http://calo.sri.com/tasks#"};
+
+char *calo_string_expansion(char *str) {
+  char *nstr;
+  int32_t i, len;
+  
+  for (i = 0; i < 12; i++) {
+    if (strncmp(str, uri_abbr[i], strlen(uri_abbr[i])) == 0) {
+      len = strlen(str) - strlen(uri_abbr[i]) + strlen(uri_expn[i]) + 1;
+      nstr = safe_malloc(len * sizeof(char));
+      strcpy(nstr,uri_expn[i]);
+      strcat(nstr,&str[strlen(uri_abbr[i])]);
+      return nstr;
+    }
+  }
+  return str;
+}
+
+ICLTerm *calo_expansion(ICLTerm *Atom) {
+  char *str, *nstr;
+
+  str = icl_Str(Atom);
+  nstr = calo_string_expansion(str);
+  if (str == nstr) {
+    return Atom;
+  } else {
+    return icl_NewStr(nstr);
+  }
+}
+
+// Mixing the following functions from prolog PCE:
+// clean atom:
+//   equ(A,B) ==> if A=B then true else A==B
+//   nl_rule_expansion
+//   'clib:'FOO(A,B) ==> iris(FOO(A,B))
+//   ow calo_syntax:expand
+// nl rule expansion:
+//   equ(A,B) ==> A==B
+//   related_to(A,B) ==> 'http://calo.sri.com/core-plus-office#relatedProjectIs'(A,B)
+//   contains(A,B) ==> iris(fullTextSearch(A,B))
+//   'iris:bp_email_subject'(A,B) ==> iris('iris:bp_email_subject'(A,B))
+//   ow return Atom
+// calo_syntax_expand:
+//   don't recurse down iris(...) terms
+//   translate abbrs to expanded URIs
+
+ICLTerm *calo_syntax_expand(ICLTerm *Term) {
+  ICLTerm *Nterm, *Arg, *Args;
+  char *func, *nfunc;
+  bool changed;
+  int32_t i;
+  
+  // Recurse down the Term to atoms, then translate short forms to long forms
+  // Don't go down 'iris(...)' terms
+  if (icl_IsStruct(Term)) {
+    func = icl_Functor(Term);
+    if (strcmp(func,"iris") == 0) {
+      return Term;
+    }
+    changed = false;
+    nfunc = calo_string_expansion(func);
+    Nterm = icl_CopyTerm(Term);
+    if (nfunc != func) {
+      Args = icl_NewList(NULL);
+      for (i = 0; i < icl_NumTerms(Term); i++) {
+	icl_AddToList(Args, icl_NthTerm(Term, i+1), true);
+      }
+      Nterm = icl_NewStructFromList(nfunc, Args);
+      changed = true;
+    }
+    for (i = 0; i < icl_NumTerms(Nterm); i++) {
+      Arg = calo_syntax_expand(icl_NthTerm(Nterm, i+1));
+      if (icl_NthTerm(Nterm, i+1) != Arg) {
+	// Note that icl_NthTerm is 1-based, icl_ReplaceElement is 0-based
+	icl_ReplaceElement(Nterm, i, Arg, false);
+	changed = true;
+      }
+    }
+    if (!changed) {
+      icl_Free(Nterm);
+      Nterm = Term;
+    }
+    if (strcmp(func,"equ") == 0) {
+      if (icl_match_terms(icl_NthTerm(Nterm, 1),icl_NthTerm(Nterm, 2), NULL)) {
+	return icl_True();
+      } else {
+	return icl_NewStruct("==",2,icl_NthTerm(Nterm, 1),icl_NthTerm(Nterm, 2));
+      }
+    } else if (strcmp(func,"related_to") == 0) {
+      return icl_NewStruct("http://calo.sri.com/core-plus-office#relatedProjectIs",
+			   2, icl_NthTerm(Nterm, 1), icl_NthTerm(Nterm, 2));
+    } else if (strcmp(func,"contains") == 0) {
+      return icl_NewStruct("iris", 1,
+			   icl_NewStruct("iris:bp_email_subject", 2,
+					 icl_NthTerm(Nterm, 1), icl_NthTerm(Nterm, 2)));
+    }
+    return Nterm;
+  } else if (icl_IsStr(Term)) {
+    return calo_expansion(Term);
+  }
+  return Term;
+}
+
+// Goal of form pce_add_user_defined_rule(Username,Text,Rule)
+int pce_add_user_defined_rule_callback(ICLTerm *goal, ICLTerm *params,
+				       ICLTerm *solutions) {
+  ICLTerm *Username, *Text, *Rule, *Strength, *Antecedent, *Consequent, *Impl;
+  char *name, *iclstr;
+  double strength;
+
+  iclstr = icl_NewStringFromTerm(goal);  
+  pce_log("%s", iclstr);
+  icl_stFree(iclstr);
+
+  Username = icl_CopyTerm(icl_NthTerm(goal, 1));
+  name = pce_make_lname(Username);
+  // We don't actually care about the Text
+  Text = icl_CopyTerm(icl_NthTerm(goal, 2));
+  // Rule is of the form 'implies(Strength,Antecedent,Consequent)'
+  Rule = icl_CopyTerm(icl_NthTerm(goal, 3));
+  assert(strcmp(icl_Functor(Rule),"implies") == 0);
+  Strength = icl_NthTerm(Rule, 1);
+  Antecedent = icl_NthTerm(icl_NthTerm(Rule, 2), 1);
+  Consequent = icl_NthTerm(icl_NthTerm(Rule, 3), 1);
+  Impl = calo_syntax_expand(icl_NewStruct("implies", 2, Antecedent, Consequent));
+  // Convert Strength to Weight
+  strength = pce_translate_weight(Strength);
+  pce_install_rule(Impl, strength);
+  return true;
+}
+
 int pce_reset_cache_callback(ICLTerm *goal, ICLTerm *params,
 			     ICLTerm *solutions) {
   char *iclstr;
@@ -2140,6 +2338,9 @@ int setup_oaa_connection(int argc, char *argv[]) {
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_update_model(),[callback(pce_update_model)])"),
 		true);
+  icl_AddToList(pceSolvables,
+		icl_NewTermFromString("solvable(pce_add_user_defined_rule(Username,Text,Rule),[callback(pce_add_user_defined_rule)])"),
+		true);
 
   // Register solvables with the Facilitator.
   // The string "parent" represents the Facilitator.
@@ -2191,6 +2392,10 @@ int setup_oaa_connection(int argc, char *argv[]) {
   }
   if (!oaa_RegisterCallback("pce_update_model", pce_update_model_callback)) {
     printf("Could not register pce_update_model callback\n");
+    return false;
+  }
+  if (!oaa_RegisterCallback("pce_add_user_defined_rule", pce_add_user_defined_rule_callback)) {
+    printf("Could not register pce_add_user_defined_rule callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_reset_cache", pce_reset_cache_callback)) {
