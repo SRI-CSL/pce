@@ -797,6 +797,7 @@ int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   // cnf has side effect of setting rules_vars_buffer
   lits = cnf(QueryFormula);
   query_index = add_to_query_table(&rules_vars_buffer, lits, &samp_table);
+  result = false;
 
   for (i = 0; i < query_instance_table->num_queries; i++) {
     if (query_instance_table->query_inst[i]->query_index == query_index) {
@@ -910,7 +911,7 @@ void add_subscription_source_to_query(int32_t query_index,
 }
 
 
-int32_t pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
+int pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
 			       ICLTerm *solutions) {
   ICLTerm *Lid, *Formula, *Who, *Condition, *Id, *Sid;
   rule_literal_t ***lits;
@@ -962,7 +963,7 @@ int32_t pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
     Sid = Id;
   } else {
     // TBD - See if we already have a subscription for this formula
-    sprintf(idstr, "%d", subscriptions.size);
+    sprintf(idstr, "%"PRIu32, subscriptions.size);
     sid = str_copy(idstr);
     Sid = icl_NewStr(sid);
   }
@@ -1043,7 +1044,7 @@ void process_subscription(subscription_t *subscription) {
   }
   // Need to call oaa_Solve with solution a list of atoms of the form
   // pce_subscription_callback(m(Sid, Formula, Prob), ...)
-  printf("process_subscription: returning %d solutions for subscription %s\n",
+  printf("process_subscription: returning %"PRId32" solutions for subscription %s\n",
 	 cnt, subscription->id);
   fflush(stdout);
   callback = icl_NewStruct("pce_subscription_callback", 1, callbacklist);
@@ -1166,7 +1167,7 @@ bool pce_unsubscribe(int32_t subscr_index) {
 //  pce_unsubscribe(Lid,F,Who,Condition)
 //  pce_unsubscribe(SubscriptionId)
 
-int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
+int pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
 				 ICLTerm *solutions) {
   ICLTerm *Lid, *Formula, *Who, *Condition, *Sid;
   char *sid, *lid;
@@ -1180,6 +1181,7 @@ int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
   Lid = NULL;
   Who = NULL;
   Sid = NULL;
+  Formula = NULL;
   if (icl_NumTerms(goal) == 2) {
     Lid       = icl_CopyTerm(icl_NthTerm(goal, 1));
     Formula   = icl_CopyTerm(icl_NthTerm(goal, 2));
@@ -1246,7 +1248,7 @@ int32_t pce_unsubscribe_callback(ICLTerm *goal, ICLTerm *params,
 }
 
 // goal of the form pce_unsubscribe_learner(Lid)
-int32_t pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
+int pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
                                          ICLTerm *solutions) {
   ICLTerm *Lid;
   char *lid;
@@ -1278,8 +1280,8 @@ int32_t pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
       }
     }
   }
-  printf("%d subscriptions removed", i);
-  pce_log("%d subscriptions removed", i);
+  printf("%"PRId32" subscriptions removed", i);
+  pce_log("%"PRId32" subscriptions removed", i);
   return true;
 }
 
@@ -1361,7 +1363,7 @@ int cmp_atom_prob(const void *a1, const void *a2) {
 }
 
 // goal of the form pce_full_model(M)
-int32_t pce_full_model_callback(ICLTerm *goal, ICLTerm *params,
+int pce_full_model_callback(ICLTerm *goal, ICLTerm *params,
 				ICLTerm *solutions) {
   atom_table_t *atom_table;
   pred_table_t *pred_table;
@@ -1404,7 +1406,7 @@ int32_t pce_full_model_callback(ICLTerm *goal, ICLTerm *params,
 }
 
 
-int32_t pce_update_model_callback(ICLTerm *goal, ICLTerm *params,
+int pce_update_model_callback(ICLTerm *goal, ICLTerm *params,
 				  ICLTerm *solutions) {
   return true;
 }
@@ -1767,12 +1769,12 @@ static void get_qm_instances(samp_table_t *table) {
 	strcpy(query, "query(query_pattern('(");
 	strcat(query, pred);
 	for (j = 0; j < arity; j++) {
-	  sprintf(argstr, " ?x%.2d", j+1);
+	  sprintf(argstr, " ?x%.2"PRId32, j+1);
 	  strcat(query, argstr);
 	}
 	strcat(query, ")'),[answer_pattern('[");
 	for (j = 0; j < arity; j++) {
-	  sprintf(argstr, "{?x%.2d}", j+1);
+	  sprintf(argstr, "{?x%.2"PRId32"}", j+1);
 	  strcat(query, argstr);
 	  if (j+1 < arity) {
 	    strcat(query, ",");
@@ -1869,7 +1871,7 @@ static void get_qm_instances(samp_table_t *table) {
 		      icl_IsFloat(Arg) ? "Float" :
 		      icl_IsDataQ(Arg) ? "DataQ" :
 		      icl_IsValid(Arg) ? "Valid" : "Invalid";
-		    fprintf(stderr, "Query Manager returned a %s for binding no. %d (0-based):\n", icltype, k);
+		    fprintf(stderr, "Query Manager returned a %s for binding no. %"PRId32" (0-based):\n", icltype, k);
 		    query = icl_NewStringFromTerm(callback);
 		    inststr = icl_NewStringFromTerm(Instances);
 		    fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);

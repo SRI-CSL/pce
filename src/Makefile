@@ -156,7 +156,7 @@ CFLAGS := $(CFLAGS) -O3 -fomit-frame-pointer $(PIC)
 CPPFLAGS := $(CPPFLAGS) -DNDEBUG
 else 
 ifeq ($(MCSAT_MODE),static)
-CFLAGS := $(CFLAGS) -DNDEBUG -O3 $(STATIC)
+CFLAGS := $(CFLAGS) -DNDEBUG -O $(STATIC)
 else
 ifeq ($(MCSAT_MODE),profile)
 CFLAGS := $(CFLAGS) -O3 $(PIC) -pg
