@@ -2283,6 +2283,7 @@ static void pce_error(const char *fmt, ...) {
   if (pce_log_fp != NULL) {
     va_start(argp, fmt);
     vfprintf(pce_log_fp, fmt, argp);
+    vprintf(pce_log_fp, "\n");
     va_end(argp);
   }
   printf("\n");
