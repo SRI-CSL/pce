@@ -111,11 +111,11 @@ int32_t add_internal_atom(samp_table_t *table,
       atom_table->pmodel[current_atom_index] = 0; //atom_table->num_samples/2;
       atom_table->assignment[0][current_atom_index] = v_false;
       atom_table->assignment[1][current_atom_index] = v_false;
+      atom_table->num_unfixed_vars++;
     }
     add_atom_to_pred(pred_table, predicate, current_atom_index);
     clause_table->watched[pos_lit(current_atom_index)] = NULL;
     clause_table->watched[neg_lit(current_atom_index)] = NULL;
-    atom_table->num_unfixed_vars++;
     assert(valid_table(table));
     return current_atom_index;
   } else {
