@@ -25,13 +25,14 @@
 #include "samplesat.h"
 #include "lazysamplesat.h"
 #include "memalloc.h"
+#include "memsize.h"
 #include "pce.h"
 
 #define AGENT_NAME "pce"
 
 #define MALLOC_CHECK_ 2
 
-static bool lazy_pce = false;
+static bool lazy_pce = true;
 
 static const char *const pce_solvables[] = {
   "pce_add_user_defined_rule(Username,_Text,Rule)",
@@ -104,6 +105,8 @@ static void rule_vars_buffer_resize(rule_vars_buffer_t *buf);
 static var_entry_t **rule_vars_buffer_copy(rule_vars_buffer_t *buf);
 static char **names_buffer_copy(names_buffer_t *nbuf);
 
+ICLTerm *empty_params = NULL;
+
 static char *pce_init_file = "pce.init";
 static char *pce_save_file = "pce.persist";
 static FILE *pce_save_fp;
@@ -133,6 +136,77 @@ void pce_save(ICLTerm *goal) {
   fflush(pce_save_fp);
   fsync(fileno(pce_save_fp));
 }
+
+// Adds "sort SORT;" to the persist file
+void pce_save_sort(char *typestr) {
+  fprintf(pce_save_fp, "sort '%s';\n", typestr);
+  fflush(pce_save_fp);
+  fsync(fileno(pce_save_fp));
+}
+
+void pce_save_const(char *name, int32_t sortidx) {
+  char *typestr;
+
+  typestr = samp_table.sort_table.entries[sortidx].name;
+  fprintf(pce_save_fp, "const '%s': '%s';\n", name, typestr);
+  fflush(pce_save_fp);
+  fsync(fileno(pce_save_fp));
+}
+
+// Adds "assert ATOM;" to the persist file
+void pce_save_fact(input_atom_t *atom) {
+  uint32_t i;
+  
+  fprintf(pce_save_fp, "assert '%s'", atom->pred);
+  for (i = 0; atom->args[i] != NULL; i++){
+    i == 0 ? fprintf(pce_save_fp, "(") : fprintf(pce_save_fp, ", ");
+    fprintf(pce_save_fp, "'%s'", atom->args[i]);
+  }
+  fprintf(pce_save_fp, ");\n");
+  fflush(pce_save_fp);
+  fsync(fileno(pce_save_fp));  
+}
+
+// Adds "add CLAUSE WEIGHT;" to the persist file
+void pce_save_clause(samp_rule_t *rule) {
+  pred_table_t *pred_table = &samp_table.pred_table;
+  const_table_t *const_table = &samp_table.const_table;
+  int32_t j;
+  
+  fprintf(pce_save_fp, "add ");
+  if (rule->num_vars != 0) {
+    for(j=0; j<rule->num_vars; j++) {
+      j==0 ? fprintf(pce_save_fp, " (") : fprintf(pce_save_fp, ", ");
+      fprintf(pce_save_fp, "%s", rule->vars[j]->name);
+    }
+    fprintf(pce_save_fp, ")");
+  }
+  for(j=0; j<rule->num_lits; j++) {
+    if (j!=0) fprintf(pce_save_fp, " | ");
+    rule_literal_t *lit = rule->literals[j];
+    if (lit->neg) fprintf(pce_save_fp, "~");
+    samp_atom_t *atom = lit->atom;
+    int32_t pred_idx = atom->pred;
+    fprintf(pce_save_fp, "'%s'", pred_name(pred_idx, pred_table));
+    int32_t k;
+    for(k=0; k<pred_arity(pred_idx, pred_table); k++) {
+      k==0 ? fprintf(pce_save_fp, "(") : fprintf(pce_save_fp, ", ");
+      int32_t argidx = atom->args[k];
+      if(argidx < 0) {
+	// Must be a variable - look it up in the vars
+	fprintf(pce_save_fp, "%s", rule->vars[-(argidx + 1)]->name);
+      } else {
+	// Look it up in the const_table
+	fprintf(pce_save_fp, "'%s'", const_table->entries[argidx].name);
+      }
+    }
+    fprintf(pce_save_fp, ")");
+  }
+  fprintf(pce_save_fp, ";\n");
+  fflush(pce_save_fp);
+  fsync(fileno(pce_save_fp));  
+}
+
 
 // Check that the Term is a simple atom, i.e., p(a, b, c, ...) where a, b,
 // c, ... are all constants or variables.  Also check for free variables if
@@ -176,39 +250,194 @@ static bool icl_IsAtomStruct(ICLTerm *icl_term, bool vars_allowed) {
   }
   return true;
 }
+  
+// Builds a query of the form
+// query(query_pattern('(rdf:type NAME ?x)'),[],Result)
+// Result then has form query(X,Y,answer(['[''x''=TYPE]'],[...]))
+int32_t pce_get_rdf_type(char *name) {
+  ICLTerm *Callback, *Out, *Instances, *Answer, *Bindings, *Binding, *Params, *Type;
+  char *query, *inststr, *bindingstr, *typestr;
+  int32_t j, k, qsize, success, error, sortidx;
+  sort_table_t *sort_table = &samp_table.sort_table;
 
-bool pce_add_const(char *name, int32_t sort_index, samp_table_t *table) {
-  int32_t stat, cidx;
+  // "query(query_pattern('(rdf:type \"" + strlen(NAME) + "\" ?x))'),[],Result)" + '0'
+  qsize = 32 + strlen(name) + 20;
+  query = (char *) safe_malloc(qsize * sizeof(char));
+  strcpy(query, "query(query_pattern('(rdf:type \"");
+  strcat(query, name);
+  strcat(query, "\" ?x))'),[],Result)");
+  assert(strlen(query) == qsize-1);
+  Callback = icl_NewTermFromData(query, qsize);
+  if (empty_params == NULL) {
+    empty_params = icl_NewTermFromString("[]");
+  }
+  Out = NULL;
+  Instances = NULL;
+  success = oaa_Solve(Callback, empty_params, &Out, &Instances);
+  if (success) {
+    // We now have Instances of the form [query(X, Y, answer([Binding], [Params]))]
+    inststr = icl_NewStringFromTerm(Instances);
+    cprintf(2,"Query result for %s is %s\n", name, inststr);
+    fflush(stdout);
+    icl_stFree(inststr);
+    if (! icl_IsList(Instances) || icl_NumTerms(Instances) != 1) {
+      pce_error("query: list of 1 element expected for Instances");
+      inststr = icl_NewStringFromTerm(Instances);
+      pce_error("Instances for %s are %s\n", name, inststr);
+      fflush(stdout);
+      icl_stFree(inststr);
+      return -1;
+    } else {
+      Answer = icl_NthTerm(icl_NthTerm(Instances, 1), 3);
+      // Bindings should be of the form ['[''x''=\"TYPE\"]']
+      Bindings = icl_NthTerm(Answer, 1);
+      if (icl_NumTerms(Bindings) != 1) {
+	inststr = icl_NewStringFromTerm(Bindings);
+	pce_error("Instances for %s lead to error %s\n", name, inststr);
+	fflush(stdout);
+	icl_stFree(inststr);
+	return -1;
+      }
+      Params = icl_NthTerm(Answer, 2);
+      // Check the Params - only care about errors for now.
+      error = false;
+      for (j = 0; j < icl_NumTerms(Params); j++) {
+	if (strcmp(icl_Functor(icl_NthTerm(Params,j+1)),"error") == 0) {
+	  error = true;
+	  break;
+	}
+      }
+      if (error) {
+	// This shouldn't happen - not sure what it means
+	inststr = icl_NewStringFromTerm(Params);
+	pce_error("Instances for %s lead to error %s\n", name, inststr);
+	fflush(stdout);
+	icl_stFree(inststr);
+	return -1;
+      }
+      assert(icl_IsStr(icl_NthTerm(Bindings, 1)));
+      bindingstr = str_copy(icl_Str(icl_NthTerm(Bindings, 1)));
+      // Need to replace " with ' so we can get the term
+      // '[''x''=\"TYPE\"]' ==> '[''x''='TYPE']'
+      for (k = 0; k < strlen(bindingstr); k++) {
+	if (bindingstr[k] == '"') {
+	  bindingstr[k] = '\'';
+	}
+      }
+      Binding = icl_NewTermFromString(bindingstr);
+      Type = icl_NthTerm(icl_NthTerm(Binding, 1), 2);
+      typestr = icl_Str(Type);
+      // Now check if the type is already known
+      sortidx = sort_name_index(typestr, sort_table);
+      if (sortidx == -1) {
+	// Complain, but add the sort anyway
+	pce_error("Sort %s not declared in pce.init; declaring it now\n", typestr);
+	add_sort(sort_table, typestr);
+	pce_save_sort(typestr);
+	sortidx = sort_name_index(typestr, sort_table);
+      }
+      printf("rdf:type (sort from QM) for %s is %s\n", name, typestr);
+      return sortidx;
+    }
+  } else {
+    pce_error("oaa_Solve of %s was unsuccessful\n", query);
+    return -1;
+  }
+}
 
-  stat = add_const_internal(name, sort_index, table);
-  if (stat == -1) {
+int32_t pce_add_const(char *name, samp_table_t *table) {
+  const_table_t *const_table = &table->const_table;
+  int32_t cidx, sortidx;
+  
+  cidx = stbl_find(&const_table->const_name_index, name);
+  if (cidx == -1) {
+    // Const is not in the symbol table - look up its signature from Calo
+    sortidx = pce_get_rdf_type(name);
+    if (sortidx == -1) {
+      return -1;
+    }
+    add_const_internal(name, sortidx, table);
+    pce_save_const(name, sortidx);
+    cidx = stbl_find(&const_table->const_name_index, name);
+  }
+  if (cidx == -1) {
     pce_error("Error adding constant %s", name);
-    return false;
+    return -1;
   }
-  if (stat == 1) {
-    return true;
-  }
-  cidx = const_index(name, &table->const_table);
   create_new_const_rule_instances(cidx, table, false, 0);
   create_new_const_query_instances(cidx, table, false, 0);
+  return cidx;
+}
+
+// bool pce_add_const(char *name, int32_t sort_index, samp_table_t *table) {
+//   int32_t stat, cidx;
+
+//   if (get_verbosity_level() > 0 &&
+//       stbl_find(&table->const_table.const_name_index, name) == -1) {
+//     pce_log("Adding constant %s of sort %s\n",
+// 	    name, table->sort_table.entries[sort_index].name);
+//   }
+//   stat = add_const_internal(name, sort_index, table);
+//   if (stat == -1) {
+//     pce_error("Error adding constant %s", name);
+//     return false;
+//   }
+//   if (stat == 1) {
+//     return true;
+//   }
+//   cidx = const_index(name, &table->const_table);
+//   create_new_const_rule_instances(cidx, table, false, 0);
+//   create_new_const_query_instances(cidx, table, false, 0);
+//   return true;
+// }
+
+bool typecheck_pred_arg(int32_t const_sig, int32_t predarg_sig,
+			char *cname, char *pname, int32_t argno) {
+  sort_entry_t *sort_entries;
+  int32_t i, *supersorts;
+  bool foundit;
+  
+  if (predarg_sig != const_sig) {
+    sort_entries = samp_table.sort_table.entries; 
+    supersorts = sort_entries[predarg_sig].supersorts;
+    foundit = false;
+    for (i = 0; supersorts[i] != -1; i++) {
+      if (supersorts[i] == const_sig) {
+	foundit = true;
+	break;
+      }
+    }
+    if (!foundit) {      
+      fprintf(stderr,
+	      "Sort error; predicate %s arg %d expects sort %s,\n",
+	      pname, argno, sort_entries[predarg_sig].name);
+      fprintf(stderr, "but was given constant %s of sort %s\n",
+	      cname, sort_entries[const_sig].name);
+      return false;
+      }
+    }
   return true;
 }
+    
 
 // Returns atom or NULL
 input_atom_t *icl_term_to_atom(ICLTerm *icl_atom, bool vars_allowed,
 			       bool indirect_allowed) {
   pred_table_t *pred_table;
+  const_table_t *const_table;
   ICLTerm *icl_arg;
-  char *pred;
-  int32_t pred_val, pred_idx;
+  char *pred, *cname;
+  int32_t pred_val, pred_idx, const_index;
   int32_t i, num_args;
   int32_t *psig;
+  uint32_t csig;
   input_atom_t *atom;
   
   if (!icl_IsAtomStruct(icl_atom, vars_allowed)) {
     return NULL;
   }
-  pred_table = &(samp_table.pred_table);
+  pred_table = &samp_table.pred_table;
+  const_table = &samp_table.const_table;
   pred = icl_Functor(icl_atom);
   num_args = icl_NumTerms(icl_atom);
   // check if we've seen the predicate before and complain if not.
@@ -231,10 +460,19 @@ input_atom_t *icl_term_to_atom(ICLTerm *icl_atom, bool vars_allowed,
   psig = pred_signature(pred_idx, pred_table);
   for(i=0; i < num_args; i++) {
     icl_arg = icl_NthTerm(icl_atom, i+1);
-    names_buffer.name[i] = icl_Str(icl_arg);
-    // Add the constant, of sort corresponding to the pred
-    pce_add_const(names_buffer.name[i], psig[i], &samp_table);
-    //add_const_internal(names_buffer.name[i], psig[i], &samp_table);
+    cname = str_copy(icl_Str(icl_arg));
+    names_buffer.name[i] = cname;
+    
+    const_index = stbl_find(&(const_table->const_name_index), cname);
+    if (const_index == -1) {
+      // New constant, need to add it, but we get the sort from query,
+      // not the predicate
+      const_index = pce_add_const(cname, &samp_table);
+    }
+    csig = const_table->entries[const_index].sort_index;
+    if (!typecheck_pred_arg(csig, psig[i], cname, pred, i+1)) {
+      return NULL;
+    }
   }
   // We have the pred and args - now create an atom
   atom = (input_atom_t *) safe_malloc(sizeof(input_atom_t));
@@ -260,16 +498,18 @@ input_atom_t *icl_term_to_atom(ICLTerm *icl_atom, bool vars_allowed,
 
 bool pce_fact(ICLTerm *goal) {
   // The "goal" struct is in the form "pce_fact(Source,Formula)".
-  pred_table_t *pred_table = &(samp_table.pred_table);
+  pred_table_t *pred_table = &samp_table.pred_table;
+  const_table_t *const_table = &samp_table.const_table;
   ICLTerm *Source = icl_CopyTerm(icl_NthTerm(goal, 1));
   ICLTerm *Formula = icl_CopyTerm(icl_NthTerm(goal, 2));
   ICLTerm *Arg;
   char *source, *iclstr;
   input_atom_t *atom;
-  char *pred;
-  int32_t pred_val, pred_idx;
+  char *pred, *cname;
+  int32_t pred_val, pred_idx, const_index;
   int32_t i, num_args;
   int32_t *psig;
+  uint32_t csig;
 
   iclstr = icl_NewStringFromTerm(goal);  
   pce_log("%s", iclstr);
@@ -312,9 +552,14 @@ bool pce_fact(ICLTerm *goal) {
       return false;
     }
     names_buffer_resize(&names_buffer);
-    names_buffer.name[i] = icl_Str(Arg);
+    cname = str_copy(icl_Str(Arg));
+    names_buffer.name[i] = cname;
     // Add the constant, of sort corresponding to the pred
-    pce_add_const(names_buffer.name[i], psig[i], &samp_table);
+    const_index = pce_add_const(cname, &samp_table);
+    csig = const_table->entries[const_index].sort_index;
+    if (!typecheck_pred_arg(csig, psig[i], cname, pred, i+1)) {
+      return false;
+    }
     //add_const_internal(names_buffer.name[i], psig[i], &samp_table);
   }
   names_buffer.size = num_args;
@@ -330,6 +575,8 @@ bool pce_fact(ICLTerm *goal) {
   //dump_sort_table(&samp_table);
   //dump_atom_table(&samp_table);
   //free_atom(&atom);
+  // Save fact in the form "assert ATOM;"
+  pce_save_fact(atom);
   return true;
 }
 
@@ -342,7 +589,7 @@ bool pce_fact(ICLTerm *goal) {
  */
 int pce_fact_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   if (pce_fact(goal)) {
-    pce_save(goal);
+    //pce_save(goal);
     return true;
   } else {
     return false;
@@ -570,7 +817,6 @@ void pce_install_rule(ICLTerm *Formula, double weight) {
       }
       add_internal_clause(&samp_table, clause_buffer.data,
 			  clauses[i]->num_lits, weight);
-      safe_free(clauses[i]);
     } else {
       int32_t current_rule = rule_table->num_rules;
       samp_rule_t *new_rule = clauses[i];
@@ -587,6 +833,10 @@ void pce_install_rule(ICLTerm *Formula, double weight) {
       if (!lazy_pce) {
 	all_rule_instances(current_rule, &samp_table);
       }
+    }
+    pce_save_clause(clauses[i]);
+    if (clauses[i]->num_vars == 0) {
+      safe_free(clauses[i]);
     }
   }
   cprintf(2, "Processed %d clauses\n", i);
@@ -631,7 +881,7 @@ bool pce_learner_assert(ICLTerm *goal) {
   }
   lid = icl_Str(Lid);
   if (pce_learner_assert_internal(lid, Formula, Weight)) {
-    pce_save(goal);
+    //pce_save(goal);
     return true;
   } else {
     return false;
@@ -704,7 +954,7 @@ bool pce_learner_assert_list(ICLTerm *goal) {
 int pce_learner_assert_list_callback(ICLTerm *goal, ICLTerm *params,
 				     ICLTerm *solutions) {
   if (pce_learner_assert_list(goal)) {
-    pce_save(goal);
+    //pce_save(goal);
     return true;
   } else {
     return false;
@@ -1423,7 +1673,7 @@ int32_t pce_update_model() {
   atom_table_t *atom_table;
   pred_table_t *pred_table;
   const_table_t *const_table;
-  ICLTerm *Retract, *BecameTrueWeights, *Flag, *Pair, *Callback, *Out, *Sol;
+  ICLTerm *Retract, *BecameTrueWeights, *Flag, *Pair, *Callback, *Out, *Sol, *Nlist;
   int32_t i, j, cur;
   double prob;
   bool was_true;
@@ -1434,7 +1684,6 @@ int32_t pce_update_model() {
   icl_atoms_resize(atom_table->num_vars);
   Retract = icl_NewList(NULL);
   BecameTrueWeights = icl_NewList(NULL);
-  Flag = pce_model.size == 0 ? icl_NewStr("full") : icl_NewStr("incremental");
   Out = NULL;
   Sol = NULL;
   for (i = 0; i < atom_table->num_vars; i++) {
@@ -1470,12 +1719,18 @@ int32_t pce_update_model() {
   pce_model.size = cur;
 
   if (icl_ListLen(Retract) > 0 || icl_ListLen(BecameTrueWeights) > 0) {
+    Flag = pce_model.size == 0 ? icl_NewStr("full") : icl_NewStr("incremental");
     Callback = icl_NewStruct("pce_update_model_callback", 3, Retract, BecameTrueWeights, Flag);
-    oaa_Solve(Callback, icl_NewList(NULL), &Out, &Sol);
+    Nlist = icl_NewList(NULL);
+    oaa_Solve(Callback, Nlist, &Out, &Sol);
     pce_log("pce_update_model_callback: Retract %d, BecameTrueWeights %d, Flag %s",
 	    icl_ListLen(Retract), icl_ListLen(BecameTrueWeights), icl_Str(Flag));
     printf("pce_update_model_callback: Retract %d, BecameTrueWeights %d, Flag %s\n",
 	   icl_ListLen(Retract), icl_ListLen(BecameTrueWeights), icl_Str(Flag));
+    icl_FreeTerm(Callback);
+    icl_FreeTerm(Nlist);
+    icl_FreeTerm(Out);
+    icl_FreeTerm(Sol);
   }
   return true;
 }
@@ -1723,6 +1978,7 @@ static void qm_buffer_resize() {
 // Check the availablity of the Query Manager
 bool qm_available() {
   ICLTerm *Agtdata, *Params, *Out, *Result;
+  bool result;
 
   Params = icl_NewTermFromString("[block(true)]");
   Agtdata = icl_NewTermFromString("agent_data(Address, Type, ready, Solvables, 'QueryManager', Info)");
@@ -1730,37 +1986,29 @@ bool qm_available() {
   Result = NULL;
 
   oaa_Solve(Agtdata, Params, &Out, &Result);
-  return icl_NumTerms(Result) == 0 ? false : true;
+  result = (icl_NumTerms(Result) != 0);
+  icl_FreeTerm(Params);
+  icl_FreeTerm(Agtdata);
+  icl_FreeTerm(Out);
+  icl_FreeTerm(Result);
+  return result;
 }
 
-ICLTerm *empty_params = NULL;
-
-static void get_qm_instances(samp_table_t *table) {
-  pred_table_t *pred_table;
-  pred_tbl_t *evpred_tbl;
+void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
   const_table_t *const_table;
   char *pred, *query, argstr[8], *inststr, *cname, *bindingstr;
-  int32_t i, j, k, arity, qsize, *psig, cidx, newconsts;
+  int32_t i, j, k, arity, bnum, qsize, *psig, cidx, newconsts;
   int success;
   bool error;
-  ICLTerm *callback, *Instances, *Answer, *Bindings, *Params, *Binding, *Arg, *Out;
-  time_t start_time;
+  ICLTerm *callback, *Instances, *Answer, *Bindings, *Params, *Binding, *CBinding, *Arg, *Out;
 
-  if (!qm_available()) {
-    printf("QueryManager not yet available\n");
-    return;
-  }
-
-  Binding = NULL;
-  start_time = time(NULL);
-  pred_table = &table->pred_table;
-  evpred_tbl = &pred_table->evpred_tbl;
   const_table = &table->const_table;
-  for (i = 0; i<evpred_tbl->num_preds; i++) {
-    pred = evpred_tbl->entries[i].name;
-    arity = evpred_tbl->entries[i].arity;
+  Binding = NULL;
+  for (i = 0; i<pred_tbl->num_preds; i++) {
+    pred = pred_tbl->entries[i].name;
+    arity = pred_tbl->entries[i].arity;
     if (arity > 0) {
-      psig = evpred_tbl->entries[i].signature;
+      psig = pred_tbl->entries[i].signature;
       if (i >= qm_buffer.size) {
 	// Now we build the query - has the form
 	//  query(query_pattern('(PRED ?x01 ?x02)'),[answer_pattern('[{?x01},{?x02}]')],Results)
@@ -1783,6 +2031,7 @@ static void get_qm_instances(samp_table_t *table) {
 	strcat(query, "]')],Results)");
 	assert(strlen(query) == qsize-1);
 	callback = icl_NewTermFromData(query, qsize);
+	safe_free(query);
 	qm_buffer_resize();
 	assert(qm_buffer.size < qm_buffer.capacity);
 	qm_buffer.size += 1;
@@ -1794,7 +2043,7 @@ static void get_qm_instances(samp_table_t *table) {
 	//oaa_Solve(callback, NULL, NULL, Instances);
 	//      callback = icl_NewTermFromString("foo(X)");
 	Instances = NULL;
-	cprintf(1, "Calling query manager for predicate %s", pred);
+	cprintf(1, "Calling QM for instances of predicate %s\n", pred);
 	fflush(stdout);
 	if (empty_params == NULL) {
 	  empty_params = icl_NewTermFromString("[]");
@@ -1831,6 +2080,7 @@ static void get_qm_instances(samp_table_t *table) {
 	    if (error) {
 	      // Assume this means the predicate is unknown - set query to NULL
 	      cprintf(1, ": unknown\n");
+	      icl_FreeTerm(qm_buffer.entry[i]->query);
 	      qm_buffer.entry[i]->query = NULL;
 	    } else {
 	      newconsts = 0;
@@ -1844,49 +2094,77 @@ static void get_qm_instances(samp_table_t *table) {
 		    bindingstr[k] = '\'';
 		  }
 		}
-		Binding = icl_NewTermFromString(bindingstr);
-		assert(icl_IsList(Binding));
-		for (k = 0; k < arity; k++) {
-		  Arg = icl_NthTerm(Binding, k+1);
-		  if (icl_IsStr(Arg)) {
-		    cname = icl_Str(Arg);
-		    cidx = const_index(cname, const_table);
-		    if (cidx == -1) {
-		      newconsts += 1;
+		CBinding = icl_NewTermFromString(bindingstr);
+		safe_free(bindingstr);
+		assert(icl_IsList(CBinding));
+		bnum = icl_NumTerms(CBinding);
+		if (bnum == arity) {
+		  for (k = 0; k < arity; k++) {
+		    Arg = icl_NthTerm(CBinding, k+1);
+		    if (icl_IsStr(Arg)) {
+		      cname = icl_Str(Arg);
+		      cidx = const_index(cname, const_table);
+		      if (cidx == -1) {
+			newconsts += 1;
+			inststr = icl_NewStringFromTerm(Arg);
+			fprintf(stderr, "Adding new constant %s\n", inststr);
+			icl_stFree(inststr);
+			pce_add_const(cname, table);
+		      }
+		    } else {
 		      inststr = icl_NewStringFromTerm(Arg);
-		      fprintf(stderr, "Adding new constant %s\n", inststr);
+		      fprintf(stderr, "Arg is %s\n", inststr);
 		      icl_stFree(inststr);
-		      pce_add_const(cname, psig[k], table);
+		      char *icltype =
+			icl_IsList(Arg) ? "List" :
+			icl_IsGroup(Arg) ? "Group" :
+			icl_IsStruct(Arg) ? "Struct" :
+			icl_IsVar(Arg) ? "Var" :
+			icl_IsInt(Arg) ? "Int" :
+			icl_IsFloat(Arg) ? "Float" :
+			icl_IsDataQ(Arg) ? "DataQ" :
+			icl_IsValid(Arg) ? "Valid" : "Invalid";
+		      fprintf(stderr, "Query Manager returned a %s for binding no. %"PRId32" (0-based):\n", icltype, k);
+		      query = icl_NewStringFromTerm(callback);
+		      inststr = icl_NewStringFromTerm(Instances);
+		      fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);
+		      icl_stFree(query);
+		      icl_stFree(inststr);
 		    }
-		  } else {
-		    inststr = icl_NewStringFromTerm(Arg);
-		    fprintf(stderr, "Arg is %s\n", inststr);
-		    icl_stFree(inststr);
-		    char *icltype =
-		      icl_IsList(Arg) ? "List" :
-		      icl_IsGroup(Arg) ? "Group" :
-		      icl_IsStruct(Arg) ? "Struct" :
-		      icl_IsVar(Arg) ? "Var" :
-		      icl_IsInt(Arg) ? "Int" :
-		      icl_IsFloat(Arg) ? "Float" :
-		      icl_IsDataQ(Arg) ? "DataQ" :
-		      icl_IsValid(Arg) ? "Valid" : "Invalid";
-		    fprintf(stderr, "Query Manager returned a %s for binding no. %"PRId32" (0-based):\n", icltype, k);
-		    query = icl_NewStringFromTerm(callback);
-		    inststr = icl_NewStringFromTerm(Instances);
-		    fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);
-		    icl_stFree(query);
-		    icl_stFree(inststr);
 		  }
+		} else {
+		  fprintf(stderr, "Query Manager returned %"PRId32" arguments for %s, expected %"PRId32"\n",
+			  bnum, pred, arity);
 		}
+		icl_FreeTerm(CBinding);
 	      }
-	    cprintf(1, " %d instances, %d new constants\n", icl_NumTerms(Binding), newconsts);
+	      cprintf(1, " %d instances, %d new constants\n", icl_NumTerms(Bindings), newconsts);
 	    }
 	  }
 	}
+	icl_FreeTerm(Out);
+	icl_FreeTerm(Instances);
       }
     }
   }
+}
+
+static void get_qm_instances(samp_table_t *table) {
+  pred_table_t *pred_table;
+  time_t start_time;
+  static bool first_time = true;
+
+  if (!qm_available()) {
+    printf("QueryManager not yet available\n");
+    return;
+  }
+  start_time = time(NULL);
+  pred_table = &table->pred_table;
+  if (first_time) {
+    get_predtbl_qm_instances(&pred_table->pred_tbl, table);
+    first_time = false;
+  }
+  get_predtbl_qm_instances(&pred_table->evpred_tbl, table);
   cprintf(1, "Query Manager calls took %d sec\n", time(NULL) - start_time); 
 }
 
@@ -1915,6 +2193,8 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
     }
     printf("Calling pce_update_model\n");
     pce_update_model();
+    printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
+    fflush(stdout);
     time(&idle_timer);
   }
   // Should these be saved?
@@ -2135,12 +2415,9 @@ static rule_literal_t *** icl_to_cnf_literal(ICLTerm *formula, bool neg) {
 static rule_literal_t *icl_to_rule_literal(ICLTerm *formula, bool neg) {
   ICLTerm *Arg;
   pred_table_t *pred_table = &samp_table.pred_table;
-  const_table_t *const_table = &samp_table.const_table;
-  int32_t i, j, num_args;
-  char *icl_string;
-  char *pred, *var;
-  int32_t *psig;
-  int32_t pred_val, pred_idx;
+  sort_table_t *sort_table = &samp_table.sort_table;
+  int32_t i, j, num_args, pred_val, pred_idx, const_idx, *psig, vsig, subsig;
+  char *icl_string, *pred, *var, *cname;
   samp_atom_t *atom;
   rule_literal_t *lit;
   
@@ -2182,14 +2459,48 @@ static rule_literal_t *icl_to_rule_literal(ICLTerm *formula, bool neg) {
 	// Copy the string
 	rules_vars_buffer.vars[rules_vars_buffer.size]->name = str_copy(var);
 	rules_vars_buffer.vars[rules_vars_buffer.size++]->sort_index = psig[i];
+      } else {
+	// Check the signature, and adjust to the least common supersort
+	vsig = rules_vars_buffer.vars[j]->sort_index;
+	subsig = greatest_common_subsort(vsig, psig[i], sort_table);
+	if (subsig != vsig) {
+	  if (subsig == -1) {
+	    pce_error("Variable %s used with incompatible sorts %s and %s",
+		      var, sort_table->entries[vsig].name, sort_table->entries[psig[i]].name);
+	    return NULL;
+	  }
+	  rules_vars_buffer.vars[j]->sort_index = subsig;
+	}
       }
       // Variables are negated indices into the var array, which will match
       // the names_buffer.  Need to add one in order not to hit zero.
       atom->args[i] = -(j + 1);
     } else {
-      // Add the constant, of sort corresponding to the pred
-      pce_add_const(icl_Str(Arg), psig[i], &samp_table);
-      atom->args[i] = const_index(icl_Str(Arg), const_table);
+      cname = icl_Str(Arg);
+      // Add the constant - note that the sort may be a subsort of the
+      // corresponding predicate argument sort
+      const_idx = pce_add_const(cname, &samp_table);
+      if (const_idx == -1) {
+	// rdf:type is not available - get out
+	pce_error("Error adding constant %s\n", cname);
+	return NULL;
+      } else {
+	// Check that const is in the predicate sort
+	sort_entry_t *sort_entry = &samp_table.sort_table.entries[psig[i]];
+	bool foundit = false;
+	for (j = 0; j < sort_entry->cardinality; j++) {
+	  if (sort_entry->constants[j] == const_idx) {
+	    foundit = true;
+	    break;
+	  }
+	}
+	if (!foundit) {
+	  pce_error("Sort error: constant %s of sort %s\n does not match pred %s arg %d sort %s\n",
+		    cname, const_sort_name(const_idx,&samp_table), pred, i+1, sort_entry->name);
+	  return NULL;
+	}
+      }
+      atom->args[i] = const_idx;
     }
   }
   //print_atom(atom, &samp_table);
@@ -2261,6 +2572,8 @@ static void names_buffer_resize(names_buffer_t *nbuf) {
   }
 }
 
+// Creates a NULL-terminated copy of the names_buffer
+// Note that the name strings themselves are not copied
 static char **names_buffer_copy(names_buffer_t *nbuf) {
   char **names;
   int32_t i;
@@ -2283,7 +2596,7 @@ static void pce_error(const char *fmt, ...) {
   if (pce_log_fp != NULL) {
     va_start(argp, fmt);
     vfprintf(pce_log_fp, fmt, argp);
-    vprintf(pce_log_fp, "\n");
+    fprintf(pce_log_fp, "\n");
     va_end(argp);
   }
   printf("\n");
@@ -2428,79 +2741,6 @@ int setup_oaa_connection(int argc, char *argv[]) {
   return true;
 }
 
-void process_save_file_cmd(char *goal) {
-  ICLTerm *Goal;
-  int32_t len;
-
-  if (goal == NULL) {
-    return;
-  }
-  len = strlen(goal);
-  Goal = icl_NewTermFromData(goal, len);
-  
-  // We assume the Goal is well-formed
-  if (Goal == NULL) {
-    pce_error("pce.persist: %s not parseable", goal);
-    return;
-  }
-  if (strcmp(icl_Functor(Goal), "pce_fact") == 0) {
-    pce_fact(Goal);
-  } else if (strcmp(icl_Functor(Goal), "pce_learner_assert") == 0) {
-    pce_learner_assert(Goal);
-  } else if (strcmp(icl_Functor(Goal), "pce_learner_assert_list") == 0) {
-    pce_learner_assert_list(Goal);
-  } else {
-    fprintf(stderr, "Something's wrong: save file contains\n  %s\n", goal);
-  }
-  icl_Free(Goal);
-}
-
-bool load_save_file(char *curdir) {
-  bool save_file_exists;
-  int32_t i;
-  int32_t readbufsize;
-  static char *readbuf;
-  char *copy;
-  char c;
-
-  readbufsize = 80;
-  readbuf = (char *) safe_malloc(readbufsize * sizeof(char));
-  
-  // Open the save file, and restore previous sessions
-  save_file_exists = (access(pce_save_file, F_OK) == 0);
-  pce_save_fp = fopen(pce_save_file, "a+");
-  if (pce_save_fp == NULL) {
-    char* err = (char *)
-      safe_malloc((strlen(curdir) + strlen(pce_save_file) + 15) * sizeof(char));
-    strncpy(err, "Error opening ", 15);
-    strcat(err, getenv("PWD"));
-    strcat(err, pce_save_file);
-    perror(err);
-    safe_free(err);
-    return false;
-  }
-  if (save_file_exists) {
-    i = 0;
-    while ((c = fgetc(pce_save_fp)) != EOF) {
-      if (c == '\n') {
-	readbuf[i] = '\0';
-	copy = str_copy(readbuf);
-	process_save_file_cmd(copy);
-	safe_free(copy);
-	i = 0;
-      } else {
-	if (i + 1 >= readbufsize) {
-	  readbufsize += readbufsize/2;
-	  readbuf = (char *)
-	    safe_realloc(readbuf, readbufsize * sizeof(char));
-	}
-	readbuf[i++] = c;
-      }
-    }
-  }
-  return true;
-}
-
 void create_log_file(char *curdir) {
   time_t t;
   struct tm *tmp;
@@ -2532,23 +2772,40 @@ int main(int argc, char *argv[]){
   create_log_file(curdir);
   
   // Initialize OAA
+  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
+  fflush(stdout);
   pce_log("Initializing OAA\n");
   printf("Initializing OAA\n");
   oaa_Init(argc, argv);
+  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
+  fflush(stdout);
   if (!setup_oaa_connection(argc, argv)) {
     pce_error("Could not set up OAA connections...exiting\n");
     return EXIT_FAILURE;
   }
+  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
+  fflush(stdout);
   
   init_samp_table(&samp_table);
+  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
+  fflush(stdout);
 
   pce_log("Loading %s/%s\n", curdir, pce_init_file);
   printf("Loading %s/%s\n", curdir, pce_init_file);
   load_mcsat_file(pce_init_file, &samp_table);
-  if (!load_save_file(curdir)) {
-    return EXIT_FAILURE;
+  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
+  fflush(stdout);
+  if (access(pce_save_file, F_OK) == 0) {
+    pce_log("Loading %s/%s\n", curdir, pce_save_file);
+    printf("Loading %s/%s\n", curdir, pce_save_file);
+    load_mcsat_file(pce_save_file, &samp_table);
+  } else {
+    pce_log("%s/%s not found\n", curdir, pce_save_file);
+    printf("%s/%s not found\n", curdir, pce_save_file);  
   }
-  
+  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
+  fflush(stdout);
+  pce_save_fp = fopen(pce_save_file, "a+");  
   pce_log("Entering MainLoop\n");
   printf("Entering MainLoop\n");
   oaa_MainLoop(true);
