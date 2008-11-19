@@ -11,6 +11,8 @@
 #include "parser.h"
 #include "vectors.h"
 #define YYDEBUG 1
+#define YYERROR_VERBOSE 1
+#define YYINCLUDED_STDLIB_H 1
 
 extern void free_parse_data();
 
@@ -21,12 +23,8 @@ static char yystrbuf[1000];
 static pvector_t yyargs;
 static pvector_t yylits;
 FILE *parse_input;
-  
-void yyerror (char *str) {
-  printf("pce: %s\n", str);
-  input_command.kind = 0;
-  yyerrflg = true;
-};
+
+void yyerror (char *str);
 
 char **copy_yyargs() {
   char **arg;
@@ -145,6 +143,11 @@ bool yy_check_float(char *str) {
   void yy_sortdecl (char *name) {
     input_command.kind = SORT;
     input_command.decl.sortdecl.name = name;
+  };
+  void yy_subsortdecl (char *subsort, char *supersort) {
+    input_command.kind = SUBSORT;
+    input_command.decl.subsortdecl.subsort = subsort;
+    input_command.decl.subsortdecl.supersort = supersort;
   };
   void yy_preddecl (input_atom_t *atom, bool witness) {
     input_command.kind = PREDICATE;
@@ -332,8 +335,9 @@ void yy_mcsatdecl (char **params) {
     input_command.decl.verbositydecl.level = atoi(level);
     safe_free(level);
   };
-  void yy_help () {
+  void yy_help (char* name) {
     input_command.kind = HELP;
+    input_command.decl.helpdecl.command = name;
   };
   void yy_quit () {
     input_command.kind = QUIT;
@@ -345,6 +349,7 @@ void yy_mcsatdecl (char **params) {
 %token DIRECT
 %token INDIRECT
 %token SORT
+%token SUBSORT
 %token CONST
 %token VAR
 %token ATOM
@@ -375,7 +380,7 @@ void yy_mcsatdecl (char **params) {
   input_atom_t *atom;
 }
 
-%type <str> arg NAME NUM STRING addwt oarg
+%type <str> arg NAME NUM STRING addwt oarg oname
 %type <strs> arguments variables oarguments
 %type <clause> clause
 %type <lit> literal 
@@ -389,6 +394,8 @@ void yy_mcsatdecl (char **params) {
   yyargs.size = 0;
   yylits.size = 0;
   yyerrflg = false;
+  yylloc.first_line = yylloc.last_line = 1;
+  yylloc.first_column = yylloc.last_column = 0;
  }
 
 /* Add sorts, declarations (var, const have sorts)
@@ -410,6 +417,7 @@ command: decl ';' {if (yyerrflg) {yyerrflg=false; YYABORT;} else {YYACCEPT;}}
        | QUIT {yy_quit(); YYACCEPT;}; 
 
 decl: SORT NAME {yy_sortdecl($2);}
+    | SUBSORT NAME NAME {yy_subsortdecl($2, $3);}
     | PREDICATE atom witness {yy_preddecl($2, $3);}
     | CONST arguments ':' NAME {yy_constdecl($2, $4);}
     | VAR arguments ':' NAME {yy_vardecl($2, $4);}
@@ -422,8 +430,8 @@ decl: SORT NAME {yy_sortdecl($2);}
     | DUMPTABLES {yy_dumptables();}
     | LOAD STRING {yy_load($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
-    | TEST {yy_test();}
-    | HELP {yy_help();}
+    | TEST {yy_test(@1);}
+    | HELP oname {yy_help($2);}
     ;
 
 witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;}
@@ -466,6 +474,8 @@ arg: NAME | NUM; // returns string from yystrings
 
 addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
 
+oname: /* empty */ {$$=NULL;} | NAME;
+
 %%
 
 int isidentchar(int c) {
@@ -479,10 +489,17 @@ int skip_white_space_and_comments (void) {
   do {
     do {
       c = getc(parse_input);
+      if (c == '\n') {
+	++yylloc.last_line;
+	yylloc.last_column = 0;
+      } else {
+	++yylloc.last_column;
+      }
     } while (isspace(c));
     if (c == '#') {
       do {
 	c = getc(parse_input);
+	++yylloc.last_column;
       } while (c != '\n' && c != EOF);
     } else {
       return c;
@@ -497,6 +514,8 @@ int yylex (void) {
   char *nstr;
   
   c = skip_white_space_and_comments();
+  yylloc.first_line = yylloc.last_line;
+  yylloc.first_column = yylloc.last_column;
 
   /* process numbers - note that we process for as long as it could be a
      legitimate number, but return the string, so that numbers may be used
@@ -518,9 +537,11 @@ int yylex (void) {
       };
       yystrbuf[i++] = c;
       c = getc(parse_input);
+      ++yylloc.last_column;
     } while (c != EOF && (isdigit(c) || c == '.'));
     yystrbuf[i] = '\0';
     ungetc(c, parse_input);
+    --yylloc.last_column;
     yylval.str = yystrbuf;
     if (! have_digit)
       yyerror("Malformed number - '.', '+', '-' must have following digits");
@@ -533,9 +554,11 @@ int yylex (void) {
     do {
       yystrbuf[i++] = c;
       c = getc(parse_input);
+      ++yylloc.last_column;      
     } while (c != EOF && isidentchar(c));
     yystrbuf[i] = '\0';
     ungetc(c, parse_input);
+    --yylloc.last_column;
     yylval.str = yystrbuf;
     if (strcasecmp(yylval.str, "PREDICATE") == 0)
       return PREDICATE;
@@ -545,6 +568,8 @@ int yylex (void) {
       return INDIRECT;
     else if (strcasecmp(yylval.str, "SORT") == 0)
       return SORT;
+    else if (strcasecmp(yylval.str, "SUBSORT") == 0)
+      return SUBSORT;
     else if (strcasecmp(yylval.str, "CONST") == 0)
       return CONST;
     else if (strcasecmp(yylval.str, "VAR") == 0)
@@ -583,6 +608,7 @@ int yylex (void) {
     // At the moment, escapes not recognized
     do {
       c = getc(parse_input);
+      ++yylloc.last_column;      
       if (c == '\"' || c == EOF) {
         break;
       } else {
@@ -599,6 +625,7 @@ int yylex (void) {
     // At the moment, escapes not recognized
     do {
       c = getc(parse_input);
+      ++yylloc.last_column;      
       if (c == '\'' || c == EOF) {
         break;
       } else {
@@ -631,6 +658,11 @@ void free_preddecl_data() {
 
 void free_sortdecl_data() {
   safe_free(input_command.decl.sortdecl.name);
+}
+
+void free_subsortdecl_data() {
+  safe_free(input_command.decl.subsortdecl.subsort);
+  safe_free(input_command.decl.subsortdecl.supersort);
 }
 
 void free_constdecl_data() {
@@ -702,6 +734,10 @@ void free_parse_data () {
     free_sortdecl_data();
     break;
   }
+  case SUBSORT: {
+    free_subsortdecl_data();
+    break;
+  }
   case CONST: {
     free_constdecl_data();
     break;
@@ -757,6 +793,11 @@ void free_parse_data () {
   }
 }
 
+void yyerror (char *str) {
+  printf("pce:%d: %s\n", yylloc.first_line, str);
+  input_command.kind = 0;
+  yyerrflg = true;
+};
 
 // Local variables:
 // c-electric-flag: nil
