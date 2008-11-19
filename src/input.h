@@ -25,6 +25,11 @@ typedef struct input_sortdecl_s {
   char *name;
 } input_sortdecl_t;
 
+typedef struct input_subsortdecl_s {
+  char *subsort;
+  char *supersort;
+} input_subsortdecl_t;
+
 typedef struct input_constdecl_s {
   int32_t num_names;
   char **name;
@@ -73,12 +78,17 @@ typedef struct input_loaddecl_s {
   char *file;
 } input_loaddecl_t;
 
+typedef struct input_helpdecl_s {
+  char *command;
+} input_helpdecl_t;
+
 typedef struct input_verbositydecl_s {
   int32_t level;
 } input_verbositydecl_t;
 
 typedef union input_decl_s {
   input_sortdecl_t sortdecl;
+  input_subsortdecl_t subsortdecl;
   input_preddecl_t preddecl;
   input_constdecl_t constdecl;
   input_vardecl_t vardecl;
@@ -90,6 +100,7 @@ typedef union input_decl_s {
   input_resetdecl_t resetdecl;
   input_loaddecl_t loaddecl;
   input_verbositydecl_t verbositydecl;
+  input_helpdecl_t helpdecl;
 } input_decl_t;
 
 typedef struct input_command_s {
