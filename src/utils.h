@@ -65,7 +65,6 @@ static inline samp_truth_value_t negate_tval(samp_truth_value_t v){
     return v_undef;
   }
 }
-  
 
 typedef struct clause_buffer_s {
   int32_t size;
@@ -107,6 +106,7 @@ extern substit_buffer_t substit_buffer;
 
 extern void substit_buffer_resize(int32_t length);
 
+extern char *const_sort_name(int32_t const_idx, samp_table_t *table);
 
 extern bool assigned_undef(samp_truth_value_t value);
 extern bool assigned_true(samp_truth_value_t value);
@@ -127,5 +127,8 @@ extern clause_buffer_t clause_buffer;
 
 extern void clause_buffer_resize(int32_t length);
 
+extern bool subsort_p(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
+extern int32_t least_common_supersort(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
+extern int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
 
 #endif /* __UTILS_H */     
