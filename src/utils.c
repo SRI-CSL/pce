@@ -168,6 +168,15 @@ void substit_buffer_resize(int32_t length) {
   }
 }
 
+char *const_sort_name(int32_t const_idx, samp_table_t *table) {
+  sort_table_t *sort_table = &table->sort_table;
+  const_table_t *const_table = &table->const_table;
+  int32_t const_sig;
+
+  const_sig = const_table->entries[const_idx].sort_index;
+  return sort_table->entries[const_sig].name;
+}
+
 void free_atom(input_atom_t *atom) {
   int32_t i;
 
@@ -200,6 +209,7 @@ void free_literals (input_literal_t **lit) {
 void free_clause(input_clause_t *clause) {
   free_strings(clause->variables);
   free_literals(clause->literals);
+  safe_free(clause);
 }
 
 void free_strings (char **string) {
@@ -213,3 +223,89 @@ void free_strings (char **string) {
     }
   }
 }
+
+bool subsort_p(int32_t sig1, int32_t sig2, sort_table_t *sort_table) {
+  int32_t i;
+  sort_entry_t *ent2;
+  if (sig1 == sig2) {
+    return true;
+  }
+  ent2 = &sort_table->entries[sig2];
+  if (ent2->supersorts != NULL) {
+    for (i = 0; ent2->supersorts[i] != -1; i++) {
+      if (ent2->supersorts[i] == sig1) {
+	return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Return a (not necessarily unique) least common supersort, or -1 if there is none
+int32_t least_common_supersort(int32_t sig1, int32_t sig2, sort_table_t *sort_table) {
+  int32_t i, j, lcs;
+  sort_entry_t *ent1, *ent2;
+  
+  if (sig1 == sig2) {
+    return sig1;
+  }
+  // First check if one is a subsort of the other
+  if (subsort_p(sig1, sig2, sort_table)) {
+    return sig2;
+  } else if (subsort_p(sig2, sig1, sort_table)) {
+    return sig1;
+  } else {
+    ent1 = &sort_table->entries[sig1];
+    ent2 = &sort_table->entries[sig2];
+    // Now the tricky one
+    if (ent1->supersorts == NULL || ent2->supersorts == NULL) {
+      return -1;
+    }
+    lcs = -1;
+    for (i = 0; ent1->supersorts[i] != -1; i++) {
+      for (j = 0; ent2->supersorts[j] != -1; j++) {
+	if (ent1->supersorts[i] == ent2->supersorts[j]) {
+	  if (lcs == -1 || subsort_p(ent1->supersorts[i], lcs, sort_table)) {
+	    lcs = ent1->supersorts[i];
+	  }
+	}
+      }
+    }
+    return lcs;
+  }
+}
+
+// Return a (not necessarily unique) greatest common subsort, or -1 if there is none
+int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_table) {
+  int32_t i, j, gcs;
+  sort_entry_t *ent1, *ent2;
+
+  if (sig1 == sig2) {
+    return sig1;
+  }
+  // First check if one is a subsort of the other
+  if (subsort_p(sig1, sig2, sort_table)) {
+    return sig1;
+  } else if (subsort_p(sig2, sig1, sort_table)) {
+    return sig2;
+  } else {
+    ent1 = &sort_table->entries[sig1];
+    ent2 = &sort_table->entries[sig2];
+    // Now the tricky one
+    if (ent1->subsorts == NULL || ent2->subsorts == NULL) {
+      return -1;
+    }
+    gcs = -1;
+    for (i = 0; ent1->subsorts[i] != -1; i++) {
+      for (j = 0; ent2->subsorts[j] != -1; j++) {
+	if (ent1->subsorts[i] == ent2->subsorts[j]) {
+	  if (gcs == -1 || subsort_p(gcs, ent1->subsorts[i], sort_table)) {
+	    gcs = ent1->subsorts[i];
+	  }
+	}
+      }
+    }
+    return gcs;
+  }
+}
+      
