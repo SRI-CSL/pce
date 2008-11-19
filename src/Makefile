@@ -41,7 +41,7 @@ bindir := $(BUILD)/bin
 # source files for the library
 #
 src_c := array_hash_map.c gcd.c hash_functions.c input.c int_array_sort.c \
-	 integer_stack.c int_stack.c mcsat.c memalloc.c samplesat.c \
+	 integer_stack.c int_stack.c mcsat.c memalloc.c memsize.c samplesat.c \
 	 lazysamplesat.c string_heap.c tables.c symbol_tables.c utils.c \
          vectors.c parser.c print.c yacc.tab.c
 ifneq ($(OAACFLAGS),)
