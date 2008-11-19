@@ -1700,10 +1700,10 @@ bool check_clause_instance(samp_table_t *table,
 // based on the predicate and its sorts
 
 void all_rule_instances_rec(int32_t vidx,
-			      samp_rule_t *rule,
-			      samp_table_t *table,
-			      bool lazy,
-			      int32_t atom_index) {
+			    samp_rule_t *rule,
+			    samp_table_t *table,
+			    bool lazy,
+			    int32_t atom_index) {
   if(substit_buffer.entries[vidx].fixed) {
     // Simply do the substitution, or go to the next var
     if (vidx == rule->num_vars - 1) {
@@ -1713,7 +1713,7 @@ void all_rule_instances_rec(int32_t vidx,
       all_rule_instances_rec(vidx+1, rule, table, lazy, atom_index);
     }
   } else {
-    sort_table_t *sort_table = &(table->sort_table);
+    sort_table_t *sort_table = &table->sort_table;
     int32_t vsort = rule->vars[vidx]->sort_index;
     sort_entry_t entry = sort_table->entries[vsort];
     int32_t i;
@@ -1733,7 +1733,7 @@ void all_rule_instances_rec(int32_t vidx,
 
 // Eager - called by MCSAT when a new rule is added.
 void all_rule_instances(int32_t rule_index, samp_table_t *table) {
-  rule_table_t *rule_table = &(table->rule_table);
+  rule_table_t *rule_table = &table->rule_table;
   samp_rule_t *rule = rule_table->samp_rules[rule_index];
   substit_buffer_resize(rule->num_vars);
   int32_t i;
