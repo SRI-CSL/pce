@@ -139,6 +139,8 @@ typedef struct sort_entry_s {
   int32_t cardinality; //number of elements in sort i
   char *name;//print name of the sort
   int32_t *constants; //array of constants in the given sort
+  int32_t *subsorts; // array of subsort indices
+  int32_t *supersorts; // array of supersort indices
 } sort_entry_t;
   
 typedef  struct sort_table_s {
@@ -343,6 +345,10 @@ extern void init_const_table(const_table_t *const_table);
 extern int32_t const_index(char *name, const_table_t *const_table);
 
 extern int32_t const_sort_index(int32_t const_index, const_table_t *const_table);
+
+extern void add_const_to_sort(int32_t const_index,
+			      int32_t sort_index,
+			      sort_table_t *sort_table);
 
 extern int32_t var_index(char *name, var_table_t *var_table);
 
