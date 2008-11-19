@@ -34,7 +34,7 @@ static void sort_table_resize(sort_table_t *sort_table, uint32_t n){
   sort_table->size = n; 
 }
 
-void add_sort(sort_table_t *sort_table, char *name){
+void add_sort(sort_table_t *sort_table, char *name) {
   int32_t index = stbl_find(&(sort_table->sort_name_index), name);
   if (index == -1){//sort is not in the symbol table
     int32_t n = sort_table->num_sorts;
@@ -47,6 +47,8 @@ void add_sort(sort_table_t *sort_table, char *name){
     sort_table->entries[n].cardinality = 0;
     sort_table->entries[n].constants =
       (int32_t *) safe_malloc(INIT_SORT_CONST_SIZE * sizeof(int32_t));
+    sort_table->entries[n].subsorts = NULL;
+    sort_table->entries[n].supersorts = NULL;
     sort_table->num_sorts++;
     stbl_add(&(sort_table->sort_name_index), name, n);
   }
@@ -75,6 +77,150 @@ int32_t *sort_signature(char **in_signature,
   return signature;
 }
 
+void add_new_supersort(sort_entry_t *entry, int32_t supidx) {
+  int32_t size;
+  
+  if (entry->supersorts == NULL) {
+    entry->supersorts = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+    entry->supersorts[0] = supidx;
+    entry->supersorts[1] = -1;
+  } else {
+    for (size = 0; entry->supersorts[size] != -1; size++) { }
+    entry->supersorts = (int32_t *)
+      safe_realloc(entry->supersorts, (size+2) * sizeof(int32_t));
+    entry->supersorts[size] = supidx;
+    entry->supersorts[size+1] = -1;
+  }
+}
+
+void add_new_subsort(sort_entry_t *entry, int32_t subidx) {
+  int32_t size;
+  
+  if (entry->subsorts == NULL) {
+    entry->subsorts = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+    entry->subsorts[0] = subidx;
+    entry->subsorts[1] = -1;
+  } else {
+    for (size = 0; entry->subsorts[size] != -1; size++) { }
+    entry->subsorts = (int32_t *)
+      safe_realloc(entry->subsorts, (size+2) * sizeof(int32_t));
+    entry->subsorts[size] = subidx;
+    entry->subsorts[size+1] = -1;
+  }
+}
+
+void add_subsort_consts_to_supersort(int32_t subidx, int32_t supidx,
+				     sort_table_t *sort_table) {
+  sort_entry_t subentry, supentry;
+  int32_t i, j;
+  bool foundit;
+
+  subentry = sort_table->entries[subidx];
+  supentry = sort_table->entries[supidx];
+  for (i = 0; i < subentry.cardinality; i++) {
+    foundit = false;
+    for (j = 0; j < supentry.cardinality; j++) {
+      if (subentry.constants[i] == supentry.constants[j]) {
+	foundit = true;
+	break;
+      }
+    }
+    if (! foundit) {
+      // Note that this alao adds to the supersorts of supentry
+      add_const_to_sort(subentry.constants[i], supidx, sort_table);
+    }
+  }
+}
+
+void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort) {
+  int32_t i, j, subidx, supidx;
+  sort_entry_t *subentry, *supentry;
+  bool foundit;
+
+  add_sort(sort_table, subsort); // Does nothing if already there
+  add_sort(sort_table, supersort);
+  
+  subidx = stbl_find(&(sort_table->sort_name_index), subsort);
+  supidx = stbl_find(&(sort_table->sort_name_index), supersort);
+  subentry = &sort_table->entries[subidx];
+  supentry = &sort_table->entries[supidx];
+
+  // Check if this is unnecessary
+  if (subidx == supidx) {
+    printf("Declaring %s as a subsort of itself has no effect\n", subsort);
+    return;
+  }
+  // Note that we only need to test one direction
+  if (supentry->subsorts != NULL) {
+    for (i = 0; supentry->subsorts[i] != -1; i++) {
+      if (supentry->subsorts[i] == subidx) {
+	printf("%s is already a subsort of %s; this delaration has no effect\n",
+	       subsort, supersort);
+	return;
+      }
+    }
+  }
+  // Now check for cirularities
+  if (supentry->supersorts != NULL) {
+    for (i = 0; supentry->supersorts[i] != -1; i++) {
+      if (supentry->supersorts[i] == subidx) {
+	printf("%s is a already supersort of %s; cannot be made a subsort\n",
+	       subsort, supersort);
+	return;
+      }
+    }
+  }
+  // Need to check both ways
+  if (subentry->subsorts != NULL) {
+    for (i = 0; subentry->subsorts[i] != -1; i++) {
+      if (subentry->subsorts[i] == supidx) {
+	printf("%s is a already subsort of %s; cannot be made a supersort\n",
+	       supersort, subsort);
+	return;
+      }
+    }
+  }
+  // Everything's OK, update the subentry supersorts and the supentry subsorts
+  if (supentry->supersorts != NULL) {
+    for (i = 0; supentry->supersorts[i] != -1; i++) {
+      foundit = false;
+      if (subentry->supersorts != NULL) {
+	for (j = 0; subentry->supersorts[j] != -1; j++) {
+	  if (supentry->supersorts[i] == subentry->supersorts[j]) {
+	    foundit = true;
+	    break;
+	  }
+	}
+      }
+      if (!foundit) {
+	add_new_supersort(subentry, supentry->supersorts[i]);
+      }
+    }
+  }
+  add_new_supersort(subentry, supidx);
+  if (subentry->subsorts != NULL) {
+    for (i = 0; subentry->subsorts[i] != -1; i++) {
+      foundit = false;
+      if (supentry->subsorts != NULL) {
+	for (j = 0; supentry->subsorts[j] != -1; j++) {
+	  if (subentry->subsorts[i] == supentry->subsorts[j]) {
+	    foundit = true;
+	    break;
+	  }
+	}
+      }
+      if (!foundit) {
+	add_new_subsort(supentry, subentry->subsorts[i]);
+      }
+    }
+  }
+  add_new_subsort(supentry, subidx);
+  assert(supentry->subsorts != NULL);
+  assert(subentry->supersorts != NULL);
+  // Finally, add constants of the subsort to the supersort
+  add_subsort_consts_to_supersort(subidx, supidx, sort_table);
+}
+
 /* The same functionality is repeated for constants
  */
 
@@ -99,10 +245,14 @@ static void const_table_resize(const_table_t *const_table, uint32_t n){
   const_table->size = n; 
 }
 
-static void add_const_to_sort(int32_t const_index,
+void add_const_to_sort(int32_t const_index,
 			      int32_t sort_index,
 			      sort_table_t *sort_table){
-  sort_entry_t *entry = &(sort_table->entries[sort_index]);
+  int32_t i, j;
+  bool foundit;
+  sort_entry_t *entry, *supentry;
+  
+  entry = &sort_table->entries[sort_index];  
   if (entry->size == entry->cardinality){
     if (MAXSIZE(sizeof(int32_t), 0) - entry->size < entry->size/2){
       out_of_memory();
@@ -112,6 +262,22 @@ static void add_const_to_sort(int32_t const_index,
 						entry->size * sizeof(int32_t));
     }
   entry->constants[entry->cardinality++] = const_index;
+  // Added it to this sort, now do its supersorts
+  if (entry->supersorts != NULL) {    
+    for (i = 0; entry->supersorts[i] != -1; i++) {
+      supentry = &sort_table->entries[entry->supersorts[i]];
+      foundit = false;
+      for (j = 0; j < supentry->cardinality; j++) {
+	if (supentry->constants[j] == const_index) {
+	  foundit = true;
+	  break;
+	}
+      }
+      if (!foundit) {
+	add_const_to_sort(const_index, entry->supersorts[i], sort_table);
+      }
+    }
+  }
 }
 
 // Internal form of add_const, checks if const already exists, and verifies
@@ -146,7 +312,10 @@ int32_t add_const_internal (char *name, int32_t sort_index,
     if (sort_index == const_table->entries[const_index].sort_index) {
       return 1;
     } else {
-      printf("Const %s previously declared.with a different sort\n", name);
+      printf("Const %s of sort %s may not be redeclared to sort %s\n",
+	     name,
+	     sort_table->entries[const_table->entries[const_index].sort_index].name,
+	     sort_table->entries[sort_index].name);
       return -1;
     }
   }
@@ -852,7 +1021,7 @@ bool valid_table(samp_table_t *table){
     return false;
   }
   if (!valid_atom_table(atom_table, pred_table, const_table, sort_table)) {
-    printf("Invalid atom_table\n");
+    printf("Invalid atom table\n");
     return false;
   }
   if (!valid_clause_table(clause_table, atom_table)) {
