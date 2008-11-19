@@ -154,6 +154,13 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	add_sort(sort_table, decl.name);
 	break;
       }
+      case SUBSORT: {
+	input_subsortdecl_t decl = input_command.decl.subsortdecl;
+	printf("Adding subsort %s of %s information\n",
+	       decl.subsort, decl.supersort);
+	add_subsort(sort_table, decl.subsort, decl.supersort);
+	break;
+      }
       case CONST: {
 	input_constdecl_t decl = input_command.decl.constdecl;
 	if (sort_name_index(decl.sort, sort_table) == -1) {
@@ -311,7 +318,9 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
       }
       case HELP: {
 	printf("\nInput grammar:\n");
-	printf(" sort NAME ';'\n const NAME++',' ':' NAME ';'\n");
+	printf(" sort NAME ';'\n");
+	printf(" subsort NAME NAME ';'\n");
+	printf(" const NAME++',' ':' NAME ';'\n");
 	printf(" predicate ATOM [direct|indirect] ';'\n");
 	printf(" atom ATOM ';'\n assert ATOM ';'\n");
 	printf(" add CLAUSE [NUM] ';'\n");
