@@ -25,7 +25,7 @@ else
 include $(conf)
 endif
 
-LIBS := $(LIBS) -lm
+LIBS := $(LIBS) -lm -lglib
 
 YFLAGS := $(YFLAGS) -d -t
 
@@ -40,12 +40,12 @@ bindir := $(BUILD)/bin
 #
 # source files for the library
 #
-src_c := array_hash_map.c gcd.c hash_functions.c input.c int_array_sort.c \
-	 integer_stack.c int_stack.c mcsat.c memalloc.c memsize.c samplesat.c \
-	 lazysamplesat.c string_heap.c tables.c symbol_tables.c utils.c \
-         vectors.c parser.c print.c yacc.tab.c
+src_c := array_hash_map.c cnf.c gcd.c hash_functions.c input.c \
+         int_array_sort.c integer_stack.c int_stack.c mcsat.c memalloc.c \
+         memsize.c samplesat.c lazysamplesat.c string_heap.c tables.c \
+         symbol_tables.c utils.c vectors.c parser.c print.c yacc.tab.c
 ifneq ($(OAACFLAGS),)
-src_c := $(src_c) pce.c
+src_c := $(src_c) pce.c reduced_pce.c
 endif
 
 
@@ -92,7 +92,7 @@ libmcsat_def=$(libdir)/libmcsat.def
 # binaries
 binaries := $(bindir)/mcsat$(EXEEXT)
 ifneq ($(OAACFLAGS),)
-binaries := $(binaries) $(bindir)/pce$(EXEEXT)
+binaries := $(binaries) $(bindir)/pce$(EXEEXT) $(bindir)/reduced_pce$(EXEEXT)
 endif
 
 
@@ -240,6 +240,10 @@ $(objdir)/%.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 $(objdir)/pce.o: pce.c
+	echo OAACFLAGS = $(OAACFLAGS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) -I/usr/include/glib-2.0 -c $< -o $@
+
+$(objdir)/reduced_pce.o: reduced_pce.c
 	echo OAACFLAGS = $(OAACFLAGS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) -I/usr/include/glib-2.0 -c $< -o $@
 

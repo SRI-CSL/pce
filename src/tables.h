@@ -124,12 +124,38 @@ typedef struct input_literal_s {
 
 // This is used for both clauses (no vars) and rules.
 typedef struct input_clause_s {
-  int varlen;
+  int32_t varlen;
   char **variables; //Input variables
-  int litlen;
+  int32_t litlen;
   input_literal_t **literals;
 } input_clause_t;
 
+// This is used for formulas
+typedef struct input_comp_fmla_s {
+  int32_t op;
+  struct input_fmla_s *arg1;
+  struct input_fmla_s *arg2;
+} input_comp_fmla_t;
+
+typedef union input_ufmla_s {
+  input_atom_t *atom;
+  input_comp_fmla_t *cfmla;
+} input_ufmla_t;
+
+typedef struct input_fmla_s {
+  int32_t kind;
+  input_ufmla_t *ufmla;
+} input_fmla_t;
+
+typedef struct var_entry_s {
+  char *name;
+  int32_t sort_index; 
+} var_entry_t;
+
+typedef struct input_formula_s {
+  var_entry_t **vars; // NULL terminated list of vars
+  input_fmla_t *fmla;
+} input_formula_t;
 
 
 //Each sort has a name (string), and a cardinality.  Each element is also assigned
@@ -203,11 +229,6 @@ typedef struct const_table_s {
   const_entry_t *entries; 
   stbl_t const_name_index; //table mapping const name to index
 } const_table_t;
-
-typedef struct var_entry_s {
-  char *name;
-  uint32_t sort_index; 
-} var_entry_t;
 
 typedef struct var_table_s {
   int32_t size;
@@ -332,6 +353,8 @@ extern void init_sort_table(sort_table_t *sort_table);
 extern void reset_sort_table(sort_table_t *sort_table);
 
 extern void add_sort(sort_table_t *sort_table, char *name);
+
+extern void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort);
 
 extern int32_t add_pred(pred_table_t *pred_table, char *name, bool evidence,
 			int32_t arity, sort_table_t *sort_table, char **in_signature);

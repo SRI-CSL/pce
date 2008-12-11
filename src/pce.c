@@ -34,6 +34,8 @@
 
 static bool lazy_pce = true;
 
+static bool keep_looping;
+
 static const char *const pce_solvables[] = {
   "pce_add_user_defined_rule(Username,_Text,Rule)",
   "pce_current_assertions(L)",
@@ -83,20 +85,20 @@ static names_buffer_t names_buffer = {0, 0, NULL};
 // Stores learner ids
 static names_buffer_t learner_ids = {0, 0, NULL};
 
-// There are two rules_vars_buffers - as a formula is clausified by cnf,
+// There are two rules_vars_buffers - as a formula is clausified by icl_toCnf,
 // variables are added to the rules_vars_buffer.  At the end,
 static rule_vars_buffer_t rules_vars_buffer = {0, 0, NULL};
 static rule_vars_buffer_t rule_vars_buffer = {0, 0, NULL};
 
-static samp_table_t samp_table;
+//samp_table_t samp_table;
 
 static void pce_error(const char *fmt, ...);
-static rule_literal_t ***cnf(ICLTerm *formula);
-static rule_literal_t ***cnf_pos(ICLTerm *formula);
-static rule_literal_t ***cnf_neg(ICLTerm *formula);
-static rule_literal_t ***cnf_product(rule_literal_t ***c1,
+static rule_literal_t ***icl_toCnf(ICLTerm *formula);
+static rule_literal_t ***icl_toCnf_pos(ICLTerm *formula);
+static rule_literal_t ***icl_toCnf_neg(ICLTerm *formula);
+static rule_literal_t ***icl_toCnf_product(rule_literal_t ***c1,
 				     rule_literal_t ***c2);
-static rule_literal_t ***cnf_union(rule_literal_t ***c1,
+static rule_literal_t ***icl_toCnf_union(rule_literal_t ***c1,
 				   rule_literal_t ***c2);
 static rule_literal_t *** icl_to_cnf_literal(ICLTerm *formula, bool neg);
 static rule_literal_t *icl_to_rule_literal(ICLTerm *formula, bool neg);
@@ -286,7 +288,8 @@ int32_t pce_get_rdf_type(char *name) {
       pce_error("Instances for %s are %s\n", name, inststr);
       fflush(stdout);
       icl_stFree(inststr);
-      return -1;
+      sortidx = -1;
+      goto done;
     } else {
       Answer = icl_NthTerm(icl_NthTerm(Instances, 1), 3);
       // Bindings should be of the form ['[''x''=\"TYPE\"]']
@@ -296,7 +299,8 @@ int32_t pce_get_rdf_type(char *name) {
 	pce_error("Instances for %s lead to error %s\n", name, inststr);
 	fflush(stdout);
 	icl_stFree(inststr);
-	return -1;
+	sortidx = -1;
+	goto done;
       }
       Params = icl_NthTerm(Answer, 2);
       // Check the Params - only care about errors for now.
@@ -313,7 +317,8 @@ int32_t pce_get_rdf_type(char *name) {
 	pce_error("Instances for %s lead to error %s\n", name, inststr);
 	fflush(stdout);
 	icl_stFree(inststr);
-	return -1;
+	sortidx = -1;
+	goto done;
       }
       assert(icl_IsStr(icl_NthTerm(Bindings, 1)));
       bindingstr = str_copy(icl_Str(icl_NthTerm(Bindings, 1)));
@@ -325,6 +330,7 @@ int32_t pce_get_rdf_type(char *name) {
 	}
       }
       Binding = icl_NewTermFromString(bindingstr);
+      safe_free(bindingstr);
       Type = icl_NthTerm(icl_NthTerm(Binding, 1), 2);
       typestr = icl_Str(Type);
       // Now check if the type is already known
@@ -337,12 +343,21 @@ int32_t pce_get_rdf_type(char *name) {
 	sortidx = sort_name_index(typestr, sort_table);
       }
       printf("rdf:type (sort from QM) for %s is %s\n", name, typestr);
-      return sortidx;
+      // BD: Not sure what to do for Binding? is it safe to delete it??
+      icl_FreeTerm(Binding);
+      goto done;
     }
   } else {
     pce_error("oaa_Solve of %s was unsuccessful\n", query);
-    return -1;
+    sortidx = -1;
   }
+
+ done:
+  safe_free(query);
+  icl_FreeTerm(Callback);
+  icl_FreeTerm(Instances);
+  icl_FreeTerm(Out);
+  return sortidx;
 }
 
 int32_t pce_add_const(char *name, samp_table_t *table) {
@@ -783,8 +798,8 @@ void pce_install_rule(ICLTerm *Formula, double weight) {
   int32_t i, j, litlen, atom_idx;
   char *str;
   
-  // cnf has side effect of setting rules_vars_buffer
-  lits = cnf(Formula);
+  // icl_toCnf has side effect of setting rules_vars_buffer
+  lits = icl_toCnf(Formula);
 
   if (lits == NULL) {
     str = icl_NewStringFromTerm(Formula);
@@ -1044,8 +1059,8 @@ int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
     return false;
   }
   
-  // cnf has side effect of setting rules_vars_buffer
-  lits = cnf(QueryFormula);
+  // icl_toCnf has side effect of setting rules_vars_buffer
+  lits = icl_toCnf(QueryFormula);
   query_index = add_to_query_table(&rules_vars_buffer, lits, &samp_table);
   result = false;
 
@@ -1218,7 +1233,7 @@ int pce_subscribe_callback(ICLTerm *goal, ICLTerm *params,
     Sid = icl_NewStr(sid);
   }
   // Convert the Formula to rule_literal_t's - side effects rules_vars_buffer
-  lits = cnf(Formula);
+  lits = icl_toCnf(Formula);
   if (lits == NULL) {
     return 1;
   }
@@ -1731,7 +1746,11 @@ int32_t pce_update_model() {
     icl_FreeTerm(Nlist);
     icl_FreeTerm(Out);
     icl_FreeTerm(Sol);
+  } else {
+    icl_FreeTerm(Retract);
+    icl_FreeTerm(BecameTrueWeights);
   }
+
   return true;
 }
 
@@ -1846,7 +1865,6 @@ ICLTerm *calo_expansion(ICLTerm *Atom) {
 ICLTerm *calo_syntax_expand(ICLTerm *Term) {
   ICLTerm *Nterm, *Arg, *Args;
   char *func, *nfunc;
-  bool changed;
   int32_t i;
   
   // Recurse down the Term to atoms, then translate short forms to long forms
@@ -1854,50 +1872,39 @@ ICLTerm *calo_syntax_expand(ICLTerm *Term) {
   if (icl_IsStruct(Term)) {
     func = icl_Functor(Term);
     if (strcmp(func,"iris") == 0) {
-      return Term;
+      return icl_CopyTerm(Term);
     }
-    changed = false;
     nfunc = calo_string_expansion(func);
-    Nterm = icl_CopyTerm(Term);
-    if (nfunc != func) {
-      Args = icl_NewList(NULL);
-      for (i = 0; i < icl_NumTerms(Term); i++) {
-	icl_AddToList(Args, icl_NthTerm(Term, i+1), true);
-      }
-      Nterm = icl_NewStructFromList(nfunc, Args);
-      changed = true;
+    Args = icl_NewList(NULL);
+    for (i = 0; i < icl_NumTerms(Term); i++) {
+      Arg = calo_syntax_expand(icl_NthTerm(Term, i+1));
+      icl_AddToList(Args, Arg, true);
     }
-    for (i = 0; i < icl_NumTerms(Nterm); i++) {
-      Arg = calo_syntax_expand(icl_NthTerm(Nterm, i+1));
-      if (icl_NthTerm(Nterm, i+1) != Arg) {
-	// Note that icl_NthTerm is 1-based, icl_ReplaceElement is 0-based
-	icl_ReplaceElement(Nterm, i, Arg, false);
-	changed = true;
-      }
-    }
-    if (!changed) {
-      icl_Free(Nterm);
-      Nterm = Term;
-    }
+    Nterm = icl_NewStructFromList(nfunc, Args);
     if (strcmp(func,"equ") == 0) {
       if (icl_match_terms(icl_NthTerm(Nterm, 1),icl_NthTerm(Nterm, 2), NULL)) {
+	icl_FreeTerm(Nterm);
 	return icl_True();
       } else {
-	return icl_NewStruct("==",2,icl_NthTerm(Nterm, 1),icl_NthTerm(Nterm, 2));
+	// Only free up the structure, not the args
+	icl_stFree(Nterm);
+	return icl_NewStruct("==",2,icl_NthTerm(Args, 1),icl_NthTerm(Args, 2));
       }
     } else if (strcmp(func,"related_to") == 0) {
+      icl_stFree(Nterm);
       return icl_NewStruct("http://calo.sri.com/core-plus-office#relatedProjectIs",
-			   2, icl_NthTerm(Nterm, 1), icl_NthTerm(Nterm, 2));
+			   2, icl_NthTerm(Args, 1), icl_NthTerm(Args, 2));
     } else if (strcmp(func,"contains") == 0) {
+      icl_stFree(Nterm);
       return icl_NewStruct("iris", 1,
 			   icl_NewStruct("iris:bp_email_subject", 2,
-					 icl_NthTerm(Nterm, 1), icl_NthTerm(Nterm, 2)));
+					 icl_NthTerm(Args, 1), icl_NthTerm(Args, 2)));
     }
     return Nterm;
   } else if (icl_IsStr(Term)) {
     return calo_expansion(Term);
   }
-  return Term;
+  return icl_CopyTerm(Term);
 }
 
 // Goal of form pce_add_user_defined_rule(Username,Text,Rule)
@@ -2170,6 +2177,7 @@ static void get_qm_instances(samp_table_t *table) {
 
 time_t pce_timeout = 60;
 static time_t idle_timer = 0;
+static int32_t counter = 5;
 
 int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   time_t curtime;
@@ -2189,13 +2197,19 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 	mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
 	       DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
 	       DEFAULT_MAX_EXTRA_FLIPS, DEFAULT_MAX_SAMPLES);
-      }
+      }      
     }
     printf("Calling pce_update_model\n");
     pce_update_model();
+
     printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
     fflush(stdout);
     time(&idle_timer);
+
+    counter --;
+    if (counter <= 0) {
+      keep_looping = false;
+    }
   }
   // Should these be saved?
   // pce_save(goal);
@@ -2209,7 +2223,7 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 /*   return 0; */
 /* } */
 
-// The cnf function basically converts a formula to CNF, returning a list of
+// The icl_toCnf function basically converts a formula to CNF, returning a list of
 // samp_rules.
 
 // The Prolog PCE has the following formula operators: false, true, not,
@@ -2232,86 +2246,86 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 
 // CNF(not(not(A))) = CNF(A)
 
-rule_literal_t ***cnf(ICLTerm *formula) {
+rule_literal_t ***icl_toCnf(ICLTerm *formula) {
   // Initialize the rules_vars_buffer, which will be used to hold the
   // variables as we go along
   rules_vars_buffer.size = 0;
   
-  return cnf_pos(formula);
+  return icl_toCnf_pos(formula);
 }
 
-rule_literal_t ***cnf_pos(ICLTerm *formula) {
+rule_literal_t ***icl_toCnf_pos(ICLTerm *formula) {
   char *functor;
   
   if (icl_IsStruct(formula)) {
     functor = icl_Functor(formula);
     if (strcmp(functor, "not") == 0) {
-      return cnf_neg(icl_NthTerm(formula, 1));
+      return icl_toCnf_neg(icl_NthTerm(formula, 1));
     } else if (strcmp(functor, "or") == 0) {
-      return cnf_product(cnf_pos(icl_NthTerm(formula, 1)),
-			 cnf_pos(icl_NthTerm(formula, 2)));
+      return icl_toCnf_product(icl_toCnf_pos(icl_NthTerm(formula, 1)),
+			 icl_toCnf_pos(icl_NthTerm(formula, 2)));
     } else if ((strcmp(functor, "implies") == 0)
 	       || (strcmp(functor, "=>") == 0)) {
-      return cnf_product(cnf_neg(icl_NthTerm(formula, 1)),
-			 cnf_pos(icl_NthTerm(formula, 2)));
+      return icl_toCnf_product(icl_toCnf_neg(icl_NthTerm(formula, 1)),
+			 icl_toCnf_pos(icl_NthTerm(formula, 2)));
     } else if (strcmp(functor, "and") == 0) {
-      return cnf_union(cnf_pos(icl_NthTerm(formula, 1)),
-		       cnf_pos(icl_NthTerm(formula, 2)));
+      return icl_toCnf_union(icl_toCnf_pos(icl_NthTerm(formula, 1)),
+		       icl_toCnf_pos(icl_NthTerm(formula, 2)));
     } else if (strcmp(functor, "iff") == 0) {
       // CNF(A iff B) = CNF(A /\ B) X CNF(not(A) /\ not(B))
-      return cnf_product(cnf_union(cnf_pos(icl_NthTerm(formula, 1)),
-				   cnf_pos(icl_NthTerm(formula, 2))),
-			 cnf_union(cnf_neg(icl_NthTerm(formula, 1)),
-				   cnf_neg(icl_NthTerm(formula, 2))));
+      return icl_toCnf_product(icl_toCnf_union(icl_toCnf_pos(icl_NthTerm(formula, 1)),
+				   icl_toCnf_pos(icl_NthTerm(formula, 2))),
+			 icl_toCnf_union(icl_toCnf_neg(icl_NthTerm(formula, 1)),
+				   icl_toCnf_neg(icl_NthTerm(formula, 2))));
 /*     } else if (strcmp(functor, "eq") == 0) { */
 /*     } else if (strcmp(functor, "mutex") == 0) { */
 /*     } else if (strcmp(functor, "oneof") == 0) { */
     } else if (strcmp(functor, "iris") == 0 ||
 	       strcmp(functor, "oaa") == 0) {
-      return cnf_pos(icl_NthTerm(formula, 1));
+      return icl_toCnf_pos(icl_NthTerm(formula, 1));
     } else {
       return icl_to_cnf_literal(formula, false);
     }
   } else {
-    pce_error("cnf_pos: Expect a struct here");
+    pce_error("icl_toCnf_pos: Expect a struct here");
     return NULL;
   }
 }
 
-rule_literal_t ***cnf_neg(ICLTerm *formula) {
+rule_literal_t ***icl_toCnf_neg(ICLTerm *formula) {
   char *functor;
   
   if (icl_IsStruct(formula)) {
     functor = icl_Functor(formula);
     if (strcmp(functor, "not") == 0) {
-      return cnf_pos(icl_NthTerm(formula, 1));
+      return icl_toCnf_pos(icl_NthTerm(formula, 1));
     } else if (strcmp(functor, "or") == 0) {
-      return cnf_union(cnf_neg(icl_NthTerm(formula, 1)),
-		       cnf_neg(icl_NthTerm(formula, 2)));
+      return icl_toCnf_union(icl_toCnf_neg(icl_NthTerm(formula, 1)),
+		       icl_toCnf_neg(icl_NthTerm(formula, 2)));
     } else if ((strcmp(functor, "implies") == 0)
 	       || (strcmp(functor, "=>") == 0)) {
-      return cnf_union(cnf_pos(icl_NthTerm(formula, 1)),
-		       cnf_neg(icl_NthTerm(formula, 2)));
+      return icl_toCnf_union(icl_toCnf_pos(icl_NthTerm(formula, 1)),
+		       icl_toCnf_neg(icl_NthTerm(formula, 2)));
     } else if (strcmp(functor, "and") == 0) {
-      return cnf_product(cnf_neg(icl_NthTerm(formula, 1)),
-			 cnf_neg(icl_NthTerm(formula, 2)));
+      return icl_toCnf_product(icl_toCnf_neg(icl_NthTerm(formula, 1)),
+			 icl_toCnf_neg(icl_NthTerm(formula, 2)));
     } else if (strcmp(functor, "iff") == 0) {
       // CNF(not(A iff B)) = CNF(A \/ B) U CNF(not(A) \/ not(B))
-      return cnf_union(cnf_product(cnf_pos(icl_NthTerm(formula, 1)),
-				   cnf_pos(icl_NthTerm(formula, 2))),
-		       cnf_product(cnf_neg(icl_NthTerm(formula, 1)),
-				   cnf_neg(icl_NthTerm(formula, 2))));
+      return icl_toCnf_union(icl_toCnf_product(icl_toCnf_pos(icl_NthTerm(formula, 1)),
+				   icl_toCnf_pos(icl_NthTerm(formula, 2))),
+		       icl_toCnf_product(icl_toCnf_neg(icl_NthTerm(formula, 1)),
+				   icl_toCnf_neg(icl_NthTerm(formula, 2))));
 /*     } else if (strcmp(functor, "eq") == 0) { */
 /*     } else if (strcmp(functor, "mutex") == 0) { */
 /*     } else if (strcmp(functor, "oneof") == 0) { */
     } else if (strcmp(functor, "iris") == 0 ||
 	       strcmp(functor, "oaa") == 0) {
-      return cnf_neg(icl_NthTerm(formula, 1));
+      return icl_toCnf_neg(icl_NthTerm(formula, 1));
     } else {
       return icl_to_cnf_literal(formula, true);
     }
   } else {
-    pce_error("cnf_neg: Expect a struct here");
+    pce_error("icl_toCnf_neg: Expect a struct here");
     return NULL;
   }
 }
@@ -2324,7 +2338,7 @@ rule_literal_t ***cnf_neg(ICLTerm *formula) {
 // ((a b) (c)) X ((a ~c)) == ((a b a ~c) (c a ~c)), which could simplify to
 //  ((a b ~c))
 
-static rule_literal_t ***cnf_product(rule_literal_t ***c1,
+static rule_literal_t ***icl_toCnf_product(rule_literal_t ***c1,
 				     rule_literal_t ***c2) {
   int32_t i, j, ii, jj, len1, len2, cnflen1, cnflen2, idx;
   rule_literal_t ***productcnf;
@@ -2370,7 +2384,7 @@ static rule_literal_t ***cnf_product(rule_literal_t ***c1,
 // ((a b) (c d)) U ((x y z) (w)) == ((a b) (c d) (x y z) (w))
 // Again, no simplification involved.
 
-static rule_literal_t ***cnf_union(rule_literal_t ***c1,
+static rule_literal_t ***icl_toCnf_union(rule_literal_t ***c1,
 				   rule_literal_t ***c2) {
   int32_t i, cnflen1, cnflen2;
   rule_literal_t ***unioncnf;
@@ -2808,6 +2822,23 @@ int main(int argc, char *argv[]){
   pce_save_fp = fopen(pce_save_file, "a+");  
   pce_log("Entering MainLoop\n");
   printf("Entering MainLoop\n");
-  oaa_MainLoop(true);
+
+  //  oaa_MainLoop(true); This expands to the code below (more or less)
+
+
+  ICLTerm *Event, *Params;
+
+  keep_looping = true;
+  while (keep_looping) {
+    oaa_GetEvent(&Event, &Params, 0);
+    CHECK_LEAKS();
+    oaa_ProcessEvent(Event, Params);
+    CHECK_LEAKS();
+    icl_Free(Event);
+    icl_Free(Params);
+  }
+
+  oaa_Disconnect(NULL, NULL);
+
   return EXIT_SUCCESS;
 }

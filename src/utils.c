@@ -177,41 +177,6 @@ char *const_sort_name(int32_t const_idx, samp_table_t *table) {
   return sort_table->entries[const_sig].name;
 }
 
-void free_atom(input_atom_t *atom) {
-  int32_t i;
-
-  i = 0;
-  safe_free(atom->pred);
-  while (atom->args[i] != NULL) {
-    safe_free(atom->args[i]);
-    i++;
-  }
-  safe_free(atom->args);
-  safe_free(atom);
-}
-
-void free_literal(input_literal_t *lit) {
-  free_atom(lit->atom);
-  safe_free(lit);
-}
-
-void free_literals (input_literal_t **lit) {
-  int32_t i;
-
-  i = 0;
-  while (lit[i] != NULL) {
-    free_literal(lit[i]);
-    i++;
-  }
-  safe_free(lit);
-}
-
-void free_clause(input_clause_t *clause) {
-  free_strings(clause->variables);
-  free_literals(clause->literals);
-  safe_free(clause);
-}
-
 void free_strings (char **string) {
   int32_t i;
 

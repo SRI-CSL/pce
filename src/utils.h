@@ -81,8 +81,6 @@ typedef struct substit_buffer_s {
   substit_entry_t *entries;
 } substit_buffer_t;
 
-extern void free_atom(input_atom_t *atom);
-extern void free_clause(input_clause_t *clause);
 extern void free_strings (char **string);
 
 extern void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table);

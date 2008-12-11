@@ -50,7 +50,7 @@ int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table) {
   return card;
 }
 
-static clause_buffer_t rule_atom_buffer = {0, NULL}; 
+//static clause_buffer_t rule_atom_buffer = {0, NULL}; 
 
 // void rule_atom_buffer_resize(int32_t size){
 //     if (rule_atom_buffer.data == NULL){

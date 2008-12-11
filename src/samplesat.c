@@ -350,7 +350,8 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
   int argidx;
   //  int32_t size = pred_entry.arity * sizeof(int32_t);
   // Create a new atom - note that we will need to free it if there is an error
-  samp_atom_t * new_atom = (samp_atom_t *) safe_malloc(sizeof(samp_atom_t) + pred_entry.arity * sizeof(int32_t));
+  samp_atom_t * new_atom = (samp_atom_t *)
+    safe_malloc(sizeof(samp_atom_t) + pred_entry.arity * sizeof(int32_t));
   new_atom->pred = pred_idx;
   for (argidx=0; argidx<arglen; argidx++) {
     int32_t varidx = -1;

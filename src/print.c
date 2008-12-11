@@ -285,25 +285,29 @@ extern void dump_clause_table (samp_table_t *table) {
 
 void print_rule (samp_rule_t *rule, samp_table_t *table, int indent) {
   pred_table_t *pred_table = &(table->pred_table);
-  const_table_t *const_table = &(table->const_table);  
-  int32_t j;
-  for(j=0; j<rule->num_vars; j++) {
-    j==0 ? printf(" (") : printf(", ");
-    printf("%s", rule->vars[j]->name);
+  const_table_t *const_table = &(table->const_table);
+  rule_literal_t *lit;
+  samp_atom_t *atom;
+  int32_t j, k, argidx, pred_idx;
+
+  if (rule->num_vars > 0) {
+    for(j = 0; j < rule->num_vars; j++) {
+      j==0 ? printf(" (") : printf(", ");
+      printf("%s", rule->vars[j]->name);
+    }
+    printf(")");
   }
-  printf(")");
   for(j=0; j<rule->num_lits; j++) {
     printf("\n%*s  ", indent, "");
     j==0 ? printf("   ") : printf(" | ");
-    rule_literal_t *lit = rule->literals[j];
+    lit = rule->literals[j];
     if (lit->neg) printf("~");
-    samp_atom_t *atom = lit->atom;
-    int32_t pred_idx = atom->pred;
+    atom = lit->atom;
+    pred_idx = atom->pred;
     printf("%s", pred_name(pred_idx, pred_table));
-    int32_t k;
-    for(k=0; k<pred_arity(pred_idx, pred_table); k++) {
+    for(k = 0; k < pred_arity(pred_idx, pred_table); k++) {
       k==0 ? printf("(") : printf(", ");
-      int32_t argidx = atom->args[k];
+      argidx = atom->args[k];
       if(argidx < 0) {
 	// Must be a variable - look it up in the vars
 	printf("%s", rule->vars[-(argidx + 1)]->name);

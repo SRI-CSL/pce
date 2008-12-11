@@ -10,6 +10,7 @@
 #include "input.h"
 #include "parser.h"
 #include "vectors.h"
+#include "tables.h"
 #define YYDEBUG 1
 #define YYERROR_VERBOSE 1
 #define YYINCLUDED_STDLIB_H 1
@@ -22,6 +23,7 @@ static bool yyerrflg = false;
 static char yystrbuf[1000];
 static pvector_t yyargs;
 static pvector_t yylits;
+char *parse_file;
 FILE *parse_input;
 
 void yyerror (char *str);
@@ -47,6 +49,57 @@ input_atom_t *yy_atom (char *pred, char **args) {
   atom->pred = pred;
   atom->args = args;
   return atom;
+};
+
+input_formula_t *yy_formula (char **vars, input_fmla_t *fmla) {
+  input_formula_t *formula;
+  int32_t i, vlen;
+
+  formula = (input_formula_t *) safe_malloc(sizeof(input_formula_t));
+  if (vars == NULL) {
+    formula->vars = NULL;
+  } else {
+    for (vlen = 0; vars[vlen] != NULL; vlen++) {}
+    formula->vars = (var_entry_t **)
+      safe_malloc((vlen + 1) * sizeof(var_entry_t *));
+    for (i = 0; i < vlen; i++) {
+      formula->vars[i] = (var_entry_t *) safe_malloc(sizeof(var_entry_t));
+      formula->vars[i]->name = vars[i];
+      formula->vars[i]->sort_index = -1;
+    }
+    formula->vars[vlen] = NULL;
+  }
+  formula->fmla = fmla;
+  return formula;
+};
+
+input_fmla_t *yy_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2) {
+  input_fmla_t *fmla;
+  input_ufmla_t *ufmla;
+  input_comp_fmla_t *cfmla;
+
+  fmla = (input_fmla_t *) safe_malloc(sizeof(input_fmla_t));
+  ufmla = (input_ufmla_t *) safe_malloc(sizeof(input_ufmla_t));
+  cfmla = (input_comp_fmla_t *) safe_malloc(sizeof(input_comp_fmla_t));
+  fmla->kind = op;
+  fmla->ufmla = ufmla;
+  ufmla->cfmla = cfmla;
+  cfmla->op = op;
+  cfmla->arg1 = (input_fmla_t *) arg1;
+  cfmla->arg2 = arg2;
+  return fmla;
+};
+
+input_fmla_t *yy_atom_to_fmla (input_atom_t *atom) {
+  input_fmla_t *fmla;
+  input_ufmla_t *ufmla;
+
+  fmla = (input_fmla_t *) safe_malloc(sizeof(input_fmla_t));
+  ufmla = (input_ufmla_t *) safe_malloc(sizeof(input_ufmla_t));
+  fmla->kind = ATOM;
+  fmla->ufmla = ufmla;
+  ufmla->atom = atom;
+  return fmla;
 };
 
 input_literal_t *yy_literal(bool neg, input_atom_t *atom) {
@@ -140,67 +193,108 @@ bool yy_check_float(char *str) {
     //input_command.decl = decl;
   };
 
-  void yy_sortdecl (char *name) {
+  void yy_sort_decl (char *name) {
     input_command.kind = SORT;
-    input_command.decl.sortdecl.name = name;
+    input_command.decl.sort_decl.name = name;
   };
-  void yy_subsortdecl (char *subsort, char *supersort) {
+  void yy_subsort_decl (char *subsort, char *supersort) {
     input_command.kind = SUBSORT;
-    input_command.decl.subsortdecl.subsort = subsort;
-    input_command.decl.subsortdecl.supersort = supersort;
+    input_command.decl.subsort_decl.subsort = subsort;
+    input_command.decl.subsort_decl.supersort = supersort;
   };
-  void yy_preddecl (input_atom_t *atom, bool witness) {
+  void yy_pred_decl (input_atom_t *atom, bool witness) {
     input_command.kind = PREDICATE;
-    input_command.decl.preddecl.atom = atom;
-    input_command.decl.preddecl.witness = witness;
+    input_command.decl.pred_decl.atom = atom;
+    input_command.decl.pred_decl.witness = witness;
   };
-  void yy_constdecl (char **name, char *sort) {
+  void yy_const_decl (char **name, char *sort) {
     int32_t i = 0;
     
     input_command.kind = CONST;
     while (name[i] != NULL) {i++;}
-    input_command.decl.constdecl.num_names = i;
-    input_command.decl.constdecl.name = name;
-    input_command.decl.constdecl.sort = sort;
+    input_command.decl.const_decl.num_names = i;
+    input_command.decl.const_decl.name = name;
+    input_command.decl.const_decl.sort = sort;
   };
-  void yy_vardecl (char **name, char *sort) {
+  void yy_var_decl (char **name, char *sort) {
     int32_t i = 0;
     
     input_command.kind = VAR;
     while (name[i] != NULL) {i++;}
-    input_command.decl.constdecl.num_names = i;
-    input_command.decl.vardecl.name = name;
-    input_command.decl.vardecl.sort = sort;
+    input_command.decl.const_decl.num_names = i;
+    input_command.decl.var_decl.name = name;
+    input_command.decl.var_decl.sort = sort;
   };
-  void yy_atomdecl (input_atom_t *atom) {
+  void yy_atom_decl (input_atom_t *atom) {
     input_command.kind = ATOM;
-    input_command.decl.atomdecl.atom = atom;
+    input_command.decl.atom_decl.atom = atom;
   };
-  void yy_assertdecl (input_atom_t *atom) {
+  void yy_assert_decl (input_atom_t *atom, char *source) {
     input_command.kind = ASSERT;
-    input_command.decl.assertdecl.atom = atom;
+    input_command.decl.assert_decl.atom = atom;
+    input_command.decl.assert_decl.source = source;
   };
-  void yy_adddecl (input_clause_t *clause, char *wt) {
+  void yy_add_fdecl (input_formula_t *formula, char *wt, char *source) {
     input_command.kind = ADD;
-    input_command.decl.adddecl.clause = clause;
+    input_command.decl.add_fdecl.formula = formula;
+    input_command.decl.add_fdecl.source = source;
     if (strcmp(wt, "DBL_MAX") == 0) {
-      input_command.decl.adddecl.weight = DBL_MAX;
+      input_command.decl.add_fdecl.weight = DBL_MAX;
     } else {
-      input_command.decl.adddecl.weight = atof(wt);
+      input_command.decl.add_fdecl.weight = atof(wt);
       safe_free(wt);
     }
   };
-  void yy_askdecl (input_clause_t *clause, char *thresholdstr, char *allstr) {
+  void yy_add_decl (input_clause_t *clause, char *wt, char *source) {
+    input_command.kind = ADD_CLAUSE;
+    input_command.decl.add_decl.clause = clause;
+    input_command.decl.add_decl.source = source;
+    if (strcmp(wt, "DBL_MAX") == 0) {
+      input_command.decl.add_decl.weight = DBL_MAX;
+    } else {
+      input_command.decl.add_decl.weight = atof(wt);
+      safe_free(wt);
+    }
+  };
+  void yy_ask_fdecl (input_formula_t *formula, char *thresholdstr, char *allstr) {
     double threshold;
     input_command.kind = ASK;
-    input_command.decl.askdecl.clause = clause;
+    input_command.decl.ask_fdecl.formula = formula;
+    threshold = atof(thresholdstr);
+    if (0.0 <= threshold && threshold <= 1.0) {
+      input_command.decl.ask_fdecl.threshold = threshold;
+    } else {
+      free_formula(formula);
+      safe_free(thresholdstr);
+      safe_free(allstr);
+      yyerror("ask: threshold must be between 0.0 and 1.0");
+      return;
+    }
+    safe_free(thresholdstr);
+    if (allstr == NULL || strcasecmp(allstr, "BEST") == 0) {
+      input_command.decl.ask_fdecl.all = false;
+    } else if (strcasecmp(allstr, "ALL") == 0) {
+      input_command.decl.ask_fdecl.all = true;
+    } else {
+      free_formula(formula);
+      safe_free(thresholdstr);
+      safe_free(allstr);
+      yyerror("ask: which must be 'all' or 'best'");
+      return;
+    }
+    safe_free(allstr);
+  };
+  void yy_ask_decl (input_clause_t *clause, char *thresholdstr, char *allstr) {
+    double threshold;
+    input_command.kind = ASK;
+    input_command.decl.ask_decl.clause = clause;
     if (clause->litlen > 1) {
       yyerror("ask: currently only allows a single literal with variables");
       free_clause(clause);
     }
     threshold = atof(thresholdstr);
     if (0.0 <= threshold && threshold <= 1.0) {
-      input_command.decl.askdecl.threshold = threshold;
+      input_command.decl.ask_decl.threshold = threshold;
     } else {
       free_clause(clause);
       safe_free(thresholdstr);
@@ -210,9 +304,9 @@ bool yy_check_float(char *str) {
     }
     safe_free(thresholdstr);
     if (allstr == NULL || strcasecmp(allstr, "BEST") == 0) {
-      input_command.decl.askdecl.all = false;
+      input_command.decl.ask_decl.all = false;
     } else if (strcasecmp(allstr, "ALL") == 0) {
-      input_command.decl.askdecl.all = true;
+      input_command.decl.ask_decl.all = true;
     } else {
       free_clause(clause);
       safe_free(thresholdstr);
@@ -227,7 +321,7 @@ bool yy_check_float(char *str) {
  * max_flips, max_extra_flips, and max_samples, in that order.  Missing
  * args get default values.
  */
-void yy_mcsatdecl (char **params) {
+void yy_mcsat_decl (char **params) {
   int32_t arglen = 0;
   if (params != NULL) {
     while (arglen <= 6 && (params[arglen] != NULL)) {
@@ -243,75 +337,76 @@ void yy_mcsatdecl (char **params) {
     if (yy_check_float(params[0])) {
       double prob = atof(params[0]);
       if (0.0 <= prob && prob <= 1.0) {
-	input_command.decl.mcsatdecl.sa_probability = prob;
+	input_command.decl.mcsat_decl.sa_probability = prob;
       } else {
 	yyerror("sa_probability should be between 0.0 and 1.0");
       }
     }
   } else {
-    input_command.decl.mcsatdecl.sa_probability = DEFAULT_SA_PROBABILITY;
+    input_command.decl.mcsat_decl.sa_probability = DEFAULT_SA_PROBABILITY;
   }
   // samp_temperature
   if (arglen > 1) {
     if (yy_check_float(params[1])) {
       double temp = atof(params[1]);
       if (temp > 0.0) {
-	input_command.decl.mcsatdecl.samp_temperature = temp;
+	input_command.decl.mcsat_decl.samp_temperature = temp;
       } else {
 	yyerror("samp_temperature should be greater than 0.0");
       }
     }
   } else {
-    input_command.decl.mcsatdecl.samp_temperature = DEFAULT_SAMP_TEMPERATURE;
+    input_command.decl.mcsat_decl.samp_temperature = DEFAULT_SAMP_TEMPERATURE;
   }
   // rvar_probability
   if (arglen > 2) {
     if (yy_check_float(params[2])) {
       double prob = atof(params[2]);
       if (0.0 <= prob && prob <= 1.0) {
-	input_command.decl.mcsatdecl.rvar_probability = prob;
+	input_command.decl.mcsat_decl.rvar_probability = prob;
       } else {
 	yyerror("rvar_probability should be between 0.0 and 1.0");
       }
     }
   } else {
-    input_command.decl.mcsatdecl.rvar_probability = DEFAULT_RVAR_PROBABILITY;
+    input_command.decl.mcsat_decl.rvar_probability = DEFAULT_RVAR_PROBABILITY;
   }
   // max_flips
   if (arglen > 3) {
     if (yy_check_int(params[3])) {
-      input_command.decl.mcsatdecl.max_flips = atoi(params[3]);
+      input_command.decl.mcsat_decl.max_flips = atoi(params[3]);
     }
   } else {
-    input_command.decl.mcsatdecl.max_flips = DEFAULT_MAX_FLIPS;
+    input_command.decl.mcsat_decl.max_flips = DEFAULT_MAX_FLIPS;
   }
   // max_extra_flips
   if (arglen > 4) {
     if (yy_check_int(params[4])) {
-      input_command.decl.mcsatdecl.max_extra_flips = atoi(params[4]);
+      input_command.decl.mcsat_decl.max_extra_flips = atoi(params[4]);
     }
   } else {
-    input_command.decl.mcsatdecl.max_flips = DEFAULT_MAX_EXTRA_FLIPS;
+    input_command.decl.mcsat_decl.max_flips = DEFAULT_MAX_EXTRA_FLIPS;
   }
   // max_samples
   if (arglen > 5) {
     if (yy_check_int(params[5])) {
-      input_command.decl.mcsatdecl.max_samples = atoi(params[5]);
+      input_command.decl.mcsat_decl.max_samples = atoi(params[5]);
     }
   } else {
-    input_command.decl.mcsatdecl.max_samples = DEFAULT_MAX_SAMPLES;
+    input_command.decl.mcsat_decl.max_samples = DEFAULT_MAX_SAMPLES;
   }
   free_strings(params);
 };
-  void yy_dumptables () {
+  void yy_dumptables (int32_t table) {
     input_command.kind = DUMPTABLES;
+    input_command.decl.dumptable_decl.table = table;
   };
   void yy_reset (char *name) {
     input_command.kind = RESET;
     if (name == NULL || strcasecmp(name, "ALL") ==0) {
-      input_command.decl.resetdecl.kind = ALL;
+      input_command.decl.reset_decl.kind = ALL;
     } else if (strcasecmp(name, "PROBABILITIES") == 0) {
-      input_command.decl.resetdecl.kind = PROBABILITIES;      
+      input_command.decl.reset_decl.kind = PROBABILITIES;      
     } else {
       yyerror("Reset must be omitted, 'all', or 'probabilities'");
     }
@@ -319,7 +414,7 @@ void yy_mcsatdecl (char **params) {
   };
   void yy_load (char *name) {
     input_command.kind = LOAD;
-    input_command.decl.loaddecl.file = name;
+    input_command.decl.load_decl.file = name;
   };
   void yy_test () {
     input_command.kind = TEST;
@@ -332,12 +427,12 @@ void yy_mcsatdecl (char **params) {
       }
     }
     input_command.kind = VERBOSITY;
-    input_command.decl.verbositydecl.level = atoi(level);
+    input_command.decl.verbosity_decl.level = atoi(level);
     safe_free(level);
   };
-  void yy_help (char* name) {
+  void yy_help (int32_t command) {
     input_command.kind = HELP;
-    input_command.decl.helpdecl.command = name;
+    input_command.decl.help_decl.command = command;
   };
   void yy_quit () {
     input_command.kind = QUIT;
@@ -348,6 +443,8 @@ void yy_mcsatdecl (char **params) {
 %token PREDICATE
 %token DIRECT
 %token INDIRECT
+%token CLAUSE
+%token RULE
 %token SORT
 %token SUBSORT
 %token CONST
@@ -356,6 +453,8 @@ void yy_mcsatdecl (char **params) {
 %token ASSERT
 %token ADD
 %token ASK
+%token ADD_CLAUSE
+%token ASK_CLAUSE
 %token MCSAT
 %token RESET
 %token DUMPTABLES
@@ -364,7 +463,11 @@ void yy_mcsatdecl (char **params) {
 %token TEST
 %token HELP
 %token QUIT
-
+%left IFF
+%right IMPLIES
+%left OR
+%left AND
+%token NOT
 %token NAME
 %token NUM
 %token STRING
@@ -374,19 +477,25 @@ void yy_mcsatdecl (char **params) {
   bool bval;
   char *str;
   char **strs;
+  input_fmla_t *fmla;
+  input_formula_t *formula;
   input_clause_t *clause;
   input_literal_t *lit;
   input_literal_t **lits;
   input_atom_t *atom;
+  int32_t ival;
 }
 
 %type <str> arg NAME NUM STRING addwt oarg oname
 %type <strs> arguments variables oarguments
+%type <formula> formula
+%type <fmla> fmla
 %type <clause> clause
 %type <lit> literal 
 %type <lits> literals
 %type <atom> atom
 %type <bval> witness
+%type <ival> cmd table
 
 %start command
 
@@ -394,8 +503,8 @@ void yy_mcsatdecl (char **params) {
   yyargs.size = 0;
   yylits.size = 0;
   yyerrflg = false;
-  yylloc.first_line = yylloc.last_line = 1;
-  yylloc.first_column = yylloc.last_column = 0;
+  //yylloc.first_line = yylloc.last_line = 1;
+  //yylloc.first_column = yylloc.last_column = 0;
  }
 
 /* Add sorts, declarations (var, const have sorts)
@@ -413,29 +522,80 @@ void yy_mcsatdecl (char **params) {
 /* Grammar */
 %%
 
-command: decl ';' {if (yyerrflg) {yyerrflg=false; YYABORT;} else {YYACCEPT;}}
-       | QUIT {yy_quit(); YYACCEPT;}; 
+command: decl enddecl {if (yyerrflg) {yyerrflg=false; YYABORT;} else {YYACCEPT;}}
+       | QUIT {yy_quit(); YYACCEPT;}
+       | error enddecl {yyerrflg=false; YYABORT;}
+       ;
 
-decl: SORT NAME {yy_sortdecl($2);}
-    | SUBSORT NAME NAME {yy_subsortdecl($2, $3);}
-    | PREDICATE atom witness {yy_preddecl($2, $3);}
-    | CONST arguments ':' NAME {yy_constdecl($2, $4);}
-    | VAR arguments ':' NAME {yy_vardecl($2, $4);}
-    | ATOM atom {yy_atomdecl($2);}
-    | ASSERT atom {yy_assertdecl($2);}
-    | ADD clause addwt {yy_adddecl($2, $3);}
-    | ASK clause NUM oarg {yy_askdecl($2, $3, $4);}
-    | MCSAT oarguments {yy_mcsatdecl($2);}
+enddecl: ';' | QUIT;
+
+decl: SORT NAME {yy_sort_decl($2);}
+    | SUBSORT NAME NAME {yy_subsort_decl($2, $3);}
+    | PREDICATE atom witness {yy_pred_decl($2, $3);}
+    | CONST arguments ':' NAME {yy_const_decl($2, $4);}
+    | VAR arguments ':' NAME {yy_var_decl($2, $4);}
+    | ATOM atom {yy_atom_decl($2);}
+    | ASSERT atom oname {yy_assert_decl($2, $3);}
+    | ADD_CLAUSE clause addwt oname {yy_add_decl($2, $3, $4);}
+    | ASK_CLAUSE clause NUM oarg {yy_ask_decl($2, $3, $4);}
+    | ADD formula NUM addwt oname {yy_add_fdecl($2, $3, $4);}
+    | ASK formula NUM oarg {yy_ask_fdecl($2, $3, $4);}
+    | MCSAT oarguments {yy_mcsat_decl($2);}
     | RESET oarg {yy_reset($2);}
-    | DUMPTABLES {yy_dumptables();}
+    | DUMPTABLES table {yy_dumptables($2);}
     | LOAD STRING {yy_load($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
     | TEST {yy_test(@1);}
-    | HELP oname {yy_help($2);}
+    | HELP cmd {yy_help($2);}
     ;
+
+cmd: /* empty */ {$$ = ALL;}
+     | SORT {$$ = SORT;} | SUBSORT {$$ = SUBSORT;} | PREDICATE {$$ = PREDICATE;}
+     | CONST {$$ = CONST;} | VAR {$$ = VAR;} | ATOM {$$ = ATOM;}
+     | ASSERT {$$ = ASSERT;} | ADD {$$ = ADD;} | ADD_CLAUSE {$$ = ADD_CLAUSE;}
+     | ASK {$$ = ASK;} | ASK_CLAUSE {$$ = ASK_CLAUSE;} | MCSAT {$$ = MCSAT;}
+     | RESET {$$ = RESET;} | DUMPTABLES {$$ = DUMPTABLES;}
+     | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
+     ;
+
+table: /* empty */ {$$ = ALL;}
+       | SORT {$$ = SORT;} | PREDICATE {$$ = PREDICATE} | ATOM {$$ = ATOM}
+       | CLAUSE {$$ = CLAUSE} | RULE {$$ = RULE}
+       ;
 
 witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;}
        | /* empty */ {$$ = true;};
+
+formula: fmla {$$ = yy_formula(NULL, $1);}
+       | '[' variables ']' fmla {$$ = yy_formula($2, $4);}
+       ;
+
+fmla: atom {$$ = yy_atom_to_fmla($1);}
+    | fmla IFF fmla {$$ = yy_fmla(IFF, $1, $3);}
+    | fmla IMPLIES fmla {$$ = yy_fmla(IMPLIES, $1, $3);}
+    | fmla OR fmla {$$ = yy_fmla(OR, $1, $3);}
+    | fmla AND fmla {$$ = yy_fmla(AND, $1, $3);}
+    | NOT fmla {$$ = yy_fmla(NOT, $2, NULL);}
+    | '(' fmla ')' {$$ = $2;}
+    ;
+
+// formula: iff_formula {$$ = yy_formula(NULL, $1);}
+//        | '(' variables ')' iff_formula {$$ = yy_formula($2, $4);};
+
+// iff_formula: implies_formula
+//            | iff_formula IFF implies_formula {yy_fmla(IFF, $1, $3);};
+
+// implies_formula: or_formula
+//                | implies_formula IMPLIES or_formula {yy_fmla(IMPLIES, $1, $3);};
+
+// or_formula: and_formula
+//           | or_formula OR and_formula {yy_fmla(OR, $1, $3);};
+
+// and_formula: not_formula
+//            | and_formula AND not_formula {yy_fmla(AND, $1, $3);};
+
+// not_formula: atom {$$ = yy_atom_to_fmla($1);}
+//            | NOT not_formula {yy_fmla(NOT, $2, NULL);};
 
 clause: literals {$$ = yy_clause(NULL, $1);};
       | '(' variables ')'
@@ -480,9 +640,10 @@ oname: /* empty */ {$$=NULL;} | NAME;
 
 int isidentchar(int c) {
   return !(isspace(c) || iscntrl(c) || c =='(' || c == ')' || c == '|'
-	   || c == ',' || c == ';' || c == ':');
+	   || c == '[' || c == ']' || c == ',' || c == ';' || c == ':');
 }
 
+// if YYRECOVERING need to read till no more input, then output ';'
 int skip_white_space_and_comments (void) {
   int c;
 
@@ -490,8 +651,12 @@ int skip_white_space_and_comments (void) {
     do {
       c = getc(parse_input);
       if (c == '\n') {
-	++yylloc.last_line;
-	yylloc.last_column = 0;
+	if (yynerrs && (parse_input == stdin)) {
+	  return ';';
+	} else {
+	  ++yylloc.last_line;
+	  yylloc.last_column = 0;
+	}
       } else {
 	++yylloc.last_column;
       }
@@ -582,6 +747,10 @@ int yylex (void) {
       return ADD;
     else if (strcasecmp(yylval.str, "ASK") == 0)
       return ASK;
+    else if (strcasecmp(yylval.str, "ADD_CLAUSE") == 0)
+      return ADD_CLAUSE;
+    else if (strcasecmp(yylval.str, "ASK_CLAUSE") == 0)
+      return ASK_CLAUSE;
     else if (strcasecmp(yylval.str, "MCSAT") == 0)
       return MCSAT;
     else if (strcasecmp(yylval.str, "RESET") == 0)
@@ -598,6 +767,16 @@ int yylex (void) {
       return HELP;
     else if (strcasecmp(yylval.str, "QUIT") == 0)
       return QUIT;
+    else if (strcasecmp(yylval.str, "IFF") == 0)
+      return IFF;
+    else if (strcasecmp(yylval.str, "IMPLIES") == 0)
+      return IMPLIES;
+    else if (strcasecmp(yylval.str, "OR") == 0)
+      return OR;
+    else if (strcasecmp(yylval.str, "AND") == 0)
+      return AND;
+    else if (strcasecmp(yylval.str, "NOT") == 0)
+      return NOT;
     else
       nstr = (char *) safe_malloc((strlen(yylval.str)+1) * sizeof(char));
     strcpy(nstr, yylval.str);
@@ -652,63 +831,71 @@ int yylex (void) {
 /* Free the memory allocated for the declaration */
   
 
-void free_preddecl_data() {
-  free_atom(input_command.decl.preddecl.atom);
+void free_pred_decl_data() {
+  free_atom(input_command.decl.pred_decl.atom);
 }
 
-void free_sortdecl_data() {
-  safe_free(input_command.decl.sortdecl.name);
+void free_sort_decl_data() {
+  safe_free(input_command.decl.sort_decl.name);
 }
 
-void free_subsortdecl_data() {
-  safe_free(input_command.decl.subsortdecl.subsort);
-  safe_free(input_command.decl.subsortdecl.supersort);
+void free_subsort_decl_data() {
+  safe_free(input_command.decl.subsort_decl.subsort);
+  safe_free(input_command.decl.subsort_decl.supersort);
 }
 
-void free_constdecl_data() {
-  free_strings(input_command.decl.constdecl.name);
-  safe_free(input_command.decl.constdecl.name);
-  safe_free(input_command.decl.constdecl.sort);
+void free_const_decl_data() {
+  free_strings(input_command.decl.const_decl.name);
+  safe_free(input_command.decl.const_decl.name);
+  safe_free(input_command.decl.const_decl.sort);
 }
 
-void free_vardecl_data() {
-  free_strings(input_command.decl.vardecl.name);
-  safe_free(input_command.decl.vardecl.sort);
+void free_var_decl_data() {
+  free_strings(input_command.decl.var_decl.name);
+  safe_free(input_command.decl.var_decl.sort);
 }
 
-void free_atomdecl_data() {
-  free_atom(input_command.decl.atomdecl.atom);
+void free_atom_decl_data() {
+  free_atom(input_command.decl.atom_decl.atom);
 }
 
-void free_assertdecl_data() {
-  free_atom(input_command.decl.assertdecl.atom);
+void free_assert_decl_data() {
+  free_atom(input_command.decl.assert_decl.atom);
 }
 
-void free_adddecl_data() {
-  free_clause(input_command.decl.adddecl.clause);
+void free_add_fdecl_data() {
+  free_formula(input_command.decl.add_fdecl.formula);
 }
 
-void free_askdecl_data() {
-  free_clause(input_command.decl.askdecl.clause);
+void free_ask_fdecl_data() {
+  free_formula(input_command.decl.ask_fdecl.formula);
 }
 
-void free_mcsatdecl_data() {
+void free_add_decl_data() {
+  free_clause(input_command.decl.add_decl.clause);
+}
+
+void free_ask_decl_data() {
+  free_clause(input_command.decl.ask_decl.clause);
+}
+
+void free_mcsat_decl_data() {
   // Nothing to do here
 }
 
-void free_resetdecl_data() {
+void free_reset_decl_data() {
   // Nothing to do here
 }
 
-void free_loaddecl_date() {
-  safe_free(input_command.decl.loaddecl.file);
+void free_load_decl_date() {
+  safe_free(input_command.decl.load_decl.file);
 }
 
-void free_dumptablesdecl_data() {
+void free_dumptables_decl_data() {
   // Nothing to do here
 }
 
-void free_verbositydecl_data() {
+void free_verbosity_decl_data() {
   // Nothing to do here
 }
 
@@ -716,66 +903,74 @@ void free_testdecl_data() {
   // Nothing to do here
 }
 
-void free_helpdecl_data() {
+void free_help_decl_data() {
   // Nothing to do here
 }
 
-void free_quitdecl_data() {
+void free_quit_decl_data() {
   // Nothing to do here
 }
 
 void free_parse_data () {
   switch (input_command.kind) {
   case PREDICATE: {
-    free_preddecl_data();
+    free_pred_decl_data();
     break;
   }
   case SORT: {
-    free_sortdecl_data();
+    free_sort_decl_data();
     break;
   }
   case SUBSORT: {
-    free_subsortdecl_data();
+    free_subsort_decl_data();
     break;
   }
   case CONST: {
-    free_constdecl_data();
+    free_const_decl_data();
     break;
   }
   case VAR: {
-    free_vardecl_data();
+    free_var_decl_data();
     break;
   }
   case ATOM: {
-    free_atomdecl_data();
+    free_atom_decl_data();
     break;
   }
   case ASSERT: {
-    free_assertdecl_data();
+    free_assert_decl_data();
     break;
   }
   case ADD: {
-    free_adddecl_data();
+    free_add_fdecl_data();
     break;
   }
   case ASK: {
-    free_askdecl_data();
+    free_ask_fdecl_data();
+    break;
+  }
+  case ADD_CLAUSE: {
+    free_add_decl_data();
+    break;
+  }
+  case ASK_CLAUSE: {
+    free_ask_decl_data();
     break;
   }
   case MCSAT: {
-    free_mcsatdecl_data();
+    free_mcsat_decl_data();
     break;
   }
   case RESET: {
-    free_resetdecl_data();
+    free_reset_decl_data();
     break;
   }
   case DUMPTABLES: {
-    free_dumptablesdecl_data();
+    free_dumptables_decl_data();
     break;
   }
   case VERBOSITY: {
-    free_verbositydecl_data();
+    free_verbosity_decl_data();
     break;
   }
   case TEST: {
@@ -783,18 +978,18 @@ void free_parse_data () {
     break;
   }
   case HELP: {
-    free_helpdecl_data();
+    free_help_decl_data();
     break;
   }
   case QUIT: {
-    free_quitdecl_data();
+    free_quit_decl_data();
     break;
   }
   }
 }
 
 void yyerror (char *str) {
-  printf("pce:%d: %s\n", yylloc.first_line, str);
+  printf("%s:%d:%d: %s\n", parse_file, yylloc.last_line, yylloc.last_column, str);
   input_command.kind = 0;
   yyerrflg = true;
 };

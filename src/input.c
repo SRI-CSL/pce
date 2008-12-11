@@ -2,25 +2,43 @@
 
 #include <inttypes.h>
 #include <float.h>
+#include <string.h>
 #include "memalloc.h"
 #include "utils.h"
 #include "parser.h"
 #include "yacc.tab.h"
 #include "print.h"
 #include "input.h"
+#include "cnf.h"
 #include "samplesat.h"
-
-bool nonstrict = 0;
 
 extern int yyparse ();
 extern void free_parse_data();
 extern int yydebug;
 
-static file_stack_t parse_input_stack = {0, 0, NULL};
+static bool strict_consts = true;
+static bool lazy = true;
 
 input_clause_buffer_t input_clause_buffer = {0, 0, NULL};
 input_literal_buffer_t input_literal_buffer = {0, 0, NULL};
 input_atom_buffer_t input_atom_buffer = {0, 0, NULL};
+
+bool strict_constants() {
+  return strict_consts;
+}
+
+void set_strict_constants(bool val) {
+  strict_consts = val;
+}
+
+bool lazy_mcsat() {
+  return lazy;
+}
+
+void set_lazy_mcsat(bool val) {
+  lazy = val;
+}
+
 
 void input_clause_buffer_resize (){
   if (input_clause_buffer.capacity == 0){
@@ -103,15 +121,89 @@ input_atom_t *new_input_atom () {
   return &input_atom_buffer.atoms[input_atom_buffer.size++];
 }
 
-extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
+void free_atom(input_atom_t *atom) {
+  int32_t i;
+
+  i = 0;
+  safe_free(atom->pred);
+  while (atom->args[i] != NULL) {
+    safe_free(atom->args[i]);
+    i++;
+  }
+  safe_free(atom->args);
+  safe_free(atom);
+}
+
+void free_literal(input_literal_t *lit) {
+  free_atom(lit->atom);
+  safe_free(lit);
+}
+
+void free_literals (input_literal_t **lit) {
+  int32_t i;
+
+  i = 0;
+  while (lit[i] != NULL) {
+    free_literal(lit[i]);
+    i++;
+  }
+  safe_free(lit);
+}
+
+void free_fmla (input_fmla_t *fmla) {
+  if (fmla->kind == ATOM) {
+    free_atom(fmla->ufmla->atom);
+  } else {
+    input_comp_fmla_t *cfmla = fmla->ufmla->cfmla;
+    input_fmla_t *arg1 = (input_fmla_t *) cfmla->arg1;
+    free_fmla(arg1);
+    if (cfmla->arg2 != NULL) {
+      free_fmla((input_fmla_t *) cfmla->arg2);
+    }
+  }
+  safe_free(fmla);
+}
+
+void free_var_entry(var_entry_t *var) {
+  safe_free(var->name);
+  safe_free(var);
+}
+
+void free_var_entries(var_entry_t **vars) {
+  int32_t i;
+
+  if (vars != NULL) {
+    for (i = 0; vars[i] != NULL; i++) {
+      free_var_entry(vars[i]);
+    }
+    safe_free(vars);
+  }
+}
+
+void free_formula(input_formula_t *formula) {
+  free_var_entries(formula->vars);
+  free_fmla(formula->fmla);
+  safe_free(formula);
+}
+
+void free_clause(input_clause_t *clause) {
+  free_strings(clause->variables);
+  free_literals(clause->literals);
+  safe_free(clause);
+}
+
+extern void read_eval_print_loop(char *file, samp_table_t *table) {
   sort_table_t *sort_table = &(table->sort_table);
   const_table_t *const_table = &(table->const_table);
   var_table_t *var_table = &(table->var_table);
   pred_table_t *pred_table = &(table->pred_table);
   atom_table_t *atom_table = &(table->atom_table);
-
-  file_stack_push(input, &parse_input_stack); // sets parse_input
+  input_stack_push(file); // sets parse_file and parse_input
   //yydebug = 1;
+  yylloc.first_line = 1;
+  yylloc.first_column = 0;
+  yylloc.last_line = 1;
+  yylloc.last_column = 0;
   do {
     printf("mcsat> ");
     fflush(stdout);
@@ -120,7 +212,7 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
       switch (input_command.kind) {
       case PREDICATE: {
 	int err = 0;
-	input_preddecl_t decl = input_command.decl.preddecl;
+	input_pred_decl_t decl = input_command.decl.pred_decl;
 	char * pred = decl.atom->pred;
 	// First the sorts - those we don't find, we add to the sort list
 	// if nonstrict is set.
@@ -128,7 +220,7 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	do {
 	  char * sort = decl.atom->args[i];
 	  if (sort_name_index(sort, sort_table) == -1) {
-	    if (nonstrict)
+	    if (!strict_constants())
 	      add_sort(sort_table, sort);
 	    else {
 	      err = 1;
@@ -149,22 +241,22 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	break;
       }
       case SORT: {
-	input_sortdecl_t decl = input_command.decl.sortdecl;
+	input_sort_decl_t decl = input_command.decl.sort_decl;
 	printf("Adding sort %s\n", decl.name);
 	add_sort(sort_table, decl.name);
 	break;
       }
       case SUBSORT: {
-	input_subsortdecl_t decl = input_command.decl.subsortdecl;
+	input_subsort_decl_t decl = input_command.decl.subsort_decl;
 	printf("Adding subsort %s of %s information\n",
 	       decl.subsort, decl.supersort);
 	add_subsort(sort_table, decl.subsort, decl.supersort);
 	break;
       }
       case CONST: {
-	input_constdecl_t decl = input_command.decl.constdecl;
+	input_const_decl_t decl = input_command.decl.const_decl;
 	if (sort_name_index(decl.sort, sort_table) == -1) {
-	  if (nonstrict)
+	  if (!strict_constants())
 	    add_sort(sort_table, decl.sort);
 	  else {
 	    fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
@@ -191,9 +283,9 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	break;
       }
       case VAR: {
-	input_vardecl_t decl = input_command.decl.vardecl;
+	input_var_decl_t decl = input_command.decl.var_decl;
 	if (sort_name_index(decl.sort, sort_table) == -1) {
-	  if (nonstrict)
+	  if (!strict_constants())
 	    add_sort(sort_table, decl.sort);
 	  else {
 	    fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
@@ -210,19 +302,31 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
       }
       case ATOM: {
 	// invoke add_atom
-	input_atomdecl_t decl = input_command.decl.atomdecl;
+	input_atom_decl_t decl = input_command.decl.atom_decl;
 	add_atom(table, decl.atom);
 	break;
       }
       case ASSERT: {
 	// Need to check that the predicate is a witness predicate,
 	// then invoke assert_atom.
-	input_assertdecl_t decl = input_command.decl.assertdecl;
+	input_assert_decl_t decl = input_command.decl.assert_decl;
 	assert_atom(table, decl.atom);
 	break;
       }
       case ADD: {
-	input_adddecl_t decl = input_command.decl.adddecl;
+	input_add_fdecl_t decl = input_command.decl.add_fdecl;
+	printf("Clausifying and adding formula\n");
+	add_cnf(decl.formula, decl.weight);
+	break;
+      }
+      case ASK: {
+	input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
+	printf("Clausifying formula\n");
+	//ask_cnf(decl.formula, decl.weight);
+	break;
+      }
+      case ADD_CLAUSE: {
+	input_add_decl_t decl = input_command.decl.add_decl;
 	if (decl.clause->varlen == 0) {
 	  // No variables - adding a clause
 	  printf("Adding clause\n");
@@ -246,14 +350,14 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	}
 	break;
       }
-      case ASK: {
-	input_askdecl_t decl = input_command.decl.askdecl;
+      case ASK_CLAUSE: {
+	input_ask_decl_t decl = input_command.decl.ask_decl;
 	assert(decl.clause->litlen == 1);
 	query_clause(decl.clause, decl.threshold, decl.all, table);
 	break;
       }
       case MCSAT: {
-	input_mcsatdecl_t decl = input_command.decl.mcsatdecl;
+	input_mcsat_decl_t decl = input_command.decl.mcsat_decl;
 	printf("Calling MCSAT with parameters:\n");
 	printf(" sa_probability = %f\n", decl.sa_probability);
 	printf(" samp_temperature = %f\n", decl.samp_temperature);
@@ -268,7 +372,7 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	break;
       }
       case RESET: {
-	input_resetdecl_t decl = input_command.decl.resetdecl;
+	input_reset_decl_t decl = input_command.decl.reset_decl;
 	switch (decl.kind) {
 	case ALL: {
 	  // Resets the sample tables
@@ -291,23 +395,49 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	break;
       }
       case LOAD: {
-	input_loaddecl_t decl = input_command.decl.loaddecl;
+	input_load_decl_t decl = input_command.decl.load_decl;
 	load_mcsat_file(decl.file, table);
 	break;
       }
       case DUMPTABLES: {
-	printf("Dumping tables...\n");
-	dump_sort_table(table);
-	dump_pred_table(table);
-	//dump_const_table(const_table, sort_table);
-	//dump_var_table(var_table, sort_table);
-	dump_atom_table(table);
-	dump_clause_table(table);
-	dump_rule_table(table);
+	input_dumptable_decl_t decl = input_command.decl.dumptable_decl;
+	switch (decl.table) {
+	case ALL: {
+	  printf("Dumping tables...\n");
+	  dump_sort_table(table);
+	  dump_pred_table(table);
+	  //dump_const_table(const_table, sort_table);
+	  //dump_var_table(var_table, sort_table);
+	  dump_atom_table(table);
+	  dump_clause_table(table);
+	  dump_rule_table(table);
+	  break;
+	}
+	case SORT: {
+	  dump_sort_table(table);
+	  break;
+	}
+	case PREDICATE: {
+	  dump_pred_table(table);
+	  break;
+	}
+	case ATOM: {
+	  dump_atom_table(table);
+	  break;
+	}
+	case CLAUSE: {
+	  dump_clause_table(table);
+	  break;
+	}
+	case RULE: {
+	  dump_rule_table(table);
+	  break;
+	}
+	}
 	break;
       }
       case VERBOSITY: {
-	input_verbositydecl_t decl = input_command.decl.verbositydecl;
+	input_verbosity_decl_t decl = input_command.decl.verbosity_decl;
 	set_verbosity_level(decl.level);
 	printf("Setting verbosity to %"PRId32"\n", decl.level);
 	break;
@@ -317,55 +447,125 @@ extern void read_eval_print_loop(FILE *input, samp_table_t *table) {
 	break;
       }
       case HELP: {
-	printf("\nInput grammar:\n");
-	printf(" sort NAME ';'\n");
-	printf(" subsort NAME NAME ';'\n");
-	printf(" const NAME++',' ':' NAME ';'\n");
-	printf(" predicate ATOM [direct|indirect] ';'\n");
-	printf(" atom ATOM ';'\n assert ATOM ';'\n");
-	printf(" add CLAUSE [NUM] ';'\n");
-	printf(" ask CLAUSE ';'\n");
-	printf(" mcsat NUM**','\n");
-	printf(" reset probabilities\n");
-	printf(" dumptables ';'\n verbosity NUM ';'\n help ';'\n quit ';'\n");
-	printf("where:\n CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n");
-	printf(" LITERAL := ['~'] ATOM\n ATOM := NAME '(' ARG++',' ')'\n");
-	printf(" ARG := NAME | NUM\n");
-	printf(" NAME := chars except whitespace parens ':' ',' ';'\n");
-	printf(" NUM := ['+'|'-'] simple floating point number\n");
-	printf("predicates default to 'direct' (i.e., witness/observable)\n");
-	printf("mcsat NUMs are optional, and represent, in order:\n");
-	printf("  sa_probability - double\n");
-	printf("  samp_temperature - double\n");
-	printf("  rvar_probability - double\n");
-	printf("  max_flips - int\n");
-	printf("  max_extra_flips - int\n");
-	printf("  max_samples - int\n");
+	input_help_decl_t decl = input_command.decl.help_decl;
+	switch (decl.command) {
+	case ALL: {
+	    printf("\n\
+Input grammar:\n\
+ sort NAME ';'\n\
+ subsort NAME NAME ';'\n\
+ const NAME++',' ':' NAME ';'\n\
+ predicate ATOM [direct|indirect] ';'\n\
+ atom ATOM ';'\n assert ATOM ';'\n\
+ add CLAUSE [NUM] ';'\n\
+ ask CLAUSE NUM ';'\n\
+ mcsat NUM**','\n\
+ reset probabilities\n\
+ dumptables ';'\n verbosity NUM ';'\n help ';'\n quit ';'\n\
+where:\n CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n\
+ LITERAL := ['~'] ATOM\n ATOM := NAME '(' ARG++',' ')'\n\
+ ARG := NAME | NUM\n\
+ NAME := chars except whitespace parens ':' ',' ';'\n\
+ NUM := ['+'|'-'] simple floating point number\n\
+predicates default to 'direct' (i.e., witness/observable)\n\
+mcsat NUMs are optional, and represent, in order:\n\
+  sa_probability - double\n\
+  samp_temperature - double\n\
+  rvar_probability - double\n\
+  max_flips - int\n\
+  max_extra_flips - int\n\
+  max_samples - int\n\
+");
+	    break;
+	  }
+	case SORT: {
+	    printf("\n\
+sort NAME;\n\
+  declares NAME as a new sort\n\
+");
+	    break;
+	  };
+	case SUBSORT: {
+	    printf("\n\
+subsort NAME1 NAME2;\n\
+  declares NAME1 as a subsort of NAME2\n\
+NAME1 and NAME2 may or may not be existing sorts.\n\
+The effect of this is to allow more refined predicates,\n\
+leading to a smaller sample space.\n\
+");
+	    break;
+	  }
+	case PREDICATE: {
+	    printf("\n\
+predicate PRED(SORT1, ..., SORTn) [WITNESS];\n\
+  Declares a predicate PRED, its signature, and whether it is a witness.\n\
+WITNESS may be 'DIRECT' or 'INDIRECT' - if omitted, defaults to 'DIRECT'.\n\
+A direct predicate is one that is observable.  The primary impact of this\n\
+is that direct predicates satisfy the closed world assumption, while\n\
+indirect predicates do not.\n\
+");
+	    break;
+	  }
+	case CONST: {
+	    printf("\n\
+const NAME1, NAME2, ... : SORT;\n\
+  Declares constants to be of the given sort.\n\
+");
+	    break;
+	  }
+	case ADD: {
+	    printf("\n\
+add FORMULA WEIGHT [SOURCE];\n\
+  Clausifies the FORMULA, and adds each clause to the clause or rules table,\n\
+with the given WEIGHT (a floating point number) and associated with the SOURCE\n\
+(an arbitrary NAME).\n\
+Ground clauses are added to the clause table, and clauses with variables are\n\
+added to the rule table.  For a ground clause, the formula is an atom\n\
+(i.e., predicate applied to constants), or a boolean expression\n\
+built using NOT, AND, OR, IMPLIES (or =>), IFF, and parentheses.\n\
+A rule is similar, but involves variables, which are in square brackets\n\
+before the boolean formula.\n\
+For example:\n\
+  add p(c1) and (p(c2) or p(c3)) 3.3;\n\
+  add [x, y, z] r(x, y) and r(y, z) implies r(x, z) 15 user;\n\
+");
+	    break;
+	  }
+	case ADD_CLAUSE:
+	case ATOM:
+	case VAR:
+	case ASK:
+	case ASK_CLAUSE:
+	case MCSAT:
+	case RESET:
+	case DUMPTABLES:
+	case LOAD:
+	case VERBOSITY:
+	case HELP:
+	  printf("\n\
+No help available yet\n\
+");
+	  break;
+	}
 	break;
       }
       case QUIT:
 	printf("QUIT reached, exiting read_eval_print_loop\n");
+	input_command.kind = 0;
 	goto end;
 	break;
       };
     free_parse_data();
+    //yylloc.first_line += yylloc.last_line;
+    //yylloc.first_column += yyloc.last_column;
   } while (true);
  end:
-  file_stack_pop(&parse_input_stack);
+  input_stack_pop();
   return;
 }
 
-extern bool load_mcsat_file(char *file, samp_table_t *table) {
-  FILE *fp = fopen(file, "r");
-  if (fp != NULL) {
-    printf("Loading file %s\n", file);
-    read_eval_print_loop(fp, table);
-    fclose(fp);
-    return true;
-  } else {
-    printf("File %s could not be opened\n", file);
-    return false;
-  }
+extern void load_mcsat_file(char *file, samp_table_t *table) {
+  read_eval_print_loop(file, table);
 }
 
 // This is a placeholder - useful for debugging purposes.
