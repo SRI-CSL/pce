@@ -15,6 +15,11 @@ sort 'http://calo.sri.com/core-plus-office#ComputerFile';
 predicate 'http://calo.sri.com/core-plus-office#relatedProjectIs'
             ('http://calo.sri.com/core-plus-office#EmailMessage',
 	     'http://calo.sri.com/core-plus-office#Project') indirect;
+predicate 'http://calo.sri.com/core-plus-office#emailSenderIs'
+            ('http://calo.sri.com/core-plus-office#EmailMessage',
+	     'http://calo.sri.com/core-plus-office#Person') indirect;
+predicate 'http://calo.sri.com/core-plus-office#EmailMessage'('http://calo.sri.com/core-plus-office#EmailMessage') direct;
+predicate 'http://calo.sri.com/core-plus-office#Person'('http://calo.sri.com/core-plus-office#Person') direct;
 	     
 #predicate attached('http://calo.sri.com/core-plus-office#DocumentFile', 'http://calo.sri.com/core-plus-office#EmailMessage') direct;
 predicate 'SubjectCategory'(Category_t) direct;
