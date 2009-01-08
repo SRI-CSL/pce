@@ -58,14 +58,21 @@ extern void add_rule_to_pred(pred_table_t *pred_table,
 			     int32_t predicate,
 			     int32_t current_rule_index);
 
+extern int32_t add_query(var_entry_t **vars, rule_literal_t ***lits,
+			 samp_table_t *table);
+
+// extern int32_t add_query_instance(samp_literal_t **lits, int32_t num_lits, samp_table_t *table);
+
+extern int32_t add_subst_query_instance(samp_literal_t **litinst, substit_entry_t *substs,
+					samp_query_t *query, samp_table_t *table);
+
 extern void all_rule_instances(int32_t rule, samp_table_t *table);
 
 extern int32_t samp_query_to_query_instance(samp_query_t *query,
 					    samp_table_t *table);
 
 extern void all_query_instances_rec(int32_t vidx, samp_query_t *query,
-				    samp_table_t *table, bool lazy,
-				    int32_t atom_index);
+				    samp_table_t *table, int32_t atom_index);
   
 extern void all_query_instances(samp_query_t *query, samp_table_t *table);
 
@@ -93,11 +100,11 @@ extern void init_clause_lists(clause_table_t *clause_table);
   
 extern void create_new_const_rule_instances(int32_t constidx,
 					    samp_table_t *table,
-					    bool lazy, int32_t atom_index);
+					    int32_t atom_index);
 
 extern void create_new_const_query_instances(int32_t constidx,
 					     samp_table_t *table,
-					     bool lazy, int32_t atom_index);
+					     int32_t atom_index);
 
 extern int32_t activate_atom(samp_table_t *table, samp_atom_t *atom);
 
@@ -117,8 +124,8 @@ extern void init_random_assignment(samp_truth_value_t *assignment, int32_t num_v
 
 extern int32_t init_sample_sat(samp_table_t *table);
 
-extern void query_clause(input_clause_t *clause, double threshold, bool all,
-			 samp_table_t *table);
+// extern void query_clause(input_clause_t *clause, double threshold, bool all,
+// 			 samp_table_t *table);
 
 /* bool valid_atom_table(atom_table_t *atom_table, */
 /* 		      pred_table_t *pred_table, */
@@ -143,5 +150,12 @@ void mc_sat(samp_table_t *table, double sa_probability,
 bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
 			     int32_t arity);
 
-#endif /* __SAMPLESAT_H */     
+bool eql_samp_atom(samp_atom_t *atom1, samp_atom_t *atom2, samp_table_t *table);
 
+bool eql_rule_literal(rule_literal_t *lit1, rule_literal_t *lit2, samp_table_t *table);
+
+bool eql_query_entries(rule_literal_t ***lits, samp_query_t *query, samp_table_t *table);
+
+bool eql_query_instance_lits(samp_literal_t **lit1, samp_literal_t **lit2);
+
+#endif /* __SAMPLESAT_H */
