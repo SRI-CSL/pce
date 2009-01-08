@@ -11,13 +11,14 @@
 #include "input.h"
 #include "cnf.h"
 #include "samplesat.h"
+#include "lazysamplesat.h"
 
 extern int yyparse ();
 extern void free_parse_data();
 extern int yydebug;
 
 static bool strict_consts = true;
-static bool lazy = true;
+static bool lazy = false;
 
 input_clause_buffer_t input_clause_buffer = {0, 0, NULL};
 input_literal_buffer_t input_literal_buffer = {0, 0, NULL};
@@ -53,7 +54,7 @@ void input_clause_buffer_resize (){
 	out_of_memory();
       }
       capacity += capacity/2;
-      printf("Increasing clause buffer to %"PRIu32"\n", capacity);
+      cprintf(2,"Increasing clause buffer to %"PRIu32"\n", capacity);
       input_clause_buffer.clauses = (input_clause_t **)
 	safe_realloc(input_clause_buffer.clauses,
 		     capacity * sizeof(input_clause_t *));
@@ -75,7 +76,7 @@ void input_literal_buffer_resize (){
 	out_of_memory();
       }
       capacity += capacity/2;
-      printf("Increasing literal buffer to %"PRIu32"\n", capacity);
+      cprintf(2, "Increasing literal buffer to %"PRIu32"\n", capacity);
       input_literal_buffer.literals = (input_literal_t *)
 	safe_realloc(input_literal_buffer.literals,
 		     capacity * sizeof(input_literal_t));
@@ -98,7 +99,7 @@ void input_atom_buffer_resize (){
 	out_of_memory();
       }
       capacity += capacity/2;
-      printf("Increasing atom buffer to %"PRIu32"\n", capacity);
+      cprintf(2, "Increasing atom buffer to %"PRIu32"\n", capacity);
       input_atom_buffer.atoms = (input_atom_t *)
 	safe_realloc(input_atom_buffer.atoms, capacity * sizeof(input_atom_t));
       input_atom_buffer.capacity = capacity;
@@ -192,6 +193,144 @@ void free_clause(input_clause_t *clause) {
   safe_free(clause);
 }
 
+void show_help(int32_t topic) {
+  switch (topic) {
+  case ALL: {
+    printf("\n\
+Input grammar:\n\
+ sort NAME ';'\n\
+ subsort NAME NAME ';'\n\
+ const NAME++',' ':' NAME ';'\n\
+ predicate ATOM [direct|indirect] ';'\n\
+ atom ATOM ';'\n assert ATOM ';'\n\
+ add CLAUSE [NUM] ';'\n\
+ ask CLAUSE NUM ';'\n\
+ mcsat NUM**','\n\
+ reset probabilities\n\
+ dumptables ';'\n verbosity NUM ';'\n help ';'\n quit ';'\n\
+where:\n CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n\
+ LITERAL := ['~'] ATOM\n ATOM := NAME '(' ARG++',' ')'\n\
+ ARG := NAME | NUM\n\
+ NAME := chars except whitespace parens ':' ',' ';'\n\
+ NUM := ['+'|'-'] simple floating point number\n\
+predicates default to 'direct' (i.e., witness/observable)\n\
+mcsat NUMs are optional, and represent, in order:\n\
+  sa_probability - double\n\
+  samp_temperature - double\n\
+  rvar_probability - double\n\
+  max_flips - int\n\
+  max_extra_flips - int\n\
+  max_samples - int\n\
+");
+    break;
+  }
+  case SORT: {
+    printf("\n\
+sort NAME;\n\
+  declares NAME as a new sort\n\
+");
+    break;
+  };
+  case SUBSORT: {
+    printf("\n\
+subsort NAME1 NAME2;\n\
+  declares NAME1 as a subsort of NAME2\n\
+NAME1 and NAME2 may or may not be existing sorts.\n\
+The effect of this is to allow more refined predicates,\n\
+leading to a smaller sample space.\n\
+");
+    break;
+  }
+  case PREDICATE: {
+    printf("\n\
+predicate PRED(SORT1, ..., SORTn) [WITNESS];\n\
+  Declares a predicate PRED, its signature, and whether it is a witness.\n\
+WITNESS may be 'DIRECT' or 'INDIRECT' - if omitted, defaults to 'DIRECT'.\n\
+A direct predicate is one that is observable.  The primary impact of this\n\
+is that direct predicates satisfy the closed world assumption, while\n\
+indirect predicates do not.\n\
+");
+    break;
+  }
+  case CONST: {
+    printf("\n\
+const NAME1, NAME2, ... : SORT;\n\
+  Declares constants to be of the given sort.\n\
+");
+    break;
+  }
+  case ADD: {
+    printf("\n\
+add FORMULA WEIGHT [SOURCE];\n\
+  Clausifies the FORMULA, and adds each clause to the clause or rules table,\n\
+with the given WEIGHT (a floating point number) and associated with the SOURCE\n\
+(an arbitrary NAME).\n\
+Ground clauses are added to the clause table, and clauses with variables are\n\
+added to the rule table.  For a ground clause, the formula is an atom\n\
+(i.e., predicate applied to constants), or a boolean expression\n\
+built using NOT, AND, OR, IMPLIES (or =>), IFF, and parentheses.\n\
+A rule is similar, but involves variables, which are in square brackets\n\
+before the boolean formula.\n\
+For example:\n\
+  add p(c1) and (p(c2) or p(c3)) 3.3;\n\
+  add [x, y, z] r(x, y) and r(y, z) implies r(x, z) 15 user;\n\
+");
+    break;
+  }
+  case ADD_CLAUSE: {
+    printf("\n\
+add_clause [VARS] CLAUSE WEIGHT [SOURCE];\n\
+  Adds the clause to the clause or rules table with the given WEIGHT\n\
+(a floating point number) and associated with the SOURCE (a NAME).\n\
+Ground clauses are added to the clause table, and clauses with variables are\n\
+added to the rule table.  Ground clauses are added to the clause table\n\
+For example:\n\
+  add_clause ~p(c1) | ~p(c2) | p(c3) 3.3;\n\
+  add [x, y, z] r(x, y) and r(y, z) implies r(x, z) 15 user;\n\
+");
+    break;
+  }
+  case ATOM: {
+    printf("\n\
+atom ATOM;\n\
+  Simply adds an atom to the atom table, without any associated weight or truth value.\n\
+Probably not needed.\n\
+");
+    break;
+  }
+    //case VAR:
+  case ASK: {
+    printf("\n\
+ask FORMULA [NUMBER_OF_SAMPLES [THRESHOLD]];\n\
+  Queries for the probability of instances of the given formula.\n\
+Does sampling over the given NUMBER_OF_SAMPLES (default %d), and prints\n\
+the instance with the highest probability if THRESHOLD is not provided.\n\
+If THRESHOLD is provided, all instances whose probabilities are >= THRESHOLD\n\
+are printed, in order.\n\
+For example:\n\
+  ask [x] father(Bob, x) and mother(Alice, x)\n\
+    may produce 'father(Bob, Carl) and mother(Alice, Carl): .253\n\
+  ask [x] father(Bob, x) and mother(Alice, x) 200 .2\n\
+    may produce 'father(Bob, Carl) and mother(Alice, Carl): .253\n\
+                 father(Bob, Cathy) and mother(Alice, Cathy): .215'\n\
+", DEFAULT_MAX_SAMPLES);
+    break;
+  }
+
+//  case ASK_CLAUSE:
+  case MCSAT:
+  case RESET:
+  case DUMPTABLE:
+  case LOAD:
+  case VERBOSITY:
+  case HELP:
+    printf("\n\
+No help available yet\n\
+");
+    break;
+  }
+}
+	
 extern void read_eval_print_loop(char *file, samp_table_t *table) {
   sort_table_t *sort_table = &(table->sort_table);
   const_table_t *const_table = &(table->const_table);
@@ -234,7 +373,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	if (err)
 	  fprintf(stderr, "Predicate %s not added\n", pred);
 	else {
-	  printf("Adding predicate %s\n", pred);
+	  cprintf(1, "Adding predicate %s\n", pred);
 	  add_pred(pred_table, pred, decl.witness, arity,
 		   sort_table, decl.atom->args);
 	}
@@ -242,13 +381,13 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
       }
       case SORT: {
 	input_sort_decl_t decl = input_command.decl.sort_decl;
-	printf("Adding sort %s\n", decl.name);
+	cprintf(1, "Adding sort %s\n", decl.name);
 	add_sort(sort_table, decl.name);
 	break;
       }
       case SUBSORT: {
 	input_subsort_decl_t decl = input_command.decl.subsort_decl;
-	printf("Adding subsort %s of %s information\n",
+	cprintf(1, "Adding subsort %s of %s information\n",
 	       decl.subsort, decl.supersort);
 	add_subsort(sort_table, decl.subsort, decl.supersort);
 	break;
@@ -267,13 +406,13 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	for (i = 0; i<decl.num_names; i++) {
 	  // Need to see if name in var_table
 	  if (var_index(decl.name[i], var_table) == -1) {
-	    cprintf(1,"Adding const %s\n", decl.name[i]);
-	    if(add_const(decl.name[i], decl.sort, table) != -1){
+	    cprintf(1, "Adding const %s\n", decl.name[i]);
+	    if (add_const(decl.name[i], decl.sort, table) != -1) {
 	      int32_t cidx = const_index(decl.name[i], const_table);
 	      // We don't invoke this in add_const, as this is eager.
 	      // Last arg says this is not lazy.
-	      create_new_const_rule_instances(cidx, table, false, 0);
-	      create_new_const_query_instances(cidx, table, false, 0);
+	      create_new_const_rule_instances(cidx, table, 0);
+	      create_new_const_query_instances(cidx, table, 0);
 	    }
 	  }
 	  else
@@ -295,7 +434,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	int32_t i;
 	for (i=0; i<decl.num_names; i++) {
 	  // Need to see if name in const_table
-	  printf("Adding var %s\n", decl.name[i]);
+	  cprintf(1, "Adding var %s\n", decl.name[i]);
 	  add_var(var_table, decl.name[i], sort_table, decl.sort);
 	}
 	break;
@@ -315,21 +454,15 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
       }
       case ADD: {
 	input_add_fdecl_t decl = input_command.decl.add_fdecl;
-	printf("Clausifying and adding formula\n");
+	cprintf(1, "Clausifying and adding formula\n");
 	add_cnf(decl.formula, decl.weight);
-	break;
-      }
-      case ASK: {
-	input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
-	printf("Clausifying formula\n");
-	//ask_cnf(decl.formula, decl.weight);
 	break;
       }
       case ADD_CLAUSE: {
 	input_add_decl_t decl = input_command.decl.add_decl;
 	if (decl.clause->varlen == 0) {
 	  // No variables - adding a clause
-	  printf("Adding clause\n");
+	  cprintf(1, "Adding clause\n");
 	  add_clause(table,
 		     decl.clause->literals,
 		     decl.weight);
@@ -338,9 +471,9 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	  // Have variables - adding a rule
 	  double wt = decl.weight;
 	  if (wt == DBL_MAX) {
-	    printf("Adding rule with MAX weight\n");
+	    cprintf(1, "Adding rule with MAX weight\n");
 	  } else {
-	    printf("Adding rule with weight %f\n", wt);
+	    cprintf(1, "Adding rule with weight %f\n", wt);
 	  }
 	  int32_t ruleidx = add_rule(decl.clause, decl.weight, table);
 	  // Create instances here rather than add_rule, as this is eager
@@ -350,31 +483,44 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	}
 	break;
       }
-      case ASK_CLAUSE: {
-	input_ask_decl_t decl = input_command.decl.ask_decl;
-	assert(decl.clause->litlen == 1);
-	query_clause(decl.clause, decl.threshold, decl.all, table);
+      case ASK: {
+	input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
+	cprintf(1, "Clausifying formula\n");
+	ask_cnf(decl.formula, decl.num_samples, decl.threshold);
 	break;
       }
+//       case ASK_CLAUSE: {
+// 	input_ask_decl_t decl = input_command.decl.ask_decl;
+// 	assert(decl.clause->litlen == 1);
+// 	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
+// 	break;
+//       }
       case MCSAT: {
 	input_mcsat_decl_t decl = input_command.decl.mcsat_decl;
-	printf("Calling MCSAT with parameters:\n");
+	printf("Calling %sMC_SAT with parameters:\n",
+	       lazy_mcsat() ? "LAZY_" : "");
 	printf(" sa_probability = %f\n", decl.sa_probability);
 	printf(" samp_temperature = %f\n", decl.samp_temperature);
 	printf(" rvar_probability = %f\n", decl.rvar_probability);
 	printf(" max_flips = %"PRId32"\n", decl.max_flips);
 	printf(" max_extra_flips = %"PRId32"\n", decl.max_extra_flips);
 	printf(" max_samples = %"PRId32"\n", decl.max_samples);
-	mc_sat(table, decl.sa_probability, decl.samp_temperature,
-	       decl.rvar_probability, decl.max_flips,
-	       decl.max_extra_flips, decl.max_samples);
+	if (lazy_mcsat()) {
+	  lazy_mc_sat(table, decl.sa_probability, decl.samp_temperature,
+		      decl.rvar_probability, decl.max_flips,
+		      decl.max_extra_flips, decl.max_samples);
+	} else {
+	  mc_sat(table, decl.sa_probability, decl.samp_temperature,
+		 decl.rvar_probability, decl.max_flips,
+		 decl.max_extra_flips, decl.max_samples);
+	}
 	printf("\n");
 	break;
       }
       case RESET: {
 	input_reset_decl_t decl = input_command.decl.reset_decl;
 	switch (decl.kind) {
-	case ALL: {
+	case RESETALL: {
 	  // Resets the sample tables
 	  reset_sort_table(sort_table);
 	  // Need to do more here - like free up space.
@@ -399,11 +545,11 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	load_mcsat_file(decl.file, table);
 	break;
       }
-      case DUMPTABLES: {
+      case DUMPTABLE: {
 	input_dumptable_decl_t decl = input_command.decl.dumptable_decl;
 	switch (decl.table) {
 	case ALL: {
-	  printf("Dumping tables...\n");
+	  cprintf(1, "Dumping tables...\n");
 	  dump_sort_table(table);
 	  dump_pred_table(table);
 	  //dump_const_table(const_table, sort_table);
@@ -439,7 +585,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
       case VERBOSITY: {
 	input_verbosity_decl_t decl = input_command.decl.verbosity_decl;
 	set_verbosity_level(decl.level);
-	printf("Setting verbosity to %"PRId32"\n", decl.level);
+	cprintf(1, "Setting verbosity to %"PRId32"\n", decl.level);
 	break;
       }
       case TEST: {
@@ -448,109 +594,11 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
       }
       case HELP: {
 	input_help_decl_t decl = input_command.decl.help_decl;
-	switch (decl.command) {
-	case ALL: {
-	    printf("\n\
-Input grammar:\n\
- sort NAME ';'\n\
- subsort NAME NAME ';'\n\
- const NAME++',' ':' NAME ';'\n\
- predicate ATOM [direct|indirect] ';'\n\
- atom ATOM ';'\n assert ATOM ';'\n\
- add CLAUSE [NUM] ';'\n\
- ask CLAUSE NUM ';'\n\
- mcsat NUM**','\n\
- reset probabilities\n\
- dumptables ';'\n verbosity NUM ';'\n help ';'\n quit ';'\n\
-where:\n CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n\
- LITERAL := ['~'] ATOM\n ATOM := NAME '(' ARG++',' ')'\n\
- ARG := NAME | NUM\n\
- NAME := chars except whitespace parens ':' ',' ';'\n\
- NUM := ['+'|'-'] simple floating point number\n\
-predicates default to 'direct' (i.e., witness/observable)\n\
-mcsat NUMs are optional, and represent, in order:\n\
-  sa_probability - double\n\
-  samp_temperature - double\n\
-  rvar_probability - double\n\
-  max_flips - int\n\
-  max_extra_flips - int\n\
-  max_samples - int\n\
-");
-	    break;
-	  }
-	case SORT: {
-	    printf("\n\
-sort NAME;\n\
-  declares NAME as a new sort\n\
-");
-	    break;
-	  };
-	case SUBSORT: {
-	    printf("\n\
-subsort NAME1 NAME2;\n\
-  declares NAME1 as a subsort of NAME2\n\
-NAME1 and NAME2 may or may not be existing sorts.\n\
-The effect of this is to allow more refined predicates,\n\
-leading to a smaller sample space.\n\
-");
-	    break;
-	  }
-	case PREDICATE: {
-	    printf("\n\
-predicate PRED(SORT1, ..., SORTn) [WITNESS];\n\
-  Declares a predicate PRED, its signature, and whether it is a witness.\n\
-WITNESS may be 'DIRECT' or 'INDIRECT' - if omitted, defaults to 'DIRECT'.\n\
-A direct predicate is one that is observable.  The primary impact of this\n\
-is that direct predicates satisfy the closed world assumption, while\n\
-indirect predicates do not.\n\
-");
-	    break;
-	  }
-	case CONST: {
-	    printf("\n\
-const NAME1, NAME2, ... : SORT;\n\
-  Declares constants to be of the given sort.\n\
-");
-	    break;
-	  }
-	case ADD: {
-	    printf("\n\
-add FORMULA WEIGHT [SOURCE];\n\
-  Clausifies the FORMULA, and adds each clause to the clause or rules table,\n\
-with the given WEIGHT (a floating point number) and associated with the SOURCE\n\
-(an arbitrary NAME).\n\
-Ground clauses are added to the clause table, and clauses with variables are\n\
-added to the rule table.  For a ground clause, the formula is an atom\n\
-(i.e., predicate applied to constants), or a boolean expression\n\
-built using NOT, AND, OR, IMPLIES (or =>), IFF, and parentheses.\n\
-A rule is similar, but involves variables, which are in square brackets\n\
-before the boolean formula.\n\
-For example:\n\
-  add p(c1) and (p(c2) or p(c3)) 3.3;\n\
-  add [x, y, z] r(x, y) and r(y, z) implies r(x, z) 15 user;\n\
-");
-	    break;
-	  }
-	case ADD_CLAUSE:
-	case ATOM:
-	case VAR:
-	case ASK:
-	case ASK_CLAUSE:
-	case MCSAT:
-	case RESET:
-	case DUMPTABLES:
-	case LOAD:
-	case VERBOSITY:
-	case HELP:
-	  printf("\n\
-No help available yet\n\
-");
-	  break;
-	}
+	show_help(decl.command);
 	break;
       }
       case QUIT:
-	printf("QUIT reached, exiting read_eval_print_loop\n");
+	cprintf(1, "QUIT reached, exiting read_eval_print_loop\n");
 	input_command.kind = 0;
 	goto end;
 	break;
