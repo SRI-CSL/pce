@@ -10,8 +10,6 @@
 #include "integer_stack.h"
 #include "utils.h"
 
-extern void all_lazy_query_instances(samp_query_t *query, samp_table_t *table);
-
 extern void lazy_mc_sat(samp_table_t *table, double sa_probability,
 			double samp_temperature, double rvar_probability,
 			uint32_t max_flips, uint32_t max_extra_flips,
