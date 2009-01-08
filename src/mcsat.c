@@ -29,10 +29,10 @@ enum {
   STRICT_OPTION
 };
 
-enum subcommand {
-  UNKNOWN_SUBCOMMAND,
-  VERBOSITY_SUBCOMMAND
-};
+// enum subcommand {
+//   UNKNOWN_SUBCOMMAND,
+//   VERBOSITY_SUBCOMMAND
+// };
 
 static struct option long_options[] = {
   {"help", no_argument, &show_help, 'h'},
@@ -43,7 +43,7 @@ static struct option long_options[] = {
   {0, 0, 0, 0}
 };
 
-static enum subcommand subcommand_option;
+// static enum subcommand subcommand_option;
 
 // Print a usage message and exit
 static void usage () {
@@ -70,13 +70,13 @@ Options:\n\
 
 #define OPTION_STRING "hVv:"
 
-static void set_subcommand_option (enum subcommand subcommand) {
-  if (subcommand_option != subcommand) {
-    fprintf(stderr, "You may not specify more than one '-vV?' option\n");
-    exit(1);
-  }
-  subcommand_option = subcommand;
-}
+// static void set_subcommand_option (enum subcommand subcommand) {
+//   if (subcommand_option != subcommand) {
+//     fprintf(stderr, "You may not specify more than one '-vV?' option\n");
+//     exit(1);
+//   }
+//   subcommand_option = subcommand;
+// }
 
 static void decode_options(int argc, char **argv) {
   int32_t i, optchar, option_index;  
