@@ -1,13 +1,10 @@
-//#include <inttypes.h>
-//#include <float.h>
 #include <string.h>
 #include "memalloc.h"
 #include "utils.h"
-//#include "parser.h"
 #include "yacc.tab.h"
-//#include "print.h"
 #include "input.h"
-//#include "samplesat.h"
+#include "print.h"
+#include "lazysamplesat.h"
 
 extern samp_table_t samp_table;
 
@@ -447,60 +444,62 @@ void add_cnf(input_formula_t *formula, double weight) {
 
 
 // Generates the CNF form of a formula, and updates the query and
-// query_instance tables.
+// query_instance tables.  These are analogous to the rule and clause
+// tables, respectively.  Thus queries without variables are immediately
+// added to the query_instance table, while queries with variables are
+// added to the query table, and instances of them are generated as needed
+// and added to the query_intsance table.
 
-// void ask_cnf(input_formula_t *formula, double weight) {
-//   query_table_t *query_table = &(samp_table.query_table);
-//   query_instance_table_t *query_instance_table = &(samp_table.query_instance_table);
-//   int32_t i, j, current_rule, num_lits, num_vars, atom_idx;
-//   rule_literal_t ***lits, *lit;
-//   samp_rule_t *clause;
+void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
+  query_instance_table_t *query_instance_table;
+  rule_literal_t ***lits;
+  samp_query_t *query;
+  samp_query_instance_t *qinst, *best;
+  int32_t i;
 
-//   // Returns the literals, and sets the sort of the variables
-//   lits = cnf_pos(formula->fmla, formula->vars);
-  
-//   if (formula->vars == NULL) {
-//     // No variables, just add to query_instance tables
-    
-//     for (i = 0; lits[i] != NULL; i++) {
-//       for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++) {}
-//       clause_buffer_resize(num_lits);
-//       for (j = 0; j < num_lits; j++) {
-// 	lit = lits[i][j];
-// 	atom_idx = add_internal_atom(&samp_table, lit->atom);
-// 	clause_buffer.data[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
-//       }
-//       add_to_query_instance_table(&samp_table, clause_buffer.data, num_lits);
-//     }
-//   } else {
-//     for (num_vars = 0; formula->vars[num_vars] != NULL; num_vars++) {}
-//     for (i = 0; i < num_vars; i++) {
-//       // Check that all variables have been referenced
-//       if (formula->vars[i]->sort_index == -1) {
-// 	printf("cnf error: variable %s not used in formula\n",
-// 	       formula->vars[i]->name);
-// 	safe_free(lits);
-// 	return;
-//       }
-//     }
-//     // Now create the samp_rule_t, and add it to the rule_table
-//     for (i = 0; lits[i] != NULL; i++) {
-//       clause = (samp_rule_t *) safe_malloc(sizeof(samp_rule_t));
-//       for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++) {}
-//       clause->num_lits = num_lits;
-//       clause->literals = lits[i];
-//       //set_clause_variables(clause);
-//       clause->num_vars = num_vars;
-//       clause->vars = formula->vars;
-//       clause->weight = weight;
-//       rule_table_resize(rule_table);
-//       current_rule = rule_table->num_rules;      
-//       rule_table->samp_rules[current_rule] = clause;
-//       rule_table->num_rules++;
-//       if (!lazy_mcsat) {
-// 	all_rule_instances(current_rule, &samp_table);
-//       }
-//     }
-//     safe_free(lits);
-//   }
-// }
+  // Returns the literals, and sets the sort of the variables
+  lits = cnf_pos(formula->fmla, formula->vars);
+  if (lits == NULL) {
+    return;
+  }
+  // Temporarily add all instances of the query to the query_instance_table
+  query = (samp_query_t *) safe_malloc(sizeof(samp_query_t));
+  for (i = 0; lits[i] != NULL; i++) {}
+  query->num_clauses = i;
+  for (i = 0; formula->vars[i] != NULL; i++) {}
+  query->num_vars = i;
+  query->vars = formula->vars;
+  query->literals = lits;
+  // Get the instances into the query_instance_table
+  all_query_instances(query, &samp_table);
+  if (lazy_mcsat()) {
+    // Run the specified number of samples
+    lazy_mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
+		DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
+		DEFAULT_MAX_EXTRA_FLIPS, num_samples);
+  } else {
+    // Run the specified number of samples
+    mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
+	   DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
+	   DEFAULT_MAX_EXTRA_FLIPS, num_samples);
+  }
+  query_instance_table = &samp_table.query_instance_table;
+  // Print the result according to whether threshold is set
+  if (threshold >= 0) {
+    // Collect those above the threshold, sort, and print
+  } else {
+    // Simply find the best and print it, ignoring threshold
+    best = query_instance_table->query_inst[0];
+    for (i = 1; i < query_instance_table->num_queries; i++) {
+      qinst = query_instance_table->query_inst[i];
+      if (best == NULL || best->pmodel < qinst->pmodel) {
+	best = qinst;
+      }
+    }
+    print_query_instance(best, &samp_table, 0);
+    printf(" : % 5.3f\n", query_probability(best, &samp_table));
+    fflush(stdout);
+  }
+  // Now clear out the query_instance table for the next query
+  reset_query_instance_table(query_instance_table);
+}
