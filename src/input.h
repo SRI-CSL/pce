@@ -61,6 +61,7 @@ typedef struct input_ask_fdecl_s {
   input_formula_t *formula;
   double threshold;
   bool all;
+  int32_t num_samples;
 } input_ask_fdecl_t;
 
 typedef struct input_add_decl_s {
@@ -73,6 +74,7 @@ typedef struct input_ask_decl_s {
   input_clause_t *clause;
   double threshold;
   bool all;
+  int32_t num_samples;
 } input_ask_decl_t;
 
 typedef struct input_mcsat_decl_s {
@@ -85,7 +87,7 @@ typedef struct input_mcsat_decl_s {
 } input_mcsat_decl_t;
 
 typedef struct input_reset_decl_s {
-  enum {ALL, PROBABILITIES} kind;
+  enum {RESETALL, PROBABILITIES} kind;
 } input_reset_decl_t;
 
 typedef struct input_load_decl_s {
