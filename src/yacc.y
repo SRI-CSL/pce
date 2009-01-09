@@ -256,66 +256,77 @@ bool yy_check_float(char *str) {
       safe_free(wt);
     }
   };
-  void yy_ask_fdecl (input_formula_t *formula, char *thresholdstr, char *allstr) {
+  void yy_ask_fdecl (input_formula_t *formula, char *numsamp, char *thresholdstr) {
     double threshold;
     input_command.kind = ASK;
     input_command.decl.ask_fdecl.formula = formula;
-    threshold = atof(thresholdstr);
-    if (0.0 <= threshold && threshold <= 1.0) {
-      input_command.decl.ask_fdecl.threshold = threshold;
+    if (numsamp == NULL) {
+      input_command.decl.ask_fdecl.num_samples = DEFAULT_MAX_SAMPLES;
+    } else if (yy_check_int(numsamp)) {
+      input_command.decl.ask_fdecl.num_samples = atoi(numsamp);
     } else {
       free_formula(formula);
+      safe_free(numsamp);
       safe_free(thresholdstr);
-      safe_free(allstr);
-      yyerror("ask: threshold must be between 0.0 and 1.0");
-      return;
+      yyerror("ask: NUMBER_OF_SAMPLES must be an integer");
     }
-    safe_free(thresholdstr);
-    if (allstr == NULL || strcasecmp(allstr, "BEST") == 0) {
-      input_command.decl.ask_fdecl.all = false;
-    } else if (strcasecmp(allstr, "ALL") == 0) {
-      input_command.decl.ask_fdecl.all = true;
+    safe_free(numsamp);
+    if (thresholdstr == NULL) {
+      input_command.decl.ask_fdecl.threshold = -1;
     } else {
-      free_formula(formula);
+      threshold = atof(thresholdstr);
+      if (0.0 <= threshold && threshold <= 1.0) {
+	input_command.decl.ask_fdecl.threshold = threshold;
+      } else {
+	free_formula(formula);
+	safe_free(numsamp);
+	safe_free(thresholdstr);
+	yyerror("ask: THRESHOLD must be between 0.0 and 1.0");
+	return;
+      }
       safe_free(thresholdstr);
-      safe_free(allstr);
-      yyerror("ask: which must be 'all' or 'best'");
-      return;
     }
-    safe_free(allstr);
   };
-  void yy_ask_decl (input_clause_t *clause, char *thresholdstr, char *allstr) {
-    double threshold;
-    input_command.kind = ASK;
-    input_command.decl.ask_decl.clause = clause;
-    if (clause->litlen > 1) {
-      yyerror("ask: currently only allows a single literal with variables");
-      free_clause(clause);
-    }
-    threshold = atof(thresholdstr);
-    if (0.0 <= threshold && threshold <= 1.0) {
-      input_command.decl.ask_decl.threshold = threshold;
-    } else {
-      free_clause(clause);
-      safe_free(thresholdstr);
-      safe_free(allstr);
-      yyerror("ask: threshold must be between 0.0 and 1.0");
-      return;
-    }
-    safe_free(thresholdstr);
-    if (allstr == NULL || strcasecmp(allstr, "BEST") == 0) {
-      input_command.decl.ask_decl.all = false;
-    } else if (strcasecmp(allstr, "ALL") == 0) {
-      input_command.decl.ask_decl.all = true;
-    } else {
-      free_clause(clause);
-      safe_free(thresholdstr);
-      safe_free(allstr);
-      yyerror("ask: which must be 'all' or 'best'");
-      return;
-    }
-    safe_free(allstr);
-  };
+  
+//   void yy_ask_decl (input_clause_t *clause, char *thresholdstr, char *allstr, char *numsamp) {
+//     double threshold;
+//     input_command.kind = ASK_CLAUSE;
+//     input_command.decl.ask_decl.clause = clause;
+//     threshold = atof(thresholdstr);
+//     if (0.0 <= threshold && threshold <= 1.0) {
+//       input_command.decl.ask_decl.threshold = threshold;
+//     } else {
+//       free_clause(clause);
+//       safe_free(thresholdstr);
+//       safe_free(allstr);
+//       safe_free(numsamp);
+//       yyerror("ask_clause: threshold must be between 0.0 and 1.0");
+//       return;
+//     }
+//     safe_free(thresholdstr);
+//     if (allstr == NULL || strcasecmp(allstr, "BEST") == 0) {
+//       input_command.decl.ask_decl.all = false;
+//     } else if (strcasecmp(allstr, "ALL") == 0) {
+//       input_command.decl.ask_decl.all = true;
+//     } else {
+//       free_clause(clause);
+//       safe_free(allstr);
+//       safe_free(numsamp);
+//       yyerror("ask_clause: which must be 'all' or 'best'");
+//       return;
+//     }
+//     safe_free(allstr);
+//     if (numsamp == NULL) {
+//       input_command.decl.ask_decl.num_samples = DEFAULT_MAX_SAMPLES;
+//     } else if (yy_check_int(numsamp)) {
+//       input_command.decl.ask_decl.num_samples = atoi(numsamp);
+//     } else {
+//       free_clause(clause);
+//       safe_free(numsamp);
+//       yyerror("ask_clause: numsamps must be an integer");
+//     }
+//     safe_free(numsamp);
+// };
   
 /* The params map to sa_probability, samp_temperature, rvar_probability,
  * max_flips, max_extra_flips, and max_samples, in that order.  Missing
@@ -385,7 +396,7 @@ void yy_mcsat_decl (char **params) {
       input_command.decl.mcsat_decl.max_extra_flips = atoi(params[4]);
     }
   } else {
-    input_command.decl.mcsat_decl.max_flips = DEFAULT_MAX_EXTRA_FLIPS;
+    input_command.decl.mcsat_decl.max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
   }
   // max_samples
   if (arglen > 5) {
@@ -398,7 +409,7 @@ void yy_mcsat_decl (char **params) {
   free_strings(params);
 };
   void yy_dumptables (int32_t table) {
-    input_command.kind = DUMPTABLES;
+    input_command.kind = DUMPTABLE;
     input_command.decl.dumptable_decl.table = table;
   };
   void yy_reset (char *name) {
@@ -440,6 +451,7 @@ void yy_mcsat_decl (char **params) {
 
   %}
 
+%token ALL
 %token PREDICATE
 %token DIRECT
 %token INDIRECT
@@ -454,10 +466,10 @@ void yy_mcsat_decl (char **params) {
 %token ADD
 %token ASK
 %token ADD_CLAUSE
-%token ASK_CLAUSE
+//%token ASK_CLAUSE
 %token MCSAT
 %token RESET
-%token DUMPTABLES
+%token DUMPTABLE
 %token LOAD
 %token VERBOSITY
 %token TEST
@@ -467,7 +479,7 @@ void yy_mcsat_decl (char **params) {
 %right IMPLIES
 %left OR
 %left AND
-%token NOT
+%nonassoc NOT
 %token NAME
 %token NUM
 %token STRING
@@ -486,7 +498,7 @@ void yy_mcsat_decl (char **params) {
   int32_t ival;
 }
 
-%type <str> arg NAME NUM STRING addwt oarg oname
+%type <str> arg NAME NUM STRING addwt oarg oname onum
 %type <strs> arguments variables oarguments
 %type <formula> formula
 %type <fmla> fmla
@@ -537,30 +549,32 @@ decl: SORT NAME {yy_sort_decl($2);}
     | ATOM atom {yy_atom_decl($2);}
     | ASSERT atom oname {yy_assert_decl($2, $3);}
     | ADD_CLAUSE clause addwt oname {yy_add_decl($2, $3, $4);}
-    | ASK_CLAUSE clause NUM oarg {yy_ask_decl($2, $3, $4);}
-    | ADD formula NUM addwt oname {yy_add_fdecl($2, $3, $4);}
-    | ASK formula NUM oarg {yy_ask_fdecl($2, $3, $4);}
+//    | ASK_CLAUSE clause NUM oarg oarg {yy_ask_decl($2, $3, $4, $5);}
+    | ADD formula addwt oname {yy_add_fdecl($2, $3, $4);}
+    | ASK formula onum onum {yy_ask_fdecl($2, $3, $4);}
     | MCSAT oarguments {yy_mcsat_decl($2);}
     | RESET oarg {yy_reset($2);}
-    | DUMPTABLES table {yy_dumptables($2);}
+    | DUMPTABLE table {yy_dumptables($2);}
     | LOAD STRING {yy_load($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
     | TEST {yy_test(@1);}
     | HELP cmd {yy_help($2);}
     ;
 
-cmd: /* empty */ {$$ = ALL;}
+cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | SORT {$$ = SORT;} | SUBSORT {$$ = SUBSORT;} | PREDICATE {$$ = PREDICATE;}
      | CONST {$$ = CONST;} | VAR {$$ = VAR;} | ATOM {$$ = ATOM;}
      | ASSERT {$$ = ASSERT;} | ADD {$$ = ADD;} | ADD_CLAUSE {$$ = ADD_CLAUSE;}
-     | ASK {$$ = ASK;} | ASK_CLAUSE {$$ = ASK_CLAUSE;} | MCSAT {$$ = MCSAT;}
-     | RESET {$$ = RESET;} | DUMPTABLES {$$ = DUMPTABLES;}
+     | ASK {$$ = ASK;}
+     //| ASK_CLAUSE {$$ = ASK_CLAUSE;}
+     | MCSAT {$$ = MCSAT;}
+     | RESET {$$ = RESET;} | DUMPTABLE {$$ = DUMPTABLE;}
      | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
      ;
 
-table: /* empty */ {$$ = ALL;}
-       | SORT {$$ = SORT;} | PREDICATE {$$ = PREDICATE} | ATOM {$$ = ATOM}
-       | CLAUSE {$$ = CLAUSE} | RULE {$$ = RULE}
+table: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
+       | SORT {$$ = SORT;} | PREDICATE {$$ = PREDICATE;} | ATOM {$$ = ATOM;}
+       | CLAUSE {$$ = CLAUSE;} | RULE {$$ = RULE;}
        ;
 
 witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;}
@@ -608,7 +622,7 @@ lits: literal {pvector_push(&yylits, $1);}
     ;
 
 literal: atom {$$ = yy_literal(0,$1);}
-       | '~' atom {$$ = yy_literal(1,$2);}
+       | NOT atom {$$ = yy_literal(1,$2);}
        ;
 
 atom: NAME '(' arguments ')' {$$ = yy_atom($1, $3);}
@@ -635,6 +649,7 @@ arg: NAME | NUM; // returns string from yystrings
 addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
 
 oname: /* empty */ {$$=NULL;} | NAME;
+onum: /* empty */ {$$=NULL;} | NUM;
 
 %%
 
@@ -749,14 +764,15 @@ int yylex (void) {
       return ASK;
     else if (strcasecmp(yylval.str, "ADD_CLAUSE") == 0)
       return ADD_CLAUSE;
-    else if (strcasecmp(yylval.str, "ASK_CLAUSE") == 0)
-      return ASK_CLAUSE;
+//     else if (strcasecmp(yylval.str, "ASK_CLAUSE") == 0)
+//       return ASK_CLAUSE;
     else if (strcasecmp(yylval.str, "MCSAT") == 0)
       return MCSAT;
     else if (strcasecmp(yylval.str, "RESET") == 0)
       return RESET;
-    else if (strcasecmp(yylval.str, "DUMPTABLES") == 0)
-      return DUMPTABLES;
+    else if (strcasecmp(yylval.str, "DUMPTABLE") == 0
+	     || strcasecmp(yylval.str, "DUMPTABLES") == 0)
+      return DUMPTABLE;
     else if (strcasecmp(yylval.str, "LOAD") == 0)
       return LOAD;
     else if (strcasecmp(yylval.str, "VERBOSITY") == 0)
@@ -767,6 +783,8 @@ int yylex (void) {
       return HELP;
     else if (strcasecmp(yylval.str, "QUIT") == 0)
       return QUIT;
+    else if (strcasecmp(yylval.str, "ALL") == 0)
+      return ALL;
     else if (strcasecmp(yylval.str, "IFF") == 0)
       return IFF;
     else if (strcasecmp(yylval.str, "IMPLIES") == 0)
@@ -824,7 +842,11 @@ int yylex (void) {
   /* return end-of-file  */
   if (c == EOF) return QUIT;
   /* return single chars */
-  return c;
+  if (c == '~') {
+    return NOT;
+  } else {
+    return c;
+  }
 }
 
 
@@ -953,10 +975,10 @@ void free_parse_data () {
     free_add_decl_data();
     break;
   }
-  case ASK_CLAUSE: {
-    free_ask_decl_data();
-    break;
-  }
+//   case ASK_CLAUSE: {
+//     free_ask_decl_data();
+//     break;
+//   }
   case MCSAT: {
     free_mcsat_decl_data();
     break;
@@ -965,7 +987,7 @@ void free_parse_data () {
     free_reset_decl_data();
     break;
   }
-  case DUMPTABLES: {
+  case DUMPTABLE: {
     free_dumptables_decl_data();
     break;
   }
