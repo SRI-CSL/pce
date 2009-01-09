@@ -415,6 +415,8 @@ extern void init_query_instance_table(query_instance_table_t *table);
 
 extern void query_instance_table_resize(query_instance_table_t *table);
 
+extern void reset_query_instance_table(query_instance_table_t *table);
+
 extern void init_samp_table(samp_table_t *table);
 
 extern bool valid_table(samp_table_t *table);
