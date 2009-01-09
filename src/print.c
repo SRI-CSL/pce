@@ -56,6 +56,40 @@ void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
   }
 }
 
+// Returns a newly allocated string
+// char *atom_string(samp_atom_t *atom, samp_table_t *table) {
+//   pred_table_t *pred_table = &table->pred_table;
+//   const_table_t *const_table = &table->const_table;
+//   char *pred, *result;
+//   uint32_t i, strsize;
+
+//   pred = pred_name(atom->pred, pred_table);
+//   strsize = strlen(pred) + 1;
+//   for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
+//     // Assume no more than 99 vars in list
+//     if (atom->args[i] < 0) {
+//       strsize += -(atom->args[i]+1) > 9 ? 3 : 2;
+//     } else {
+//       strsize += strlen(const_name(atom->args[i], const_table));
+//     }
+//     strsize += 2; // include ", " or ")\0"
+//   }
+//   result = (char *) safe_malloc(strsize * sizeof(char));
+//   strcpy(result, pred);
+//   for (i = 0; i < pred_arity(atom->pred, pred_table); i++){
+//     i == 0 ? strcat(result, "(") : strcat(result, ", ");
+//     if (atom->args[i] < 0) {
+//       // A variable - print X followed by index
+//       sprintf(result, "X%d", -(atom->args[i]+1));
+//     } else {
+//       sprintf(result, "%s", const_name(atom->args[i], const_table));
+//     }
+//   }
+//   strcat(result, ")");
+//   return result;
+// }
+  
+
 void print_atom(samp_atom_t *atom, samp_table_t *table) {
   pred_table_t *pred_table = &(table->pred_table);
   const_table_t *const_table = &(table->const_table);
@@ -106,7 +140,7 @@ void print_atoms(samp_table_t *table){
 }
 
 void print_clause(samp_clause_t *clause, samp_table_t *table){
-  atom_table_t *atom_table = &(table->atom_table);
+  atom_table_t *atom_table = &table->atom_table;
   int32_t i;
   for (i = 0; i<clause->numlits; i++){
     if (i != 0) printf(" | ");
@@ -339,6 +373,45 @@ extern void dump_rule_table (samp_table_t *samp_table) {
       printf("| %*"PRIu32" | % 9.3f | ", nwdth, i, wt);
     }
     print_rule(rule, samp_table, nwdth+17);
+    printf("\n");
+  }
+  printf("-------------------------------------------------------------------------------\n");
+}
+
+extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table, int32_t indent) {
+  atom_table_t *atom_table;
+  samp_literal_t **lit;
+  int32_t i, j, samp_atom;
+
+  atom_table = &table->atom_table;
+  lit = qinst->lit;
+  for (i = 0; lit[i] != NULL; i++) {
+    if (i != 0) printf(")\n& ("); else printf("  (");
+    for (j = 0; lit[i][j] != -1; j++) {
+      if (j != 0) printf(" | ");
+      samp_atom = var_of(lit[i][j]);
+      if (is_neg(lit[i][j])) printf("~");
+      print_atom(atom_table->atom[samp_atom], table);
+    }
+  }
+  printf(")");
+}
+
+extern void dump_query_instance_table (samp_table_t *samp_table) {
+  query_instance_table_t *query_instance_table = &samp_table->query_instance_table;
+  samp_query_instance_t *qinst;
+  uint32_t nqueries = query_instance_table->num_queries;
+  char d[10];
+  int nwdth = sprintf(d, "%"PRIu32, nqueries);
+  int32_t i;
+  
+  printf("Query Instance Table:\n");
+  printf("--------------------------------------------------------------------------------\n");
+  printf("| %-*s | weight    | %-*s |\n", nwdth, "i", 61-nwdth, "Rule");
+  printf("--------------------------------------------------------------------------------\n");
+  for(i=0; i<nqueries; i++) {
+    qinst = query_instance_table->query_inst[i];
+    print_query_instance(qinst, samp_table, nwdth+17);
     printf("\n");
   }
   printf("-------------------------------------------------------------------------------\n");
