@@ -170,36 +170,20 @@ int32_t choose_random_atom(samp_table_t *table){
   }
 }
 
-void all_lazy_query_instances(samp_query_t *query, samp_table_t *table) {
-  int32_t i;
-  if (query->num_vars == 0) {
-    // Already instantiated, but needs to be converted from rule_literals to
-    // samp_clauses.  Do this here since we don't know if variables are
-    // involved earlier.
-    samp_query_to_query_instance(query, table);
-  } else {
-    substit_buffer_resize(query->num_vars);
-    for (i=0; i < substit_buffer.size; i++) {
-      substit_buffer.entries[i].fixed = false;
-    }
-    all_query_instances_rec(0, query, table, true, -1);
-  }
-}
-
 void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
-		     double samp_temperature, double rvar_probability){
+			  double samp_temperature, double rvar_probability){
   //Assumed that table is in a valid state with a random assignment.
   //We first decide on simulated annealing vs. walksat.
-  clause_table_t *clause_table = &(table->clause_table);
-  atom_table_t *atom_table = &(table->atom_table);
-  samp_truth_value_t *assignment =
-    atom_table->assignment[atom_table->current_assignment];
+  clause_table_t *clause_table = &table->clause_table;
+  atom_table_t *atom_table = &table->atom_table;
+  samp_truth_value_t *assignment;
   int32_t dcost;
   double choice; 
   int32_t var;
   uint32_t clause_position;
   samp_clause_t *link;
 
+  assignment = atom_table->assignment[atom_table->current_assignment];
   assert(valid_table(table));
   choice = choose();
   if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
@@ -356,7 +340,7 @@ void lazy_mc_sat(samp_table_t *table, double sa_probability,
   //  print_state(table, 0);  
   assert(valid_table(table));
   for (i = 0; i < max_samples; i++){
-    cprintf(1, "---- sample[%"PRIu32"] ---\n", i);
+    cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
     lazy_sample_sat(table, sa_probability, samp_temperature,
 		    rvar_probability, max_flips, max_extra_flips);
     //    print_state(table, i+1);
