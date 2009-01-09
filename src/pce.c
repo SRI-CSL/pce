@@ -15,6 +15,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <time.h>
+#include <getopt.h>
 #include <libicl.h>
 #include <liboaa.h>
 #include "utils.h"
@@ -30,11 +31,30 @@
 
 #define AGENT_NAME "pce"
 
+#define VERSION "0.1"
+
 #define MALLOC_CHECK_ 2
 
-static bool lazy_pce = true;
-
 static bool keep_looping;
+
+static const char *program_name;
+static int32_t show_version;
+static int32_t show_help;
+enum {PERSIST_RW, PERSIST_RO, PERSIST_WO, PERSIST_NONE};
+static int32_t persist_option = PERSIST_RW;
+
+enum {
+  LAZY_OPTION = CHAR_MAX + 1
+};
+
+static struct option long_options[] = {
+  {"help", no_argument, &show_help, 'h'},
+  {"lazy", required_argument, 0, LAZY_OPTION},
+  {"verbosity", required_argument, 0, 'v'},
+  {"version", no_argument, &show_version, 1},
+  {"persistmode", required_argument, 0, 'p'},
+  {0, 0, 0, 0}
+};
 
 static const char *const pce_solvables[] = {
   "pce_add_user_defined_rule(Username,_Text,Rule)",
@@ -78,6 +98,38 @@ static const char *const pce_callbacks[] = {
   "app_idle",
   "app_done"
 };
+
+// Print a usage message and exit
+static void usage () {
+  fprintf(stderr, "Try '%s --help' for more information.\n",
+	  program_name);
+  exit(1);
+}
+
+static void help () {
+  printf("\
+PCE computes marginal probabilities based on facts and weighted assertions.\n\
+Interacts with OAA - see MCSAT for the standalone program.\n\
+Note that this requires a 'pce.init' file defining at least the sorts and\n\
+predicates or it will not work.  In addition, the 'pce.persist' file is used\n\
+so that restarting PCE returns the system to the state at the end of the previous\n\
+execution.\n\n\
+Usage: %s [OPTION]... [FILE]...\n\n\
+Options:\n\
+  -h, -?, --help           print this help and exit\n\
+          --lazy=BOOL      whether to use lazy version (true)\n\
+  -p,     --persistmode    mode for the pce.persist file, one of\n\
+                           rw -- reads at startup, appends new events\n\
+                           ro -- reads only, no writing\n\
+                           wo -- does not read, but appends new events\n\
+                           none -- no reading or writing\n\
+  -v,     --verbosity=NUM  sets the verbosity level\n\
+  -V,     --version        prints the version number and exits\n\
+", program_name);
+  exit(0);
+}
+
+#define OPTION_STRING "hpVv:"
 
 // names_buffer is temporary storage for names
 static names_buffer_t names_buffer = {0, 0, NULL};
@@ -132,11 +184,13 @@ void pce_log(const char *fmt, ...) {
 void pce_save(ICLTerm *goal) {
   char *str;
 
-  str = icl_NewStringFromTerm(goal);
-  fprintf(pce_save_fp, "%s\n", str);
-  icl_stFree(str);
-  fflush(pce_save_fp);
-  fsync(fileno(pce_save_fp));
+  if (persist_option == PERSIST_RW || persist_option == PERSIST_WO) {
+    str = icl_NewStringFromTerm(goal);
+    fprintf(pce_save_fp, "%s\n", str);
+    icl_stFree(str);
+    fflush(pce_save_fp);
+    fsync(fileno(pce_save_fp));
+  }
 }
 
 // Adds "sort SORT;" to the persist file
@@ -209,6 +263,76 @@ void pce_save_clause(samp_rule_t *rule) {
   fsync(fileno(pce_save_fp));  
 }
 
+static void decode_options(int argc, char **argv) {
+  int32_t i, optchar, option_index;  
+
+  option_index = 0;
+  while ((optchar = getopt_long(argc, argv, OPTION_STRING, long_options, &option_index)) != -1) {
+    switch (optchar) {
+    case '?':
+      usage();
+    case 0:
+      break;
+    case 'h':
+      show_help = 1;
+      break;
+    case LAZY_OPTION:
+      if ((strcasecmp(optarg, "true") == 0) || (strcasecmp(optarg, "t") == 0) || (strcmp(optarg, "1") == 0)) {
+	set_lazy_mcsat(true);
+      } else if ((strcasecmp(optarg, "false") == 0) || (strcasecmp(optarg, "f") == 0) || (strcmp(optarg, "0") == 0)) {
+	set_lazy_mcsat(false);
+      } else {
+	printf("Error: lazy must be true, false, t, f, 0, or 1\n");
+	exit(1);
+      }
+      break;
+    case 'p':
+      if (strcasecmp(optarg, "rw") == 0) {
+	persist_option = PERSIST_RW;
+      } else if (strcasecmp(optarg, "ro") == 0) {
+	persist_option = PERSIST_RO;
+      } else if (strcasecmp(optarg, "wo") == 0) {
+	persist_option = PERSIST_WO;
+      } else if (strcasecmp(optarg, "none") == 0) {
+	persist_option = PERSIST_NONE;
+      } else {
+	printf("Error: persistmode must be rw, ro, wo, or none\n");
+	exit(1);
+      }
+      break;
+    case 'v':
+      if (strlen(optarg) > 0) {
+	for (i = 0; i < strlen(optarg); i++) {
+	  if (!isdigit(optarg[i])) {
+	    printf("Verbosity must be a number\n");
+	    exit(1);
+	  }
+	}
+      } else {
+	printf("Verbosity must be a number\n");
+	exit(1);
+      }
+      pce_log("Setting verbosity to %d\n", atoi(optarg));
+      printf("Setting verbosity to %d\n", atoi(optarg));
+      set_verbosity_level(atoi(optarg));
+      break;
+    case 'V':
+      show_version = true;
+      break;
+    default:
+      usage();
+    }
+    if (show_version) {
+      printf("pce %s\nCopyright (C) 2008, SRI International.  All Rights Reserved.\n",
+	     VERSION);
+      exit(0);
+    }
+    if (show_help) {
+      help();
+    }
+  }
+}
+
 
 // Check that the Term is a simple atom, i.e., p(a, b, c, ...) where a, b,
 // c, ... are all constants or variables.  Also check for free variables if
@@ -279,6 +403,7 @@ int32_t pce_get_rdf_type(char *name) {
   if (success) {
     // We now have Instances of the form [query(X, Y, answer([Binding], [Params]))]
     inststr = icl_NewStringFromTerm(Instances);
+    pce_log("Query result for %s is %s\n", name, inststr);
     cprintf(2,"Query result for %s is %s\n", name, inststr);
     fflush(stdout);
     icl_stFree(inststr);
@@ -342,7 +467,9 @@ int32_t pce_get_rdf_type(char *name) {
 	pce_save_sort(typestr);
 	sortidx = sort_name_index(typestr, sort_table);
       }
-      printf("rdf:type (sort from QM) for %s is %s\n", name, typestr);
+      pce_log("rdf:type (sort from QM) for %s is %s\n", name, typestr);
+      cprintf(2, "rdf:type (sort from QM) for %s is %s\n", name, typestr);
+      fflush(stdout);
       // BD: Not sure what to do for Binding? is it safe to delete it??
       icl_FreeTerm(Binding);
       goto done;
@@ -379,8 +506,8 @@ int32_t pce_add_const(char *name, samp_table_t *table) {
     pce_error("Error adding constant %s", name);
     return -1;
   }
-  create_new_const_rule_instances(cidx, table, false, 0);
-  create_new_const_query_instances(cidx, table, false, 0);
+  create_new_const_rule_instances(cidx, table, 0);
+  create_new_const_query_instances(cidx, table, 0);
   return cidx;
 }
 
@@ -423,6 +550,10 @@ bool typecheck_pred_arg(int32_t const_sig, int32_t predarg_sig,
       }
     }
     if (!foundit) {      
+      pce_log("Sort error; predicate %s arg %d expects sort %s,\n",
+	      pname, argno, sort_entries[predarg_sig].name);
+      pce_log("but was given constant %s of sort %s\n",
+	      cname, sort_entries[const_sig].name);
       fprintf(stderr,
 	      "Sort error; predicate %s arg %d expects sort %s,\n",
 	      pname, argno, sort_entries[predarg_sig].name);
@@ -611,54 +742,6 @@ int pce_fact_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   }
 }
 
-bool eql_samp_atom(samp_atom_t *atom1, samp_atom_t *atom2,
-		   samp_table_t *table) {
-  int32_t i, arity;
-
-  if (atom1->pred != atom2->pred) {
-    return false;
-  }
-  arity = pred_arity(atom1->pred, &table->pred_table);
-  for (i = 0; i < arity; i++) {
-    if (atom1->args[i] != atom2->args[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool eql_rule_literal(rule_literal_t *lit1, rule_literal_t *lit2,
-		      samp_table_t *table) {
-  return ((lit1->neg == lit2->neg)
-	  && eql_samp_atom(lit1->atom, lit2->atom, table));
-}
-
-// Checks if the queries are the same - this is essentially a syntactic
-// test, though it won't care about variable names.
-bool eql_query_entries(rule_literal_t ***lits, samp_query_t *query,
-		       samp_table_t *table) {
-  int32_t i, j;
-  
-  for (i = 0; i < query->num_clauses; i++) {
-    if (lits[i] == NULL) {
-      return false;
-    }
-    for (j = 0; query->literals[i][j] != NULL; j++) {
-      if (lits[i][j] == NULL) {
-	return false;
-      }
-      if (! eql_rule_literal(query->literals[i][j], lits[i][j], table)) {
-	return false;
-      }
-    }
-    // Check if lits[i] has more elements 
-    if (lits[i][j] != NULL) {
-      return false;
-    }
-  }
-  return (lits[i] == NULL);
-}
-
       
 int32_t add_to_query_table(rule_vars_buffer_t *vars, rule_literal_t ***lits,
 			   samp_table_t *table) {
@@ -683,13 +766,8 @@ int32_t add_to_query_table(rule_vars_buffer_t *vars, rule_literal_t ***lits,
   query->vars = rule_vars_buffer_copy(&rules_vars_buffer);
   query->source_index = NULL;
 
-  if (lazy_pce) {
-    // Need to create instances based on the atom table
-    all_lazy_query_instances(query, &samp_table);
-  } else {
-    // Need to create all instances and add to query_instance_table
-    all_query_instances(query, &samp_table);
-  }
+  // Need to create all instances and add to query_instance_table
+  all_query_instances(query, &samp_table);
   return query_index;
 }
     
@@ -844,18 +922,17 @@ void pce_install_rule(ICLTerm *Formula, double weight) {
 	int32_t pred = new_rule->literals[j]->atom->pred;
 	add_rule_to_pred(pred_table, pred, current_rule);
       }
-      // Create instances here rather than add_rule, as this is eager
-      if (!lazy_pce) {
-	all_rule_instances(current_rule, &samp_table);
-      }
+      // Create rule instances
+      all_rule_instances(current_rule, &samp_table);
     }
     pce_save_clause(clauses[i]);
     if (clauses[i]->num_vars == 0) {
       safe_free(clauses[i]);
     }
   }
+  pce_log("Processed %d clauses\n", i);
   cprintf(2, "Processed %d clauses\n", i);
-
+  fflush(stdout);
   
   safe_free(clauses);
   //dump_clause_table(&samp_table);
@@ -1070,7 +1147,7 @@ int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
       if (query_instance_table->query_inst[i]->sampling_num
 	  >= atom_table->num_samples) {
 	// Need to generate some samples
-	if (lazy_pce) {
+	if (lazy_mcsat()) {
 	  lazy_mc_sat(&samp_table, DEFAULT_SA_PROBABILITY,
 		      DEFAULT_SAMP_TEMPERATURE, DEFAULT_RVAR_PROBABILITY,
 		      DEFAULT_MAX_FLIPS, DEFAULT_MAX_EXTRA_FLIPS,
@@ -1309,6 +1386,8 @@ void process_subscription(subscription_t *subscription) {
   }
   // Need to call oaa_Solve with solution a list of atoms of the form
   // pce_subscription_callback(m(Sid, Formula, Prob), ...)
+  pce_log("process_subscription: returning %"PRId32" solutions for subscription %s\n",
+	  cnt, subscription->id);
   printf("process_subscription: returning %"PRId32" solutions for subscription %s\n",
 	 cnt, subscription->id);
   fflush(stdout);
@@ -1332,6 +1411,7 @@ int pce_process_subscriptions_callback(ICLTerm *goal, ICLTerm *params,
     process_subscription(subscriptions.subscription[i]);
   }
   // pce_save(goal);
+  pce_log("pce_process_subscriptions_callback called\n");
   printf("pce_process_subscriptions_callback called\n");
   fflush(stdout);  
   return true;
@@ -1781,6 +1861,7 @@ double pce_translate_weight(ICLTerm *Strength) {
     return 20.0;
   } else {
     str = icl_NewStringFromTerm(Strength);
+    pce_log("* Note: %s defaulting to 5.0\n", str);
     printf("* Note: %s defaulting to 5.0\n", str);
     icl_stFree(str);
     return 5.0;
@@ -2050,6 +2131,7 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	//oaa_Solve(callback, NULL, NULL, Instances);
 	//      callback = icl_NewTermFromString("foo(X)");
 	Instances = NULL;
+	pce_log("Calling QM for instances of predicate %s\n", pred);
 	cprintf(1, "Calling QM for instances of predicate %s\n", pred);
 	fflush(stdout);
 	if (empty_params == NULL) {
@@ -2059,6 +2141,7 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	success = oaa_Solve(callback, empty_params, &Out, &Instances);
 	if (success) {
 	  inststr = icl_NewStringFromTerm(Instances);
+	  pce_log("Instances for %s are %s\n", pred, inststr);
 	  printf("Instances for %s are %s\n", pred, inststr);
 	  fflush(stdout);
 	  icl_stFree(inststr);
@@ -2069,6 +2152,7 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	  if (! icl_IsList(Instances) || icl_NumTerms(Instances) != 1) {
 	    pce_error("query: list of 1 element expected for Instances");
 	    inststr = icl_NewStringFromTerm(Instances);
+	    pce_log("Instances for %s are %s\n", pred, inststr);
 	    printf("Instances for %s are %s\n", pred, inststr);
 	    fflush(stdout);
 	    icl_stFree(inststr);
@@ -2086,6 +2170,7 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	    }
 	    if (error) {
 	      // Assume this means the predicate is unknown - set query to NULL
+	      pce_log(": unknown\n");
 	      cprintf(1, ": unknown\n");
 	      icl_FreeTerm(qm_buffer.entry[i]->query);
 	      qm_buffer.entry[i]->query = NULL;
@@ -2114,12 +2199,14 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 		      if (cidx == -1) {
 			newconsts += 1;
 			inststr = icl_NewStringFromTerm(Arg);
+			pce_log("Adding new constant %s\n", inststr);
 			fprintf(stderr, "Adding new constant %s\n", inststr);
 			icl_stFree(inststr);
 			pce_add_const(cname, table);
 		      }
 		    } else {
 		      inststr = icl_NewStringFromTerm(Arg);
+		      pce_log("Arg is %s\n", inststr);
 		      fprintf(stderr, "Arg is %s\n", inststr);
 		      icl_stFree(inststr);
 		      char *icltype =
@@ -2131,20 +2218,25 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 			icl_IsFloat(Arg) ? "Float" :
 			icl_IsDataQ(Arg) ? "DataQ" :
 			icl_IsValid(Arg) ? "Valid" : "Invalid";
+		      pce_log("Query Manager returned a %s for binding no. %"PRId32" (0-based):\n", icltype, k);
 		      fprintf(stderr, "Query Manager returned a %s for binding no. %"PRId32" (0-based):\n", icltype, k);
 		      query = icl_NewStringFromTerm(callback);
 		      inststr = icl_NewStringFromTerm(Instances);
+		      pce_log("  query: %s\n  binding: %s\n", query, inststr);
 		      fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);
 		      icl_stFree(query);
 		      icl_stFree(inststr);
 		    }
 		  }
 		} else {
+		  pce_log("Query Manager returned %"PRId32" arguments for %s, expected %"PRId32"\n",
+			  bnum, pred, arity);
 		  fprintf(stderr, "Query Manager returned %"PRId32" arguments for %s, expected %"PRId32"\n",
 			  bnum, pred, arity);
 		}
 		icl_FreeTerm(CBinding);
 	      }
+	      pce_log(" %d instances, %d new constants\n", icl_NumTerms(Bindings), newconsts);
 	      cprintf(1, " %d instances, %d new constants\n", icl_NumTerms(Bindings), newconsts);
 	    }
 	  }
@@ -2162,6 +2254,7 @@ static void get_qm_instances(samp_table_t *table) {
   static bool first_time = true;
 
   if (!qm_available()) {
+    pce_log("QueryManager not yet available\n");
     printf("QueryManager not yet available\n");
     return;
   }
@@ -2172,6 +2265,7 @@ static void get_qm_instances(samp_table_t *table) {
     first_time = false;
   }
   get_predtbl_qm_instances(&pred_table->evpred_tbl, table);
+  pce_log("Query Manager calls took %d sec\n", time(NULL) - start_time); 
   cprintf(1, "Query Manager calls took %d sec\n", time(NULL) - start_time); 
 }
 
@@ -2188,7 +2282,7 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 
     if (samp_table.atom_table.num_vars > 0) {
       pce_log("pce_idle_callback generating %d samples", DEFAULT_MAX_SAMPLES);
-      if (lazy_pce) {
+      if (lazy_mcsat()) {
 	lazy_mc_sat(&samp_table, DEFAULT_SA_PROBABILITY,
 		    DEFAULT_SAMP_TEMPERATURE, DEFAULT_RVAR_PROBABILITY,
 		    DEFAULT_MAX_FLIPS, DEFAULT_MAX_EXTRA_FLIPS,
@@ -2199,11 +2293,10 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 	       DEFAULT_MAX_EXTRA_FLIPS, DEFAULT_MAX_SAMPLES);
       }      
     }
+    pce_log("Calling pce_update_model\n");
     printf("Calling pce_update_model\n");
     pce_update_model();
 
-    printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
-    fflush(stdout);
     time(&idle_timer);
 
     counter --;
@@ -2626,6 +2719,7 @@ static void pce_error(const char *fmt, ...) {
 int setup_oaa_connection(int argc, char *argv[]) {
   ICLTerm *pceSolvables;
 
+  pce_log("Setting up OAA connection\n");
   printf("Setting up OAA connection\n");
   if (!oaa_SetupCommunication(AGENT_NAME)) {
     printf("Could not connect\n");
@@ -2634,6 +2728,7 @@ int setup_oaa_connection(int argc, char *argv[]) {
 
   // Prepare a list of solvables that this agent is capable of
   // handling.
+  pce_log("Setting up solvables\n");
   printf("Setting up solvables\n");
   pceSolvables = icl_NewList(NULL); 
   icl_AddToList(pceSolvables,
@@ -2681,6 +2776,7 @@ int setup_oaa_connection(int argc, char *argv[]) {
 
   // Register solvables with the Facilitator.
   // The string "parent" represents the Facilitator.
+  pce_log("Registering solvables\n");
   printf("Registering solvables\n");
   if (!oaa_Register("parent", AGENT_NAME, pceSolvables)) {
     printf("Could not register\n");
@@ -2782,63 +2878,59 @@ void create_log_file(char *curdir) {
 int main(int argc, char *argv[]){
   char *curdir;
 
+  program_name = argv[0];
+  decode_options(argc, argv);
+  
   curdir = getenv("PWD");
   create_log_file(curdir);
   
   // Initialize OAA
-  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
-  fflush(stdout);
   pce_log("Initializing OAA\n");
   printf("Initializing OAA\n");
   oaa_Init(argc, argv);
-  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
-  fflush(stdout);
+
   if (!setup_oaa_connection(argc, argv)) {
     pce_error("Could not set up OAA connections...exiting\n");
     return EXIT_FAILURE;
   }
-  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
-  fflush(stdout);
   
   init_samp_table(&samp_table);
-  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
-  fflush(stdout);
 
   pce_log("Loading %s/%s\n", curdir, pce_init_file);
   printf("Loading %s/%s\n", curdir, pce_init_file);
   load_mcsat_file(pce_init_file, &samp_table);
-  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
-  fflush(stdout);
-  if (access(pce_save_file, F_OK) == 0) {
-    pce_log("Loading %s/%s\n", curdir, pce_save_file);
-    printf("Loading %s/%s\n", curdir, pce_save_file);
-    load_mcsat_file(pce_save_file, &samp_table);
-  } else {
-    pce_log("%s/%s not found\n", curdir, pce_save_file);
-    printf("%s/%s not found\n", curdir, pce_save_file);  
+
+  if (persist_option == PERSIST_RW || persist_option == PERSIST_RO) {
+    if (access(pce_save_file, F_OK) == 0) {
+      pce_log("Loading %s/%s\n", curdir, pce_save_file);
+      printf("Loading %s/%s\n", curdir, pce_save_file);
+      load_mcsat_file(pce_save_file, &samp_table);
+    } else {
+      pce_log("%s/%s not found\n", curdir, pce_save_file);
+      printf("%s/%s not found\n", curdir, pce_save_file);  
+    }
   }
-  printf("Memory used so far: %.2f MB\n", mem_size()/(1024 * 1024));
-  fflush(stdout);
-  pce_save_fp = fopen(pce_save_file, "a+");  
+  if (persist_option == PERSIST_RW || persist_option == PERSIST_WO) {
+    pce_save_fp = fopen(pce_save_file, "a+");
+  }
   pce_log("Entering MainLoop\n");
   printf("Entering MainLoop\n");
 
-  //  oaa_MainLoop(true); This expands to the code below (more or less)
+  oaa_MainLoop(true); //This expands to the code below (more or less)
 
+//   ICLTerm *Event, *Params;
 
-  ICLTerm *Event, *Params;
+//   keep_looping = true;
+//   while (keep_looping) {
+//     oaa_GetEvent(&Event, &Params, 0);
+//     CHECK_LEAKS();
+//     oaa_ProcessEvent(Event, Params);
+//     CHECK_LEAKS();
+//     icl_Free(Event);
+//     icl_Free(Params);
+//   }
 
-  keep_looping = true;
-  while (keep_looping) {
-    oaa_GetEvent(&Event, &Params, 0);
-    CHECK_LEAKS();
-    oaa_ProcessEvent(Event, Params);
-    CHECK_LEAKS();
-    icl_Free(Event);
-    icl_Free(Params);
-  }
-
-  oaa_Disconnect(NULL, NULL);
+//   oaa_Disconnect(NULL, NULL);
 
   return EXIT_SUCCESS;
 }
