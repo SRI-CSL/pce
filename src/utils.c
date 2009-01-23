@@ -183,7 +183,9 @@ void free_strings (char **string) {
   i = 0;
   if (string != NULL) {
     while (string[i] != NULL) {
-      safe_free(string[i]);
+      if (strcmp(string[i], "") != 0) {
+	safe_free(string[i]);
+      }
       i++;
     }
   }

@@ -125,7 +125,7 @@ int32_t choose_random_atom(samp_table_t *table){
   all_card = all_atoms_cardinality(pred_tbl, sort_table);
 
   atom_num = random_uint(all_card);
-  assert(valid_table(table));
+  //assert(valid_table(table));
 
   int32_t predicate = 0;
   card = 0;
@@ -137,7 +137,7 @@ int32_t choose_random_atom(samp_table_t *table){
   }
   // We went past the one we actually want
   predicate--;
-  assert(valid_table(table));
+  //assert(valid_table(table));
   assert(pred_cardinality(pred_tbl, sort_table, predicate) != 0);
 
   atom_num = card - atom_num; //gives the position of atom within predicate
@@ -156,13 +156,13 @@ int32_t choose_random_atom(samp_table_t *table){
     atom_num = atom_num/card;
     atom->args[i] = sort_table->entries[signature[i]].constants[constant];
   }
-  assert(valid_table(table));
+  //assert(valid_table(table));
 
   array_hmap_pair_t *atom_map;
   atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
 				  arity + 1,
 				  (int32_t *) atom);
-  assert(valid_table(table));
+  //assert(valid_table(table));
   if (atom_map == NULL){//need to activate atom
     return activate_atom(table, atom);
   } else {
@@ -184,29 +184,29 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
   samp_clause_t *link;
 
   assignment = atom_table->assignment[atom_table->current_assignment];
-  assert(valid_table(table));
+  //assert(valid_table(table));
   choice = choose();
   if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
     /*
      * Simulated annealing step
      */
     // choose a random atom
-    assert(valid_table(table));
+    //assert(valid_table(table));
     //    var = choose_random_atom(table);
     var = choose_unfixed_variable(assignment, atom_table->num_vars,
  				  atom_table->num_unfixed_vars);
-    assert(valid_table(table));
+    //assert(valid_table(table));
     if (var == -1) return;
     cost_flip_unfixed_variable(table, &dcost, var);
-    assert(valid_table(table));
+    //assert(valid_table(table));
     if (dcost < 0){
       flip_unfixed_variable(table, var);
-      assert(valid_table(table));
+      //assert(valid_table(table));
     } else {
       choice = choose();
       if (choice < exp(-dcost/samp_temperature)) {
 	flip_unfixed_variable(table, var);
-	assert(valid_table(table));
+	//assert(valid_table(table));
       }
     }
   } else {
@@ -220,11 +220,11 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
       link = link->link;
       clause_position--;
     } 
-    assert(valid_table(table));
+    //assert(valid_table(table));
     //link points to chosen clause
     var = choose_clause_var(table, link, assignment, rvar_probability);
     flip_unfixed_variable(table, var);
-    assert(valid_table(table));
+    //assert(valid_table(table));
   }
 }
 
@@ -259,15 +259,15 @@ void lazy_sample_sat(samp_table_t *table, double sa_probability,
 		     double samp_temperature, double rvar_probability,
 		     uint32_t max_flips, uint32_t max_extra_flips) {
   int32_t conflict;
-  assert(valid_table(table));
+  //assert(valid_table(table));
   conflict = reset_sample_sat(table);
-  assert(valid_table(table));
+  //assert(valid_table(table));
   uint32_t num_flips = max_flips;
   if (conflict != -1) {
     while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0) {
       lazy_sample_sat_body(table, sa_probability, samp_temperature,
 			   rvar_probability);
-      assert(valid_table(table));
+      //assert(valid_table(table));
       num_flips--;
     }
     if (max_extra_flips < num_flips){
@@ -276,7 +276,7 @@ void lazy_sample_sat(samp_table_t *table, double sa_probability,
     while (num_flips > 0){
       lazy_sample_sat_body(table, sa_probability, samp_temperature,
 			   rvar_probability);
-      assert(valid_table(table));
+      //assert(valid_table(table));
       num_flips--;
     }
   }
@@ -338,14 +338,14 @@ void lazy_mc_sat(samp_table_t *table, double sa_probability,
   }
 
   //  print_state(table, 0);  
-  assert(valid_table(table));
+  //assert(valid_table(table));
   for (i = 0; i < max_samples; i++){
     cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
     lazy_sample_sat(table, sa_probability, samp_temperature,
 		    rvar_probability, max_flips, max_extra_flips);
     //    print_state(table, i+1);
-    assert(valid_table(table));
+    //assert(valid_table(table));
   }
 
-  print_atoms(table);
+  //print_atoms(table);
 }

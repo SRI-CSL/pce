@@ -17,12 +17,65 @@ extern int yyparse ();
 extern void free_parse_data();
 extern int yydebug;
 
+// MCSAT parameters
+#define DEFAULT_SA_PROBABILITY .5
+#define DEFAULT_SAMP_TEMPERATURE 0.91
+#define DEFAULT_RVAR_PROBABILITY .2
+#define DEFAULT_MAX_FLIPS 1000
+#define DEFAULT_MAX_EXTRA_FLIPS 10
+#define DEFAULT_MAX_SAMPLES 100
+
+static double sa_probability = DEFAULT_SA_PROBABILITY;
+static double samp_temperature = DEFAULT_SAMP_TEMPERATURE;
+static double rvar_probability = DEFAULT_RVAR_PROBABILITY;
+static int32_t max_flips = DEFAULT_MAX_FLIPS;
+static int32_t max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
+static int32_t max_samples = DEFAULT_MAX_SAMPLES;
+
 static bool strict_consts = true;
-static bool lazy = false;
+static bool lazy = true;
 
 input_clause_buffer_t input_clause_buffer = {0, 0, NULL};
 input_literal_buffer_t input_literal_buffer = {0, 0, NULL};
 input_atom_buffer_t input_atom_buffer = {0, 0, NULL};
+
+double get_sa_probability() {
+  return sa_probability;
+}
+double get_samp_temperature() {
+  return samp_temperature;
+}
+double get_rvar_probability() {
+  return rvar_probability;
+}
+int32_t get_max_flips() {
+  return max_flips;
+}
+int32_t get_max_extra_flips() {
+  return max_extra_flips;
+}
+int32_t get_max_samples() {
+  return max_samples;
+}
+
+void set_sa_probability(double d) {
+  sa_probability = d;
+}
+void set_samp_temperature(double d) {
+  samp_temperature = d;
+}
+void set_rvar_probability(double d) {
+  rvar_probability = d;
+}
+void set_max_flips(int32_t m) {
+  max_flips = m;
+}
+void set_max_extra_flips(int32_t m) {
+  max_extra_flips = m;
+}
+void set_max_samples(int32_t m) {
+  max_samples = m;
+}
 
 bool strict_constants() {
   return strict_consts;
@@ -197,17 +250,27 @@ void show_help(int32_t topic) {
   switch (topic) {
   case ALL: {
     printf("\n\
+Type help followed by a command for details, e.g., 'help mcsat_params;'\n\n\
 Input grammar:\n\
  sort NAME ';'\n\
  subsort NAME NAME ';'\n\
- const NAME++',' ':' NAME ';'\n\
  predicate ATOM [direct|indirect] ';'\n\
- atom ATOM ';'\n assert ATOM ';'\n\
- add CLAUSE [NUM] ';'\n\
- ask CLAUSE NUM ';'\n\
- mcsat NUM**','\n\
- reset probabilities\n\
- dumptables ';'\n verbosity NUM ';'\n help ';'\n quit ';'\n\
+ const NAME++',' ':' NAME ';'\n\
+ atom ATOM ';'\n\
+ assert ATOM ';'\n\
+ add FORMULA [NUM [NAME]] ';'\n\
+ add_clause CLAUSE [NUM [NAME]] ';'\n\
+ ask FORMULA NUM [NUM | best] ';'\n\
+ mcsat ';'\n\
+ mcsat_params [NUM]**',' ';'\n\
+ reset [all | probabilities] ';'\n\
+ retract NAME ';'\n\
+ dumptable [all | sort | predicate | atom | clause | rule] ';'\n\
+ load STRING ';'\n\
+ verbosity NUM ';'\n help ';'\n quit ';'\n\
+ help [all | sort | subsort | predicate | const | atom | assert |\n\
+       add | add_clause | ask | mcsat | mcsat_params | reset | retract |\n\
+       dumptable | load | verbosity | help] ';' \n\n\
 where:\n CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n\
  LITERAL := ['~'] ATOM\n ATOM := NAME '(' ARG++',' ')'\n\
  ARG := NAME | NUM\n\
@@ -261,7 +324,7 @@ const NAME1, NAME2, ... : SORT;\n\
   }
   case ADD: {
     printf("\n\
-add FORMULA WEIGHT [SOURCE];\n\
+add FORMULA [WEIGHT [SOURCE]];\n\
   Clausifies the FORMULA, and adds each clause to the clause or rules table,\n\
 with the given WEIGHT (a floating point number) and associated with the SOURCE\n\
 (an arbitrary NAME).\n\
@@ -319,7 +382,20 @@ For example:\n\
 
 //  case ASK_CLAUSE:
   case MCSAT:
-  case RESET:
+  case RESET: {
+    printf("\n\
+reset [all | probabilities];\n\
+  Resets the internal tables.\n\
+");
+    break;
+  }
+  case RETRACT: {
+    printf("\n\
+retract [all | source];\n\
+  Removes assertions and clauses provided by source\n\
+");
+    break;
+  }
   case DUMPTABLE:
   case LOAD:
   case VERBOSITY:
@@ -344,7 +420,9 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
   yylloc.last_line = 1;
   yylloc.last_column = 0;
   do {
-    printf("mcsat> ");
+    if (parse_input == stdin) {
+      printf("mcsat> ");
+    }
     fflush(stdout);
     // yyparse returns 0 and sets input_command if no syntax errors
     if (yyparse() == 0)
@@ -373,7 +451,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	if (err)
 	  fprintf(stderr, "Predicate %s not added\n", pred);
 	else {
-	  cprintf(1, "Adding predicate %s\n", pred);
+	  cprintf(2, "Adding predicate %s\n", pred);
 	  add_pred(pred_table, pred, decl.witness, arity,
 		   sort_table, decl.atom->args);
 	}
@@ -381,13 +459,13 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
       }
       case SORT: {
 	input_sort_decl_t decl = input_command.decl.sort_decl;
-	cprintf(1, "Adding sort %s\n", decl.name);
+	cprintf(2, "Adding sort %s\n", decl.name);
 	add_sort(sort_table, decl.name);
 	break;
       }
       case SUBSORT: {
 	input_subsort_decl_t decl = input_command.decl.subsort_decl;
-	cprintf(1, "Adding subsort %s of %s information\n",
+	cprintf(2, "Adding subsort %s of %s information\n",
 	       decl.subsort, decl.supersort);
 	add_subsort(sort_table, decl.subsort, decl.supersort);
 	break;
@@ -406,7 +484,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	for (i = 0; i<decl.num_names; i++) {
 	  // Need to see if name in var_table
 	  if (var_index(decl.name[i], var_table) == -1) {
-	    cprintf(1, "Adding const %s\n", decl.name[i]);
+	    cprintf(2, "Adding const %s\n", decl.name[i]);
 	    if (add_const(decl.name[i], decl.sort, table) != -1) {
 	      int32_t cidx = const_index(decl.name[i], const_table);
 	      // We don't invoke this in add_const, as this is eager.
@@ -434,7 +512,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	int32_t i;
 	for (i=0; i<decl.num_names; i++) {
 	  // Need to see if name in const_table
-	  cprintf(1, "Adding var %s\n", decl.name[i]);
+	  cprintf(2, "Adding var %s\n", decl.name[i]);
 	  add_var(var_table, decl.name[i], sort_table, decl.sort);
 	}
 	break;
@@ -449,33 +527,33 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	// Need to check that the predicate is a witness predicate,
 	// then invoke assert_atom.
 	input_assert_decl_t decl = input_command.decl.assert_decl;
-	assert_atom(table, decl.atom);
+	assert_atom(table, decl.atom, decl.source);
 	break;
       }
       case ADD: {
 	input_add_fdecl_t decl = input_command.decl.add_fdecl;
-	cprintf(1, "Clausifying and adding formula\n");
-	add_cnf(decl.formula, decl.weight);
+	cprintf(2, "Clausifying and adding formula\n");
+	add_cnf(decl.formula, decl.weight, decl.source);
 	break;
       }
       case ADD_CLAUSE: {
 	input_add_decl_t decl = input_command.decl.add_decl;
 	if (decl.clause->varlen == 0) {
 	  // No variables - adding a clause
-	  cprintf(1, "Adding clause\n");
+	  cprintf(2, "Adding clause\n");
 	  add_clause(table,
 		     decl.clause->literals,
-		     decl.weight);
+		     decl.weight, decl.source);
 	}
 	else {
 	  // Have variables - adding a rule
 	  double wt = decl.weight;
 	  if (wt == DBL_MAX) {
-	    cprintf(1, "Adding rule with MAX weight\n");
+	    cprintf(2, "Adding rule with MAX weight\n");
 	  } else {
-	    cprintf(1, "Adding rule with weight %f\n", wt);
+	    cprintf(2, "Adding rule with weight %f\n", wt);
 	  }
-	  int32_t ruleidx = add_rule(decl.clause, decl.weight, table);
+	  int32_t ruleidx = add_rule(decl.clause, decl.weight, decl.source, table);
 	  // Create instances here rather than add_rule, as this is eager
 	  if (ruleidx != -1) {
 	    all_rule_instances(ruleidx, table);
@@ -496,23 +574,69 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 // 	break;
 //       }
       case MCSAT: {
-	input_mcsat_decl_t decl = input_command.decl.mcsat_decl;
-	printf("Calling %sMC_SAT with parameters:\n",
+	
+	printf("Calling %sMCSAT with parameters (set using mcsat_params):\n",
 	       lazy_mcsat() ? "LAZY_" : "");
-	printf(" sa_probability = %f\n", decl.sa_probability);
-	printf(" samp_temperature = %f\n", decl.samp_temperature);
-	printf(" rvar_probability = %f\n", decl.rvar_probability);
-	printf(" max_flips = %"PRId32"\n", decl.max_flips);
-	printf(" max_extra_flips = %"PRId32"\n", decl.max_extra_flips);
-	printf(" max_samples = %"PRId32"\n", decl.max_samples);
+	printf(" sa_probability = %f\n", get_sa_probability());
+	printf(" samp_temperature = %f\n", get_samp_temperature());
+	printf(" rvar_probability = %f\n", get_rvar_probability());
+	printf(" max_flips = %"PRId32"\n", get_max_flips());
+	printf(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
+	printf(" max_samples = %"PRId32"\n", get_max_samples());
 	if (lazy_mcsat()) {
-	  lazy_mc_sat(table, decl.sa_probability, decl.samp_temperature,
-		      decl.rvar_probability, decl.max_flips,
-		      decl.max_extra_flips, decl.max_samples);
+	  lazy_mc_sat(table, get_sa_probability(), get_samp_temperature(),
+		      get_rvar_probability(), get_max_flips(),
+		      get_max_extra_flips(), get_max_samples());
 	} else {
-	  mc_sat(table, decl.sa_probability, decl.samp_temperature,
-		 decl.rvar_probability, decl.max_flips,
-		 decl.max_extra_flips, decl.max_samples);
+	  mc_sat(table, get_sa_probability(), get_samp_temperature(),
+		 get_rvar_probability(), get_max_flips(),
+		 get_max_extra_flips(), get_max_samples());
+	}
+	printf("\n");
+	break;
+      }
+      case MCSAT_PARAMS: {
+	input_mcsat_params_decl_t decl = input_command.decl.mcsat_params_decl;
+	if (decl.num_params == 0) {
+	  printf("MCSAT param values:\n");
+	  printf(" sa_probability = %f\n", get_sa_probability());
+	  printf(" samp_temperature = %f\n", get_samp_temperature());
+	  printf(" rvar_probability = %f\n", get_rvar_probability());
+	  printf(" max_flips = %"PRId32"\n", get_max_flips());
+	  printf(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
+	  printf(" max_samples = %"PRId32"\n", get_max_samples());
+	} else {
+	  printf("Setting MCSAT parameters:\n");
+	  if (decl.sa_probability >= 0) {
+	    printf(" sa_probability was %f, now %f\n",
+		   get_sa_probability(), decl.sa_probability);
+	    set_sa_probability(decl.sa_probability);
+	  }
+	  if (decl.samp_temperature >= 0) {
+	    printf(" samp_temperature was %f, now %f\n",
+		   get_samp_temperature(), decl.samp_temperature);
+	    set_samp_temperature(decl.samp_temperature);
+	  }
+	  if (decl.rvar_probability >= 0) {
+	    printf(" rvar_probability was %f, now %f\n",
+		   get_rvar_probability(), decl.rvar_probability);
+	    set_rvar_probability(decl.rvar_probability);
+	  }
+	  if (decl.max_flips >= 0) {
+	    printf(" max_flips was %"PRId32", now  %"PRId32"\n",
+		   get_max_flips(), decl.max_flips);
+	    set_max_flips(decl.max_flips);
+	  }
+	  if (decl.max_extra_flips >= 0) {
+	    printf(" max_extra_flips was %"PRId32", now %"PRId32"\n",
+		   get_max_extra_flips(), decl.max_extra_flips);
+	    set_max_extra_flips(decl.max_extra_flips);
+	  }
+	  if (decl.max_samples >= 0) {
+	    printf(" max_samples was %"PRId32", now %"PRId32"\n",
+		   get_max_samples(), decl.max_samples);
+	    set_max_samples(decl.max_samples);
+	  }
 	}
 	printf("\n");
 	break;
@@ -520,7 +644,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
       case RESET: {
 	input_reset_decl_t decl = input_command.decl.reset_decl;
 	switch (decl.kind) {
-	case RESETALL: {
+	case ALL: {
 	  // Resets the sample tables
 	  reset_sort_table(sort_table);
 	  // Need to do more here - like free up space.
@@ -538,6 +662,11 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	  break;
 	}
 	}
+	break;
+      }
+      case RETRACT: {
+	input_retract_decl_t decl = input_command.decl.retract_decl;
+	retract_source(decl.source,table);
 	break;
       }
       case LOAD: {

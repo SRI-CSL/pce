@@ -717,7 +717,7 @@ bool pce_fact(ICLTerm *goal) {
     names_buffer_resize(&names_buffer);
   }
   // Everything is OK, create the atom and assert it
-  assert_atom(&samp_table, atom);
+  assert_atom(&samp_table, atom, source);
   //dump_sort_table(&samp_table);
   //dump_atom_table(&samp_table);
   //free_atom(&atom);
@@ -1148,14 +1148,14 @@ int pce_queryp_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
 	  >= atom_table->num_samples) {
 	// Need to generate some samples
 	if (lazy_mcsat()) {
-	  lazy_mc_sat(&samp_table, DEFAULT_SA_PROBABILITY,
-		      DEFAULT_SAMP_TEMPERATURE, DEFAULT_RVAR_PROBABILITY,
-		      DEFAULT_MAX_FLIPS, DEFAULT_MAX_EXTRA_FLIPS,
-		      DEFAULT_MAX_SAMPLES);
+	  lazy_mc_sat(&samp_table, get_sa_probability(),
+		      get_samp_temperature(), get_rvar_probability(),
+		      get_max_flips(), get_max_extra_flips(),
+		      get_max_samples());
 	} else {
-	  mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
-		 DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
-		 DEFAULT_MAX_EXTRA_FLIPS, DEFAULT_MAX_SAMPLES);
+	  mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
+		 get_rvar_probability(), get_max_flips(),
+		 get_max_extra_flips(), get_max_samples());
 	}
       }
       // Now add to query answer
@@ -1375,9 +1375,9 @@ void process_subscription(subscription_t *subscription) {
       if (query_instance_table->query_inst[i]->sampling_num
 	  >= atom_table->num_samples) {
 	// Need to generate some samples
-	mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
-	   DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
-	   DEFAULT_MAX_EXTRA_FLIPS, 50);
+	mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
+	       get_rvar_probability(), get_max_flips(),
+	       get_max_extra_flips(), 50);
       }
       // Now add to query answer
       add_query_instance_to_solution(callbacklist, subscription->formula,
@@ -2281,16 +2281,16 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
     get_qm_instances(&samp_table);
 
     if (samp_table.atom_table.num_vars > 0) {
-      pce_log("pce_idle_callback generating %d samples", DEFAULT_MAX_SAMPLES);
+      pce_log("pce_idle_callback generating %d samples", get_max_samples());
       if (lazy_mcsat()) {
-	lazy_mc_sat(&samp_table, DEFAULT_SA_PROBABILITY,
-		    DEFAULT_SAMP_TEMPERATURE, DEFAULT_RVAR_PROBABILITY,
-		    DEFAULT_MAX_FLIPS, DEFAULT_MAX_EXTRA_FLIPS,
-		    DEFAULT_MAX_SAMPLES);
+	lazy_mc_sat(&samp_table, get_sa_probability(),
+		    get_samp_temperature(), get_rvar_probability(),
+		    get_max_flips(), get_max_extra_flips(),
+		    get_max_samples());
       } else {
-	mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
-	       DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
-	       DEFAULT_MAX_EXTRA_FLIPS, DEFAULT_MAX_SAMPLES);
+	mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
+	       get_rvar_probability(), get_max_flips(),
+	       get_max_extra_flips(), get_max_samples());
       }      
     }
     pce_log("Calling pce_update_model\n");

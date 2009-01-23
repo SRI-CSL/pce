@@ -25,7 +25,7 @@ else
 include $(conf)
 endif
 
-LIBS := $(LIBS) -lm -lglib
+LIBS := $(LIBS) -lm -lglib-2.0
 
 YFLAGS := $(YFLAGS) -d -t
 

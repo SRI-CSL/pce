@@ -34,7 +34,11 @@ char **copy_yyargs() {
 
   arg = (char **) safe_malloc((yyargs.size + 1) * sizeof(char *));
   for (i = 0; i<yyargs.size; i++) {
-    arg[i] = yyargs.data[i];
+    if (yyargs.data[i] == NULL) {
+      arg[i] = "";
+    } else {
+      arg[i] = yyargs.data[i];
+    }
   }
   arg[i] = NULL;
   // Now that it's copied, reset the vector
@@ -261,7 +265,7 @@ bool yy_check_float(char *str) {
     input_command.kind = ASK;
     input_command.decl.ask_fdecl.formula = formula;
     if (numsamp == NULL) {
-      input_command.decl.ask_fdecl.num_samples = DEFAULT_MAX_SAMPLES;
+      input_command.decl.ask_fdecl.num_samples = get_max_samples();
     } else if (yy_check_int(numsamp)) {
       input_command.decl.ask_fdecl.num_samples = atoi(numsamp);
     } else {
@@ -272,6 +276,8 @@ bool yy_check_float(char *str) {
     }
     safe_free(numsamp);
     if (thresholdstr == NULL) {
+      input_command.decl.ask_fdecl.threshold = 0;
+    } else if (strcmp(thresholdstr,"BEST") == 0) {
       input_command.decl.ask_fdecl.threshold = -1;
     } else {
       threshold = atof(thresholdstr);
@@ -333,78 +339,86 @@ bool yy_check_float(char *str) {
  * args get default values.
  */
 void yy_mcsat_decl (char **params) {
+  //yy_get_mcsat_params(params);
+  input_command.kind = MCSAT;
+}
+
+void yy_mcsat_params_decl (char **params) {
   int32_t arglen = 0;
+  
+  input_command.kind = MCSAT_PARAMS;
+  // Determine num_params
   if (params != NULL) {
     while (arglen <= 6 && (params[arglen] != NULL)) {
       arglen++;
     }
   }
   if (arglen > 6) {
-    yyerror("mcsat: too many args");
+    yyerror("mcsat_params: too many args");
   }
-  input_command.kind = MCSAT;
+  input_command.decl.mcsat_params_decl.num_params = arglen;
   // sa_probability
-  if (arglen > 0) {
+  if (arglen > 0 && strcmp(params[0], "") != 0) {
     if (yy_check_float(params[0])) {
       double prob = atof(params[0]);
       if (0.0 <= prob && prob <= 1.0) {
-	input_command.decl.mcsat_decl.sa_probability = prob;
+	input_command.decl.mcsat_params_decl.sa_probability = prob;
       } else {
 	yyerror("sa_probability should be between 0.0 and 1.0");
       }
     }
   } else {
-    input_command.decl.mcsat_decl.sa_probability = DEFAULT_SA_PROBABILITY;
+    input_command.decl.mcsat_params_decl.sa_probability = -1;
   }
   // samp_temperature
-  if (arglen > 1) {
+  if (arglen > 1 && strcmp(params[1], "") != 0) {
     if (yy_check_float(params[1])) {
       double temp = atof(params[1]);
       if (temp > 0.0) {
-	input_command.decl.mcsat_decl.samp_temperature = temp;
+	input_command.decl.mcsat_params_decl.samp_temperature = temp;
       } else {
 	yyerror("samp_temperature should be greater than 0.0");
       }
     }
   } else {
-    input_command.decl.mcsat_decl.samp_temperature = DEFAULT_SAMP_TEMPERATURE;
+    input_command.decl.mcsat_params_decl.samp_temperature = -1;
   }
   // rvar_probability
-  if (arglen > 2) {
+  if (arglen > 2 && strcmp(params[2], "") != 0) {
     if (yy_check_float(params[2])) {
       double prob = atof(params[2]);
       if (0.0 <= prob && prob <= 1.0) {
-	input_command.decl.mcsat_decl.rvar_probability = prob;
+	input_command.decl.mcsat_params_decl.rvar_probability = prob;
       } else {
 	yyerror("rvar_probability should be between 0.0 and 1.0");
       }
     }
   } else {
-    input_command.decl.mcsat_decl.rvar_probability = DEFAULT_RVAR_PROBABILITY;
+    input_command.decl.mcsat_params_decl.rvar_probability = -1;
   }
   // max_flips
-  if (arglen > 3) {
+  if (arglen > 3 && strcmp(params[3], "") != 0) {
     if (yy_check_int(params[3])) {
-      input_command.decl.mcsat_decl.max_flips = atoi(params[3]);
+      input_command.decl.mcsat_params_decl.max_flips = atoi(params[3]);
     }
   } else {
-    input_command.decl.mcsat_decl.max_flips = DEFAULT_MAX_FLIPS;
+    input_command.decl.mcsat_params_decl.max_flips = -1;
   }
   // max_extra_flips
-  if (arglen > 4) {
+  if (arglen > 4 && strcmp(params[4], "") != 0) {
     if (yy_check_int(params[4])) {
-      input_command.decl.mcsat_decl.max_extra_flips = atoi(params[4]);
+      input_command.decl.mcsat_params_decl.max_extra_flips = atoi(params[4]);
     }
   } else {
-    input_command.decl.mcsat_decl.max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
+    input_command.decl.mcsat_params_decl.max_extra_flips = -1;
   }
   // max_samples
-  if (arglen > 5) {
+  if (arglen > 5 && strcmp(params[5], "") != 0) {
     if (yy_check_int(params[5])) {
-      input_command.decl.mcsat_decl.max_samples = atoi(params[5]);
+      input_command.decl.mcsat_params_decl.max_samples = atoi(params[5]);
     }
   } else {
-    input_command.decl.mcsat_decl.max_samples = DEFAULT_MAX_SAMPLES;
+    input_command.decl.mcsat_params_decl.max_samples = -1;
   }
   free_strings(params);
 };
@@ -412,16 +426,13 @@ void yy_mcsat_decl (char **params) {
     input_command.kind = DUMPTABLE;
     input_command.decl.dumptable_decl.table = table;
   };
-  void yy_reset (char *name) {
+  void yy_reset (int32_t what) {
     input_command.kind = RESET;
-    if (name == NULL || strcasecmp(name, "ALL") ==0) {
-      input_command.decl.reset_decl.kind = ALL;
-    } else if (strcasecmp(name, "PROBABILITIES") == 0) {
-      input_command.decl.reset_decl.kind = PROBABILITIES;      
-    } else {
-      yyerror("Reset must be omitted, 'all', or 'probabilities'");
-    }
-    safe_free(name);
+    input_command.decl.reset_decl.kind = what;
+  };
+  void yy_retract (char *source) {
+    input_command.kind = RETRACT;
+    input_command.decl.retract_decl.source = source;
   };
   void yy_load (char *name) {
     input_command.kind = LOAD;
@@ -452,6 +463,8 @@ void yy_mcsat_decl (char **params) {
   %}
 
 %token ALL
+%token BEST
+%token PROBABILITIES
 %token PREDICATE
 %token DIRECT
 %token INDIRECT
@@ -468,7 +481,9 @@ void yy_mcsat_decl (char **params) {
 %token ADD_CLAUSE
 //%token ASK_CLAUSE
 %token MCSAT
+%token MCSAT_PARAMS
 %token RESET
+%token RETRACT
 %token DUMPTABLE
 %token LOAD
 %token VERBOSITY
@@ -498,7 +513,7 @@ void yy_mcsat_decl (char **params) {
   int32_t ival;
 }
 
-%type <str> arg NAME NUM STRING addwt oarg oname onum
+%type <str> arg NAME NUM STRING addwt oarg oname onum onumorbest retractarg
 %type <strs> arguments variables oarguments
 %type <formula> formula
 %type <fmla> fmla
@@ -507,7 +522,7 @@ void yy_mcsat_decl (char **params) {
 %type <lits> literals
 %type <atom> atom
 %type <bval> witness
-%type <ival> cmd table
+%type <ival> cmd table resetarg
 
 %start command
 
@@ -551,9 +566,11 @@ decl: SORT NAME {yy_sort_decl($2);}
     | ADD_CLAUSE clause addwt oname {yy_add_decl($2, $3, $4);}
 //    | ASK_CLAUSE clause NUM oarg oarg {yy_ask_decl($2, $3, $4, $5);}
     | ADD formula addwt oname {yy_add_fdecl($2, $3, $4);}
-    | ASK formula onum onum {yy_ask_fdecl($2, $3, $4);}
+    | ASK formula onum onumorbest {yy_ask_fdecl($2, $3, $4);}
     | MCSAT oarguments {yy_mcsat_decl($2);}
-    | RESET oarg {yy_reset($2);}
+    | MCSAT_PARAMS oarguments {yy_mcsat_params_decl($2);}
+    | RESET resetarg {yy_reset($2);}
+    | RETRACT retractarg {yy_retract($2);}
     | DUMPTABLE table {yy_dumptables($2);}
     | LOAD STRING {yy_load($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
@@ -567,8 +584,8 @@ cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | ASSERT {$$ = ASSERT;} | ADD {$$ = ADD;} | ADD_CLAUSE {$$ = ADD_CLAUSE;}
      | ASK {$$ = ASK;}
      //| ASK_CLAUSE {$$ = ASK_CLAUSE;}
-     | MCSAT {$$ = MCSAT;}
-     | RESET {$$ = RESET;} | DUMPTABLE {$$ = DUMPTABLE;}
+     | MCSAT {$$ = MCSAT;} | MCSAT_PARAMS {$$ = MCSAT_PARAMS}
+     | RESET {$$ = RESET;} | RETRACT {$$ = RETRACT;} | DUMPTABLE {$$ = DUMPTABLE;}
      | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
      ;
 
@@ -579,6 +596,10 @@ table: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
 
 witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;}
        | /* empty */ {$$ = true;};
+
+resetarg: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;} | PROBABILITIES {$$ = PROBABILITIES;};
+
+retractarg: ALL {$$ = "ALL";} | NAME;
 
 formula: fmla {$$ = yy_formula(NULL, $1);}
        | '[' variables ']' fmla {$$ = yy_formula($2, $4);}
@@ -628,7 +649,11 @@ literal: atom {$$ = yy_literal(0,$1);}
 atom: NAME '(' arguments ')' {$$ = yy_atom($1, $3);}
     ;
 
-oarguments: /*empty*/ {$$ = NULL;} | arguments;
+oarguments: /*empty*/ {$$ = NULL;} | oargs {$$ = copy_yyargs();};
+
+oargs: oarg {pvector_push(&yyargs,$1);}
+      | oargs ',' oarg {pvector_push(&yyargs,$3);}
+      ;
 
 arguments: args {$$ = copy_yyargs();};
 
@@ -650,6 +675,7 @@ addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
 
 oname: /* empty */ {$$=NULL;} | NAME;
 onum: /* empty */ {$$=NULL;} | NUM;
+onumorbest: /* empty */ {$$=NULL;} | NUM | BEST {$$="BEST"};
 
 %%
 
@@ -768,8 +794,12 @@ int yylex (void) {
 //       return ASK_CLAUSE;
     else if (strcasecmp(yylval.str, "MCSAT") == 0)
       return MCSAT;
+    else if (strcasecmp(yylval.str, "MCSAT_PARAMS") == 0)
+      return MCSAT_PARAMS;
     else if (strcasecmp(yylval.str, "RESET") == 0)
       return RESET;
+    else if (strcasecmp(yylval.str, "RETRACT") == 0)
+      return RETRACT;
     else if (strcasecmp(yylval.str, "DUMPTABLE") == 0
 	     || strcasecmp(yylval.str, "DUMPTABLES") == 0)
       return DUMPTABLE;
@@ -785,6 +815,10 @@ int yylex (void) {
       return QUIT;
     else if (strcasecmp(yylval.str, "ALL") == 0)
       return ALL;
+    else if (strcasecmp(yylval.str, "BEST") == 0)
+      return BEST;
+    else if (strcasecmp(yylval.str, "PROBABILITIES") == 0)
+      return PROBABILITIES;
     else if (strcasecmp(yylval.str, "IFF") == 0)
       return IFF;
     else if (strcasecmp(yylval.str, "IMPLIES") == 0)
@@ -905,7 +939,15 @@ void free_mcsat_decl_data() {
   // Nothing to do here
 }
 
+void free_mcsat_params_decl_data() {
+  // Nothing to do here
+}
+
 void free_reset_decl_data() {
+  // Nothing to do here
+}
+
+void free_retract_decl_data() {
   // Nothing to do here
 }
 
@@ -983,8 +1025,16 @@ void free_parse_data () {
     free_mcsat_decl_data();
     break;
   }
+  case MCSAT_PARAMS: {
+    free_mcsat_params_decl_data();
+    break;
+  }
   case RESET: {
     free_reset_decl_data();
+    break;
+  }
+  case RETRACT: {
+    free_retract_decl_data();
     break;
   }
   case DUMPTABLE: {

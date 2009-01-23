@@ -88,7 +88,7 @@ int32_t add_internal_atom(samp_table_t *table,
 				 arity+1, //+1 for pred
 				 (int32_t *) atom);
   if (atom_map == NULL){
-    assert(valid_table(table));
+    //assert(valid_table(table));
     atom_table_resize(atom_table, clause_table);
     current_atom_index = atom_table->num_vars++;
     samp_atom_t * current_atom = (samp_atom_t *) safe_malloc((arity+1) * sizeof(int32_t));
@@ -118,7 +118,7 @@ int32_t add_internal_atom(samp_table_t *table,
     add_atom_to_pred(pred_table, predicate, current_atom_index);
     clause_table->watched[pos_lit(current_atom_index)] = NULL;
     clause_table->watched[neg_lit(current_atom_index)] = NULL;
-    assert(valid_table(table));
+    //assert(valid_table(table));
     return current_atom_index;
   } else {
     return atom_map->val;
@@ -176,10 +176,49 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
   return result;
 }
 
-int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom){
-  pred_table_t *pred_table = &(table->pred_table);
+void add_source_to_assertion(char *source, int32_t atom_index, samp_table_t *table) {
+  source_table_t *source_table = &table->source_table;
+  source_entry_t *source_entry;
+  int32_t numassn, srcidx;
+  
+  for (srcidx = 0; srcidx < source_table->num_entries; srcidx++) {
+    if (strcmp(source, source_table->entry[srcidx]->name) == 0) {
+      break;
+    }
+  }
+  if (srcidx == source_table->num_entries) {
+    source_table_extend(source_table);
+    source_entry = (source_entry_t *) safe_malloc(sizeof(source_entry_t));
+    source_table->entry[srcidx] = source_entry;
+    source_entry->name = source;
+    source_entry->assertion = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+    source_entry->assertion[0] = atom_index;
+    source_entry->assertion[1] = -1;
+    source_entry->clause = NULL;
+    source_entry->weight = NULL;
+  } else {
+    source_entry = source_table->entry[srcidx];
+    if (source_entry->assertion == NULL) {
+      source_entry->assertion = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+      source_entry->assertion[0] = atom_index;
+      source_entry->assertion[1] = -1;
+    } else {
+      for (numassn = 0; source_entry->assertion[numassn] != -1; numassn++) {}
+      source_entry->assertion = (int32_t *)
+	safe_realloc(source_entry->assertion, (numassn+2) * sizeof(int32_t));
+      source_entry->assertion[numassn] = atom_index;
+      source_entry->assertion[numassn+1] = -1;
+    }
+  }
+}
+    
+
+int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom,
+		    char *source){
+  pred_table_t *pred_table = &table->pred_table;
   char *in_predicate = current_atom->pred;
   int32_t pred_id = pred_index(in_predicate, pred_table);
+  
   if (pred_id == -1) return -1;
   pred_id = pred_val_to_index(pred_id);
   if (pred_id >= 0) return -1;
@@ -189,6 +228,9 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom){
   } else {
     table->atom_table.assignment[0][atom_index] = v_fixed_true;
     table->atom_table.assignment[1][atom_index] = v_fixed_true;
+    if (source != NULL) {
+      add_source_to_assertion(source, atom_index, table);
+    }
     return atom_index;
   }
 }
@@ -242,21 +284,68 @@ int32_t add_internal_clause(samp_table_t *table,
   }
 }
 
+void add_source_to_clause(char *source, int32_t clause_index, double weight,
+			  samp_table_t *table) {
+  source_table_t *source_table = &table->source_table;
+  source_entry_t *source_entry;
+  int32_t numclauses, srcidx;
+  
+  for (srcidx = 0; srcidx < source_table->num_entries; srcidx++) {
+    if (strcmp(source, source_table->entry[srcidx]->name) == 0) {
+      break;
+    }
+  }
+  if (srcidx == source_table->num_entries) {
+    source_table_extend(source_table);
+    source_entry = (source_entry_t *) safe_malloc(sizeof(source_entry_t));
+    source_table->entry[srcidx] = source_entry;
+    source_entry->name = source;
+    source_entry->assertion = NULL;
+    source_entry->clause = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+    source_entry->weight = (double *) safe_malloc(2 * sizeof(double));
+    source_entry->clause[0] = clause_index;
+    source_entry->clause[1] = -1;
+    source_entry->weight[0] = weight;
+    source_entry->weight[1] = -1;
+  } else {
+    source_entry = source_table->entry[srcidx];
+    if (source_entry->clause == NULL) {
+      source_entry->clause = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+      source_entry->weight = (double *) safe_malloc(2 * sizeof(double));
+      source_entry->clause[0] = clause_index;
+      source_entry->clause[1] = -1;
+      source_entry->weight[0] = clause_index;
+      source_entry->weight[1] = -1;
+    } else {
+      for (numclauses = 0; source_entry->assertion[numclauses] != -1; numclauses++) {}
+      source_entry->clause = (int32_t *)
+	safe_realloc(source_entry->clause, (numclauses+2) * sizeof(int32_t));
+      source_entry->weight = (double *)
+	safe_realloc(source_entry->weight, (numclauses+2) * sizeof(double));
+      source_entry->clause[numclauses] = clause_index;
+      source_entry->clause[numclauses+1] = -1;
+      source_entry->weight[numclauses] = weight;
+      source_entry->weight[numclauses+1] = -1;
+    }
+  }
+}
+  
+
 //add_clause is used to add an input clause with named atoms and constants.
 //the disjunct array is assumed to be NULL terminated; in_clause is non-NULL.
 
 int32_t add_clause(samp_table_t *table,
 		   input_literal_t **in_clause,
-		   double weight){
-  int32_t i;
-  int32_t length = 0;
+		   double weight, char *source){
+  int32_t i, atom, length, clause_index;
+  
+  length = 0;
   while (in_clause[length] != NULL){
     length++;
   }
 
   clause_buffer_resize(length);
 
-  int32_t atom;
   for (i=0; i < length; i++){
     atom = add_atom(table, in_clause[i]->atom);
     
@@ -270,7 +359,9 @@ int32_t add_clause(samp_table_t *table,
       clause_buffer.data[i] = pos_lit(atom);
     }
   }
-  return add_internal_clause(table, clause_buffer.data, length, weight);
+  clause_index = add_internal_clause(table, clause_buffer.data, length, weight);
+  add_source_to_clause(source, clause_index, weight, table);
+  return clause_index;
 }
 
 // new_samp_rule sets up a samp_rule, initializing what it can, and leaving
@@ -402,6 +493,7 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
 
 int32_t add_rule(input_clause_t *rule,
 		 double weight,
+		 char *source,
 		 samp_table_t *samp_table){
   rule_table_t *rule_table = &(samp_table->rule_table);
   pred_table_t *pred_table = &(samp_table->pred_table);
@@ -588,8 +680,58 @@ int32_t add_query(var_entry_t **vars, rule_literal_t ***lits,
 //   }
 //   return qindex;
 // }
-  
 
+void retract_source(char *source, samp_table_t *table) {
+  source_table_t *source_table = &table->source_table;
+  clause_table_t *clause_table;
+  source_entry_t *source_entry;
+  int32_t i, j, srcidx, sidx, clause_idx;
+  samp_clause_t *clause;
+  double wt;
+
+  for (srcidx = 0; srcidx < source_table->num_entries; srcidx++) {
+    if (strcmp(source, source_table->entry[srcidx]->name) == 0) {
+      break;
+    }
+  }
+  if (srcidx == source_table->num_entries) {
+    printf("\nSource %s unknown\n", source);
+    return;
+  }
+  source_entry = source_table->entry[srcidx];
+  if (source_entry->assertion != NULL) {
+    // Not sure what to do here
+  }
+  if (source_entry->clause != NULL) {
+    clause_table = &table->clause_table;
+    for (i = 0; source_entry->clause[i] != -1; i++) {
+      clause_idx = source_entry->clause[i];
+      clause = clause_table->samp_clauses[clause_idx];
+      if (source_entry->weight[i] == DBL_MAX) {
+	// Need to go through all other sources and add them up
+	wt = 0.0;
+	for (sidx = 0; sidx < source_table->num_entries; sidx++) {
+	  if (sidx != srcidx
+	      && source_table->entry[sidx]->clause != NULL) {
+	    for (j = 0; source_table->entry[sidx]->clause[j] != -1; j++) {
+	      if (source_table->entry[sidx]->clause[j] = clause_idx) {
+		wt += source_table->entry[sidx]->weight[j];
+		// Assume clause occurs only once for given source,
+		// as we can simply sum up all such occurrences.
+		break;
+	      }
+	    }
+	  }
+	}
+	clause->weight = wt;
+      } else if (clause->weight != DBL_MAX) {
+	// Subtract the weight of this source from the clause
+	clause->weight -= source_entry->weight[i];
+      } // Nothing to do if current weight is DBL_MAX
+    }
+  }
+}
+  
 
 //Next, need to write the main samplesat routine.
 //How should hard clauses be represented, with weight MAX_DOUBLE?
@@ -1624,14 +1766,14 @@ void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 		uint32_t max_flips, uint32_t max_extra_flips) {
   int32_t conflict;
-  assert(valid_table(table));
+  //assert(valid_table(table));
   conflict = reset_sample_sat(table);
-  assert(valid_table(table));
+  //assert(valid_table(table));
   uint32_t num_flips = max_flips;
   if (conflict != -1) {
     while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0) {
       sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
-      assert(valid_table(table));
+      //assert(valid_table(table));
       num_flips--;
     }
     if (max_extra_flips < num_flips){
@@ -1639,7 +1781,7 @@ void sample_sat(samp_table_t *table, double sa_probability,
     }
     while (num_flips > 0){
       sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
-      assert(valid_table(table));
+      //assert(valid_table(table));
       num_flips--;
     }
   }
@@ -1702,16 +1844,16 @@ void mc_sat(samp_table_t *table, double sa_probability,
   }
 
   //  print_state(table, 0);
-  assert(valid_table(table));
+  //assert(valid_table(table));
   for (i = 0; i < max_samples; i++){
     cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
     sample_sat(table, sa_probability, samp_temperature,
 	       rvar_probability, max_flips, max_extra_flips);
     //    print_state(table, i+1);
-    assert(valid_table(table));
+    //assert(valid_table(table));
   }
 
-  print_atoms(table);
+  //print_atoms(table);
 }
 
 // Given a rule, a -1 terminated array of constants corresponding to the
@@ -2234,9 +2376,9 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
   int32_t i, j, arity, atom_index;
 
   arity = pred_arity(predicate, pred_table);
-  assert(valid_table(table));
+  //assert(valid_table(table));
   atom_index = add_internal_atom(table, atom);
-  assert(valid_table(table));
+  //assert(valid_table(table));
   for (i = 0; i < num_rules; i++) {
     samp_rule_t *rule_entry = rule_table->samp_rules[rules[i]];
     for (j = 0; j < rule_entry->num_lits; j++) {
@@ -2246,7 +2388,7 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
       }
     }
   }
-  assert(valid_table(table));
+  //assert(valid_table(table));
   return 0; // Not yet finished
 }
 

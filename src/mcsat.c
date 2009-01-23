@@ -23,6 +23,7 @@ samp_table_t samp_table;
 static const char *program_name;
 static int32_t show_version;
 static int32_t show_help;
+static int32_t interactive;
 
 enum {
   LAZY_OPTION = CHAR_MAX + 1,
@@ -36,6 +37,7 @@ enum {
 
 static struct option long_options[] = {
   {"help", no_argument, &show_help, 'h'},
+  {"interactive", no_argument, &interactive, 'i'},
   {"lazy", required_argument, 0, LAZY_OPTION},
   {"strict", required_argument, 0, STRICT_OPTION},
   {"verbosity", required_argument, 0, 'v'},
@@ -68,7 +70,7 @@ Options:\n\
   exit(0);
 }
 
-#define OPTION_STRING "hVv:"
+#define OPTION_STRING "ihVv:"
 
 // static void set_subcommand_option (enum subcommand subcommand) {
 //   if (subcommand_option != subcommand) {
@@ -87,6 +89,9 @@ static void decode_options(int argc, char **argv) {
     case '?':
       usage();
     case 0:
+      break;
+    case 'i':
+      interactive = true;
       break;
     case 'h':
       show_help = 1;
@@ -142,23 +147,28 @@ static void decode_options(int argc, char **argv) {
 // Main routine for mcsat
 int main(int argc, char *argv[]) {
   int32_t i;
+  bool file_loaded;
 
   program_name = argv[0];
   decode_options(argc, argv);
   init_samp_table(&samp_table);
+  file_loaded = false;
   for (i = optind; i < argc; i++) {
     if (access(argv[i], R_OK) == 0) {
       printf("Loading %s\n", argv[i]);
       load_mcsat_file(argv[i], &samp_table);
+      file_loaded = true;
     } else {
       err(1, "File %s\n", argv[i]);
     }
   }
-  // Now go interactive - empty string is for stdin
-  printf("\n\
-%s: type 'help;' for help\n\
+  if (interactive || !file_loaded) {
+    // Now go interactive - empty string is for stdin
+    printf("\n\
+%s: type 'help;' for help\n			\
 ", program_name);
-  read_eval_print_loop("", &samp_table);
-  printf("Exiting MCSAT\n");
+    read_eval_print_loop("", &samp_table);
+    printf("Exiting MCSAT\n");
+  }
   return 0;
 }

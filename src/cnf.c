@@ -1,9 +1,11 @@
 #include <string.h>
+#include <stdlib.h>
 #include "memalloc.h"
 #include "utils.h"
 #include "yacc.tab.h"
 #include "input.h"
 #include "print.h"
+#include "vectors.h"
 #include "lazysamplesat.h"
 
 extern samp_table_t samp_table;
@@ -443,6 +445,20 @@ void add_cnf(input_formula_t *formula, double weight) {
 }
 
 
+static int cmp_pmodels(const void *p1, const void *p2) {
+  samp_query_instance_t **q1, **q2;
+  int32_t n1, n2;
+  
+  q1 = (samp_query_instance_t **)p1;
+  q2 = (samp_query_instance_t **)p2;
+  n1 = (*q1)->pmodel;
+  n2 = (*q2)->pmodel;
+  return n1 < n2 ? 1 : n1 > n2 ? -1 : 0;
+}
+
+pvector_t ask_buffer = {0, 0, NULL};
+
+
 // Generates the CNF form of a formula, and updates the query and
 // query_instance tables.  These are analogous to the rule and clause
 // tables, respectively.  Thus queries without variables are immediately
@@ -455,6 +471,7 @@ void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
   rule_literal_t ***lits;
   samp_query_t *query;
   samp_query_instance_t *qinst, *best;
+  double tnum;
   int32_t i;
 
   // Returns the literals, and sets the sort of the variables
@@ -474,19 +491,38 @@ void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
   all_query_instances(query, &samp_table);
   if (lazy_mcsat()) {
     // Run the specified number of samples
-    lazy_mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
-		DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
-		DEFAULT_MAX_EXTRA_FLIPS, num_samples);
+    lazy_mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
+		get_rvar_probability(), get_max_flips(),
+		get_max_extra_flips(), num_samples);
   } else {
     // Run the specified number of samples
-    mc_sat(&samp_table, DEFAULT_SA_PROBABILITY, DEFAULT_SAMP_TEMPERATURE,
-	   DEFAULT_RVAR_PROBABILITY, DEFAULT_MAX_FLIPS,
-	   DEFAULT_MAX_EXTRA_FLIPS, num_samples);
+    mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
+	   get_rvar_probability(), get_max_flips(),
+	   get_max_extra_flips(), num_samples);
   }
   query_instance_table = &samp_table.query_instance_table;
   // Print the result according to whether threshold is set
   if (threshold >= 0) {
     // Collect those above the threshold, sort, and print
+    // First convert threshold to a number for fast compare
+    tnum = threshold * num_samples;
+    if (ask_buffer.data == NULL) {
+      init_pvector(&ask_buffer, 16);
+    } else {
+      pvector_reset(&ask_buffer);
+    }
+    for (i = 0; i < query_instance_table->num_queries; i++) {
+      qinst = query_instance_table->query_inst[i];
+      if (qinst->pmodel >= tnum) {
+	pvector_push(&ask_buffer, qinst);
+      }
+    }
+    qsort(&ask_buffer.data[0], ask_buffer.size, sizeof(samp_query_instance_t *), cmp_pmodels);
+    for (i = 0; i < ask_buffer.size; i++) {
+      print_query_instance(ask_buffer.data[i], &samp_table, 0);
+      printf(" : % 5.3f\n", query_probability(ask_buffer.data[i], &samp_table));
+      fflush(stdout);
+    }
   } else {
     // Simply find the best and print it, ignoring threshold
     best = query_instance_table->query_inst[0];

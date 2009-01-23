@@ -12,13 +12,6 @@
 
 #define MCSAT_CONFLICT 21
 
-#define DEFAULT_SA_PROBABILITY .5
-#define DEFAULT_SAMP_TEMPERATURE 0.91
-#define DEFAULT_RVAR_PROBABILITY .2
-#define DEFAULT_MAX_FLIPS 1000
-#define DEFAULT_MAX_EXTRA_FLIPS 10
-#define DEFAULT_MAX_SAMPLES 100
-
 extern int32_t add_var(var_table_t *var_table,
 		       char *name,
 		       sort_table_t *sort_table,
@@ -39,11 +32,11 @@ extern int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
 
 extern int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom);
 
-extern int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom);
+extern int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source);
 
 extern int32_t add_clause(samp_table_t *table,
 			  input_literal_t **in_clause,
-			  double weight);
+			  double weight, char *source);
 
 extern int32_t add_internal_clause(samp_table_t *table,
 				   int32_t *clause,
@@ -52,6 +45,7 @@ extern int32_t add_internal_clause(samp_table_t *table,
 
 extern int32_t add_rule(input_clause_t *in_rule,
 			double weight,
+			char *source,
 			samp_table_t *samp_table);
 
 extern void add_rule_to_pred(pred_table_t *pred_table,

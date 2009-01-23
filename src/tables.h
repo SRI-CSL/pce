@@ -185,6 +185,7 @@ typedef  struct sort_table_s {
 #define INIT_ATOM_TABLE_SIZE 64
 #define INIT_QUERY_TABLE_SIZE 16
 #define INIT_QUERY_INSTANCE_TABLE_SIZE 64
+#define INIT_SOURCE_TABLE_SIZE 16
 #define INIT_CLAUSE_TABLE_SIZE 64
 #define INIT_RULE_TABLE_SIZE 64
 #define INIT_SORT_CONST_SIZE 16
@@ -332,6 +333,24 @@ typedef struct query_instance_table_s {
   samp_query_instance_t **query_inst;
 } query_instance_table_t;
 
+// Sources indicate the source of the assertion, rule, etc.
+// and is used to reset, untell, etc.  For each explicitly
+// provided source, we keep track of the formula and assertion
+// So we can undo the effects.  For weighted formulas, we keep
+// track of the weight so we can subtract it later.
+typedef struct source_entry_s {
+  char *name;
+  int32_t *assertion; // indices to atom_table, -1 terminated
+  int32_t *clause; // indices to clause_table; -1 terminated
+  double *weight; // weights corresponding to clause list
+} source_entry_t;
+
+typedef struct source_table_s {
+  int32_t size;
+  int32_t num_entries;
+  source_entry_t **entry;
+} source_table_t;
+
 typedef struct samp_table_s {
   sort_table_t sort_table;
   const_table_t const_table;
@@ -342,8 +361,10 @@ typedef struct samp_table_s {
   rule_table_t rule_table;
   query_table_t query_table;
   query_instance_table_t query_instance_table;
+  source_table_t source_table;
   integer_stack_t fixable_stack;
 } samp_table_t;
+  
 
 /*
  * Explain these functions: what do they do?
@@ -416,6 +437,12 @@ extern void init_query_instance_table(query_instance_table_t *table);
 extern void query_instance_table_resize(query_instance_table_t *table);
 
 extern void reset_query_instance_table(query_instance_table_t *table);
+
+extern void init_source_table(source_table_t *table);
+
+extern void source_table_extend(source_table_t *table);
+
+extern void reset_source_table(source_table_t *table);
 
 extern void init_samp_table(samp_table_t *table);
 

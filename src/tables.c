@@ -728,17 +728,49 @@ void reset_query_instance_table(query_instance_table_t *table) {
   table->num_queries = 0;
 }
 
-void init_samp_table(samp_table_t *table){
-  init_sort_table(&(table->sort_table));
-  init_const_table(&(table->const_table));
-  init_var_table(&(table->var_table));
-  init_pred_table(&(table->pred_table));
-  init_atom_table(&(table->atom_table));
-  init_clause_table(&(table->clause_table));
-  init_rule_table(&(table->rule_table));
-  init_query_table(&(table->query_table));
-  init_query_instance_table(&(table->query_instance_table));
-  init_integer_stack(&(table->fixable_stack), 0);
+void init_source_table(source_table_t *table) {
+  table->size = INIT_SOURCE_TABLE_SIZE;
+  table->num_entries = 0;
+  if (table->size >= MAXSIZE(sizeof(source_entry_t *), 0)) {
+    out_of_memory();
+  }
+  table->entry = (source_entry_t **)
+    safe_malloc(table->size * sizeof(source_entry_t *));
+}
+
+void source_table_extend(source_table_t *table) {
+  int32_t size = table->size;
+  int32_t num_entries = table->num_entries;
+  if (num_entries + 1 < size) return;
+  if (MAXSIZE(sizeof(source_entry_t *), 0) - size <= (size/2)) {
+    out_of_memory();
+  }
+  size += size/2;
+  table->entry = (source_entry_t **)
+    safe_realloc(table->entry, size * sizeof(source_entry_t *));
+  table->size = size; 
+}
+
+void reset_source_table(source_table_t *table) {
+  int32_t i;
+  for (i = 0; i < table->num_entries; i++) {
+    safe_free(table->entry[i]);
+  }
+  table->num_entries = 0;
+}
+
+void init_samp_table(samp_table_t *table) {
+  init_sort_table(&table->sort_table);
+  init_const_table(&table->const_table);
+  init_var_table(&table->var_table);
+  init_pred_table(&table->pred_table);
+  init_atom_table(&table->atom_table);
+  init_clause_table(&table->clause_table);
+  init_rule_table(&table->rule_table);
+  init_query_table(&table->query_table);
+  init_query_instance_table(&table->query_instance_table);
+  init_source_table(&table->source_table);
+  init_integer_stack(&table->fixable_stack, 0);
 }
 
 void init_rule_table(rule_table_t *table){

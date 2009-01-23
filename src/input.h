@@ -77,18 +77,32 @@ typedef struct input_ask_decl_s {
   int32_t num_samples;
 } input_ask_decl_t;
 
-typedef struct input_mcsat_decl_s {
+// typedef struct input_mcsat_decl_s {
+//   double sa_probability;
+//   double samp_temperature;
+//   double rvar_probability;
+//   int32_t max_flips;
+//   int32_t max_extra_flips;
+//   int32_t max_samples;
+// } input_mcsat_decl_t;
+
+typedef struct input_mcsat_params_decl_s {
+  int32_t num_params;
   double sa_probability;
   double samp_temperature;
   double rvar_probability;
   int32_t max_flips;
   int32_t max_extra_flips;
   int32_t max_samples;
-} input_mcsat_decl_t;
+} input_mcsat_params_decl_t;
 
 typedef struct input_reset_decl_s {
-  enum {RESETALL, PROBABILITIES} kind;
+  int32_t kind;
 } input_reset_decl_t;
+
+typedef struct input_retract_decl_s {
+  char *source;
+} input_retract_decl_t;
 
 typedef struct input_load_decl_s {
   char *file;
@@ -118,8 +132,10 @@ typedef union input_decl_s {
   input_ask_fdecl_t ask_fdecl;
   input_add_decl_t add_decl;
   input_ask_decl_t ask_decl;
-  input_mcsat_decl_t mcsat_decl;
+  //input_mcsat_decl_t mcsat_decl;
+  input_mcsat_params_decl_t mcsat_params_decl;
   input_reset_decl_t reset_decl;
+  input_retract_decl_t retract_decl;
   input_load_decl_t load_decl;
   input_verbosity_decl_t verbosity_decl;
   input_dumptable_decl_t dumptable_decl;
@@ -161,6 +177,20 @@ typedef struct input_atom_buffer_s {
 extern input_clause_buffer_t input_clause_buffer;
 extern input_literal_buffer_t input_literal_buffer;
 extern input_atom_buffer_t input_atom_buffer;
+
+extern double get_sa_probability();
+extern double get_samp_temperature();
+extern double get_rvar_probability();
+extern int32_t get_max_flips();
+extern int32_t get_max_extra_flips();
+extern int32_t get_max_samples();
+
+extern void set_sa_probability(double d);
+extern void set_samp_temperature(double d);
+extern void set_rvar_probability(double d);
+extern void set_max_flips(int32_t m);
+extern void set_max_extra_flips(int32_t m);
+extern void set_max_samples(int32_t m);
 
 extern bool strict_constants();
 extern void set_strict_constants(bool val);

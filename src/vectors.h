@@ -52,7 +52,7 @@ typedef struct dvector_s {
  * init_vector(v, n) with  n = size
  * delete_vector(v)
  * extend(v): increase size by 50%
- * resize(v, n): make v large enough for at list n elements
+ * resize(v, n): make v large enough for at least n elements
  * push(v, x): add x at the end of v
  * reset(v): empty x
  * shrink(v, n): remove all elements but n
