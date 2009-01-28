@@ -116,35 +116,40 @@ int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table) {
 // }
 
 int32_t choose_random_atom(samp_table_t *table){
-  uint32_t i, atom_num;
-  int32_t card, all_card;
-  pred_tbl_t *pred_tbl = &(table->pred_table.pred_tbl);
-  atom_table_t *atom_table = &(table->atom_table);
-  sort_table_t *sort_table = &(table->sort_table);
-    
+  uint32_t i, atom_num, anum;
+  int32_t card, all_card, acard, pcard, predicate;
+  pred_tbl_t *pred_tbl = &table->pred_table.pred_tbl; // Indirect preds
+  atom_table_t *atom_table = &table->atom_table;
+  sort_table_t *sort_table = &table->sort_table;
+  const_table_t *const_table = &table->const_table;
+  pred_entry_t *pred_entry;
+
+  // Get the number of possible indirect atoms
   all_card = all_atoms_cardinality(pred_tbl, sort_table);
 
   atom_num = random_uint(all_card);
   //assert(valid_table(table));
 
-  int32_t predicate = 0;
-  card = 0;
-
-  while (card < atom_num){//determine the predicate
+  predicate = 1; // Skip past true
+  acard = 0;
+  while (true) {//determine the predicate
     assert (predicate <= pred_tbl->num_preds);
-    card += pred_cardinality(pred_tbl, sort_table, predicate);
+    pcard = pred_cardinality(pred_tbl, sort_table, predicate);
+    if (acard + pcard >= atom_num) {
+      break;
+    }
+    acard += pcard;
     predicate++;
   }
-  // We went past the one we actually want
-  predicate--;
   //assert(valid_table(table));
   assert(pred_cardinality(pred_tbl, sort_table, predicate) != 0);
 
-  atom_num = card - atom_num; //gives the position of atom within predicate
+  anum = atom_num - acard; //gives the position of atom within predicate
   //Now calculate the arguments.  We represent the arguments in
   //little-endian form
-  int32_t *signature = pred_tbl->entries[predicate].signature;
-  int32_t arity = pred_tbl->entries[predicate].arity;
+  pred_entry = &pred_tbl->entries[predicate];
+  int32_t *signature = pred_entry->signature;
+  int32_t arity = pred_entry->arity;
   atom_buffer_resize(arity);
   int32_t constant;
   samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
@@ -152,10 +157,13 @@ int32_t choose_random_atom(samp_table_t *table){
   atom->pred = predicate;
   for (i = 0; i < arity; i++){
     card = sort_table->entries[signature[i]].cardinality;
-    constant = atom_num % card; //card can't be zero
-    atom_num = atom_num/card;
+    constant = anum % card; //card can't be zero
+    anum = anum/card;
     atom->args[i] = sort_table->entries[signature[i]].constants[constant];
+    // Quick typecheck
+    assert(const_sort_index(atom->args[i],const_table) == signature[i]);
   }
+  
   //assert(valid_table(table));
 
   array_hmap_pair_t *atom_map;
@@ -164,6 +172,12 @@ int32_t choose_random_atom(samp_table_t *table){
 				  (int32_t *) atom);
   //assert(valid_table(table));
   if (atom_map == NULL){//need to activate atom
+    if (get_verbosity_level() > 1) {
+      printf("Activating atom ");
+      print_atom(atom, table);
+      printf("\n");
+      fflush(stdout);
+    }
     return activate_atom(table, atom);
   } else {
     return atom_map->val;
@@ -192,9 +206,9 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
      */
     // choose a random atom
     //assert(valid_table(table));
-    //    var = choose_random_atom(table);
-    var = choose_unfixed_variable(assignment, atom_table->num_vars,
- 				  atom_table->num_unfixed_vars);
+    var = choose_random_atom(table);
+    //var = choose_unfixed_variable(assignment, atom_table->num_vars,
+    //			  atom_table->num_unfixed_vars);
     //assert(valid_table(table));
     if (var == -1) return;
     cost_flip_unfixed_variable(table, &dcost, var);
@@ -289,9 +303,9 @@ void lazy_sample_sat(samp_table_t *table, double sa_probability,
      * restore the earlier assignment
      */
     if (conflict == -1){
-      cprintf(1, "Hit a conflict.\n");
+      cprintf(2, "Hit a conflict.\n");
     } else {
-      cprintf(1, "Failed to find a model.\n");
+      cprintf(2, "Failed to find a model.\n");
     }
 
     // Flip current_assignment (restore the saved assignment)

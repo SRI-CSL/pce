@@ -714,7 +714,7 @@ void retract_source(char *source, samp_table_t *table) {
 	  if (sidx != srcidx
 	      && source_table->entry[sidx]->clause != NULL) {
 	    for (j = 0; source_table->entry[sidx]->clause[j] != -1; j++) {
-	      if (source_table->entry[sidx]->clause[j] = clause_idx) {
+	      if (source_table->entry[sidx]->clause[j] == clause_idx) {
 		wt += source_table->entry[sidx]->weight[j];
 		// Assume clause occurs only once for given source,
 		// as we can simply sum up all such occurrences.
@@ -948,6 +948,9 @@ void flip_unfixed_variable(samp_table_t *table,
     assignment[var] = v_false;
     link_propagate(table, pos_lit(var));
   } else {
+    if (var == 2726) {
+      printf("var\n");
+    }
     assignment[var] = v_true;
     link_propagate(table, neg_lit(var));
   }
@@ -1209,6 +1212,9 @@ void init_random_assignment(samp_truth_value_t *assignment, int32_t num_vars,
       if (choose() < 0.5){
 	assignment[i] = v_false;
       } else {
+	if (i == 2726) {
+	  printf("i\n");
+	}
 	assignment[i] = v_true;
       }
       (*num_unfixed_vars)++;
@@ -1374,7 +1380,7 @@ void restore_sat_dead_clauses(clause_table_t *clause_table, samp_truth_value_t *
   while (link != NULL){
     val = eval_clause(assignment, link);
     if (val != -1) {
-      cprintf(1, "---> restoring dead clause %p (val = %"PRId32")\n", link, val); //BD
+      cprintf(2, "---> restoring dead clause %p (val = %"PRId32")\n", link, val); //BD
       lit = link->disjunct[val];
       link->disjunct[val] = link->disjunct[0];
       link->disjunct[0] = lit;
@@ -1384,7 +1390,7 @@ void restore_sat_dead_clauses(clause_table_t *clause_table, samp_truth_value_t *
       link = next;
       assert(assigned_true_lit(assignment, clause_table->watched[lit]->disjunct[0]));
     } else {
-      cprintf(1, "---> dead clause %p stays dead (val = %"PRId32")\n", link, val);  //BD 
+      cprintf(2, "---> dead clause %p stays dead (val = %"PRId32")\n", link, val);  //BD 
       *link_ptr = link;
       link_ptr = &(link->link);
       link = link->link;
@@ -1508,6 +1514,9 @@ int32_t reset_sample_sat(samp_table_t *table){
       if (choice == 0){
 	new_assignment[i] = v_false;
       } else {
+	if (i == 2726) {
+	  printf("iuu\n");
+	}
 	new_assignment[i] = v_true;
       }
       num_unfixed_vars++;
@@ -1707,6 +1716,10 @@ void update_pmodel(samp_table_t *table){
   table->atom_table.num_samples++;
   for (i = 0; i < num_vars; i++){
     if (assigned_true(assignment[i])){
+      if (i == 2726) {
+	print_atom(table->atom_table.atom[i], table);
+	fflush(stdout);
+      }
       pmodel[i]++;
     }
   }
@@ -1794,9 +1807,9 @@ void sample_sat(samp_table_t *table, double sa_probability,
      * restore the earlier assignment
      */
     if (conflict == -1){
-      cprintf(1, "Hit a conflict.\n");
+      cprintf(2, "Hit a conflict.\n");
     } else {
-      cprintf(1, "Failed to find a model. Consider increasing max_flips - see mcsat help.\n");
+      cprintf(2, "Failed to find a model. Consider increasing max_flips - see mcsat help.\n");
     }
 
     // Flip current_assignment (restore the saved assignment)
@@ -2019,6 +2032,39 @@ void all_rule_instances_rec(int32_t vidx,
       }
     }
   }
+}
+
+// Fills in the substit_buffer, creates atoms when arity is reached
+void all_pred_instances_rec(int32_t vidx, int32_t *psig, int32_t arity,
+			    samp_atom_t *atom, samp_table_t *table) {
+  sort_table_t *sort_table = &table->sort_table;
+  sort_entry_t entry;
+  int32_t i;
+
+  if (vidx == arity) {
+    add_internal_atom(table, atom);
+  } else {
+    entry = sort_table->entries[psig[vidx]];
+    for (i = 0; i < entry.cardinality; i++) {
+      atom->args[vidx] = entry.constants[i];
+      all_pred_instances_rec(vidx+1, psig, arity, atom, table);
+    }
+  }
+}
+
+void all_pred_instances(char *pred, samp_table_t *table) {
+  pred_table_t *pred_table = &table->pred_table;
+  int32_t predval, predidx, arity, *psig;
+  samp_atom_t *atom;
+
+  predidx = pred_index(pred, pred_table);
+  predval = pred_val_to_index(predidx);
+  arity = pred_arity(predval, pred_table);
+  psig = pred_signature(predval, pred_table);
+  atom_buffer_resize(arity);
+  atom = (samp_atom_t *) atom_buffer.data;
+  atom->pred = predval;
+  all_pred_instances_rec(0, psig, arity, atom, table);
 }
 
 // Eager - called by MCSAT when a new rule is added.

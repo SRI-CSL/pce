@@ -392,7 +392,8 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
 // variables) or the rule table.
 
 void add_cnf(input_formula_t *formula, double weight) {
-  rule_table_t *rule_table = &(samp_table.rule_table);
+  rule_table_t *rule_table = &samp_table.rule_table;
+  pred_table_t *pred_table = &samp_table.pred_table;
   int32_t i, j, current_rule, num_lits, num_vars, atom_idx;
   rule_literal_t ***lits, *lit;
   samp_rule_t *clause;
@@ -439,6 +440,10 @@ void add_cnf(input_formula_t *formula, double weight) {
       rule_table->samp_rules[current_rule] = clause;
       rule_table->num_rules++;
       all_rule_instances(current_rule, &samp_table);
+      for (j = 0; j < num_lits; j++) {
+	int32_t pred = lits[i][j]->atom->pred;
+	add_rule_to_pred(pred_table, pred, current_rule);
+      }
     }
     safe_free(lits);
   }
@@ -483,8 +488,12 @@ void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
   query = (samp_query_t *) safe_malloc(sizeof(samp_query_t));
   for (i = 0; lits[i] != NULL; i++) {}
   query->num_clauses = i;
-  for (i = 0; formula->vars[i] != NULL; i++) {}
-  query->num_vars = i;
+  if (formula->vars == NULL) {
+    query->num_vars = 0;
+  } else {
+    for (i = 0; formula->vars[i] != NULL; i++) {}
+    query->num_vars = i;
+  }
   query->vars = formula->vars;
   query->literals = lits;
   // Get the instances into the query_instance_table

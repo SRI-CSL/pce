@@ -119,7 +119,7 @@ char *samp_truth_value_string(samp_truth_value_t val){
 }
 
 void print_atoms(samp_table_t *table){
-  atom_table_t *atom_table = &(table->atom_table);
+  atom_table_t *atom_table = &table->atom_table;
   uint32_t nvars = atom_table->num_vars;
   char d[10];
   int nwdth = sprintf(d, "%"PRId32"", nvars);

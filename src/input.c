@@ -277,13 +277,6 @@ where:\n CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n\
  NAME := chars except whitespace parens ':' ',' ';'\n\
  NUM := ['+'|'-'] simple floating point number\n\
 predicates default to 'direct' (i.e., witness/observable)\n\
-mcsat NUMs are optional, and represent, in order:\n\
-  sa_probability - double\n\
-  samp_temperature - double\n\
-  rvar_probability - double\n\
-  max_flips - int\n\
-  max_extra_flips - int\n\
-  max_samples - int\n\
 ");
     break;
   }
@@ -381,7 +374,34 @@ For example:\n\
   }
 
 //  case ASK_CLAUSE:
-  case MCSAT:
+  case MCSAT_PARAMS: {
+    printf("\n\
+mcsat_params [NUM++','];\n\
+  Sets the MCSAT parameters.  With no arguments, displays the current values.\n\
+mcsat NUMs are optional, and represent, in order:\n\
+  sa_probability (double): Prob of taking simulated annealing step\n\
+  samp_temperature (double): Simulated annealing temperature\n\
+  rvar_probability (double): Prob of flipping a random variable\n\
+                             in non-simulated annealing step\n\
+  max_flips (int): Max number of variable flips to find a model\n\
+  max_extra_flips (int): Max number of extra flips to try\n\
+  max_samples (int): Number of samples to take\n\
+Example:\n\
+  mcsat_params .8,,,1000;\n\
+    Sets sa_probability to .8, max_flips to 1000, and keeps other parameter values.\n\
+");
+    break;
+  }
+  case MCSAT: {
+    printf("\n\
+mcsat;\n\
+  Runs the %s mcsat process\n\
+Restart MCSAT with '--lazy=%s' for the %slazy version\n\
+", lazy_mcsat() ? "lazy" : "",
+	   lazy_mcsat() ? "false" : "true",
+	   lazy_mcsat() ? "non" : "");
+    break;
+  }
   case RESET: {
     printf("\n\
 reset [all | probabilities];\n\
@@ -413,6 +433,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
   var_table_t *var_table = &(table->var_table);
   pred_table_t *pred_table = &(table->pred_table);
   atom_table_t *atom_table = &(table->atom_table);
+  
   input_stack_push(file); // sets parse_file and parse_input
   //yydebug = 1;
   yylloc.first_line = 1;
@@ -428,14 +449,18 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
     if (yyparse() == 0)
       switch (input_command.kind) {
       case PREDICATE: {
-	int err = 0;
-	input_pred_decl_t decl = input_command.decl.pred_decl;
-	char * pred = decl.atom->pred;
+	input_pred_decl_t decl;
+	int err, i, arity;
+	char *pred, *sort;
+	
+	err = 0;
+	decl = input_command.decl.pred_decl;
+	pred = decl.atom->pred;
 	// First the sorts - those we don't find, we add to the sort list
 	// if nonstrict is set.
-	int32_t i = 0;
+	i = 0;
 	do {
-	  char * sort = decl.atom->args[i];
+	  sort = decl.atom->args[i];
 	  if (sort_name_index(sort, sort_table) == -1) {
 	    if (!strict_constants())
 	      add_sort(sort_table, sort);
@@ -446,14 +471,18 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	  }
 	  i += 1;
 	} while (decl.atom->args[i] != NULL);
-	int32_t arity = i;
+	arity = i;
 
-	if (err)
+	if (err) {
 	  fprintf(stderr, "Predicate %s not added\n", pred);
-	else {
+	} else {
 	  cprintf(2, "Adding predicate %s\n", pred);
-	  add_pred(pred_table, pred, decl.witness, arity,
-		   sort_table, decl.atom->args);
+	  err = add_pred(pred_table, pred, decl.witness, arity,
+			 sort_table, decl.atom->args);
+	  if (err == 0 && !lazy_mcsat()) {
+	    // Need to create all atom instances
+	    all_pred_instances(pred, table);
+	  }
 	}
 	break;
       }
