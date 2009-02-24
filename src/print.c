@@ -99,12 +99,18 @@ void print_atom(samp_atom_t *atom, samp_table_t *table) {
     i == 0 ? printf("(") : printf(", ");
     if (atom->args[i] < 0) {
       // A variable - print X followed by index
-      printf("X%d", -(atom->args[i]+1));
+      printf("X%"PRId32"", -(atom->args[i]+1));
     } else {
       printf("%s", const_name(atom->args[i], const_table));
     }
   }
   printf(")");
+}
+
+void print_atom_now(samp_atom_t *atom, samp_table_t *table) {
+  print_atom(atom, table);
+  printf("\n");
+  fflush(stdout);
 }
 
 char *samp_truth_value_string(samp_truth_value_t val){
