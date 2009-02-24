@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
 #include "memalloc.h"
@@ -107,7 +108,7 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 	  }
 	}
 	if (!foundit) {
-	  printf("Sort error: constant %s of sort %s\n does not match pred %s arg %d sort %s\n",
+	  printf("Sort error: constant %s of sort %s\n does not match pred %s arg %"PRId32" sort %s\n",
 		    cname, const_sort_name(const_idx,&samp_table), pred, i+1, sort_entry->name);
 	  return NULL;
 	}
@@ -251,7 +252,7 @@ rule_literal_t ***cnf_pos(input_fmla_t *fmla, var_entry_t **vars) {
 			 cnf_union(cnf_neg(cfmla->arg1, vars),
 				   cnf_neg(cfmla->arg2, vars)));
     } else {
-      printf("cnfpos error: op %d unexpected\n", op);
+      printf("cnfpos error: op %"PRId32" unexpected\n", op);
       return NULL;
     }
   }
@@ -286,7 +287,7 @@ rule_literal_t ***cnf_neg(input_fmla_t *fmla, var_entry_t **vars) {
 		       cnf_product(cnf_neg(cfmla->arg1, vars),
 				   cnf_neg(cfmla->arg2, vars)));
     } else {
-      printf("cnfpos error: op %d unexpected\n", op);
+      printf("cnfpos error: op %"PRId32" unexpected\n", op);
       return NULL;
     }
   }
