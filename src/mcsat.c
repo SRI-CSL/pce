@@ -137,6 +137,7 @@ static void decode_options(int argc, char **argv) {
     if (show_version) {
       printf("mcsat %s\nCopyright (C) 2008, SRI International.  All Rights Reserved.\n",
 	     VERSION);
+      exit(0);
     }
     if (show_help) {
       help();
