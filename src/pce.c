@@ -1105,7 +1105,7 @@ void add_query_instance_to_solution(ICLTerm *solutions,
     str = icl_NewStringFromTerm(Formula);
     pce_error("add_query_instance_to_solution: Problem in substitution for formula\n  %s",
 	      str);
-    icl_stFree(cname);    
+    icl_stFree(str);    
   } else {
     prob = query_probability(qinst, &samp_table);
     
