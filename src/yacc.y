@@ -803,6 +803,10 @@ int yylex (void) {
     else if (strcasecmp(yylval.str, "DUMPTABLE") == 0
 	     || strcasecmp(yylval.str, "DUMPTABLES") == 0)
       return DUMPTABLE;
+    else if (strcasecmp(yylval.str, "CLAUSE") == 0)
+      return CLAUSE;
+    else if (strcasecmp(yylval.str, "RULE") == 0)
+      return RULE;
     else if (strcasecmp(yylval.str, "LOAD") == 0)
       return LOAD;
     else if (strcasecmp(yylval.str, "VERBOSITY") == 0)
