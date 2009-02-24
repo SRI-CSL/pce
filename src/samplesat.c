@@ -2115,6 +2115,56 @@ void create_new_const_rule_instances(int32_t constidx, samp_table_t *table,
   }
 }
 
+/*
+ * Given a ground atom and a literal from a rule, this returns true if the
+ * literal matches - ignores sign, and finds consistent binding for the rule
+ * variables - we don't want p(a, b) to match p(V, V).
+ * Side effect: substit_buffer has the (partial) matching substitution
+ * Of course, this is only useful if this function returns true.
+ */
+extern bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
+				    int32_t arity) {
+  // Don't know the rule this literal came from, so we don't actually know
+  // the number of variables - we just use the whole substit buffer, which
+  // is assumed to be large enough.
+  int32_t i, varidx;
+  
+  // First check that the preds match
+  if (atom->pred != lit->atom->pred) {
+    return false;
+  }
+  // Initialize the substit_buffer
+  for (i = 0; i < substit_buffer.size; i++) {
+    substit_buffer.entries[i].const_index = -1;
+    substit_buffer.entries[i].fixed = false;
+  }
+  // Now go through comparing the args of the atoms
+  for (i = 0; i < arity; i++) {
+    if (lit->atom->args[i] >= 0) {
+      // Constants must be equal
+      if (atom->args[i] != lit->atom->args[i]) {
+	return false;
+      }
+    } else {
+      // It's a variable
+      varidx = -(lit->atom->args[i]) - 1;
+      assert(substit_buffer.size > varidx); // Just in case
+      if (substit_buffer.entries[varidx].const_index == -1) {
+	// Variable not yet set, simply set it
+	substit_buffer.entries[varidx].const_index = atom->args[i];
+	substit_buffer.entries[varidx].fixed = true;
+      } else {
+	// Already set, make sure it's the same value
+	if (substit_buffer.entries[varidx].const_index != atom->args[i]) {
+	  return false;
+	}
+      }
+    }
+  }
+  return true;
+}
+
+
 // Queries are not like rules, as rules are simpler (can treat as separate
 // clauses), and have a weight.  substit on rules updates the clause_table,
 // whereas substit_query updates the query_instance_table.
@@ -2436,56 +2486,6 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
   }
   //assert(valid_table(table));
   return 0; // Not yet finished
-}
-
-
-/*
- * Given a ground atom and a literal from a rule, this returns true if the
- * literal matches - ignores sign, and finds consistent binding for the rule
- * variables - we don't want p(a, b) to match p(V, V).
- * Side effect: substit_buffer has the (partial) matching substitution
- * Of course, this is only useful if this function returns true.
- */
-extern bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
-				    int32_t arity) {
-  // Don't know the rule this literal came from, so we don't actually know
-  // the number of variables - we just use the whole substit buffer, which
-  // is assumed to be large enough.
-  int32_t i, varidx;
-  
-  // First check that the preds match
-  if (atom->pred != lit->atom->pred) {
-    return false;
-  }
-  // Initialize the substit_buffer
-  for (i = 0; i < substit_buffer.size; i++) {
-    substit_buffer.entries[i].const_index = -1;
-    substit_buffer.entries[i].fixed = false;
-  }
-  // Now go through comparing the args of the atoms
-  for (i = 0; i < arity; i++) {
-    if (lit->atom->args[i] >= 0) {
-      // Constants must be equal
-      if (atom->args[i] != lit->atom->args[i]) {
-	return false;
-      }
-    } else {
-      // It's a variable
-      varidx = -(lit->atom->args[i]) - 1;
-      assert(substit_buffer.size > varidx); // Just in case
-      if (substit_buffer.entries[varidx].const_index == -1) {
-	// Variable not yet set, simply set it
-	substit_buffer.entries[varidx].const_index = atom->args[i];
-	substit_buffer.entries[varidx].fixed = true;
-      } else {
-	// Already set, make sure it's the same value
-	if (substit_buffer.entries[varidx].const_index != atom->args[i]) {
-	  return false;
-	}
-      }
-    }
-  }
-  return true;
 }
 
   
