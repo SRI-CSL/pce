@@ -555,7 +555,7 @@ bool typecheck_pred_arg(int32_t const_sig, int32_t predarg_sig,
       pce_log("but was given constant %s of sort %s\n",
 	      cname, sort_entries[const_sig].name);
       fprintf(stderr,
-	      "Sort error; predicate %s arg %d expects sort %s,\n",
+	      "Sort error; predicate %s arg %"PRId32" expects sort %s,\n",
 	      pname, argno, sort_entries[predarg_sig].name);
       fprintf(stderr, "but was given constant %s of sort %s\n",
 	      cname, sort_entries[const_sig].name);
@@ -1073,7 +1073,9 @@ ICLTerm *pce_substit(ICLTerm *Term, samp_query_instance_t *qinst) {
 	return icl_NewStr(cname);
       }
     }
-    pce_error("pce_subst: Constant not found");
+    cname = icl_NewStringFromTerm(Term);    
+    pce_error("pce_subst: Constant not found for variable %s", cname);
+    icl_stFree(cname);
     return NULL;
   }
   if(!(icl_IsList(Term) || icl_IsGroup(Term) || icl_IsStruct(Term))) {
@@ -1095,18 +1097,26 @@ void add_query_instance_to_solution(ICLTerm *solutions,
 				    bool is_subscription) {
   ICLTerm *solution, *InstForm, *Prob;
   double prob;
+  char *str;
   
   InstForm = icl_CopyTerm(Formula);
   InstForm = pce_substit(InstForm, qinst);
-  prob = query_probability(qinst, &samp_table);
-  
-  Prob = icl_NewFloat(prob);
-  if (is_subscription) {
-    solution = icl_NewStruct("m", 2, InstForm, Prob);
+  if (InstForm == NULL) {
+    str = icl_NewStringFromTerm(Formula);
+    pce_error("add_query_instance_to_solution: Problem in substitution for formula\n  %s",
+	      str);
+    icl_stFree(cname);    
   } else {
-    solution = icl_NewStruct("pce_queryp", 2, InstForm, Prob);
+    prob = query_probability(qinst, &samp_table);
+    
+    Prob = icl_NewFloat(prob);
+    if (is_subscription) {
+      solution = icl_NewStruct("m", 2, InstForm, Prob);
+    } else {
+      solution = icl_NewStruct("pce_queryp", 2, InstForm, Prob);
+    }
+    icl_AddToList(solutions, solution, true);
   }
-  icl_AddToList(solutions, solution, true);
 }
 
 
@@ -1446,12 +1456,14 @@ void remove_query(int32_t query_index, samp_table_t *table) {
   // First find and free all instances of this query
 
   cnt = 0;
-  for (i = 0; i < qinst_table->size; i++) {
+  for (i = 0; i < qinst_table->num_queries; i++) {
     if (qinst_table->query_inst[i]->query_index == query_index) {
       qinst = qinst_table->query_inst[i];
       safe_free(qinst->subst);
-      for (j = 0; qinst->lit[j] != NULL; j++) {
-	safe_free(qinst->lit[j]);
+      if (qinst->lit != NULL) {
+	for (j = 0; qinst->lit[j] != NULL; j++) {
+	  safe_free(qinst->lit[j]);
+	}
       }
       safe_free(qinst->lit);
       safe_free(qinst);
@@ -1462,7 +1474,7 @@ void remove_query(int32_t query_index, samp_table_t *table) {
       qinst_table->query_inst[i - cnt] = qinst_table->query_inst[i];
     }
   }
-  qinst_table->size -= cnt;
+  qinst_table->num_queries -= cnt;
 }
 
 bool pce_unsubscribe(int32_t subscr_index) {
