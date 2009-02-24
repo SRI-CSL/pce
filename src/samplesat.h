@@ -141,9 +141,6 @@ void mc_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 	    uint32_t max_flips, uint32_t max_extra_flips, uint32_t max_samples);
 
-bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
-			     int32_t arity);
-
 bool eql_samp_atom(samp_atom_t *atom1, samp_atom_t *atom2, samp_table_t *table);
 
 bool eql_rule_literal(rule_literal_t *lit1, rule_literal_t *lit2, samp_table_t *table);
