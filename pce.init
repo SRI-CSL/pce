@@ -8,18 +8,34 @@ sort 'http://calo.sri.com/core-plus-office#Calendar'; # Calendar_t;
 sort 'http://calo.sri.com/core-plus-office#ElectronicPresentationSlide'; # Slide_t;
 sort 'http://calo.sri.com/core-plus-office#FileAttachmentRecord';
 sort 'http://calo.sri.com/core-plus-office#ComputerFile';
+sort 'http://calo.sri.com/core-plus-office#Entity';
+
+subsort 'http://calo.sri.com/core-plus-office#EmailMessage' 'http://calo.sri.com/core-plus-office#Entity';
+subsort 'http://calo.sri.com/core-plus-office#Calendar'     'http://calo.sri.com/core-plus-office#Entity';
+subsort 'http://calo.sri.com/core-plus-office#DocumentFile' 'http://calo.sri.com/core-plus-office#Entity';
+subsort 'http://calo.sri.com/core-plus-office#ElectronicPresentationSlide' 'http://calo.sri.com/core-plus-office#Entity';
+subsort 'http://calo.sri.com/core-plus-office#WebPage' 'http://calo.sri.com/core-plus-office#Entity';
+
+sort 'http://calo.sri.com/collab#CIssue';
+sort 'http://calo.sri.com/collab#CHarvestedRecord';
+
+subsort 'http://calo.sri.com/collab#CIssue' 'http://calo.sri.com/collab#CHarvestedRecord';
 
 #sort Issue_t;
 #sort OntolotyObject_t;
 
 predicate 'http://calo.sri.com/core-plus-office#relatedProjectIs'
-            ('http://calo.sri.com/core-plus-office#EmailMessage',
+            ('http://calo.sri.com/core-plus-office#Entity',
 	     'http://calo.sri.com/core-plus-office#Project') indirect;
 predicate 'http://calo.sri.com/core-plus-office#emailSenderIs'
             ('http://calo.sri.com/core-plus-office#EmailMessage',
 	     'http://calo.sri.com/core-plus-office#Person') indirect;
-predicate 'http://calo.sri.com/core-plus-office#EmailMessage'('http://calo.sri.com/core-plus-office#EmailMessage') direct;
-predicate 'http://calo.sri.com/core-plus-office#Person'('http://calo.sri.com/core-plus-office#Person') direct;
+predicate 'http://calo.sri.com/collab#hasRelatedTask'
+            ('http://calo.sri.com/collab#CHarvestedRecord',
+             'http://calo.sri.com/core-plus-office#Task') indirect;
+predicate 'http://calo.sri.com/core-plus-office#EmailMessage'('http://calo.sri.com/core-plus-office#Entity') direct;
+predicate 'http://calo.sri.com/core-plus-office#Person'('http://calo.sri.com/core-plus-office#Entity') direct;
+predicate 'http://calo.sri.com/core-plus-office#CIssue'('http://calo.sri.com/core-plus-office#CIssue') direct;
 	     
 #predicate attached('http://calo.sri.com/core-plus-office#DocumentFile', 'http://calo.sri.com/core-plus-office#EmailMessage') direct;
 predicate 'SubjectCategory'(Category_t) direct;
@@ -35,8 +51,8 @@ predicate 'Webpage'('http://calo.sri.com/core-plus-office#WebPage') indirect;
 predicate 'DocumentFile'('http://calo.sri.com/core-plus-office#DocumentFile') indirect;
 predicate 'EmailMessage'('http://calo.sri.com/core-plus-office#EmailMessage') indirect;
 predicate 'iris'(OntolotyObject_t) indirect;
-predicate fileHasTask('http://calo.sri.com/core-plus-office#DocumentFile', 'http://calo.sri.com/core-plus-office#Task') indirect;
+#predicate fileHasTask('http://calo.sri.com/core-plus-office#DocumentFile', 'http://calo.sri.com/core-plus-office#Task') indirect;
 predicate 'CalendarEntry'('http://calo.sri.com/core-plus-office#Calendar') indirect;
-predicate emailHasTask('http://calo.sri.com/core-plus-office#EmailMessage', 'http://calo.sri.com/core-plus-office#Task') indirect;
+#predicate emailHasTask('http://calo.sri.com/core-plus-office#EmailMessage', 'http://calo.sri.com/core-plus-office#Task') indirect;
 predicate 'ElectronicPresentationSlide'('http://calo.sri.com/core-plus-office#ElectronicPresentationSlide') indirect;
 dumptables;
