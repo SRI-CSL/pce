@@ -33,7 +33,7 @@ static int32_t max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
 static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 
 static bool strict_consts = true;
-static bool lazy = true;
+static bool lazy = false;
 
 input_clause_buffer_t input_clause_buffer = {0, 0, NULL};
 input_literal_buffer_t input_literal_buffer = {0, 0, NULL};
