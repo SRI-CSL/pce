@@ -282,7 +282,7 @@ static void decode_options(int argc, char **argv) {
       } else if ((strcasecmp(optarg, "false") == 0) || (strcasecmp(optarg, "f") == 0) || (strcmp(optarg, "0") == 0)) {
 	set_lazy_mcsat(false);
       } else {
-	printf("Error: lazy must be true, false, t, f, 0, or 1\n");
+	pce_error("Error: lazy must be true, false, t, f, 0, or 1\n");
 	exit(1);
       }
       break;
@@ -296,7 +296,7 @@ static void decode_options(int argc, char **argv) {
       } else if (strcasecmp(optarg, "none") == 0) {
 	persist_option = PERSIST_NONE;
       } else {
-	printf("Error: persistmode must be rw, ro, wo, or none\n");
+	pce_error("Error: persistmode must be rw, ro, wo, or none\n");
 	exit(1);
       }
       break;
@@ -304,16 +304,16 @@ static void decode_options(int argc, char **argv) {
       if (strlen(optarg) > 0) {
 	for (i = 0; i < strlen(optarg); i++) {
 	  if (!isdigit(optarg[i])) {
-	    printf("Verbosity must be a number\n");
+	    pce_error("Verbosity must be a number\n");
 	    exit(1);
 	  }
 	}
       } else {
-	printf("Verbosity must be a number\n");
+	pce_error("Verbosity must be a number\n");
 	exit(1);
       }
       pce_log("Setting verbosity to %d\n", atoi(optarg));
-      printf("Setting verbosity to %d\n", atoi(optarg));
+      cprintf(2, "Setting verbosity to %d\n", atoi(optarg));
       set_verbosity_level(atoi(optarg));
       break;
     case 'V':
@@ -554,11 +554,10 @@ bool typecheck_pred_arg(int32_t const_sig, int32_t predarg_sig,
 	      pname, argno, sort_entries[predarg_sig].name);
       pce_log("but was given constant %s of sort %s\n",
 	      cname, sort_entries[const_sig].name);
-      fprintf(stderr,
-	      "Sort error; predicate %s arg %"PRId32" expects sort %s,\n",
-	      pname, argno, sort_entries[predarg_sig].name);
-      fprintf(stderr, "but was given constant %s of sort %s\n",
-	      cname, sort_entries[const_sig].name);
+      pce_error("Sort error; predicate %s arg %"PRId32" expects sort %s,\n",
+		pname, argno, sort_entries[predarg_sig].name);
+      pce_error("but was given constant %s of sort %s\n",
+		cname, sort_entries[const_sig].name);
       return false;
       }
     }
@@ -1033,7 +1032,7 @@ bool pce_learner_assert_list(ICLTerm *goal) {
   }
   pce_log("pce_learner_assert_list: processed %d assertions\n",
 	  icl_NumTerms(List));
-  printf("pce_learner_assert_list: processed %d assertions\n",
+  cprintf(2, "pce_learner_assert_list: processed %d assertions\n",
 	 icl_NumTerms(List));
   return true;
 }  
@@ -1398,7 +1397,7 @@ void process_subscription(subscription_t *subscription) {
   // pce_subscription_callback(m(Sid, Formula, Prob), ...)
   pce_log("process_subscription: returning %"PRId32" solutions for subscription %s\n",
 	  cnt, subscription->id);
-  printf("process_subscription: returning %"PRId32" solutions for subscription %s\n",
+  cprintf(2, "process_subscription: returning %"PRId32" solutions for subscription %s\n",
 	 cnt, subscription->id);
   fflush(stdout);
   callback = icl_NewStruct("pce_subscription_callback", 1, callbacklist);
@@ -1422,7 +1421,7 @@ int pce_process_subscriptions_callback(ICLTerm *goal, ICLTerm *params,
   }
   // pce_save(goal);
   pce_log("pce_process_subscriptions_callback called\n");
-  printf("pce_process_subscriptions_callback called\n");
+  cprintf(2, "pce_process_subscriptions_callback called\n");
   fflush(stdout);  
   return true;
 }
@@ -1637,7 +1636,7 @@ int pce_unsubscribe_learner_callback(ICLTerm *goal, ICLTerm *params,
       }
     }
   }
-  printf("%"PRId32" subscriptions removed", i);
+  cprintf(2, "%"PRId32" subscriptions removed", i);
   pce_log("%"PRId32" subscriptions removed", i);
   return true;
 }
@@ -1793,8 +1792,12 @@ int32_t pce_update_model() {
   BecameTrueWeights = icl_NewList(NULL);
   Out = NULL;
   Sol = NULL;
+  pce_log("pce_update_model: looping through the %"PRId32" vars of the atom table",
+	  atom_table->num_vars);
   for (i = 0; i < atom_table->num_vars; i++) {
     was_true = false;
+    pce_log("pce_update_model: searching through the %"PRId32" elts of the model",
+	    pce_model.size);
     for (j = 0; j < pce_model.size; j++) {
       if (pce_model.atom[j] == i) {
 	was_true = true;
@@ -1816,6 +1819,7 @@ int32_t pce_update_model() {
     }
   }
   // Now remove marked retracts from the model
+  pce_log("pce_update_model: cleaning up the model");
   cur = 0;
   for (i = 0; i < pce_model.size; i++) {
     if (pce_model.atom[i] != -1) {
@@ -1829,10 +1833,15 @@ int32_t pce_update_model() {
     Flag = pce_model.size == 0 ? icl_NewStr("full") : icl_NewStr("incremental");
     Callback = icl_NewStruct("pce_update_model_callback", 3, Retract, BecameTrueWeights, Flag);
     Nlist = icl_NewList(NULL);
+
+    char *str = icl_NewStringFromTerm(Callback);
+    pce_log("pce_update_model: calling solvable\n %s", str);
+    icl_stFree(str);    
+    
     oaa_Solve(Callback, Nlist, &Out, &Sol);
     pce_log("pce_update_model_callback: Retract %d, BecameTrueWeights %d, Flag %s",
 	    icl_ListLen(Retract), icl_ListLen(BecameTrueWeights), icl_Str(Flag));
-    printf("pce_update_model_callback: Retract %d, BecameTrueWeights %d, Flag %s\n",
+    cprintf(2, "pce_update_model_callback: Retract %d, BecameTrueWeights %d, Flag %s\n",
 	   icl_ListLen(Retract), icl_ListLen(BecameTrueWeights), icl_Str(Flag));
     icl_FreeTerm(Callback);
     icl_FreeTerm(Nlist);
@@ -1874,7 +1883,7 @@ double pce_translate_weight(ICLTerm *Strength) {
   } else {
     str = icl_NewStringFromTerm(Strength);
     pce_log("* Note: %s defaulting to 5.0\n", str);
-    printf("* Note: %s defaulting to 5.0\n", str);
+    cprintf(2, "* Note: %s defaulting to 5.0\n", str);
     icl_stFree(str);
     return 5.0;
   }
@@ -2143,18 +2152,20 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	//oaa_Solve(callback, NULL, NULL, Instances);
 	//      callback = icl_NewTermFromString("foo(X)");
 	Instances = NULL;
-	pce_log("Calling QM for instances of predicate %s\n", pred);
-	cprintf(1, "Calling QM for instances of predicate %s\n", pred);
-	fflush(stdout);
 	if (empty_params == NULL) {
 	  empty_params = icl_NewTermFromString("[]");
 	}
 	Out = NULL;
+	char *str = icl_NewStringFromTerm(callback);
+	pce_log("Calling QM for instances of predicate %s, solvable is:\n %s\n", pred, str);
+	cprintf(1, "Calling QM for instances of predicate %s, solvable is:\n %s\n", pred, str);
+	fflush(stdout);
+	icl_stFree(str);    
 	success = oaa_Solve(callback, empty_params, &Out, &Instances);
 	if (success) {
 	  inststr = icl_NewStringFromTerm(Instances);
-	  pce_log("Instances for %s are %s\n", pred, inststr);
-	  printf("Instances for %s are %s\n", pred, inststr);
+	  pce_log("Instances from QM for %s are %s\n", pred, inststr);
+	  cprintf(2, "Instances from QM for %s are %s\n", pred, inststr);
 	  fflush(stdout);
 	  icl_stFree(inststr);
 	  // We now have Instances in the form [query(X, Y, answer([Binding], [Params]))]
@@ -2165,7 +2176,7 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	    pce_error("query: list of 1 element expected for Instances");
 	    inststr = icl_NewStringFromTerm(Instances);
 	    pce_log("Instances for %s are %s\n", pred, inststr);
-	    printf("Instances for %s are %s\n", pred, inststr);
+	    cprintf(2, "Instances for %s are %s\n", pred, inststr);
 	    fflush(stdout);
 	    icl_stFree(inststr);
 	  } else {
@@ -2212,14 +2223,14 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 			newconsts += 1;
 			inststr = icl_NewStringFromTerm(Arg);
 			pce_log("Adding new constant %s\n", inststr);
-			fprintf(stderr, "Adding new constant %s\n", inststr);
+			cprintf(1, "Adding new constant %s\n", inststr);
 			icl_stFree(inststr);
 			pce_add_const(cname, table);
 		      }
 		    } else {
 		      inststr = icl_NewStringFromTerm(Arg);
 		      pce_log("Arg is %s\n", inststr);
-		      fprintf(stderr, "Arg is %s\n", inststr);
+		      cprintf(2, "Arg is %s\n", inststr);
 		      icl_stFree(inststr);
 		      char *icltype =
 			icl_IsList(Arg) ? "List" :
@@ -2231,11 +2242,11 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 			icl_IsDataQ(Arg) ? "DataQ" :
 			icl_IsValid(Arg) ? "Valid" : "Invalid";
 		      pce_log("Query Manager returned a %s for binding no. %"PRId32" (0-based):\n", icltype, k);
-		      fprintf(stderr, "Query Manager returned a %s for binding no. %"PRId32" (0-based):\n", icltype, k);
+		      cprintf(1, "Query Manager returned a %s for binding no. %"PRId32" (0-based):\n", icltype, k);
 		      query = icl_NewStringFromTerm(callback);
 		      inststr = icl_NewStringFromTerm(Instances);
 		      pce_log("  query: %s\n  binding: %s\n", query, inststr);
-		      fprintf(stderr, "  query: %s\n  binding: %s\n", query, inststr);
+		      cprintf(1, "  query: %s\n  binding: %s\n", query, inststr);
 		      icl_stFree(query);
 		      icl_stFree(inststr);
 		    }
@@ -2243,7 +2254,7 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 		} else {
 		  pce_log("Query Manager returned %"PRId32" arguments for %s, expected %"PRId32"\n",
 			  bnum, pred, arity);
-		  fprintf(stderr, "Query Manager returned %"PRId32" arguments for %s, expected %"PRId32"\n",
+		  cprintf(1, "Query Manager returned %"PRId32" arguments for %s, expected %"PRId32"\n",
 			  bnum, pred, arity);
 		}
 		icl_FreeTerm(CBinding);
@@ -2252,6 +2263,9 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	      cprintf(1, " %d instances, %d new constants\n", icl_NumTerms(Bindings), newconsts);
 	    }
 	  }
+	} else {
+	  pce_log("oaa_solve returned false\n");
+	  pce_error("oaa_solve returned false\n");
 	}
 	icl_FreeTerm(Out);
 	icl_FreeTerm(Instances);
@@ -2267,7 +2281,7 @@ static void get_qm_instances(samp_table_t *table) {
 
   if (!qm_available()) {
     pce_log("QueryManager not yet available\n");
-    printf("QueryManager not yet available\n");
+    cprintf(1, "QueryManager not yet available\n");
     return;
   }
   start_time = time(NULL);
@@ -2306,7 +2320,7 @@ int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
       }      
     }
     pce_log("Calling pce_update_model\n");
-    printf("Calling pce_update_model\n");
+    cprintf(2, "Calling pce_update_model\n");
     pce_update_model();
 
     time(&idle_timer);
@@ -2732,16 +2746,16 @@ int setup_oaa_connection(int argc, char *argv[]) {
   ICLTerm *pceSolvables;
 
   pce_log("Setting up OAA connection\n");
-  printf("Setting up OAA connection\n");
+  cprintf(2,"Setting up OAA connection\n");
   if (!oaa_SetupCommunication(AGENT_NAME)) {
-    printf("Could not connect\n");
+    pce_error("Could not connect\n");
     return false;
   }
 
   // Prepare a list of solvables that this agent is capable of
   // handling.
   pce_log("Setting up solvables\n");
-  printf("Setting up solvables\n");
+  cprintf(2,"Setting up solvables\n");
   pceSolvables = icl_NewList(NULL); 
   icl_AddToList(pceSolvables,
 		icl_NewTermFromString("solvable(pce_fact(Source,Formula),[callback(pce_fact)])"),
@@ -2789,62 +2803,62 @@ int setup_oaa_connection(int argc, char *argv[]) {
   // Register solvables with the Facilitator.
   // The string "parent" represents the Facilitator.
   pce_log("Registering solvables\n");
-  printf("Registering solvables\n");
+  cprintf(2,"Registering solvables\n");
   if (!oaa_Register("parent", AGENT_NAME, pceSolvables)) {
-    printf("Could not register\n");
+    pce_error("Could not register\n");
     return false;
   }
 
   // Register the callbacks.
   if (!oaa_RegisterCallback("pce_fact", pce_fact_callback)) {
-    printf("Could not register pce_fact callback\n");
+    pce_error("Could not register pce_fact callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_learner_assert",
 			    pce_learner_assert_callback)) {
-    printf("Could not register pce_learner_assert callback\n");
+    pce_error("Could not register pce_learner_assert callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_learner_assert_list",
 			    pce_learner_assert_list_callback)) {
-    printf("Could not register pce_learner_assert_list callback\n");
+    pce_error("Could not register pce_learner_assert_list callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_queryp", pce_queryp_callback)) {
-    printf("Could not register pce_queryp callback\n");
+    pce_error("Could not register pce_queryp callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_subscribe", pce_subscribe_callback)) {
-    printf("Could not register pce_subscribe callback\n");
+    pce_error("Could not register pce_subscribe callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_process_subscriptions",
 			    pce_process_subscriptions_callback)) {
-    printf("Could not register pce_process_subscriptions callback\n");
+    pce_error("Could not register pce_process_subscriptions callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_unsubscribe", pce_unsubscribe_callback)) {
-    printf("Could not register pce_unsubscribe callback\n");
+    pce_error("Could not register pce_unsubscribe callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_unsubscribe_learner", pce_unsubscribe_learner_callback)) {
-    printf("Could not register pce_unsubscribe_learner callback\n");
+    pce_error("Could not register pce_unsubscribe_learner callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_full_model", pce_full_model_callback)) {
-    printf("Could not register pce_full_model callback\n");
+    pce_error("Could not register pce_full_model callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_update_model", pce_update_model_callback)) {
-    printf("Could not register pce_update_model callback\n");
+    pce_error("Could not register pce_update_model callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_add_user_defined_rule", pce_add_user_defined_rule_callback)) {
-    printf("Could not register pce_add_user_defined_rule callback\n");
+    pce_error("Could not register pce_add_user_defined_rule callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("pce_reset_cache", pce_reset_cache_callback)) {
-    printf("Could not register pce_reset_cache callback\n");
+    pce_error("Could not register pce_reset_cache callback\n");
     return false;
   }
   if (!oaa_RegisterCallback("app_idle", pce_idle_callback)) {
@@ -2856,10 +2870,10 @@ int setup_oaa_connection(int argc, char *argv[]) {
   oaa_SetTimeout(pce_timeout);
 
   // Clean up.
-  printf("Freeing solvables\n");
+  cprintf(2, "Freeing solvables\n");
   icl_Free(pceSolvables);
 
-  printf("Returning from setup_oaa_connection\n");
+  cprintf(2, "Returning from setup_oaa_connection\n");
   return true;
 }
 
@@ -2875,15 +2889,15 @@ void create_log_file(char *curdir) {
     return;
   }
   if (strftime(logfile, 28, "pce_%FT%H-%M-%S.log", tmp) == 0) {
-    printf("Log file not generated: strftime returned 0\n");
+    perror("Log file not generated: strftime returned 0\n");
     return;
   }
-  printf("Attempting to open log file %s\n", logfile);
+  cprintf(1, "Attempting to open log file %s\n", logfile);
   pce_log_fp = fopen(logfile, "w");
   if (pce_log_fp == NULL) {
     perror("Could not open log file");
   } else {
-    printf("Created Log file %s/%s\n", curdir, logfile);
+    cprintf(1, "Created Log file %s/%s\n", curdir, logfile);
   }
 }
 
@@ -2898,7 +2912,7 @@ int main(int argc, char *argv[]){
   
   // Initialize OAA
   pce_log("Initializing OAA\n");
-  printf("Initializing OAA\n");
+  cprintf(2, "Initializing OAA\n");
   oaa_Init(argc, argv);
 
   if (!setup_oaa_connection(argc, argv)) {
@@ -2909,24 +2923,24 @@ int main(int argc, char *argv[]){
   init_samp_table(&samp_table);
 
   pce_log("Loading %s/%s\n", curdir, pce_init_file);
-  printf("Loading %s/%s\n", curdir, pce_init_file);
+  cprintf(2, "Loading %s/%s\n", curdir, pce_init_file);
   load_mcsat_file(pce_init_file, &samp_table);
 
   if (persist_option == PERSIST_RW || persist_option == PERSIST_RO) {
     if (access(pce_save_file, F_OK) == 0) {
       pce_log("Loading %s/%s\n", curdir, pce_save_file);
-      printf("Loading %s/%s\n", curdir, pce_save_file);
+      cprintf(2, "Loading %s/%s\n", curdir, pce_save_file);
       load_mcsat_file(pce_save_file, &samp_table);
     } else {
       pce_log("%s/%s not found\n", curdir, pce_save_file);
-      printf("%s/%s not found\n", curdir, pce_save_file);  
+      cprintf(2, "%s/%s not found\n", curdir, pce_save_file);  
     }
   }
   if (persist_option == PERSIST_RW || persist_option == PERSIST_WO) {
     pce_save_fp = fopen(pce_save_file, "a+");
   }
   pce_log("Entering MainLoop\n");
-  printf("Entering MainLoop\n");
+  cprintf(2, "Entering MainLoop\n");
 
   oaa_MainLoop(true); //This expands to the code below (more or less)
 
