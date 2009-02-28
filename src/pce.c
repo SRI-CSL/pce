@@ -2119,6 +2119,9 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
     if (arity > 0) {
       psig = pred_tbl->entries[i].signature;
       if (i >= qm_buffer.size) {
+	pce_log("QM Instances: building the query for predicate %s\n", pred);
+	cprintf(0, "QM Instances: building the query for predicate %s\n", pred);
+	fflush(stdout);
 	// Now we build the query - has the form
 	//  query(query_pattern('(PRED ?x01 ?x02)'),[answer_pattern('[{?x01},{?x02}]')],Results)
 	qsize = 22 + strlen(pred) + (arity * 5) + 22 + (arity * 7) + 13;
@@ -2146,6 +2149,9 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	qm_buffer.size += 1;
 	qm_buffer.entry[i]->query = callback;
       } else {
+	pce_log("QM Instances: getting the cached query for predicate %s\n", pred);
+	cprintf(0, "QM Instances: getting the cached query for predicate %s\n", pred);
+	fflush(stdout);
 	callback = qm_buffer.entry[i]->query;
       }
       if (callback != NULL) {
