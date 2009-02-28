@@ -21,8 +21,8 @@ sort 'http://calo.sri.com/collab#CHarvestedRecord';
 
 subsort 'http://calo.sri.com/collab#CIssue' 'http://calo.sri.com/collab#CHarvestedRecord';
 
-#sort Issue_t;
-#sort OntolotyObject_t;
+# sort Issue_t;
+# sort OntolotyObject_t;
 
 predicate 'http://calo.sri.com/core-plus-office#relatedProjectIs'
             ('http://calo.sri.com/core-plus-office#Entity',
@@ -37,22 +37,22 @@ predicate 'http://calo.sri.com/core-plus-office#EmailMessage'('http://calo.sri.c
 predicate 'http://calo.sri.com/core-plus-office#Person'('http://calo.sri.com/core-plus-office#Entity') direct;
 predicate 'http://calo.sri.com/core-plus-office#CIssue'('http://calo.sri.com/core-plus-office#CIssue') direct;
 	     
-#predicate attached('http://calo.sri.com/core-plus-office#DocumentFile', 'http://calo.sri.com/core-plus-office#EmailMessage') direct;
-predicate 'SubjectCategory'(Category_t) direct;
-predicate emailAttachmentRecordIs('http://calo.sri.com/core-plus-office#EmailMessage', 'http://calo.sri.com/core-plus-office#DocumentFile') direct;
-predicate 'ElectronicPresentationDocument'('http://calo.sri.com/core-plus-office#DocumentFile') direct;
-predicate 'superCategoryIs'(Category_t, Category_t) direct;
-predicate fileAttachmentRecordFileIs('http://calo.sri.com/core-plus-office#EmailMessage', 'http://calo.sri.com/core-plus-office#DocumentFile') direct;
-#predicate 'http://iris.sri.com/irisOntology#bp_category'(OntologyObject_t, Category_t) direct;
-#predicate 'http://iris.sri.com/irisOntology#bp_participant_in_project'('http://calo.sri.com/core-plus-office#Person', 'http://calo.sri.com/core-plus-office#Project') direct;
+# predicate attached('http://calo.sri.com/core-plus-office#DocumentFile', 'http://calo.sri.com/core-plus-office#EmailMessage') direct;
+# predicate 'SubjectCategory'(Category_t) direct;
+# predicate emailAttachmentRecordIs('http://calo.sri.com/core-plus-office#EmailMessage', 'http://calo.sri.com/core-plus-office#DocumentFile') direct;
+# predicate 'ElectronicPresentationDocument'('http://calo.sri.com/core-plus-office#DocumentFile') direct;
+# predicate 'superCategoryIs'(Category_t, Category_t) direct;
+# predicate fileAttachmentRecordFileIs('http://calo.sri.com/core-plus-office#EmailMessage', 'http://calo.sri.com/core-plus-office#DocumentFile') direct;
+# predicate 'http://iris.sri.com/irisOntology#bp_category'(OntologyObject_t, Category_t) direct;
+# predicate 'http://iris.sri.com/irisOntology#bp_participant_in_project'('http://calo.sri.com/core-plus-office#Person', 'http://calo.sri.com/core-plus-office#Project') direct;
 
 # predicate 'CIssue'(Issue_t) indirect;
-predicate 'Webpage'('http://calo.sri.com/core-plus-office#WebPage') indirect;
-predicate 'DocumentFile'('http://calo.sri.com/core-plus-office#DocumentFile') indirect;
-predicate 'EmailMessage'('http://calo.sri.com/core-plus-office#EmailMessage') indirect;
-predicate 'iris'(OntolotyObject_t) indirect;
-#predicate fileHasTask('http://calo.sri.com/core-plus-office#DocumentFile', 'http://calo.sri.com/core-plus-office#Task') indirect;
-predicate 'CalendarEntry'('http://calo.sri.com/core-plus-office#Calendar') indirect;
-#predicate emailHasTask('http://calo.sri.com/core-plus-office#EmailMessage', 'http://calo.sri.com/core-plus-office#Task') indirect;
-predicate 'ElectronicPresentationSlide'('http://calo.sri.com/core-plus-office#ElectronicPresentationSlide') indirect;
+# predicate 'Webpage'('http://calo.sri.com/core-plus-office#WebPage') indirect;
+# predicate 'DocumentFile'('http://calo.sri.com/core-plus-office#DocumentFile') indirect;
+# predicate 'EmailMessage'('http://calo.sri.com/core-plus-office#EmailMessage') indirect;
+# predicate 'iris'(OntolotyObject_t) indirect;
+# predicate fileHasTask('http://calo.sri.com/core-plus-office#DocumentFile', 'http://calo.sri.com/core-plus-office#Task') indirect;
+# predicate 'CalendarEntry'('http://calo.sri.com/core-plus-office#Calendar') indirect;
+# predicate emailHasTask('http://calo.sri.com/core-plus-office#EmailMessage', 'http://calo.sri.com/core-plus-office#Task') indirect;
+# predicate 'ElectronicPresentationSlide'('http://calo.sri.com/core-plus-office#ElectronicPresentationSlide') indirect;
 dumptables;
