@@ -34,6 +34,8 @@ extern int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom);
 
 extern int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source);
 
+extern void all_pred_instances(char *pred, samp_table_t *table);
+
 extern int32_t add_clause(samp_table_t *table,
 			  input_literal_t **in_clause,
 			  double weight, char *source);
