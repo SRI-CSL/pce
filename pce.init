@@ -1,11 +1,13 @@
-sort 'http://calo.sri.com/core-plus-office#EmailMessage'; # Email_t;
-sort 'http://calo.sri.com/core-plus-office#Project'; # Project_t;
-sort 'http://calo.sri.com/core-plus-office#Person'; # Person_t;
-sort 'http://calo.sri.com/core-plus-office#Webpage'; # Webpage_t;
-sort 'http://calo.sri.com/core-plus-office#DocumentFile'; # File_t;
-sort 'http://calo.sri.com/core-plus-office#Task'; # Task_t;
-sort 'http://calo.sri.com/core-plus-office#Calendar'; # Calendar_t;
-sort 'http://calo.sri.com/core-plus-office#ElectronicPresentationSlide'; # Slide_t;
+# (Some of) The sorts and predicates for CALO
+
+sort 'http://calo.sri.com/core-plus-office#EmailMessage';
+sort 'http://calo.sri.com/core-plus-office#Project';
+sort 'http://calo.sri.com/core-plus-office#Person';
+sort 'http://calo.sri.com/core-plus-office#Webpage';
+sort 'http://calo.sri.com/core-plus-office#DocumentFile';
+sort 'http://calo.sri.com/core-plus-office#Task';
+sort 'http://calo.sri.com/core-plus-office#Calendar';
+sort 'http://calo.sri.com/core-plus-office#ElectronicPresentationSlide';
 sort 'http://calo.sri.com/core-plus-office#FileAttachmentRecord';
 sort 'http://calo.sri.com/core-plus-office#ComputerFile';
 sort 'http://calo.sri.com/core-plus-office#CalendarEntry';
