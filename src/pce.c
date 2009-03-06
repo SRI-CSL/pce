@@ -160,6 +160,7 @@ static var_entry_t **rule_vars_buffer_copy(rule_vars_buffer_t *buf);
 static char **names_buffer_copy(names_buffer_t *nbuf);
 
 ICLTerm *empty_params = NULL;
+ICLTerm *blocking_params = NULL;
 
 static char *pce_init_file = "pce.init";
 static char *pce_save_file = "pce.persist";
@@ -394,12 +395,12 @@ int32_t pce_get_rdf_type(char *name) {
   strcat(query, "\" ?x))'),[],Result)");
   assert(strlen(query) == qsize-1);
   Callback = icl_NewTermFromData(query, qsize);
-  if (empty_params == NULL) {
-    empty_params = icl_NewTermFromString("[]");
+  if (blocking_params == NULL) {
+    blocking_params = icl_NewTermFromString("[blocking(true)]");
   }
   Out = NULL;
   Instances = NULL;
-  success = oaa_Solve(Callback, empty_params, &Out, &Instances);
+  success = oaa_Solve(Callback, blocking_params, &Out, &Instances);
   if (success) {
     // We now have Instances of the form [query(X, Y, answer([Binding], [Params]))]
     inststr = icl_NewStringFromTerm(Instances);
