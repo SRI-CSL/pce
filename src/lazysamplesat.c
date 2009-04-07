@@ -204,6 +204,7 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
     /*
      * Simulated annealing step
      */
+    printf("Doing simulated annealing step\n");
     // choose a random atom
     //assert(valid_table(table));
     var = choose_random_atom(table);
@@ -229,6 +230,7 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
     /*
      * Walksat step
      */
+    printf("Doing walksat step\n");
     //choose an unsat clause
     clause_position = random_uint(clause_table->num_unsat_clauses);
     link = clause_table->unsat_clauses;

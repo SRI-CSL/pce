@@ -178,6 +178,10 @@ extern input_clause_buffer_t input_clause_buffer;
 extern input_literal_buffer_t input_literal_buffer;
 extern input_atom_buffer_t input_atom_buffer;
 
+extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t *table);
+extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
+extern void dumptable(int32_t tbl, samp_table_t *table);
+
 extern double get_sa_probability();
 extern double get_samp_temperature();
 extern double get_rvar_probability();

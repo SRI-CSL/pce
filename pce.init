@@ -1,4 +1,4 @@
-# (Some of) The sorts and predicates for CALO
+# (Some of) The sorts and predicates for CALO - see CALO/apps/desktop/external/iris/data/docs
 
 sort 'http://calo.sri.com/core-plus-office#EmailMessage';
 sort 'http://calo.sri.com/core-plus-office#Project';

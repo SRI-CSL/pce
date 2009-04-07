@@ -10,6 +10,7 @@
 #define INIT_SUBSCRIPTIONS_SIZE 8
 #define INIT_QM_BUFFER_SIZE 8
 #define INIT_PCE_MODEL_SIZE 8
+#define INIT_OAA_SOLVE_BUFFER_SIZE 8
 
 typedef struct pce_model_s {
   uint32_t size;
@@ -68,4 +69,15 @@ typedef struct qm_buffer_s {
   // One per (direct) predicate
   qm_entry_t **entry;
 } qm_buffer_t;
+
+typedef enum {PCE_FACT, PCE_LEARNER_ASSERT, PCE_LEARNER_ASSERT_LIST}
+   goalfun_t;
+
+typedef struct oaa_solve_buffer_s {
+  uint32_t size;
+  uint32_t capacity;
+  goalfun_t *fun;
+  ICLTerm **goal;
+} oaa_solve_buffer_t;
+
 #endif

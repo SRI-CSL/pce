@@ -51,10 +51,16 @@ static void add_atom_to_pred(pred_table_t *pred_table,
 }
 
 void add_rule_to_pred(pred_table_t *pred_table,
-			     int32_t predicate,
-			     int32_t current_rule_index) {
+		      int32_t predicate,
+		      int32_t current_rule_index) {
   pred_entry_t *entry = pred_entry(pred_table, predicate);
-  int32_t size;
+  int32_t i, size;
+  
+  for (i = 0; i < entry->num_rules; i++) {
+    if (entry->rules[i] == current_rule_index) {
+      return;
+    }
+  }
   if (entry->num_rules >= entry->size_rules){
     if (entry->size_rules == 0){
       entry->rules = (int32_t *) safe_malloc(INIT_RULE_PRED_SIZE * sizeof(int32_t));
@@ -775,6 +781,8 @@ void link_propagate(samp_table_t *table, samp_literal_t lit){
   samp_literal_t *disjunct;
   samp_truth_value_t *assignment;
 
+  //cprintf(0, "link_propagate called\n");
+
   assignment = table->atom_table.assignment[table->atom_table.current_assignment];
 
   assert(assigned_false_lit(assignment, lit)); // ?? this assertion fails!
@@ -782,6 +790,7 @@ void link_propagate(samp_table_t *table, samp_literal_t lit){
   link_ptr = &(table->clause_table.watched[lit]);
   link = table->clause_table.watched[lit];
   while (link != NULL){
+    //cprintf(0, "Checking watched\n");
     numlits = link->numlits;
     disjunct = link->disjunct;
 
@@ -814,6 +823,7 @@ void link_propagate(samp_table_t *table, samp_literal_t lit){
       /*
        * move the clause to the unsat_clause list
        */
+      //cprintf(0, "Adding to usat_clauses\n");
       new_link = link->link;
       *link_ptr = new_link;
       link->link = table->clause_table.unsat_clauses;
@@ -879,6 +889,7 @@ void scan_unsat_clauses(samp_table_t *table){
   int32_t fixable;
   samp_literal_t lit;
   while (unsat_clause != NULL){//see if the clause is fixed-unit propagating
+    //cprintf(0, "Scanning unsat clauses\n");
     fixable = get_fixable_literal(assignment, unsat_clause->disjunct, unsat_clause->numlits);
     if (fixable == -1){//if not propagating
       i = get_true_lit(assignment, unsat_clause->disjunct, unsat_clause->numlits);
@@ -901,6 +912,7 @@ void scan_unsat_clauses(samp_table_t *table){
       lit = unsat_clause->disjunct[fixable]; //swap the literal to the front
       unsat_clause->disjunct[fixable] = unsat_clause->disjunct[0];
       unsat_clause->disjunct[0] = lit;
+      cprintf(2, "Fixing variable %"PRId32"\n", var_of(lit));
       if (!fixed_tval(assignment[var_of(lit)])){
 	if (is_pos(lit)){
 	  assignment[var_of(lit)] = v_fixed_true;
@@ -943,14 +955,12 @@ void flip_unfixed_variable(samp_table_t *table,
   //  double dcost = 0;   //dcost seems unnecessary
   atom_table_t *atom_table = &(table->atom_table);
   samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment]; 
-  cprintf(2,"Flipping variable %"PRId32"\n", var);
+  cprintf(2,"Flipping variable %"PRId32" to %s\n",
+	  var, assigned_true(assignment[var]) ? "false" : "true");
   if (assigned_true(assignment[var])){
     assignment[var] = v_false;
     link_propagate(table, pos_lit(var));
   } else {
-    if (var == 2726) {
-      printf("var\n");
-    }
     assignment[var] = v_true;
     link_propagate(table, neg_lit(var));
   }
@@ -1169,6 +1179,7 @@ int32_t negative_unit_propagate(samp_table_t *table){
        * This clause is considered alive from now on
        */
       if (link->weight >= 0){ //must be a unit clause
+	// FIXME
 	conflict = fix_lit_true(table, link->disjunct[0]);
 	if (conflict == -1) return -1;
       } else { //we have a negative weight clause
@@ -1212,9 +1223,6 @@ void init_random_assignment(samp_truth_value_t *assignment, int32_t num_vars,
       if (choose() < 0.5){
 	assignment[i] = v_false;
       } else {
-	if (i == 2726) {
-	  printf("i\n");
-	}
 	assignment[i] = v_true;
       }
       (*num_unfixed_vars)++;
@@ -1514,9 +1522,6 @@ int32_t reset_sample_sat(samp_table_t *table){
       if (choice == 0){
 	new_assignment[i] = v_false;
       } else {
-	if (i == 2726) {
-	  printf("iuu\n");
-	}
 	new_assignment[i] = v_true;
       }
       num_unfixed_vars++;
@@ -1716,8 +1721,8 @@ void update_pmodel(samp_table_t *table){
   table->atom_table.num_samples++;
   for (i = 0; i < num_vars; i++){
     if (assigned_true(assignment[i])){
-      if (i == 2726) {
-	print_atom(table->atom_table.atom[i], table);
+      if (i > 0) {
+	printf("Atom %d was assigned true\n", i);
 	fflush(stdout);
       }
       pmodel[i]++;
@@ -1957,12 +1962,50 @@ bool check_clause_instance(samp_table_t *table,
   //if they are active and not fixed true.
   pred_table_t *pred_table = &(table->pred_table);
   //pred_tbl_t *pred_tbl = &(pred_table->pred_tbl);
-  atom_table_t *atom_table = &(table->atom_table);
-  int32_t predicate, arity, i, j;
+  atom_table_t *atom_table = &table->atom_table;
+  int32_t predicate, arity, i, j, num_non_false;
   samp_atom_t *atom;
   samp_atom_t *rule_atom; 
   array_hmap_pair_t *atom_map;
-  
+  samp_truth_value_t *assignment;
+
+  // FIXME: Need to keep track of non-false atoms - if there is only one,
+  // then activate it, if necessary, at the end.  Have to do two loops, the
+  // first simply keeps track of the number of non-false atoms - if there is
+  // more than one, then we return false.  Otherwise we do the second loop,
+  // and activate the inactive atom if there is one.
+  assignment = table->atom_table.assignment[table->atom_table.current_assignment];
+  num_non_false = 0;
+  for (i = 0; i < rule->num_lits; i++){//for each literal
+    atom = rule->literals[i]->atom;
+    predicate = atom->pred; 
+    arity = pred_arity(predicate, pred_table);
+    rule_atom_buffer_resize(arity);
+    rule_atom = (samp_atom_t *) rule_atom_buffer.data;
+    rule_atom->pred = predicate; 
+    for (j = 0; j < arity; j++){//copy each instantiated argument
+      if (atom->args[j] < 0){
+	rule_atom->args[j]
+	  = substit_buffer.entries[-(atom->args[j]) - 1].const_index;
+      } else {
+	rule_atom->args[j] = atom->args[j];
+      }
+    }
+    //find the index of the atom
+    atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
+				    arity + 1,
+				    (int32_t *) rule_atom);
+    // check for witness predicate - fixed false if NULL atom_map
+    if (atom_map == NULL || assigned_true(assignment[atom_index])) {
+      if (num_non_false == 0) {
+	num_non_false += 1;
+      } else {
+	return false;
+      }
+    }
+  }
+  assert(num_non_false <= 1);
+  // Now we do the flipping
   for (i = 0; i < rule->num_lits; i++){//for each literal
     if (i != atom_index){//if literal is not the one being activated
       atom = rule->literals[i]->atom;
@@ -1984,7 +2027,10 @@ bool check_clause_instance(samp_table_t *table,
 				      arity + 1,
 				      (int32_t *) rule_atom);
       // check for witness predicate - fixed false if NULL atom_map
-      if (atom_map == NULL) return false;//atom is inactive
+      if (atom_map == NULL) {
+	activate_atom(table, rule_atom);
+	return false;//atom is inactive
+      }
       if (rule->literals[i]->neg &&
 	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
 	  == v_fixed_false){
@@ -2026,6 +2072,9 @@ void all_rule_instances_rec(int32_t vidx,
 	substit_buffer.entries[vidx+1].const_index = -1;
 	if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
 	  substit_rule(rule, substit_buffer.entries, table);
+	  //if (lazy_mcsat()) {
+	    // Need to add to watched list or unsat clauses
+	    
 	}
       } else {
 	all_rule_instances_rec(vidx+1, rule, table, atom_index);
@@ -2114,56 +2163,6 @@ void create_new_const_rule_instances(int32_t constidx, samp_table_t *table,
     }
   }
 }
-
-/*
- * Given a ground atom and a literal from a rule, this returns true if the
- * literal matches - ignores sign, and finds consistent binding for the rule
- * variables - we don't want p(a, b) to match p(V, V).
- * Side effect: substit_buffer has the (partial) matching substitution
- * Of course, this is only useful if this function returns true.
- */
-extern bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
-				    int32_t arity) {
-  // Don't know the rule this literal came from, so we don't actually know
-  // the number of variables - we just use the whole substit buffer, which
-  // is assumed to be large enough.
-  int32_t i, varidx;
-  
-  // First check that the preds match
-  if (atom->pred != lit->atom->pred) {
-    return false;
-  }
-  // Initialize the substit_buffer
-  for (i = 0; i < substit_buffer.size; i++) {
-    substit_buffer.entries[i].const_index = -1;
-    substit_buffer.entries[i].fixed = false;
-  }
-  // Now go through comparing the args of the atoms
-  for (i = 0; i < arity; i++) {
-    if (lit->atom->args[i] >= 0) {
-      // Constants must be equal
-      if (atom->args[i] != lit->atom->args[i]) {
-	return false;
-      }
-    } else {
-      // It's a variable
-      varidx = -(lit->atom->args[i]) - 1;
-      assert(substit_buffer.size > varidx); // Just in case
-      if (substit_buffer.entries[varidx].const_index == -1) {
-	// Variable not yet set, simply set it
-	substit_buffer.entries[varidx].const_index = atom->args[i];
-	substit_buffer.entries[varidx].fixed = true;
-      } else {
-	// Already set, make sure it's the same value
-	if (substit_buffer.entries[varidx].const_index != atom->args[i]) {
-	  return false;
-	}
-      }
-    }
-  }
-  return true;
-}
-
 
 // Queries are not like rules, as rules are simpler (can treat as separate
 // clauses), and have a weight.  substit on rules updates the clause_table,
@@ -2457,36 +2456,156 @@ void create_new_const_query_instances(int32_t constidx, samp_table_t *table,
   }
 }
 
+/*
+ * Given a ground atom and a literal from a rule, this returns true if the
+ * literal matches - ignores sign, and finds consistent binding for the rule
+ * variables - we don't want p(a, b) to match p(V, V).
+ * Side effect: substit_buffer has the (partial) matching substitution
+ * Of course, this is only useful if this function returns true.
+ */
+bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit, int32_t arity) {
+  // Don't know the rule this literal came from, so we don't actually know
+  // the number of variables - we just use the whole substit buffer, which
+  // is assumed to be large enough.
+  int32_t i, varidx;
+  
+  // First check that the preds match
+  if (atom->pred != lit->atom->pred) {
+    return false;
+  }
+  // Initialize the substit_buffer
+  for (i = 0; i < substit_buffer.size; i++) {
+    substit_buffer.entries[i].const_index = -1;
+    substit_buffer.entries[i].fixed = false;
+  }
+  // Now go through comparing the args of the atoms
+  for (i = 0; i < arity; i++) {
+    if (lit->atom->args[i] >= 0) {
+      // Constants must be equal
+      if (atom->args[i] != lit->atom->args[i]) {
+	return false;
+      }
+    } else {
+      // It's a variable
+      varidx = -(lit->atom->args[i]) - 1;
+      assert(substit_buffer.size > varidx); // Just in case
+      if (substit_buffer.entries[varidx].const_index == -1) {
+	// Variable not yet set, simply set it
+	substit_buffer.entries[varidx].const_index = atom->args[i];
+	substit_buffer.entries[varidx].fixed = true;
+      } else {
+	// Already set, make sure it's the same value
+	if (substit_buffer.entries[varidx].const_index != atom->args[i]) {
+	  return false;
+	}
+      }
+    }
+  }
+  return true;
+}
 
-int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
-  //Each rule involving the predicate in the atom is instantiated
-  //in all possible extensions of the given atom.  Only the
-  //fixed falsifiable instances are retained.
+// match_atom_in_rule_atom(int32_t atom_index, rule_literal_t *lit,
+// 			     int32_t arity, samp_table_t *table,
+// 			     bool *rule_inst_true) {
+//   // Don't know the rule this literal came from, so we don't actually know
+//   // the number of variables - we just use the whole substit buffer, which
+//   // is assumed to be large enough.
+//   atom_table_t *atom_table = &table->atom_table;
+//   samp_atom_t *atom;
+//   samp_truth_value_t *assignment;
+//   int32_t i, varidx;
 
-  pred_table_t *pred_table = &(table->pred_table);
+//   atom = atom_table->atom[atom_index];
+//   printf("Comparing ");
+//   print_atom(atom, table);
+//   printf(" to ");
+//   print_atom(lit->atom, table);
+//   printf("\n");
+//   // Make sure the preds match
+//   if (atom->pred != lit->atom->pred) {
+//     cprintf(0, "match_atom_in_rule_atom: preds don't match\n");
+//     return false;
+//   }
+//   // Initialize the substit_buffer
+//   for (i = 0; i < substit_buffer.size; i++) {
+//     substit_buffer.entries[i].const_index = -1;
+//     substit_buffer.entries[i].fixed = false;
+//   }
+//   // Now go through comparing the args of the atoms
+//   for (i = 0; i < arity; i++) {
+//     if (lit->atom->args[i] >= 0) {
+//       // Constants must be equal
+//       if (atom->args[i] != lit->atom->args[i]) {
+// 	cprintf(0, "match_atom_in_rule_atom: constant args don't match\n");
+// 	return false;
+//       }
+//     } else {
+//       // It's a variable
+//       varidx = -(lit->atom->args[i]) - 1;
+//       assert(substit_buffer.size > varidx); // Just in case
+//       if (substit_buffer.entries[varidx].const_index == -1) {
+// 	// Variable not yet set, simply set it
+// 	substit_buffer.entries[varidx].const_index = atom->args[i];
+// 	substit_buffer.entries[varidx].fixed = true;
+//       } else {
+// 	// Already set, make sure it's the same value
+// 	if (substit_buffer.entries[varidx].const_index != atom->args[i]) {
+// 	  cprintf(0, "match_atom_in_rule_atom: var already set nonmatch\n");
+// 	  return false;
+// 	}
+//       }
+//     }
+//   }
+//   return true;
+// }
+
+void activate_rules(int32_t atom_index, samp_table_t *table) {
+  atom_table_t *atom_table = &table->atom_table;
+  pred_table_t *pred_table = &table->pred_table;
+  rule_table_t *rule_table = &table->rule_table;
   pred_tbl_t *pred_tbl = &pred_table->pred_tbl;
-  rule_table_t *rule_table = &(table->rule_table);
-  int32_t predicate = atom->pred;
-  int32_t num_rules = pred_tbl->entries[predicate].num_rules;
-  int32_t *rules = pred_tbl->entries[predicate].rules;
-  int32_t i, j, arity, atom_index;
+  samp_atom_t *atom;
+  samp_rule_t *rule_entry;
+  int32_t i, j, predicate, arity, num_rules, *rules;
+  bool rule_inst_true;
 
+  atom = atom_table->atom[atom_index];
+  predicate = atom->pred;
   arity = pred_arity(predicate, pred_table);
-  //assert(valid_table(table));
-  atom_index = add_internal_atom(table, atom);
-  //assert(valid_table(table));
+  num_rules = pred_tbl->entries[predicate].num_rules;
+  rules = pred_tbl->entries[predicate].rules;
   for (i = 0; i < num_rules; i++) {
-    samp_rule_t *rule_entry = rule_table->samp_rules[rules[i]];
+    rule_entry = rule_table->samp_rules[rules[i]];
+    rule_inst_true = false;
     for (j = 0; j < rule_entry->num_lits; j++) {
+      cprintf(2, "Checking whether to activate rule %"PRId32", literal %"PRId32"\n", rules[i], j);
       if (match_atom_in_rule_atom(atom, rule_entry->literals[j], arity)) {
 	//then substit_buffer contains the matching substitution
 	fixed_const_rule_instances(rule_entry, table, atom_index);
       }
     }
   }
-  //assert(valid_table(table));
-  return 0; // Not yet finished
 }
+
+int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
+  //Each rule involving the predicate in the atom is instantiated
+  //in all possible extensions of the given atom.  Only the
+  //fixed falsifiable instances are retained.
+
+  int32_t atom_index;
+
+  //assert(valid_table(table));
+  atom_index = add_internal_atom(table, atom);
+  //assert(valid_table(table));
+  assert(table->atom_table.num_vars == atom_index + 1);
+  while (atom_index < table->atom_table.num_vars) {
+    activate_rules(atom_index, table);
+    atom_index += 1;
+  }
+  //assert(valid_table(table));
+  return 0;
+}
+
 
   
 

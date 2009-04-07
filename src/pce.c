@@ -131,6 +131,11 @@ Options:\n\
 
 #define OPTION_STRING "hpVv:"
 
+// oaa_solve_buffer holds solve requests while waiting for a result from
+// a call to oaa_Solve (e.g., to get the rdf:type and QM instances
+static bool allow_oaa_goals = true;
+static oaa_solve_buffer_t oaa_solve_buffer = {0, 0, NULL};
+
 // names_buffer is temporary storage for names
 static names_buffer_t names_buffer = {0, 0, NULL};
 
@@ -377,6 +382,31 @@ static bool icl_IsAtomStruct(ICLTerm *icl_term, bool vars_allowed) {
   }
   return true;
 }
+
+
+void oaa_solve_buffer_resize() {
+  if (oaa_solve_buffer.goal == NULL) {
+    oaa_solve_buffer.fun = (goalfun_t *)
+      safe_malloc(INIT_OAA_SOLVE_BUFFER_SIZE * sizeof(goalfun_t));
+    oaa_solve_buffer.goal = (ICLTerm **)
+      safe_malloc(INIT_OAA_SOLVE_BUFFER_SIZE * sizeof(ICLTerm *));
+    oaa_solve_buffer.capacity = INIT_OAA_SOLVE_BUFFER_SIZE;
+  }
+  int32_t capacity = oaa_solve_buffer.capacity;
+  int32_t size = oaa_solve_buffer.size;
+  if (capacity <= size + 1){
+    if (MAXSIZE(sizeof(ICLTerm *) + sizeof(goalfun_t), 0) - capacity <= capacity/2){
+      out_of_memory();
+    }
+    capacity += capacity/2;
+    oaa_solve_buffer.fun = (goalfun_t *)
+      safe_realloc(oaa_solve_buffer.fun, capacity * sizeof(goalfun_t));
+    oaa_solve_buffer.goal = (ICLTerm **)
+      safe_realloc(oaa_solve_buffer.goal, capacity * sizeof(ICLTerm *));
+    oaa_solve_buffer.capacity = capacity;
+  }
+}
+
   
 // Builds a query of the form
 // query(query_pattern('(rdf:type NAME ?x)'),[],Result)
@@ -400,7 +430,9 @@ int32_t pce_get_rdf_type(char *name) {
   }
   Out = NULL;
   Instances = NULL;
+  allow_oaa_goals = false;
   success = oaa_Solve(Callback, blocking_params, &Out, &Instances);
+  allow_oaa_goals = true;
   if (success) {
     // We now have Instances of the form [query(X, Y, answer([Binding], [Params]))]
     inststr = icl_NewStringFromTerm(Instances);
@@ -644,11 +676,9 @@ input_atom_t *icl_term_to_atom(ICLTerm *icl_atom, bool vars_allowed,
 
 bool pce_fact(ICLTerm *goal) {
   // The "goal" struct is in the form "pce_fact(Source,Formula)".
-  pred_table_t *pred_table = &samp_table.pred_table;
-  const_table_t *const_table = &samp_table.const_table;
-  ICLTerm *Source = icl_CopyTerm(icl_NthTerm(goal, 1));
-  ICLTerm *Formula = icl_CopyTerm(icl_NthTerm(goal, 2));
-  ICLTerm *Arg;
+  pred_table_t *pred_table;
+  const_table_t *const_table;
+  ICLTerm *Source, *Formula, *Arg;
   char *source, *iclstr;
   input_atom_t *atom;
   char *pred, *cname;
@@ -657,6 +687,16 @@ bool pce_fact(ICLTerm *goal) {
   int32_t *psig;
   uint32_t csig;
 
+  if (!allow_oaa_goals) {
+    oaa_solve_buffer_resize();
+    oaa_solve_buffer.fun[oaa_solve_buffer.size] = PCE_FACT;
+    oaa_solve_buffer.goal[oaa_solve_buffer.size++] = goal;
+    return false;
+  }
+  pred_table = &samp_table.pred_table;
+  const_table = &samp_table.const_table;
+  Source = icl_CopyTerm(icl_NthTerm(goal, 1));
+  Formula = icl_CopyTerm(icl_NthTerm(goal, 2));
   iclstr = icl_NewStringFromTerm(goal);  
   pce_log("%s", iclstr);
   icl_stFree(iclstr);
@@ -957,9 +997,15 @@ bool pce_learner_assert_internal(char *lid, ICLTerm *Formula, ICLTerm *Weight) {
 }
 
 bool pce_learner_assert(ICLTerm *goal) {
-    ICLTerm *Lid, *Formula, *Weight;
+  ICLTerm *Lid, *Formula, *Weight;
   char *lid, *iclstr;
 
+  if (!allow_oaa_goals) {
+    oaa_solve_buffer_resize();
+    oaa_solve_buffer.fun[oaa_solve_buffer.size] = PCE_LEARNER_ASSERT;
+    oaa_solve_buffer.goal[oaa_solve_buffer.size++] = goal;
+    return false;
+  }  
   iclstr = icl_NewStringFromTerm(goal);  
   pce_log("%s", iclstr);
   icl_stFree(iclstr);
@@ -1000,6 +1046,12 @@ bool pce_learner_assert_list(ICLTerm *goal) {
   int32_t i;
   char *iclstr, *lid;
 
+  if (!allow_oaa_goals) {
+    oaa_solve_buffer_resize();
+    oaa_solve_buffer.fun[oaa_solve_buffer.size] = PCE_LEARNER_ASSERT_LIST;
+    oaa_solve_buffer.goal[oaa_solve_buffer.size++] = goal;
+    return false;
+  }
   iclstr = icl_NewStringFromTerm(goal);  
   pce_log("%s", iclstr);
   icl_stFree(iclstr);
@@ -2167,8 +2219,10 @@ void get_predtbl_qm_instances(pred_tbl_t *pred_tbl, samp_table_t *table) {
 	pce_log("Calling QM for instances of predicate %s, solvable is:\n %s\n", pred, str);
 	cprintf(1, "Calling QM for instances of predicate %s, solvable is:\n %s\n", pred, str);
 	fflush(stdout);
-	icl_stFree(str);    
+	icl_stFree(str);
+	allow_oaa_goals = false;
 	success = oaa_Solve(callback, empty_params, &Out, &Instances);
+	allow_oaa_goals = true;
 	if (success) {
 	  inststr = icl_NewStringFromTerm(Instances);
 	  pce_log("Instances from QM for %s are %s\n", pred, inststr);
@@ -2308,8 +2362,25 @@ static int32_t counter = 5;
 
 int pce_idle_callback(ICLTerm *goal, ICLTerm *params, ICLTerm *solutions) {
   time_t curtime;
+  int32_t i;
 
   curtime = time(&curtime);
+  if (allow_oaa_goals) {
+    for (i = oaa_solve_buffer.size; i > 0; i--) {
+      switch (oaa_solve_buffer.fun[i-1]) {
+      case PCE_FACT:
+	pce_fact(oaa_solve_buffer.goal[i-1]);
+	break;
+      case PCE_LEARNER_ASSERT:
+	pce_learner_assert(oaa_solve_buffer.goal[i-1]);
+	break;
+      case PCE_LEARNER_ASSERT_LIST:
+	pce_learner_assert_list(oaa_solve_buffer.goal[i-1]);
+	break;
+      }
+    }
+    oaa_solve_buffer.size = 0;
+  }
   if (difftime(curtime, idle_timer) > pce_timeout) {
     get_qm_instances(&samp_table);
 

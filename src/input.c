@@ -426,12 +426,112 @@ No help available yet\n\
     break;
   }
 }
+
+extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t *table) {
+  sort_table_t *sort_table = &table->sort_table;
+  pred_table_t *pred_table = &table->pred_table;
+  
+  int err, i, arity;
+  err = 0;
+  // First the sorts - those we don't find, we add to the sort list
+  // if nonstrict is set.
+  i = 0;
+  do {
+    if (sort_name_index(sort[i], sort_table) == -1) {
+      if (!strict_constants())
+	add_sort(sort_table, sort[i]);
+      else {
+	err = 1;
+	fprintf(stderr, "Sort %s has not been declared\n", sort[i]);
+      }
+    }
+    i += 1;
+  } while (sort[i] != NULL);
+  arity = i;
+  
+  if (err) {
+    fprintf(stderr, "Predicate %s not added\n", pred);
+  } else {
+    cprintf(2, "Adding predicate %s\n", pred);
+    err = add_pred(pred_table, pred, directp, arity,
+		   sort_table, sort);
+    if (err == 0 && !lazy_mcsat()) {
+      // Need to create all atom instances
+      all_pred_instances(pred, table);
+    }
+  }
+  return 0;
+}
+
+
+extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
+  sort_table_t *sort_table = &table->sort_table;
+  const_table_t *const_table = &table->const_table;
+  var_table_t *var_table = &table->var_table;
+  
+  if (sort_name_index(sort, sort_table) == -1) {
+    if (!strict_constants())
+      add_sort(sort_table, sort);
+    else {
+      fprintf(stderr, "Sort %s has not been declared\n", sort);
+      return -1;
+    }
+  }
+  // Need to see if name in var_table
+  if (var_index(cnst, var_table) == -1) {
+    cprintf(2, "Adding const %s\n", cnst);
+    if (add_const(cnst, sort, table) != -1) {
+      int32_t cidx = const_index(cnst, const_table);
+      // We don't invoke this in add_const, as this is eager.
+      // Last arg says this is not lazy.
+      create_new_const_rule_instances(cidx, table, 0);
+      create_new_const_query_instances(cidx, table, 0);
+    }
+  } else {
+    fprintf(stderr, "%s is a variable, cannot be redeclared a constant\n", cnst);
+  }
+  return 0;
+}
+
+extern void dumptable(int32_t tbl, samp_table_t *table) {
+  switch (tbl) {
+  case ALL: {
+    cprintf(1, "Dumping tables...\n");
+    dump_sort_table(table);
+    dump_pred_table(table);
+    //dump_const_table(const_table, sort_table);
+    //dump_var_table(var_table, sort_table);
+    dump_atom_table(table);
+    dump_clause_table(table);
+    dump_rule_table(table);
+    break;
+  }
+  case SORT: {
+    dump_sort_table(table);
+    break;
+  }
+  case PREDICATE: {
+    dump_pred_table(table);
+    break;
+  }
+  case ATOM: {
+    dump_atom_table(table);
+    break;
+  }
+  case CLAUSE: {
+    dump_clause_table(table);
+    break;
+  }
+  case RULE: {
+    dump_rule_table(table);
+    break;
+  }
+  }
+}
 	
 extern void read_eval_print_loop(char *file, samp_table_t *table) {
   sort_table_t *sort_table = &(table->sort_table);
-  const_table_t *const_table = &(table->const_table);
   var_table_t *var_table = &(table->var_table);
-  pred_table_t *pred_table = &(table->pred_table);
   atom_table_t *atom_table = &(table->atom_table);
   
   input_stack_push(file); // sets parse_file and parse_input
@@ -450,40 +550,8 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
       switch (input_command.kind) {
       case PREDICATE: {
 	input_pred_decl_t decl;
-	int err, i, arity;
-	char *pred, *sort;
-	
-	err = 0;
 	decl = input_command.decl.pred_decl;
-	pred = decl.atom->pred;
-	// First the sorts - those we don't find, we add to the sort list
-	// if nonstrict is set.
-	i = 0;
-	do {
-	  sort = decl.atom->args[i];
-	  if (sort_name_index(sort, sort_table) == -1) {
-	    if (!strict_constants())
-	      add_sort(sort_table, sort);
-	    else {
-	      err = 1;
-	      fprintf(stderr, "Sort %s has not been declared\n", sort);
-	    }
-	  }
-	  i += 1;
-	} while (decl.atom->args[i] != NULL);
-	arity = i;
-
-	if (err) {
-	  fprintf(stderr, "Predicate %s not added\n", pred);
-	} else {
-	  cprintf(2, "Adding predicate %s\n", pred);
-	  err = add_pred(pred_table, pred, decl.witness, arity,
-			 sort_table, decl.atom->args);
-	  if (err == 0 && !lazy_mcsat()) {
-	    // Need to create all atom instances
-	    all_pred_instances(pred, table);
-	  }
-	}
+	add_predicate(decl.atom->pred, decl.atom->args, decl.witness, table);
 	break;
       }
       case SORT: {
@@ -500,31 +568,10 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 	break;
       }
       case CONST: {
-	input_const_decl_t decl = input_command.decl.const_decl;
-	if (sort_name_index(decl.sort, sort_table) == -1) {
-	  if (!strict_constants())
-	    add_sort(sort_table, decl.sort);
-	  else {
-	    fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
-	    break;
-	  }
-	}
 	int32_t i;
-	for (i = 0; i<decl.num_names; i++) {
-	  // Need to see if name in var_table
-	  if (var_index(decl.name[i], var_table) == -1) {
-	    cprintf(2, "Adding const %s\n", decl.name[i]);
-	    if (add_const(decl.name[i], decl.sort, table) != -1) {
-	      int32_t cidx = const_index(decl.name[i], const_table);
-	      // We don't invoke this in add_const, as this is eager.
-	      // Last arg says this is not lazy.
-	      create_new_const_rule_instances(cidx, table, 0);
-	      create_new_const_query_instances(cidx, table, 0);
-	    }
-	  }
-	  else
-	    fprintf(stderr, "%s is a variable, cannot be redeclared a constant\n",
-		    decl.name[i]);
+	input_const_decl_t decl = input_command.decl.const_decl;
+	for (i = 0; i < decl.num_names; i++) {
+	  add_constant(decl.name[i], decl.sort, table);
 	}
 	break;
       }
@@ -705,39 +752,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
       }
       case DUMPTABLE: {
 	input_dumptable_decl_t decl = input_command.decl.dumptable_decl;
-	switch (decl.table) {
-	case ALL: {
-	  cprintf(1, "Dumping tables...\n");
-	  dump_sort_table(table);
-	  dump_pred_table(table);
-	  //dump_const_table(const_table, sort_table);
-	  //dump_var_table(var_table, sort_table);
-	  dump_atom_table(table);
-	  dump_clause_table(table);
-	  dump_rule_table(table);
-	  break;
-	}
-	case SORT: {
-	  dump_sort_table(table);
-	  break;
-	}
-	case PREDICATE: {
-	  dump_pred_table(table);
-	  break;
-	}
-	case ATOM: {
-	  dump_atom_table(table);
-	  break;
-	}
-	case CLAUSE: {
-	  dump_clause_table(table);
-	  break;
-	}
-	case RULE: {
-	  dump_rule_table(table);
-	  break;
-	}
-	}
+	dumptable(decl.table, table);
 	break;
       }
       case VERBOSITY: {

@@ -1,5 +1,5 @@
 dnl
-dnl Configure for MCSAT and PCE
+dnl Configure for MCSAT, XPCE, and PCE
 dnl
 dnl This builds a platform-dependent configuration
 dnl file stored in configs/Makefile.$ARCH
@@ -51,6 +51,18 @@ AC_CHECK_PROG(STRIP,strip,strip)
 AC_PROG_YACC
 
 dnl
+dnl Need xmlrpc-c for xpce
+dnl --------------------------------------------
+AC_CHECK_PROG(XMLRPCCCONFIG,xmlrpc-c-config,xmlrpc-c-config)
+if test "x$XMLRPCCCONFIG" != x; then
+   XMLRPC_SERVER_LIBS=`xmlrpc-c-config abyss-server --libs`
+   XMLRPC_CLIENT_LIBS=`xmlrpc-c-config client --libs`
+   echo "XMLRPC_SERVER_LIBS = ${XMLRPC_SERVER_LIBS}"
+   echo "XMLRPC_CLIENT_LIBS = ${XMLRPC_CLIENT_LIBS}"
+fi
+   
+
+dnl
 dnl OAA Libraries (optional, but needed for PCE)
 dnl --------------------------------------------
 liboaa=""
@@ -91,6 +103,8 @@ if test "x$liboaa" == x; then
    fi
 fi
 
+AC_SUBST(XMLRPC_SERVER_LIBS)
+AC_SUBST(XMLRPC_CLIENT_LIBS)
 AC_SUBST(OAACFLAGS)
 AC_SUBST(OAALDFLAGS)
 
