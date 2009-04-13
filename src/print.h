@@ -10,6 +10,7 @@
  */
 extern void set_verbosity_level(int32_t level);
 extern int32_t get_verbosity_level();
+extern void set_output_stream (FILE *stream);
 extern void cprintf(int32_t level, const char *fmt, ...);
 
 extern void dump_sort_table (samp_table_t *table);
@@ -18,7 +19,8 @@ extern void dump_atom_table (samp_table_t *table);
 extern void dump_clause_table (samp_table_t *table);
 extern void dump_rule_table (samp_table_t *samp_table);
 
-extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table, int32_t indent);
+extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,
+				 int32_t indent, bool include_prob);
 
 extern double atom_probability(int32_t atom_index, samp_table_t *table);
 extern double query_probability(samp_query_instance_t *qinst,

@@ -528,11 +528,251 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
   }
   }
 }
+
+extern bool read_eval(samp_table_t *table) {
+  sort_table_t *sort_table = &table->sort_table;
+  var_table_t *var_table = &table->var_table;
+  atom_table_t *atom_table = &table->atom_table;
+  
+  fflush(stdout);
+  // yyparse returns 0 and sets input_command if no syntax errors
+  if (yyparse() == 0)
+    switch (input_command.kind) {
+    case PREDICATE: {
+      input_pred_decl_t decl;
+      decl = input_command.decl.pred_decl;
+      add_predicate(decl.atom->pred, decl.atom->args, decl.witness, table);
+      break;
+    }
+    case SORT: {
+      input_sort_decl_t decl = input_command.decl.sort_decl;
+      cprintf(2, "Adding sort %s\n", decl.name);
+      add_sort(sort_table, decl.name);
+      break;
+    }
+    case SUBSORT: {
+      input_subsort_decl_t decl = input_command.decl.subsort_decl;
+      cprintf(2, "Adding subsort %s of %s information\n",
+	      decl.subsort, decl.supersort);
+      add_subsort(sort_table, decl.subsort, decl.supersort);
+      break;
+    }
+    case CONST: {
+      int32_t i;
+      input_const_decl_t decl = input_command.decl.const_decl;
+      for (i = 0; i < decl.num_names; i++) {
+	add_constant(decl.name[i], decl.sort, table);
+      }
+      break;
+    }
+    case VAR: {
+      input_var_decl_t decl = input_command.decl.var_decl;
+      if (sort_name_index(decl.sort, sort_table) == -1) {
+	if (!strict_constants())
+	  add_sort(sort_table, decl.sort);
+	else {
+	  fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
+	  break;
+	}
+      }
+      int32_t i;
+      for (i=0; i<decl.num_names; i++) {
+	// Need to see if name in const_table
+	cprintf(2, "Adding var %s\n", decl.name[i]);
+	add_var(var_table, decl.name[i], sort_table, decl.sort);
+      }
+      break;
+    }
+    case ATOM: {
+      // invoke add_atom
+      input_atom_decl_t decl = input_command.decl.atom_decl;
+      add_atom(table, decl.atom);
+      break;
+    }
+    case ASSERT: {
+      // Need to check that the predicate is a witness predicate,
+      // then invoke assert_atom.
+      input_assert_decl_t decl = input_command.decl.assert_decl;
+      assert_atom(table, decl.atom, decl.source);
+      break;
+    }
+    case ADD: {
+      input_add_fdecl_t decl = input_command.decl.add_fdecl;
+      cprintf(2, "Clausifying and adding formula\n");
+      add_cnf(decl.formula, decl.weight, decl.source);
+      break;
+    }
+    case ADD_CLAUSE: {
+      input_add_decl_t decl = input_command.decl.add_decl;
+      if (decl.clause->varlen == 0) {
+	// No variables - adding a clause
+	cprintf(2, "Adding clause\n");
+	add_clause(table,
+		   decl.clause->literals,
+		   decl.weight, decl.source);
+      }
+      else {
+	// Have variables - adding a rule
+	double wt = decl.weight;
+	if (wt == DBL_MAX) {
+	  cprintf(2, "Adding rule with MAX weight\n");
+	} else {
+	  cprintf(2, "Adding rule with weight %f\n", wt);
+	}
+	int32_t ruleidx = add_rule(decl.clause, decl.weight, decl.source, table);
+	// Create instances here rather than add_rule, as this is eager
+	if (ruleidx != -1) {
+	  all_rule_instances(ruleidx, table);
+	}
+      }
+      break;
+    }
+    case ASK: {
+      input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
+      cprintf(1, "Clausifying formula\n");
+      ask_cnf(decl.formula, decl.num_samples, decl.threshold);
+      break;
+    }
+      //       case ASK_CLAUSE: {
+      // 	input_ask_decl_t decl = input_command.decl.ask_decl;
+      // 	assert(decl.clause->litlen == 1);
+      // 	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
+      // 	break;
+      //       }
+    case MCSAT: {
+	
+      printf("Calling %sMCSAT with parameters (set using mcsat_params):\n",
+	     lazy_mcsat() ? "LAZY_" : "");
+      printf(" sa_probability = %f\n", get_sa_probability());
+      printf(" samp_temperature = %f\n", get_samp_temperature());
+      printf(" rvar_probability = %f\n", get_rvar_probability());
+      printf(" max_flips = %"PRId32"\n", get_max_flips());
+      printf(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
+      printf(" max_samples = %"PRId32"\n", get_max_samples());
+      if (lazy_mcsat()) {
+	lazy_mc_sat(table, get_sa_probability(), get_samp_temperature(),
+		    get_rvar_probability(), get_max_flips(),
+		    get_max_extra_flips(), get_max_samples());
+      } else {
+	mc_sat(table, get_sa_probability(), get_samp_temperature(),
+	       get_rvar_probability(), get_max_flips(),
+	       get_max_extra_flips(), get_max_samples());
+      }
+      printf("\n");
+      break;
+    }
+    case MCSAT_PARAMS: {
+      input_mcsat_params_decl_t decl = input_command.decl.mcsat_params_decl;
+      if (decl.num_params == 0) {
+	printf("MCSAT param values:\n");
+	printf(" sa_probability = %f\n", get_sa_probability());
+	printf(" samp_temperature = %f\n", get_samp_temperature());
+	printf(" rvar_probability = %f\n", get_rvar_probability());
+	printf(" max_flips = %"PRId32"\n", get_max_flips());
+	printf(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
+	printf(" max_samples = %"PRId32"\n", get_max_samples());
+      } else {
+	printf("Setting MCSAT parameters:\n");
+	if (decl.sa_probability >= 0) {
+	  printf(" sa_probability was %f, now %f\n",
+		 get_sa_probability(), decl.sa_probability);
+	  set_sa_probability(decl.sa_probability);
+	}
+	if (decl.samp_temperature >= 0) {
+	  printf(" samp_temperature was %f, now %f\n",
+		 get_samp_temperature(), decl.samp_temperature);
+	  set_samp_temperature(decl.samp_temperature);
+	}
+	if (decl.rvar_probability >= 0) {
+	  printf(" rvar_probability was %f, now %f\n",
+		 get_rvar_probability(), decl.rvar_probability);
+	  set_rvar_probability(decl.rvar_probability);
+	}
+	if (decl.max_flips >= 0) {
+	  printf(" max_flips was %"PRId32", now  %"PRId32"\n",
+		 get_max_flips(), decl.max_flips);
+	  set_max_flips(decl.max_flips);
+	}
+	if (decl.max_extra_flips >= 0) {
+	  printf(" max_extra_flips was %"PRId32", now %"PRId32"\n",
+		 get_max_extra_flips(), decl.max_extra_flips);
+	  set_max_extra_flips(decl.max_extra_flips);
+	}
+	if (decl.max_samples >= 0) {
+	  printf(" max_samples was %"PRId32", now %"PRId32"\n",
+		 get_max_samples(), decl.max_samples);
+	  set_max_samples(decl.max_samples);
+	}
+      }
+      printf("\n");
+      break;
+    }
+    case RESET: {
+      input_reset_decl_t decl = input_command.decl.reset_decl;
+      switch (decl.kind) {
+      case ALL: {
+	// Resets the sample tables
+	reset_sort_table(sort_table);
+	// Need to do more here - like free up space.
+	init_samp_table(table);
+	break;
+      }
+      case PROBABILITIES: {
+	// Simply resets the probabilities of the atom table to -1.0
+	printf("Resetting probabilities of atoms to -1.0\n");
+	int32_t i;
+	atom_table->num_samples = 0;
+	for (i=0; i<atom_table->num_vars; i++) {
+	  atom_table->pmodel[i] = -1;
+	}
+	break;
+      }
+      }
+      break;
+    }
+    case RETRACT: {
+      input_retract_decl_t decl = input_command.decl.retract_decl;
+      retract_source(decl.source,table);
+      break;
+    }
+    case LOAD: {
+      input_load_decl_t decl = input_command.decl.load_decl;
+      load_mcsat_file(decl.file, table);
+      break;
+    }
+    case DUMPTABLE: {
+      input_dumptable_decl_t decl = input_command.decl.dumptable_decl;
+      dumptable(decl.table, table);
+      break;
+    }
+    case VERBOSITY: {
+      input_verbosity_decl_t decl = input_command.decl.verbosity_decl;
+      set_verbosity_level(decl.level);
+      cprintf(1, "Setting verbosity to %"PRId32"\n", decl.level);
+      break;
+    }
+    case TEST: {
+      test(table);
+      break;
+    }
+    case HELP: {
+      input_help_decl_t decl = input_command.decl.help_decl;
+      show_help(decl.command);
+      break;
+    }
+    case QUIT:
+      cprintf(1, "QUIT reached, exiting read_eval_print_loop\n");
+      input_command.kind = 0;
+      return true;
+      break;
+    };
+  free_parse_data();
+  //yylloc.first_line += yylloc.last_line;
+  //yylloc.first_column += yyloc.last_column;
+  return false;
+}
 	
 extern void read_eval_print_loop(char *file, samp_table_t *table) {
-  sort_table_t *sort_table = &(table->sort_table);
-  var_table_t *var_table = &(table->var_table);
-  atom_table_t *atom_table = &(table->atom_table);
   
   input_stack_push(file); // sets parse_file and parse_input
   //yydebug = 1;
@@ -544,243 +784,7 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
     if (parse_input == stdin) {
       printf("mcsat> ");
     }
-    fflush(stdout);
-    // yyparse returns 0 and sets input_command if no syntax errors
-    if (yyparse() == 0)
-      switch (input_command.kind) {
-      case PREDICATE: {
-	input_pred_decl_t decl;
-	decl = input_command.decl.pred_decl;
-	add_predicate(decl.atom->pred, decl.atom->args, decl.witness, table);
-	break;
-      }
-      case SORT: {
-	input_sort_decl_t decl = input_command.decl.sort_decl;
-	cprintf(2, "Adding sort %s\n", decl.name);
-	add_sort(sort_table, decl.name);
-	break;
-      }
-      case SUBSORT: {
-	input_subsort_decl_t decl = input_command.decl.subsort_decl;
-	cprintf(2, "Adding subsort %s of %s information\n",
-	       decl.subsort, decl.supersort);
-	add_subsort(sort_table, decl.subsort, decl.supersort);
-	break;
-      }
-      case CONST: {
-	int32_t i;
-	input_const_decl_t decl = input_command.decl.const_decl;
-	for (i = 0; i < decl.num_names; i++) {
-	  add_constant(decl.name[i], decl.sort, table);
-	}
-	break;
-      }
-      case VAR: {
-	input_var_decl_t decl = input_command.decl.var_decl;
-	if (sort_name_index(decl.sort, sort_table) == -1) {
-	  if (!strict_constants())
-	    add_sort(sort_table, decl.sort);
-	  else {
-	    fprintf(stderr, "Sort %s has not been declared\n", decl.sort);
-	    break;
-	  }
-	}
-	int32_t i;
-	for (i=0; i<decl.num_names; i++) {
-	  // Need to see if name in const_table
-	  cprintf(2, "Adding var %s\n", decl.name[i]);
-	  add_var(var_table, decl.name[i], sort_table, decl.sort);
-	}
-	break;
-      }
-      case ATOM: {
-	// invoke add_atom
-	input_atom_decl_t decl = input_command.decl.atom_decl;
-	add_atom(table, decl.atom);
-	break;
-      }
-      case ASSERT: {
-	// Need to check that the predicate is a witness predicate,
-	// then invoke assert_atom.
-	input_assert_decl_t decl = input_command.decl.assert_decl;
-	assert_atom(table, decl.atom, decl.source);
-	break;
-      }
-      case ADD: {
-	input_add_fdecl_t decl = input_command.decl.add_fdecl;
-	cprintf(2, "Clausifying and adding formula\n");
-	add_cnf(decl.formula, decl.weight, decl.source);
-	break;
-      }
-      case ADD_CLAUSE: {
-	input_add_decl_t decl = input_command.decl.add_decl;
-	if (decl.clause->varlen == 0) {
-	  // No variables - adding a clause
-	  cprintf(2, "Adding clause\n");
-	  add_clause(table,
-		     decl.clause->literals,
-		     decl.weight, decl.source);
-	}
-	else {
-	  // Have variables - adding a rule
-	  double wt = decl.weight;
-	  if (wt == DBL_MAX) {
-	    cprintf(2, "Adding rule with MAX weight\n");
-	  } else {
-	    cprintf(2, "Adding rule with weight %f\n", wt);
-	  }
-	  int32_t ruleidx = add_rule(decl.clause, decl.weight, decl.source, table);
-	  // Create instances here rather than add_rule, as this is eager
-	  if (ruleidx != -1) {
-	    all_rule_instances(ruleidx, table);
-	  }
-	}
-	break;
-      }
-      case ASK: {
-	input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
-	cprintf(1, "Clausifying formula\n");
-	ask_cnf(decl.formula, decl.num_samples, decl.threshold);
-	break;
-      }
-//       case ASK_CLAUSE: {
-// 	input_ask_decl_t decl = input_command.decl.ask_decl;
-// 	assert(decl.clause->litlen == 1);
-// 	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
-// 	break;
-//       }
-      case MCSAT: {
-	
-	printf("Calling %sMCSAT with parameters (set using mcsat_params):\n",
-	       lazy_mcsat() ? "LAZY_" : "");
-	printf(" sa_probability = %f\n", get_sa_probability());
-	printf(" samp_temperature = %f\n", get_samp_temperature());
-	printf(" rvar_probability = %f\n", get_rvar_probability());
-	printf(" max_flips = %"PRId32"\n", get_max_flips());
-	printf(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
-	printf(" max_samples = %"PRId32"\n", get_max_samples());
-	if (lazy_mcsat()) {
-	  lazy_mc_sat(table, get_sa_probability(), get_samp_temperature(),
-		      get_rvar_probability(), get_max_flips(),
-		      get_max_extra_flips(), get_max_samples());
-	} else {
-	  mc_sat(table, get_sa_probability(), get_samp_temperature(),
-		 get_rvar_probability(), get_max_flips(),
-		 get_max_extra_flips(), get_max_samples());
-	}
-	printf("\n");
-	break;
-      }
-      case MCSAT_PARAMS: {
-	input_mcsat_params_decl_t decl = input_command.decl.mcsat_params_decl;
-	if (decl.num_params == 0) {
-	  printf("MCSAT param values:\n");
-	  printf(" sa_probability = %f\n", get_sa_probability());
-	  printf(" samp_temperature = %f\n", get_samp_temperature());
-	  printf(" rvar_probability = %f\n", get_rvar_probability());
-	  printf(" max_flips = %"PRId32"\n", get_max_flips());
-	  printf(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
-	  printf(" max_samples = %"PRId32"\n", get_max_samples());
-	} else {
-	  printf("Setting MCSAT parameters:\n");
-	  if (decl.sa_probability >= 0) {
-	    printf(" sa_probability was %f, now %f\n",
-		   get_sa_probability(), decl.sa_probability);
-	    set_sa_probability(decl.sa_probability);
-	  }
-	  if (decl.samp_temperature >= 0) {
-	    printf(" samp_temperature was %f, now %f\n",
-		   get_samp_temperature(), decl.samp_temperature);
-	    set_samp_temperature(decl.samp_temperature);
-	  }
-	  if (decl.rvar_probability >= 0) {
-	    printf(" rvar_probability was %f, now %f\n",
-		   get_rvar_probability(), decl.rvar_probability);
-	    set_rvar_probability(decl.rvar_probability);
-	  }
-	  if (decl.max_flips >= 0) {
-	    printf(" max_flips was %"PRId32", now  %"PRId32"\n",
-		   get_max_flips(), decl.max_flips);
-	    set_max_flips(decl.max_flips);
-	  }
-	  if (decl.max_extra_flips >= 0) {
-	    printf(" max_extra_flips was %"PRId32", now %"PRId32"\n",
-		   get_max_extra_flips(), decl.max_extra_flips);
-	    set_max_extra_flips(decl.max_extra_flips);
-	  }
-	  if (decl.max_samples >= 0) {
-	    printf(" max_samples was %"PRId32", now %"PRId32"\n",
-		   get_max_samples(), decl.max_samples);
-	    set_max_samples(decl.max_samples);
-	  }
-	}
-	printf("\n");
-	break;
-      }
-      case RESET: {
-	input_reset_decl_t decl = input_command.decl.reset_decl;
-	switch (decl.kind) {
-	case ALL: {
-	  // Resets the sample tables
-	  reset_sort_table(sort_table);
-	  // Need to do more here - like free up space.
-	  init_samp_table(table);
-	  break;
-	}
-	case PROBABILITIES: {
-	  // Simply resets the probabilities of the atom table to -1.0
-	  printf("Resetting probabilities of atoms to -1.0\n");
-	  int32_t i;
-	  atom_table->num_samples = 0;
-	  for (i=0; i<atom_table->num_vars; i++) {
-	    atom_table->pmodel[i] = -1;
-	  }
-	  break;
-	}
-	}
-	break;
-      }
-      case RETRACT: {
-	input_retract_decl_t decl = input_command.decl.retract_decl;
-	retract_source(decl.source,table);
-	break;
-      }
-      case LOAD: {
-	input_load_decl_t decl = input_command.decl.load_decl;
-	load_mcsat_file(decl.file, table);
-	break;
-      }
-      case DUMPTABLE: {
-	input_dumptable_decl_t decl = input_command.decl.dumptable_decl;
-	dumptable(decl.table, table);
-	break;
-      }
-      case VERBOSITY: {
-	input_verbosity_decl_t decl = input_command.decl.verbosity_decl;
-	set_verbosity_level(decl.level);
-	cprintf(1, "Setting verbosity to %"PRId32"\n", decl.level);
-	break;
-      }
-      case TEST: {
-	test(table);
-	break;
-      }
-      case HELP: {
-	input_help_decl_t decl = input_command.decl.help_decl;
-	show_help(decl.command);
-	break;
-      }
-      case QUIT:
-	cprintf(1, "QUIT reached, exiting read_eval_print_loop\n");
-	input_command.kind = 0;
-	goto end;
-	break;
-      };
-    free_parse_data();
-    //yylloc.first_line += yylloc.last_line;
-    //yylloc.first_column += yyloc.last_column;
-  } while (true);
- end:
+  } while (! read_eval(table));
   input_stack_pop();
   return;
 }

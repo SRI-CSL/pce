@@ -35,6 +35,16 @@ static void input_stack_resize() {
   }
 }
 
+extern bool input_stack_push_stream(FILE *input, char *source) {
+  input_stack_resize();
+  parse_input_stack.file[parse_input_stack.size] = source;
+  parse_input_stack.fps[parse_input_stack.size] = input;
+  parse_input_stack.size++;
+  parse_file = source;
+  parse_input = input;
+  return true;
+}
+
 extern bool input_stack_push(char *file) {
   FILE *input;
     
@@ -46,13 +56,7 @@ extern bool input_stack_push(char *file) {
     printf("File %s could not be opened\n", file);
     return false;
   }
-  input_stack_resize();
-  parse_input_stack.file[parse_input_stack.size] = file;
-  parse_input_stack.fps[parse_input_stack.size] = input;
-  parse_input_stack.size++;
-  parse_file = file;
-  parse_input = input;
-  return true;
+  return input_stack_push_stream(input,file);
 }
 
 // Pops the stack, and sets the parse_input

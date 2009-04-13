@@ -149,6 +149,7 @@ typedef struct input_command_s {
 
 extern input_command_t input_command;
 
+extern bool read_eval(samp_table_t *table);
 extern void read_eval_print_loop(char *input, samp_table_t *table);
 extern void load_mcsat_file(char *file, samp_table_t *table);
 

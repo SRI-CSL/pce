@@ -1721,10 +1721,10 @@ void update_pmodel(samp_table_t *table){
   table->atom_table.num_samples++;
   for (i = 0; i < num_vars; i++){
     if (assigned_true(assignment[i])){
-      if (i > 0) {
-	printf("Atom %d was assigned true\n", i);
-	fflush(stdout);
-      }
+      //if (i > 0) {
+	//printf("Atom %d was assigned true\n", i);
+	//fflush(stdout);
+      //}
       pmodel[i]++;
     }
   }

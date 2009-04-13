@@ -529,7 +529,7 @@ void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
     }
     qsort(&ask_buffer.data[0], ask_buffer.size, sizeof(samp_query_instance_t *), cmp_pmodels);
     for (i = 0; i < ask_buffer.size; i++) {
-      print_query_instance(ask_buffer.data[i], &samp_table, 0);
+      print_query_instance(ask_buffer.data[i], &samp_table, 0, true);
       printf(" : % 5.3f\n", query_probability(ask_buffer.data[i], &samp_table));
       fflush(stdout);
     }
@@ -542,9 +542,7 @@ void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
 	best = qinst;
       }
     }
-    print_query_instance(best, &samp_table, 0);
-    printf(" : % 5.3f\n", query_probability(best, &samp_table));
-    fflush(stdout);
+    print_query_instance(best, &samp_table, 0, true);
   }
   // Now clear out the query_instance table for the next query
   reset_query_instance_table(query_instance_table);

@@ -16,6 +16,7 @@ typedef struct input_stack_s {
 extern char *parse_file;
 extern FILE *parse_input;
 
+extern bool input_stack_push_stream(FILE *input, char *source);
 extern bool input_stack_push(char *file);
 extern void input_stack_pop();
 
