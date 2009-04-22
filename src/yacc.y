@@ -23,8 +23,7 @@ static bool yyerrflg = false;
 static char yystrbuf[1000];
 static pvector_t yyargs;
 static pvector_t yylits;
-char *parse_file;
-FILE *parse_input;
+parse_input_t *parse_input;
 
 void yyerror (char *str);
 
@@ -684,15 +683,32 @@ int isidentchar(int c) {
 	   || c == '[' || c == ']' || c == ',' || c == ';' || c == ':');
 }
 
+int yygetc(parse_input_t *input) {
+  if (input->kind == INFILE) {
+    return getc(input->input.in_file.fps);
+  } else {
+    return input->input.in_string.string[input->input.in_string.index++];
+  }
+}
+
+int yyungetc(int c, parse_input_t *input) {
+  if (input->kind == INFILE) {
+    return ungetc(c, input->input.in_file.fps);
+  } else {
+    input->input.in_string.index--;
+    return c;
+  }
+}
+
 // if YYRECOVERING need to read till no more input, then output ';'
 int skip_white_space_and_comments (void) {
   int c;
 
   do {
     do {
-      c = getc(parse_input);
+      c = yygetc(parse_input);
       if (c == '\n') {
-	if (yynerrs && (parse_input == stdin)) {
+	if (yynerrs && (input_is_stdin(parse_input))) {
 	  return ';';
 	} else {
 	  ++yylloc.last_line;
@@ -704,7 +720,7 @@ int skip_white_space_and_comments (void) {
     } while (isspace(c));
     if (c == '#') {
       do {
-	c = getc(parse_input);
+	c = yygetc(parse_input);
 	++yylloc.last_column;
       } while (c != '\n' && c != EOF);
     } else {
@@ -742,11 +758,11 @@ int yylex (void) {
 	  have_dot = 1;
       };
       yystrbuf[i++] = c;
-      c = getc(parse_input);
+      c = yygetc(parse_input);
       ++yylloc.last_column;
     } while (c != EOF && (isdigit(c) || c == '.'));
     yystrbuf[i] = '\0';
-    ungetc(c, parse_input);
+    yyungetc(c, parse_input);
     --yylloc.last_column;
     yylval.str = yystrbuf;
     if (! have_digit)
@@ -759,11 +775,11 @@ int yylex (void) {
   if (isalpha(c)) {
     do {
       yystrbuf[i++] = c;
-      c = getc(parse_input);
+      c = yygetc(parse_input);
       ++yylloc.last_column;      
     } while (c != EOF && isidentchar(c));
     yystrbuf[i] = '\0';
-    ungetc(c, parse_input);
+    yyungetc(c, parse_input);
     --yylloc.last_column;
     yylval.str = yystrbuf;
     if (strcasecmp(yylval.str, "PREDICATE") == 0)
@@ -842,7 +858,7 @@ int yylex (void) {
   if (c == '\"') {
     // At the moment, escapes not recognized
     do {
-      c = getc(parse_input);
+      c = yygetc(parse_input);
       ++yylloc.last_column;      
       if (c == '\"' || c == EOF) {
         break;
@@ -859,7 +875,7 @@ int yylex (void) {
   if (c == '\'') {
     // At the moment, escapes not recognized
     do {
-      c = getc(parse_input);
+      c = yygetc(parse_input);
       ++yylloc.last_column;      
       if (c == '\'' || c == EOF) {
         break;
@@ -1065,7 +1081,13 @@ void free_parse_data () {
 }
 
 void yyerror (char *str) {
-  printf("%s:%d:%d: %s\n", parse_file, yylloc.last_line, yylloc.last_column, str);
+  if (parse_input->kind == INFILE) {
+    printf("%s:%d:%d: %s\n", parse_input->input.in_file.file,
+	   yylloc.last_line, yylloc.last_column, str);
+  } else {
+    printf("%s:%d:%d: %s\n", parse_input->input.in_string.string,
+	   yylloc.last_line, yylloc.last_column, str);
+  }
   input_command.kind = 0;
   yyerrflg = true;
 };

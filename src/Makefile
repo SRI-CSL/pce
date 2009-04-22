@@ -25,7 +25,7 @@ else
 include $(conf)
 endif
 
-LIBS := $(LIBS) -lm -lglib-2.0
+LIBS := $(LIBS) -lm
 YFLAGS := $(YFLAGS) -d -t
 
 #
@@ -43,7 +43,7 @@ src_c := array_hash_map.c cnf.c gcd.c hash_functions.c input.c \
          memsize.c samplesat.c lazysamplesat.c string_heap.c tables.c \
          symbol_tables.c utils.c vectors.c parser.c print.c yacc.tab.c
 ifneq ($(XMLRPC_SERVER_LIBS),)
-src_c := $(src_c) xpce.c test-xpce.c
+src_c := $(src_c) xpce.c test-xpce.c test-xpce2.c
 endif
 ifneq ($(OAACFLAGS),)
 src_c := $(src_c) pce.c reduced_pce.c
@@ -93,7 +93,7 @@ libmcsat_def=$(libdir)/libmcsat.def
 # binaries
 binaries := $(bindir)/mcsat$(EXEEXT)
 ifneq ($(XMLRPC_SERVER_LIBS),)
-binaries := $(binaries) $(bindir)/xpce$(EXEEXT)  $(bindir)/test-xpce$(EXEEXT) 
+binaries := $(binaries) $(bindir)/xpce$(EXEEXT) $(bindir)/test-xpce$(EXEEXT) $(bindir)/test-xpce2$(EXEEXT) 
 endif
 ifneq ($(OAACFLAGS),)
 binaries := $(binaries) $(bindir)/pce$(EXEEXT) $(bindir)/reduced_pce$(EXEEXT)
@@ -341,15 +341,17 @@ $(bindir)/xpce$(EXEEXT): $(objdir)/xpce.o $(libmcsat)
 	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(XMLRPC_SERVER_LIBS)
 $(bindir)/test-xpce$(EXEEXT): $(objdir)/test-xpce.o $(libmcsat)
 	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(XMLRPC_CLIENT_LIBS)
+$(bindir)/test-xpce2$(EXEEXT): $(objdir)/test-xpce2.o $(libmcsat)
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(XMLRPC_CLIENT_LIBS)
 endif
 
 ifneq ($(OAALDFLAGS),)
 $(bindir)/%$(EXEEXT): $(objdir)/%.o $(libmcsat)
-	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS)
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lglib-2.0
 
 $(bindir)/pce$(EXEEXT): $(objdir)/pce.o $(libmcsat)
 #	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lintl -liconv  -lglib-2.0
-	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS)
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lglib-2.0
 endif
 
 

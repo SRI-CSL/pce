@@ -161,7 +161,7 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
   char * in_predicate = current_atom->pred;
   int32_t pred_id = pred_index(in_predicate, pred_table);
   if (pred_id == -1){
-    printf("\nPredicate %s is not declared", in_predicate);
+    mcsat_err("\nPredicate %s is not declared", in_predicate);
     return -1;
   }
   int32_t predicate = pred_val_to_index(pred_id);
@@ -174,7 +174,7 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
   for (i = 0; i < arity; i++){
     atom->args[i] = const_index(current_atom->args[i], const_table);
     if (atom->args[i] == -1){
-      printf("\nConstant %s is not declared.", current_atom->args[i]);
+      mcsat_err("\nConstant %s is not declared.", current_atom->args[i]);
       return -1;
     }
   }
@@ -356,7 +356,7 @@ int32_t add_clause(samp_table_t *table,
     atom = add_atom(table, in_clause[i]->atom);
     
     if (atom == -1){
-      printf("\nBad atom");
+      mcsat_err("\nBad atom");
       return -1;
     }
     if (in_clause[i]->neg){
@@ -427,7 +427,7 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
   char * pred = atom->pred;
   int32_t pred_val = pred_index(pred, pred_table);
   if (pred_val == -1) {
-    fprintf(stderr, "Predicate %s not previously declared\n", pred);
+    mcsat_err("Predicate %s not previously declared\n", pred);
     return (samp_atom_t *) NULL;
   }
   int32_t pred_idx = pred_val_to_index(pred_val);
@@ -442,7 +442,7 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
     arglen++;
   }
   if (pred_entry.arity != arglen) {
-    fprintf(stderr, "Predicate %s has arity %"PRId32", but given %"PRId32" args\n",
+    mcsat_err("Predicate %s has arity %"PRId32", but given %"PRId32" args\n",
 	    pred, pred_entry.arity, arglen);
     return (samp_atom_t *) NULL;
   }
@@ -468,8 +468,8 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
       }
       // Check that sort matches, else it's an error
       else if (rule->vars[varidx]->sort_index != pred_entry.signature[argidx]) {
-	fprintf(stderr, "Variable %s used with multiple sorts\n",
-		rule->vars[varidx]->name);
+	mcsat_err("Variable %s used with multiple sorts\n",
+		  rule->vars[varidx]->name);
 	safe_free(new_atom);
 	return (samp_atom_t *) NULL;
       }
@@ -479,15 +479,15 @@ samp_atom_t * typecheck_atom(input_atom_t *atom,
       // Not a variable, should be in the const_table
       int32_t constidx = const_index(atom->args[argidx], const_table);
       if (constidx == -1) {
-	fprintf(stderr, "Argument %s not found\n", atom->args[argidx]);
+	mcsat_err("Argument %s not found\n", atom->args[argidx]);
 	safe_free(new_atom);
 	return (samp_atom_t *) NULL;
       }
       else
 	// Have a constant, check the sort
 	if (const_sort_index(constidx,const_table) != pred_entry.signature[argidx]) {
-	  fprintf(stderr, "Constant %s has wrong sort for predicate %s\n",
-		  atom->args[argidx], pred);
+	  mcsat_err("Constant %s has wrong sort for predicate %s\n",
+		    atom->args[argidx], pred);
 	  safe_free(new_atom);
 	  return (samp_atom_t *) NULL;
 	}
@@ -701,7 +701,7 @@ void retract_source(char *source, samp_table_t *table) {
     }
   }
   if (srcidx == source_table->num_entries) {
-    printf("\nSource %s unknown\n", source);
+    mcsat_err("\nSource %s unknown\n", source);
     return;
   }
   source_entry = source_table->entry[srcidx];
@@ -1751,7 +1751,7 @@ int32_t first_sample_sat(samp_table_t *table, double sa_probability,
     num_flips--;
   }
   if (table->clause_table.num_unsat_clauses > 0){
-    fprintf(stderr, "Initialization failed to find a model; increase max_flips\n");
+    mcsat_err("Initialization failed to find a model; increase max_flips\n");
     return -1;
   }
   update_pmodel(table);
@@ -1857,7 +1857,7 @@ void mc_sat(samp_table_t *table, double sa_probability,
   conflict = first_sample_sat(table, sa_probability, samp_temperature,
 			      rvar_probability, max_flips);
   if (conflict == -1) {
-    printf("Found conflict in initialization.\n");
+    mcsat_err("Found conflict in initialization.\n");
     return;
   }
 
@@ -1886,21 +1886,20 @@ int32_t substit_rule(samp_rule_t *rule,
   int32_t i;
   for(i=0; i<rule->num_vars; i++){
     if (substs[i].const_index == -1) {
-      fprintf(stderr, "substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
-	      i, rule->num_vars);
+      mcsat_err("substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
+		i, rule->num_vars);
       return -1;
     }
     int32_t vsort = rule->vars[i]->sort_index;
     int32_t csort = const_sort_index(substs[i].const_index, const_table);
     if (vsort != csort) {
-      fprintf(stderr, "substit: Constant/variable sorts do not match at %"PRId32"\n",
-	      i);
+      mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
       return -1;
     }
   }
   if(substs[i].const_index != -1) {
-    fprintf(stderr, "substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
-	    i, rule->num_vars);
+    mcsat_err("substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
+	      i, rule->num_vars);
       return -1;
   }
   // Everything is OK, do the sustitution
@@ -1921,7 +1920,7 @@ int32_t substit_rule(samp_rule_t *rule,
     int32_t added_atom = add_internal_atom(table, new_atom);
     if (added_atom == -1){
       // This shouldn't happen, but if it does, we need to free up space
-      printf("substit: Bad atom\n");
+      mcsat_err("substit: Bad atom\n");
       return -1;
     }
     clause_buffer.data[i] = lit->neg ? neg_lit(added_atom) : pos_lit(added_atom);
@@ -2222,21 +2221,20 @@ int32_t substit_query(samp_query_t *query,
   
   for(i = 0; i < query->num_vars; i++) {
     if (substs[i].const_index == -1) {
-      fprintf(stderr, "substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
-	      i, query->num_vars);
+      mcsat_err("substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
+		i, query->num_vars);
       return -1;
     }
     vsort = query->vars[i]->sort_index;
     csort = const_sort_index(substs[i].const_index, const_table);
     if (vsort != csort) {
-      fprintf(stderr, "substit: Constant/variable sorts do not match at %"PRId32"\n",
-	      i);
+      mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
       return -1;
     }
   }
   if (substs != NULL && substs[i].const_index != -1) {
-    fprintf(stderr, "substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
-	    i, query->num_vars);
+    mcsat_err("substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
+	      i, query->num_vars);
       return -1;
   }
   // Everything is OK, do the sustitution
@@ -2272,7 +2270,7 @@ int32_t substit_query(samp_query_t *query,
       }
       if (added_atom == -1){
 	// This shouldn't happen, but if it does, we need to free up space
-	printf("substit: Bad atom\n");
+	mcsat_err("substit: Bad atom\n");
 	return -1;
       }
       litinst[i][j] = lit[i][j]->neg ? neg_lit(added_atom) : pos_lit(added_atom);
@@ -2387,7 +2385,7 @@ int32_t samp_query_to_query_instance(samp_query_t *query, samp_table_t *table) {
       added_atom = add_internal_atom(table, new_atom);
       if (added_atom == -1){
 	// This shouldn't happen, but if it does, we need to free up space
-	printf("samp_query_to_query_instance: Bad atom\n");
+	mcsat_err("samp_query_to_query_instance: Bad atom\n");
 	return -1;
       }
       litinst[i][j] = lit[i][j]->neg ? neg_lit(added_atom) : pos_lit(added_atom);
@@ -2646,116 +2644,6 @@ static bool query_match(samp_atom_t *atom, samp_atom_t *patom,
 }
 
 static inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
-
-/* Loop through the atom table, looking for atoms matching the query clause
-   (which may have variables), that are also higher probability than the
-   threshold.  Negated literals use 1 - probability for comparison.
-   If all is true, then all matching atoms are listed, in probability order.
-   Otherwise just the highest probability match is given.
- */
-extern void query_clause(input_clause_t *clause, double threshold, bool all,
-			 samp_table_t *table) {
-  atom_table_t *atom_table = &(table->atom_table);
-  uint32_t nvars;
-  int32_t i, j;
-  double prob;
-  // The following two are used when all == false
-  int32_t best_atom; // Index in atom_table to best atom
-  double best_prob;  // Probability associated with best atom
-  // These are used when all == true
-  ivector_t atoms;  // Indices in atom_table to atoms over the threshold
-  dvector_t probs;  // Corresponding probabilities
-  int32_t num_samples;
-  int32_t *bindings;
-  input_literal_t *lit;
-  samp_rule_t *samp_clause;
-  samp_atom_t *patom;
-
-  bindings = NULL;
-  best_prob = 0.0;
-  best_atom = -1;    
-
-  nvars = atom_table->num_vars;
-  num_samples = atom_table->num_samples;
-  if (all) {
-    init_ivector(&atoms, 10);
-    init_dvector(&probs, 10);
-  }
-
-  // We preprocess the clause, to create a samp_clause and typecheck it
-  // We've already checked that there is only one literal
-  lit = clause->literals[0];
-  samp_clause = new_samp_rule(clause);
-  patom = typecheck_atom(lit->atom, samp_clause, table);
-  if (patom == NULL) {
-    // Had a type error
-    safe_free(samp_clause);
-    return;
-  }
-  if (clause->varlen > 0) {
-    // The bindings will be filled with the corresponding constants
-    // This allows matching, e.g., p(x, x) to p(a, a) but not p(a, b)
-    bindings = (int32_t *) safe_malloc(clause->varlen * sizeof(int32_t));
-  } else {
-    bindings = NULL;
-  }
-  // Loop through all the atoms in the atom table
-  for (i = 0; i < nvars; i++) {
-    // Initialize the bindings array
-    if (bindings != NULL) {
-      for (j = 0; j < clause->varlen; j++) {
-	bindings[j] = -1;
-      }
-    }
-    if (query_match(atom_table->atom[i], patom, bindings, table)) {
-      // Found a match, now check the threshold
-      
-      prob = atom_probability(i, table);
-      if (clause->literals[0]->neg) {
-	prob = 1 - prob;
-      }
-      if (prob >= threshold) {
-	if (all) {
-	  ivector_push(&atoms, i);
-	  dvector_push(&probs, prob);
-	} else if (best_atom == -1) {
-	  best_atom = i;
-	  best_prob = prob;
-	} else if (best_prob < prob) {
-	  best_atom = i;
-	  best_prob = prob;
-	}
-      }
-    }
-  }
-  if (all ? atoms.size == 0 : best_atom == -1) {
-    printf("No atoms found matching your query\n");
-  } else if (all) {
-    assert(atoms.size == probs.size);
-    // Sort the atoms and probs arrays in tandem, then print the results
-    sort_query_atoms_and_probs(atoms.data, probs.data, atoms.size);
-    printf("|  Prob  | Atom\n-------------------\n");
-    for (i = 0; i < atoms.size; i++) {
-      printf("| % 5.3f | ", probs.data[i]);
-      print_atom(atom_table->atom[atoms.data[i]], table);
-      printf("\n");
-    }
-  } else {
-    printf("atom ");
-    print_atom(atom_table->atom[best_atom], table);
-    printf(" has probability % 5.3f\n", best_prob);
-  }
-  // Now cleanup
-  if (clause->varlen > 0) {
-    safe_free(bindings);
-    safe_free(samp_clause);
-    safe_free(patom);
-  }
-  if (all) {
-    delete_ivector(&atoms);
-    delete_dvector(&probs);
-  }
-}
 
 // Based on Bruno's sort_int_array - works on two arrays in parallel
 static void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);

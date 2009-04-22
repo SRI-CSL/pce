@@ -120,9 +120,6 @@ extern void init_random_assignment(samp_truth_value_t *assignment, int32_t num_v
 
 extern int32_t init_sample_sat(samp_table_t *table);
 
-// extern void query_clause(input_clause_t *clause, double threshold, bool all,
-// 			 samp_table_t *table);
-
 /* bool valid_atom_table(atom_table_t *atom_table, */
 /* 		      pred_table_t *pred_table, */
 /* 		      const_table_t *const_table, */

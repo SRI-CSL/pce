@@ -23,100 +23,100 @@
 
 extern int yyparse ();
 
-// static xmlrpc_value *
-// xpce_sort(xmlrpc_env * const envP,
-// 	  xmlrpc_value * const paramArrayP,
-// 	  void * const serverInfo ATTR_UNUSED,
-// 	  void * const channelInfo ATTR_UNUSED) {
+static xmlrpc_value *
+xpce_sort(xmlrpc_env * const envP,
+	  xmlrpc_value * const paramArrayP,
+	  void * const serverInfo ATTR_UNUSED,
+	  void * const channelInfo ATTR_UNUSED) {
 
-//   const char *sort;
-//   /* Parse our argument array. */
-//   fprintf(stderr, "Parsing array\n");
-//   xmlrpc_decompose_value(envP, paramArrayP, "(s)", &sort);
-//   if (envP->fault_occurred)
-//     return NULL;
+  const char *sort;
+  /* Parse our argument array. */
+  fprintf(stderr, "Parsing array\n");
+  xmlrpc_decompose_value(envP, paramArrayP, "(s)", &sort);
+  if (envP->fault_occurred)
+    return NULL;
 
-//   fprintf(stderr, "Got sort %s\n", sort);
-//   //xmlrpc_read_string(envP, xsort, &sort);
-//   add_sort(&samp_table.sort_table, sort);
-//   fprintf(stderr, "Added sort %s\n", sort);
-//   return xmlrpc_build_value(envP, "i", 0);
-//   //return NULL;
-// }
+  fprintf(stderr, "Got sort %s\n", sort);
+  //xmlrpc_read_string(envP, xsort, &sort);
+  add_sort(&samp_table.sort_table, (char *)sort);
+  fprintf(stderr, "Added sort %s\n", sort);
+  return xmlrpc_build_value(envP, "i", 0);
+  //return NULL;
+}
 
-// static xmlrpc_value *
-// xpce_subsort(xmlrpc_env * const envP,
-// 	     xmlrpc_value * const paramArrayP,
-// 	     void * const serverInfo ATTR_UNUSED,
-// 	     void * const channelInfo ATTR_UNUSED) {
+static xmlrpc_value *
+xpce_subsort(xmlrpc_env * const envP,
+	     xmlrpc_value * const paramArrayP,
+	     void * const serverInfo ATTR_UNUSED,
+	     void * const channelInfo ATTR_UNUSED) {
 
-//   const char *subsort, *supersort;
-//   /* Parse our argument array. */
-//   xmlrpc_decompose_value(envP, paramArrayP, "(ss)", &subsort, &supersort);
-//   if (envP->fault_occurred)
-//     return NULL;
+  const char *subsort, *supersort;
+  /* Parse our argument array. */
+  xmlrpc_decompose_value(envP, paramArrayP, "(ss)", &subsort, &supersort);
+  if (envP->fault_occurred)
+    return NULL;
 
-//   fprintf(stderr, "Got subsort %s, supersort %s\n", subsort, supersort);
-//   //xmlrpc_read_string(envP, xsort, &sort);
-//   add_subsort(&samp_table.sort_table, subsort, supersort);
-//   fprintf(stderr, "Added subsort %s\n", subsort);
-//   return xmlrpc_build_value(envP, "i", 0);
-//   //return NULL;
-// }
+  fprintf(stderr, "Got subsort %s, supersort %s\n", subsort, supersort);
+  //xmlrpc_read_string(envP, xsort, &sort);
+  add_subsort(&samp_table.sort_table, (char *)subsort, (char *)supersort);
+  fprintf(stderr, "Added subsort %s\n", subsort);
+  return xmlrpc_build_value(envP, "i", 0);
+  //return NULL;
+}
 
-// static xmlrpc_value *
-// xpce_predicate(xmlrpc_env * const envP,
-// 	       xmlrpc_value * const paramArrayP,
-// 	       void * const serverInfo ATTR_UNUSED,
-// 	       void * const channelInfo ATTR_UNUSED) {
+static xmlrpc_value *
+xpce_predicate(xmlrpc_env * const envP,
+	       xmlrpc_value * const paramArrayP,
+	       void * const serverInfo ATTR_UNUSED,
+	       void * const channelInfo ATTR_UNUSED) {
 
-//   xmlrpc_value *xsorts, *xsort;
-//   const char *pred;
-//   const char **sorts;
-//   const bool *directp;
-//   int32_t i, sort_size;
-//   /* Parse our argument array. */
-//   xmlrpc_decompose_value(envP, paramArrayP, "(sAb)",
-// 			 &pred, &xsorts, &directp);
-//   if (envP->fault_occurred)
-//     return NULL;
+  xmlrpc_value *xsorts, *xsort;
+  const char *pred;
+  const char **sorts;
+  const bool *directp;
+  int32_t i, sort_size;
+  /* Parse our argument array. */
+  xmlrpc_decompose_value(envP, paramArrayP, "(sAb)",
+			 &pred, &xsorts, &directp);
+  if (envP->fault_occurred)
+    return NULL;
   
-//   fprintf(stderr, "Got pred %s\n", pred);
-//   //xmlrpc_read_string(envP, xpred, &pred);
-//   sort_size = xmlrpc_array_size(envP, xsorts);
-//   fprintf(stderr, "Sort size is %d\n", sort_size);
-//   sorts = safe_malloc((sort_size + 1) * sizeof(char *));
-//   for (i = 0; i < sort_size; i++) {
-//     fprintf(stderr, "Reading %d sort\n", i);
-//     xmlrpc_array_read_item(envP, xsorts, i, &xsort);
-//     fprintf(stderr, "Adding to sorts[%d]\n", i);
-//     xmlrpc_read_string(envP, xsort, &sorts[i]);
-//   }
-//   sorts[i] = NULL;
-//   fprintf(stderr, "Adding predicate\n");
-//   add_predicate(pred, sorts, directp, &samp_table);
-//   safe_free(sorts);
-//   return xmlrpc_build_value(envP, "i", 0);
-// }
+  fprintf(stderr, "Got pred %s\n", pred);
+  //xmlrpc_read_string(envP, xpred, &pred);
+  sort_size = xmlrpc_array_size(envP, xsorts);
+  fprintf(stderr, "Sort size is %d\n", sort_size);
+  sorts = safe_malloc((sort_size + 1) * sizeof(char *));
+  for (i = 0; i < sort_size; i++) {
+    fprintf(stderr, "Reading %d sort\n", i);
+    xmlrpc_array_read_item(envP, xsorts, i, &xsort);
+    fprintf(stderr, "Adding to sorts[%d]\n", i);
+    xmlrpc_read_string(envP, xsort, &sorts[i]);
+  }
+  sorts[i] = NULL;
+  fprintf(stderr, "Adding predicate\n");
+  add_predicate((char *)pred, (char **)sorts, directp, &samp_table);
+  safe_free(sorts);
+  return xmlrpc_build_value(envP, "i", 0);
+}
 
 
-// static xmlrpc_value *
-// xpce_const(xmlrpc_env * const envP,
-// 	   xmlrpc_value * const paramArrayP,
-// 	   void * const serverInfo ATTR_UNUSED,
-// 	   void * const channelInfo ATTR_UNUSED) {
+static xmlrpc_value *
+xpce_const(xmlrpc_env * const envP,
+	   xmlrpc_value * const paramArrayP,
+	   void * const serverInfo ATTR_UNUSED,
+	   void * const channelInfo ATTR_UNUSED) {
 
-//   char *cnst, *sort;
+  char *cnst, *sort;
 
-//   /* Parse our argument array. */
-//   xmlrpc_decompose_value(envP, paramArrayP, "(ss)", &cnst, &sort);
-//   if (envP->fault_occurred)
-//     return NULL;
+  /* Parse our argument array. */
+  xmlrpc_decompose_value(envP, paramArrayP, "(ss)", &cnst, &sort);
+  if (envP->fault_occurred)
+    return NULL;
   
-//   fprintf(stderr, "Got const %s of sort %s\n", cnst, sort);
-//   add_constant(cnst, sort, &samp_table);
-//   return xmlrpc_build_value(envP, "i", 0);
-// }
+  fprintf(stderr, "Got const %s of sort %s\n", cnst, sort);
+  add_constant(cnst, sort, &samp_table);
+  return xmlrpc_build_value(envP, "i", 0);
+}
 
 
 // static xmlrpc_value *
@@ -149,39 +149,39 @@ extern int yyparse ();
 // }
 
 
-// static xmlrpc_value *
-// xpce_dumptable(xmlrpc_env * const envP,
-// 	       xmlrpc_value * const paramArrayP,
-// 	       void * const serverInfo ATTR_UNUSED,
-// 	       void * const channelInfo ATTR_UNUSED) {
+static xmlrpc_value *
+xpce_dumptable(xmlrpc_env * const envP,
+	       xmlrpc_value * const paramArrayP,
+	       void * const serverInfo ATTR_UNUSED,
+	       void * const channelInfo ATTR_UNUSED) {
 
-//   const char *table;
-//   int32_t tbl;
-//   /* Parse our argument array. */
-//   xmlrpc_decompose_value(envP, paramArrayP, "(s)", &table);
-//   if (envP->fault_occurred)
-//     return NULL;
+  const char *table;
+  int32_t tbl;
+  /* Parse our argument array. */
+  xmlrpc_decompose_value(envP, paramArrayP, "(s)", &table);
+  if (envP->fault_occurred)
+    return NULL;
   
-//   fprintf(stderr, "Got dumptable %s\n", table);
-//   if (strcasecmp(table,"all") == 0) {
-//     tbl = ALL;
-//   } else if (strcasecmp(table,"sort") == 0) {
-//     tbl = SORT;
-//   } else if (strcasecmp(table,"predicate") == 0) {
-//     tbl = PREDICATE;
-//   } else if (strcasecmp(table,"atom") == 0) {
-//     tbl = ATOM;
-//   } else if (strcasecmp(table,"clause") == 0) {
-//     tbl = CLAUSE;
-//   } else if (strcasecmp(table,"rule") == 0) {
-//     tbl = RULE;
-//   } else {
-//     return NULL;
-//   }
-//   // This just prints out at the server end - need to send the string
-//   dumptable(tbl, &samp_table);
-//   return xmlrpc_build_value(envP, "i", 0);
-// }
+  fprintf(stderr, "Got dumptable %s\n", table);
+  if (strcasecmp(table,"all") == 0) {
+    tbl = ALL;
+  } else if (strcasecmp(table,"sort") == 0) {
+    tbl = SORT;
+  } else if (strcasecmp(table,"predicate") == 0) {
+    tbl = PREDICATE;
+  } else if (strcasecmp(table,"atom") == 0) {
+    tbl = ATOM;
+  } else if (strcasecmp(table,"clause") == 0) {
+    tbl = CLAUSE;
+  } else if (strcasecmp(table,"rule") == 0) {
+    tbl = RULE;
+  } else {
+    return NULL;
+  }
+  // This just prints out at the server end - need to send the string
+  dumptable(tbl, &samp_table);
+  return xmlrpc_build_value(envP, "i", 0);
+}
 
 static xmlrpc_value *
 xpce_command(xmlrpc_env * const envP,
@@ -190,9 +190,7 @@ xpce_command(xmlrpc_env * const envP,
 	     void * const channelInfo ATTR_UNUSED) {
 
   const char *cmd;
-  FILE *in, *out;
   char *output;
-  size_t size;
   xmlrpc_value *value;
   
   /* Parse our argument array. */
@@ -201,24 +199,32 @@ xpce_command(xmlrpc_env * const envP,
     return NULL;
 
   fprintf(stderr, "Got cmd %s\n", cmd);
-  in = fmemopen((void *)cmd, strlen (cmd), "r");
-  input_stack_push_stream(in, (char *)cmd);
+  //in = fmemopen((void *)cmd, strlen (cmd), "r");
+  //input_stack_push_stream(in, (char *)cmd);
+  input_stack_push_string((char *)cmd);
   // Now set up the output stream
-  out = open_memstream(&output, &size); // Grows as needed
-  set_output_stream(out);
+  //out = open_memstream(&output, &size); // Grows as needed
+  //set_output_stream(out);
+  set_output_to_string(true);
+  mcsat_error = 0;
   read_eval(&samp_table);
   fprintf(stderr, "Processed cmd %s\n", cmd);
-  fclose(out);
-  if (size == 0) {
-    fprintf(stderr, "Returning 0 value\n");
-    value = xmlrpc_build_value(envP, "i", 0);
+  output = get_output_from_string_buffer();
+  if (mcsat_error == 1) {
+    xmlrpc_env_set_fault(envP, 1, output);
+    return NULL;
   } else {
-    //free(output);
-    fprintf(stderr, "Returning string value of size %d: %s\n", size, output);
-    value = xmlrpc_build_value(envP, "s", output);
+    if (strlen(output) == 0) {
+      fprintf(stderr, "Returning 0 value\n");
+      value = xmlrpc_build_value(envP, "i", 0);
+    } else {
+      //fprintf(stderr, "Returning string value of size %d: %s\n", (int)strlen(output), output);
+      value = xmlrpc_build_value(envP, "s", output);
+      // Should be safe to free the string after this, here we simply set the index to 0
+    }
+    fprintf(stderr, "Returning value\n");
+    return value;
   }
-  fprintf(stderr, "Returning value\n");
-  return value;
 }
 
 

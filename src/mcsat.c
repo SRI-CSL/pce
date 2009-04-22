@@ -102,7 +102,7 @@ static void decode_options(int argc, char **argv) {
       } else if ((strcasecmp(optarg, "false") == 0) || (strcasecmp(optarg, "f") == 0) || (strcmp(optarg, "0") == 0)) {
 	set_lazy_mcsat(false);
       } else {
-	printf("Error: lazy must be true, false, t, f, 0, or 1\n");
+	mcsat_err("Error: lazy must be true, false, t, f, 0, or 1\n");
 	exit(1);
       }
       break;
@@ -112,7 +112,7 @@ static void decode_options(int argc, char **argv) {
       } else if ((strcasecmp(optarg, "false") == 0) || (strcasecmp(optarg, "f") == 0) || (strcmp(optarg, "0") == 0)) {
 	set_strict_constants(false);
       } else {
-	printf("Error: strict must be true, false, t, f, 0, or 1\n");
+	mcsat_err("Error: strict must be true, false, t, f, 0, or 1\n");
 	exit(1);
       }
       break;
@@ -120,12 +120,12 @@ static void decode_options(int argc, char **argv) {
       if (strlen(optarg) > 0) {
 	for (i = 0; i < strlen(optarg); i++) {
 	  if (!isdigit(optarg[i])) {
-	    printf("Verbosity must be a number\n");
+	    mcsat_err("Verbosity must be a number\n");
 	    exit(1);
 	  }
 	}
       } else {
-	printf("Verbosity must be a number\n");
+	mcsat_err("Verbosity must be a number\n");
 	exit(1);
       }
       printf("Setting verbosity to %d\n", atoi(optarg));
@@ -135,7 +135,7 @@ static void decode_options(int argc, char **argv) {
       usage();
     }
     if (show_version) {
-      printf("mcsat %s\nCopyright (C) 2008, SRI International.  All Rights Reserved.\n",
+      output("mcsat %s\nCopyright (C) 2008, SRI International.  All Rights Reserved.\n",
 	     VERSION);
       exit(0);
     }

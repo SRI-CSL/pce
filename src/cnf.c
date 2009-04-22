@@ -38,12 +38,12 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
   // check if we've seen the predicate before and complain if not.
   pred_val = pred_index(pred, pred_table);
   if (pred_val == -1) {
-    printf("Predicate %s not declared", pred);
+    mcsat_err("Predicate %s not declared", pred);
     return NULL;
   }
   pred_idx = pred_val_to_index(pred_val);
   if (pred_arity(pred_idx, pred_table) != num_args) {
-    printf("Wrong number of args");
+    mcsat_err("Wrong number of args");
     return NULL;
   }
   atom = (samp_atom_t *) safe_malloc((num_args + 1) * sizeof(samp_atom_t));
@@ -67,9 +67,9 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 	subsig = greatest_common_subsort(vsig, psig[i], sort_table);
 	if (subsig != vsig) {
 	  if (subsig == -1) {
-	    printf("Variable %s used with incompatible sorts %s and %s",
-		   var, sort_table->entries[vsig].name,
-		   sort_table->entries[psig[i]].name);
+	    mcsat_err("Variable %s used with incompatible sorts %s and %s",
+		      var, sort_table->entries[vsig].name,
+		      sort_table->entries[psig[i]].name);
 	    return NULL;
 	}
 	vars[j]->sort_index = subsig;
@@ -95,7 +95,7 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 	  }
 	  const_idx = stbl_find(&const_table->const_name_index, cname);
 	} else {
-	  printf("Constant %s not previously declared\n", cname);
+	  mcsat_err("Constant %s not previously declared\n", cname);
 	  return NULL;
 	}
       } else {
@@ -108,7 +108,7 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 	  }
 	}
 	if (!foundit) {
-	  printf("Sort error: constant %s of sort %s\n does not match pred %s arg %"PRId32" sort %s\n",
+	  mcsat_err("Sort error: constant %s of sort %s\n does not match pred %s arg %"PRId32" sort %s\n",
 		    cname, const_sort_name(const_idx,&samp_table), pred, i+1, sort_entry->name);
 	  return NULL;
 	}
@@ -252,7 +252,7 @@ rule_literal_t ***cnf_pos(input_fmla_t *fmla, var_entry_t **vars) {
 			 cnf_union(cnf_neg(cfmla->arg1, vars),
 				   cnf_neg(cfmla->arg2, vars)));
     } else {
-      printf("cnfpos error: op %"PRId32" unexpected\n", op);
+      mcsat_err("cnfpos error: op %"PRId32" unexpected\n", op);
       return NULL;
     }
   }
@@ -287,7 +287,7 @@ rule_literal_t ***cnf_neg(input_fmla_t *fmla, var_entry_t **vars) {
 		       cnf_product(cnf_neg(cfmla->arg1, vars),
 				   cnf_neg(cfmla->arg2, vars)));
     } else {
-      printf("cnfpos error: op %"PRId32" unexpected\n", op);
+      mcsat_err("cnfpos error: op %"PRId32" unexpected\n", op);
       return NULL;
     }
   }
@@ -420,8 +420,8 @@ void add_cnf(input_formula_t *formula, double weight) {
     for (i = 0; i < num_vars; i++) {
       // Check that all variables have been referenced
       if (formula->vars[i]->sort_index == -1) {
-	printf("cnf error: variable %s not used in formula\n",
-	       formula->vars[i]->name);
+	mcsat_err("cnf error: variable %s not used in formula\n",
+		  formula->vars[i]->name);
 	safe_free(lits);
 	return;
       }
@@ -530,7 +530,7 @@ void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
     qsort(&ask_buffer.data[0], ask_buffer.size, sizeof(samp_query_instance_t *), cmp_pmodels);
     for (i = 0; i < ask_buffer.size; i++) {
       print_query_instance(ask_buffer.data[i], &samp_table, 0, true);
-      printf(" : % 5.3f\n", query_probability(ask_buffer.data[i], &samp_table));
+      output(" : % 5.3f\n", query_probability(ask_buffer.data[i], &samp_table));
       fflush(stdout);
     }
   } else {

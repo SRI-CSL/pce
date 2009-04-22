@@ -261,7 +261,7 @@ int32_t first_lazy_sample_sat(samp_table_t *table, double sa_probability,
     num_flips--;
   }
   if (table->clause_table.num_unsat_clauses > 0){
-    fprintf(stderr, "Initialization failed to find a model; increase max_flips\n");
+    mcsat_err("Initialization failed to find a model; increase max_flips\n");
     return -1;
   }
   update_pmodel(table);
@@ -351,7 +351,7 @@ void lazy_mc_sat(samp_table_t *table, double sa_probability,
   conflict = first_lazy_sample_sat(table, sa_probability, samp_temperature,
 				   rvar_probability, max_flips);
   if (conflict == -1) {
-    printf("Found conflict in initialization.\n");
+    mcsat_err("Found conflict in initialization.\n");
     return;
   }
 

@@ -10,8 +10,12 @@
  */
 extern void set_verbosity_level(int32_t level);
 extern int32_t get_verbosity_level();
-extern void set_output_stream (FILE *stream);
 extern void cprintf(int32_t level, const char *fmt, ...);
+extern void set_output_to_string (bool v);
+extern char *get_output_from_string_buffer ();
+extern void output(const char *fmt, ...);
+extern int32_t mcsat_error;
+extern void mcsat_err(const char *fmt, ...);
 
 extern void dump_sort_table (samp_table_t *table);
 extern void dump_pred_table (samp_table_t *table);
