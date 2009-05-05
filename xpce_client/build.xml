@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<project name="XPCEClient" default="jar" basedir=".">
+
+    <target name="init" description="Sets properties and classpaths needed for rest of build">
+    	<property name="base.dir" location="."/>
+        <property name="src.dir" location="${base.dir}/src"/>
+        <property name="lib.dir" location="${base.dir}/lib"/>
+
+        <property name="dest.dir" location="${base.dir}/dest"/>
+        <property name="dest.classes.dir" location="${dest.dir}/classes"/>
+        <property name="dest.jar.dir" location="${dest.dir}/jar"/>
+        <property name="targetjar" location="${dest.jar.dir}/xpceClient.jar"/>
+    </target>
+
+	<target name="clean" depends="init">
+    	<delete dir="${dest.dir}"/> 	
+	</target>
+    	
+    <target name="compile" depends="init"
+        description="Compiles all java files">
+        <mkdir dir="${dest.classes.dir}"/>
+        <path id="buildpath">
+            <fileset dir="${lib.dir}" includes="*.jar"/>
+        </path>
+        <javac listfiles="true" optimize="on" debug="off" fork="true" memoryMaximumSize="256m" verbose="off"
+               srcdir="${src.dir}" destdir="${dest.classes.dir}">
+            <classpath refid="buildpath"/>
+        </javac>
+    </target>
+
+    <target name="jar" depends="compile" description="Create output jar file">
+        <mkdir dir="${dest.jar.dir}"/>
+        <jar destfile="${targetjar}">
+            <fileset dir="${dest.classes.dir}"/>
+        </jar>
+        <copy file="${targetjar}" todir="${dest.jar.dir}" />
+    </target>
+    
+</project>
