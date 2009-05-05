@@ -19,4 +19,9 @@ public class XPCEConstants {
 	public static String IMPLIES = "implies";
 	public static String IFF = "iff";
 	public static String ASSERT = "assert";
+	
+	
+	
+	public static String XPCECOMMAND = "xpce.command";
+	
 }

@@ -7,32 +7,34 @@ import org.apache.xmlrpc.XmlRpcException;
 import org.apache.xmlrpc.client.XmlRpcClient;
 import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
 
+import com.sri.csl.xpce.json.XPCEConstants;
+
 public class XpceClient {
-	protected String xpceServerURL;
+	
+	protected URL xpceServerURL;
 	
 	public void setServerURL(String url) {
-		xpceServerURL = url;
+	    try {
+	    	xpceServerURL = new URL(url);
+	    } catch (MalformedURLException m) {
+	    	m.printStackTrace();
+	    }
 	}
 	
-	public String getServerURL() {
+	public URL getServerURL() {
 		return xpceServerURL;
 	}
 	
 	public XmlRpcClient getXmlRpcClient() {
 	    XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-	    try {
-	    	config.setServerURL(new URL(xpceServerURL));
-	    } catch (MalformedURLException m) {
-	    	m.printStackTrace();
-	    	return null;
-	    }
-	    XmlRpcClient client = new XmlRpcClient();
-	    client.setConfig(config);
-		return client;
+    	config.setServerURL(xpceServerURL);
+	    XmlRpcClient xmlrpcClient = new XmlRpcClient();
+	    xmlrpcClient.setConfig(config);
+		return xmlrpcClient;
 	}
 	
 	public Object command(String command) throws XmlRpcException {
-    	return getXmlRpcClient().execute("xpce.command", new Object[] {command});
+    	return getXmlRpcClient().execute(XPCEConstants.XPCECOMMAND, new Object[] {command});
 	}
 	
 	public static void main(String[] args) {
