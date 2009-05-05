@@ -3,15 +3,25 @@
 
     <target name="init" description="Sets properties and classpaths needed for rest of build">
         <property name="base.dir" location="."/>
-
         <property name="trunk.dir" location=".."/>
+
+        <!-- Properties for accessing xpce client.-->
         <property name="xpceClient.dir" location="${trunk.dir}/xpce_client"/>
         <property name="xpceClient.lib.dir" location="${xpceClient.dir}/lib"/>
         <property name="xpceClient.jar.dir" location="${xpceClient.dir}/dest/jar"/>
         <property name="xpceClient.targetjar" location="${xpceClient.jar.dir}/xpceClient.jar"/>
 
+        <!-- Properties for accessing xpce server.-->
+        <!-- Change this when the C code moves PCE-9 -->
+        <property name="standalone.dir" location="${trunk.dir}"/>
+        <property name="standalone.bin.dir" location="${standalone.dir}/build/i686-pc-cygwin-debug/bin"/>
+        <property name="xpceServer.exe" location="${standalone.bin.dir}/xpce.exe"/>
+        <property name="xpceServer.port" value="8080"/>
+
+        <!-- Properties for autotests themselves. -->
         <property name="src.dir" location="${base.dir}/src"/>
         <property name="lib.dir" location="${base.dir}/lib"/>
+        <property name="bin.dir" location="${base.dir}/bin"/>
 
         <property name="dest.dir" location="${base.dir}/dest"/>
         <property name="dest.classes.dir" location="${dest.dir}/classes"/>
@@ -23,6 +33,12 @@
         <property name="results.default.html" location="${results.dir}/junit-noframes.html"/>
         <property name="results.html" location="${results.dir}/TestResults.html"/>
 
+        <!-- Would be good to extend this to work even if cygwin is installed
+             in some other location. -->
+        <property name="bash.exe" location="c:\cygwin\bin\bash.exe"/>
+        <property name="killxpce.sh" location="${bin.dir}/killxpce.sh"/>
+
+        <!-- java classpaths -->
         <path id="buildpath">
             <fileset dir="${xpceClient.lib.dir}" includes="*.jar"/>
             <files includes="${xpceClient.targetjar}"/>
@@ -33,18 +49,24 @@
             <files includes="${dest.targetjar}"/>
         </path>
     </target>
-
     
-	<target name="clean" depends="init">
-    	<delete dir="${dest.dir}"/> 	
-    	<delete dir="${results.dir}"/> 	
-	</target>
+    <target name="start-server" depends="init">
+        <echo message="Starting PCE XmlRpc server on port ${xpceServer.port}..."/>
+        <exec executable="${xpceServer.exe}" spawn="true" >
+            <arg value="${xpceServer.port}"/>
+        </exec>
+    </target>
 
-<!--    <target name="start-server">
-        
-    </target> -->
-    
+    <target name="stop-server" depends="init">
+        <echo message="Stopping PCE XmlRpc server..."/>
+        <exec executable="${bash.exe}" failonerror="false" dir="${bin.dir}">
+            <arg value="-e"/>
+            <arg value="${killxpce.sh}"/>
+        </exec>
+    </target>
+
     <target name="run-tests" depends="jar">
+        <antcall target="start-server"/>
         <mkdir dir="${results.dir}"/>        
         <junit printsummary="on" fork="on">
             <classpath refid="runpath"/>
@@ -59,6 +81,7 @@
             <report format="noframes" todir="${results.dir}"/>
         </junitreport>
         <move file="${results.default.html}" tofile="${results.html}"/>
+        <antcall target="stop-server"/>
         <echo message="Test results: ${results.html}"/>
     </target>
 
@@ -81,5 +104,11 @@
             <fileset dir="${dest.classes.dir}"/>
         </jar>
         <copy file="${dest.targetjar}" todir="${dest.jar.dir}" />
-    </target>    
+    </target>
+
+    <target name="clean" depends="init">
+        <delete dir="${dest.dir}"/>
+        <delete dir="${results.dir}"/>
+        <ant dir="${xpceClient.dir}" target="clean" inheritAll="false"/>
+    </target>
 </project>
