@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<project name="XPCEClientTests" default="run-tests" basedir=".">
+
+    <target name="init" description="Sets properties and classpaths needed for rest of build">
+        <property name="base.dir" location="."/>
+
+        <property name="trunk.dir" location=".."/>
+        <property name="xpceClient.dir" location="${trunk.dir}/xpce_client"/>
+        <property name="xpceClient.lib.dir" location="${xpceClient.dir}/lib"/>
+        <property name="xpceClient.jar.dir" location="${xpceClient.dir}/dest/jar"/>
+        <property name="xpceClient.targetjar" location="${xpceClient.jar.dir}/xpceClient.jar"/>
+
+        <property name="src.dir" location="${base.dir}/src"/>
+        <property name="lib.dir" location="${base.dir}/lib"/>
+
+        <property name="dest.dir" location="${base.dir}/dest"/>
+        <property name="dest.classes.dir" location="${dest.dir}/classes"/>
+        <property name="dest.jar.dir" location="${dest.dir}/jar"/>
+        <property name="dest.targetjar" location="${dest.jar.dir}/xpceClientTests.jar"/>
+
+        <property name="tests.classname" value="com.sri.csl.xpceTests.SimpleTests"/>
+        <property name="results.dir" location="${base.dir}/results"/>
+        <property name="results.default.html" location="${results.dir}/junit-noframes.html"/>
+        <property name="results.html" location="${results.dir}/TestResults.html"/>
+
+        <path id="buildpath">
+            <fileset dir="${xpceClient.lib.dir}" includes="*.jar"/>
+            <files includes="${xpceClient.targetjar}"/>
+            <fileset dir="${lib.dir}" includes="*.jar"/>
+        </path>
+        <path id="runpath">
+            <path refid="buildpath"/>
+            <files includes="${dest.targetjar}"/>
+        </path>
+    </target>
+
+    
+	<target name="clean" depends="init">
+    	<delete dir="${dest.dir}"/> 	
+    	<delete dir="${results.dir}"/> 	
+	</target>
+
+<!--    <target name="start-server">
+        
+    </target> -->
+    
+    <target name="run-tests" depends="jar">
+        <mkdir dir="${results.dir}"/>        
+        <junit printsummary="on" fork="on">
+            <classpath refid="runpath"/>
+            <test name="${tests.classname}" haltonfailure="no" todir="${results.dir}">
+                <formatter type="xml"/>
+            </test>
+        </junit>
+        <junitreport todir="${results.dir}">
+            <fileset dir="${results.dir}">
+                <include name="TEST-*.xml"/>
+            </fileset>
+            <report format="noframes" todir="${results.dir}"/>
+        </junitreport>
+        <move file="${results.default.html}" tofile="${results.html}"/>
+        <echo message="Test results: ${results.html}"/>
+    </target>
+
+    <target name="build-xpceClient" depends="init">
+        <ant dir="${xpceClient.dir}" target="jar" inheritAll="false"/>
+    </target>
+
+    <target name="compile" depends="build-xpceClient"
+        description="Compiles all java files">
+        <mkdir dir="${dest.classes.dir}"/>
+        <javac listfiles="true" optimize="on" debug="off" fork="true" memoryMaximumSize="256m" verbose="off"
+               srcdir="${src.dir}" destdir="${dest.classes.dir}">
+            <classpath refid="buildpath"/>
+        </javac>
+    </target>
+
+    <target name="jar" depends="compile" description="Create output jar file">
+        <mkdir dir="${dest.jar.dir}"/>
+        <jar destfile="${dest.targetjar}">
+            <fileset dir="${dest.classes.dir}"/>
+        </jar>
+        <copy file="${dest.targetjar}" todir="${dest.jar.dir}" />
+    </target>    
+</project>

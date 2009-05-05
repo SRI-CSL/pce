@@ -22,9 +22,12 @@
         <path id="buildpath">
             <fileset dir="${lib.dir}" includes="*.jar"/>
         </path>
-        <javac listfiles="true" optimize="on" debug="off" fork="true" memoryMaximumSize="256m" verbose="off"
+        <javac fork="true" memoryMaximumSize="256m"
                srcdir="${src.dir}" destdir="${dest.classes.dir}">
             <classpath refid="buildpath"/>
+            <!-- Uncomment this to try and cleanup some warnings, shardt
+            <compilerarg value="-Xlint:unchecked"/> 
+            -->
         </javac>
     </target>
 
