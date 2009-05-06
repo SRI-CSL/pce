@@ -16,6 +16,7 @@
         <property name="standalone.dir" location="${trunk.dir}"/>
         <property name="standalone.bin.dir" location="${standalone.dir}/build/i686-pc-cygwin-debug/bin"/>
         <property name="xpceServer.exe" location="${standalone.bin.dir}/xpce.exe"/>
+        <!-- Must be the same as com.sri.csl.xpceTests.AbstractXpceTestFixture.SERVER_PORT -->
         <property name="xpceServer.port" value="8080"/>
 
         <!-- Properties for autotests themselves. -->

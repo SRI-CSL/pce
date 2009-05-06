@@ -1,0 +1,13 @@
+sort Person;
+sort Food;
+
+const billy,sandra: Person;
+const beef,yogurt,iceCream: Food;
+
+predicate likes(Person,Food) indirect;
+
+assert likes(billy,beef);
+assert likes(sandra,iceCream);
+
+add [person] likes(person,beef) implies ~likes(person,yogurt) 2.0;
+add [person] likes(person,iceCream) implies likes(person,yogurt) 2.0;

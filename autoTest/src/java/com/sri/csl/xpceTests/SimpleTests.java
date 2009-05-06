@@ -2,26 +2,20 @@ package com.sri.csl.xpceTests;
 
 import org.junit.*;
 import static org.junit.Assert.*;
-import java.util.*;
 
-public class SimpleTests {
+public class SimpleTests extends AbstractXpceTestFixture {
     @BeforeClass
-    public static void oneTimeSetUp() {
-		System.out.println("setup");
-    }
-
-    @AfterClass
-    public static void oneTimeTearDown() {
-		System.out.println("teardown");
+    public static void oneTimeSetUp() throws Exception {
+        loadFile("food1.mcsat");
     }
 
     @Test
-    public void testOk() {
-        assertTrue("foo" == "foo");
+    public void billyYogurt() throws Exception {
+        ask("ask likes(billy,yogurt)",0.0,0.3);
     }
 
     @Test
-    public void testFail() {
-        assertEquals(1, 3);
+    public void sandraYogurt() throws Exception {
+        ask("ask likes(sandra,yogurt)",0.6,1.0);
     }
 }
