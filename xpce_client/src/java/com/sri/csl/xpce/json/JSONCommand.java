@@ -5,9 +5,8 @@ import org.json.JSONObject;
 
 import com.sri.csl.xpce.object.Atom;
 import com.sri.csl.xpce.object.Constant;
-import com.sri.csl.xpce.object.Predicate;
+import com.sri.csl.xpce.object.PredicateDecl;
 import com.sri.csl.xpce.object.Sort;
-import com.sri.csl.xpce.object.SubSort;
 
 public class JSONCommand {
 	public static JSONObject fullAddSort(Sort s) throws JSONException {
@@ -16,13 +15,7 @@ public class JSONCommand {
 		return obj;
 	}
 
-	public static JSONObject fullAddSubSort(SubSort s) throws JSONException {
-		JSONObject obj = new JSONObject();
-		obj.append(XPCEConstants.SUBSORT, s.toJSON());
-		return obj;
-	}
-
-	public static JSONObject fullAddPredicate(Predicate p) throws JSONException {
+	public static JSONObject fullAddPredicate(PredicateDecl p) throws JSONException {
 		JSONObject obj = new JSONObject();
 		obj.append(XPCEConstants.PREDICATE, p.toJSON());
 		return obj;

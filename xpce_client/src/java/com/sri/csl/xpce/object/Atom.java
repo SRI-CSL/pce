@@ -8,27 +8,54 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.sri.csl.exception.XPCException;
 import com.sri.csl.xpce.json.XPCEConstants;
 
 public class Atom extends Formula {
 	protected String functor;
-	protected ArrayList<Object> argument = new ArrayList<Object>();
+	protected ArrayList<Term> argument = new ArrayList<Term>();
 	
-	public Atom(String functor, Object... params) {
+	public Atom(String functor, Term... params) {
 		this.functor = functor;
-		for (Object p: params) argument.add(p);
+		for (Term p: params) argument.add(p);
 	}
 
-	public Atom(String functor, List<Object> params) {
+	public Atom(String functor, List<Term> params) {
 		this.functor = functor;
-		for (Object p: params) argument.add(p);
+		for (Term p: params) argument.add(p);
+	}
+
+	public Atom(String functor, Object... params) {
+		this.functor = functor;
+		for (Object p: params) {
+			if ( p instanceof Constant || p instanceof Variable )
+				argument.add((Term)p);
+			else
+				argument.add(new Constant(p));
+		}
+	}
+
+	public Atom(PredicateDecl pred, Term... params) {
+		this.functor = pred.getFunctor();
+		for (Term p: params) argument.add(p);
+	}
+	
+	
+	// The best way to define a new Atom:
+	public Atom(PredicateDecl pred, Object... params) throws XPCException {
+		this.functor = pred.getFunctor();
+		if ( params.length != pred.getArgumentsTypes().size() ) {
+			throw new XPCException("Number of input paramaters does not match the number of input parameters in the Predicate definition");
+		}
+		for (int i=0; i<params.length;i++) 
+			argument.add(new Constant(params[i]));
 	}
 
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.FUNCTOR, functor);
 		JSONArray params = new JSONArray();
-		for (Object p: argument) params.put(p) ;
+		for (Term p: argument) params.put(p.toJSON()) ;
 		obj.put(XPCEConstants.ARGUMENTS, params);
 
 		JSONObject obj1 = new JSONObject();
@@ -58,7 +85,7 @@ public class Atom extends Formula {
 	public String toString() {
 		String str = functor + "(";
 		StringBuffer buffer = new StringBuffer();
-		Iterator<Object> iter = argument.iterator();
+		Iterator<Term> iter = argument.iterator();
 		while (iter.hasNext()) {
 			buffer.append(iter.next());
 			if (iter.hasNext())	buffer.append(", ");

@@ -6,9 +6,13 @@ import java.net.URL;
 import org.apache.xmlrpc.XmlRpcException;
 import org.apache.xmlrpc.client.XmlRpcClient;
 import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
+import org.json.JSONException;
 
 import com.sri.csl.exception.XPCException;
 import com.sri.csl.xpce.json.XPCEConstants;
+import com.sri.csl.xpce.object.Constant;
+import com.sri.csl.xpce.object.PredicateDecl;
+import com.sri.csl.xpce.object.Sort;
 
 public class XpceClient {
 	
@@ -27,16 +31,8 @@ public class XpceClient {
 	    }
 	}
 	
-	protected XmlRpcClient getXmlRpcClient() {
-	    XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-    	config.setServerURL(xpceServerURL);
-	    XmlRpcClient xmlrpcClient = new XmlRpcClient();
-	    xmlrpcClient.setConfig(config);
-		return xmlrpcClient;
-	}
-	
 	public Object command(String command) throws XmlRpcException, XPCException {
-    	return getXmlRpcClient().execute(XPCEConstants.XPCECOMMAND, new Object[] {command});
+    	return xmlrpcClient.execute(XPCEConstants.XPCECOMMAND, new Object[] {command});
 	}
 	
 	public void addSort(String sort) throws XmlRpcException, XPCException {
@@ -44,9 +40,21 @@ public class XpceClient {
 		command("sort " + sort + ";");
 	}
 	
+	public void addSort(Sort sort) throws XmlRpcException, XPCException, JSONException {
+		xmlrpcClient.execute(XPCEConstants.XPCEADDSORT, new Object[] {sort.toJSON()});
+	}
+	
 	public void addSubsort(String sort, String superSort) throws XmlRpcException, XPCException {
 		// TODO: This will later be replaced with a JSON-based command
 		command("subsort " + sort + " " + superSort + ";");
+	}
+	
+	public void addPredicate(PredicateDecl p) throws XmlRpcException, XPCException, JSONException {
+		xmlrpcClient.execute(XPCEConstants.XPCEADDPREDICATE, new Object[] {p.toJSON()});
+	}
+	
+	public void addConstants(Constant c) throws XmlRpcException, XPCException, JSONException {
+		xmlrpcClient.execute(XPCEConstants.XPCEADDCONSTANTS, new Object[] {c.toJSON()});
 	}
 	
 	
@@ -70,7 +78,11 @@ public class XpceClient {
 	    	client.command("add ~P(c) or Q(c) 3.0;");
 	    	client.command("add ~P(d) or Q(d) 3.0;");
 	    	client.command("add ~P(e) or Q(e) 3.0;");
-	    	client.command("mcsat 0.01, 20.0, 0.01, 30, 500;");
+	    	ret = client.command("mcsat 0.01, 20.0, 0.01, 30, 500;");
+	    	System.out.println("Return Value:" + ret);
+	    	
+	    	//Thread.sleep(10000);
+	    	
 	    }catch (Exception e) {
 	    	e.printStackTrace();
 	    }

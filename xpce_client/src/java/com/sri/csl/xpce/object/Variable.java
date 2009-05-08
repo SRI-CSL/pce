@@ -5,24 +5,25 @@ import org.json.JSONObject;
 
 import com.sri.csl.xpce.json.XPCEConstants;
 
-public class Constant extends Term {
-	protected Object name;
+public class Variable extends Term {
+	protected String name;
 	
-	public Constant(Object name) {
+	public Variable(String name) {
 		this.name = name;
 	}
-
-	public Constant(JSONObject obj) throws JSONException {
-		name = obj.get(XPCEConstants.CONST);
+	
+	public Variable(JSONObject obj) throws JSONException {
+		name = obj.getString(XPCEConstants.VARIABLE);
 	}
 
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.CONST, name);
+		obj.put(XPCEConstants.VARIABLE, name);
 		return obj;
 	}
-	
+
 	public String toString() {
-		return name.toString();
-	}
+		return XPCEConstants.VARIABLEPREFIX + name;
+	}	
+
 }
