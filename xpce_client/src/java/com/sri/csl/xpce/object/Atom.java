@@ -3,6 +3,7 @@ package com.sri.csl.xpce.object;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.StringTokenizer;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -25,6 +26,18 @@ public class Atom extends Formula {
 		for (Term p: params) argument.add(p);
 	}
 
+	public Atom(String str) {
+		StringTokenizer tokenizer = new StringTokenizer(str, "(), ");
+		functor = tokenizer.nextToken();
+	    while (tokenizer.hasMoreTokens()) {
+	    	String ar = tokenizer.nextToken();
+	    	if ( ar.startsWith(XPCEConstants.VARIABLEPREFIX) )
+	    		argument.add(new Variable(ar.substring(XPCEConstants.VARIABLEPREFIX.length())));
+	    	else
+	    		argument.add(new Constant(ar));
+	    }
+	}
+	
 	public Atom(String functor, Object... params) {
 		this.functor = functor;
 		for (Object p: params) {

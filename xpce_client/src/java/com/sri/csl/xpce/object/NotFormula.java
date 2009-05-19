@@ -29,6 +29,6 @@ public class NotFormula extends Formula {
 	}
 
 	public String toString() {
-		return "-" + formula;
+		return XPCEConstants.NEGATIONPREFIX + formula;
 	}
 }

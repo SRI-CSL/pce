@@ -45,6 +45,8 @@ public abstract class Formula {
 	}
 	
 	public static void main(String args[]) {
+		Atom r = new Atom("family(bob, $X, tom, rose)");
+		System.out.println("r is: " + r);
 		PredicateDecl p1 = new PredicateDecl("Father", "Person", "Person");
 		PredicateDecl p2 = new PredicateDecl("Male", "Person");
 		Atom a1, a2, a3;
