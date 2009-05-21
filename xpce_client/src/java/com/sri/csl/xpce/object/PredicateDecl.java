@@ -10,14 +10,19 @@ import org.json.JSONObject;
 import com.sri.csl.xpce.json.XPCEConstants;
 
 public class PredicateDecl {
-	protected String functor;
 	protected ArrayList<Sort> argumentType = new ArrayList<Sort>();
+	protected String functor;
 	protected boolean observable = true;
 	
-	public PredicateDecl(String functor, String[] parType, boolean obs) {
+	public PredicateDecl(String functor, List<Object> parType, boolean obs) {
 		this.functor = functor;
-		for (String p: parType) argumentType.add(new Sort(p));
+		for (Object p: parType) argumentType.add(new Sort(p.toString()));
 		observable = obs;
+	}
+
+	public PredicateDecl(String functor, Sort... parType) {
+		this.functor = functor;
+		for (Sort p: parType) argumentType.add(p);
 	}
 
 	public PredicateDecl(String functor, Sort[] parType, boolean obs) {
@@ -26,28 +31,29 @@ public class PredicateDecl {
 		observable = obs;
 	}
 
-	public PredicateDecl(String functor, List<Object> parType, boolean obs) {
-		this.functor = functor;
-		for (Object p: parType) argumentType.add(new Sort(p.toString()));
-		observable = obs;
-	}
-
 	public PredicateDecl(String functor, String... parType) {
 		this.functor = functor;
 		for (String p: parType) argumentType.add(new Sort(p));
 	}
 
-	public PredicateDecl(String functor, Sort... parType) {
+	public PredicateDecl(String functor, String[] parType, boolean obs) {
 		this.functor = functor;
-		for (Sort p: parType) argumentType.add(p);
+		for (String p: parType) argumentType.add(new Sort(p));
+		observable = obs;
 	}
 
+	public ArrayList<Sort> getArgumentsTypes() {
+		return argumentType;
+	}
+	
 	public String getFunctor() {
 		return functor;
 	}
 	
-	public ArrayList<Sort> getArgumentsTypes() {
-		return argumentType;
+	public JSONObject toFullJSON() throws JSONException  {
+		JSONObject obj = new JSONObject();
+		obj.append(XPCEConstants.PREDICATE, toJSON());
+		return obj;
 	}
 	
 	public JSONObject toJSON() throws JSONException {
@@ -57,12 +63,6 @@ public class PredicateDecl {
 		for (Sort p: argumentType) params.put(p.getName()) ;
 		obj.append(XPCEConstants.ARGUMENTS, params);
 		obj.append(XPCEConstants.OBSERVABLE, observable);
-		return obj;
-	}
-	
-	public JSONObject toFullJSON() throws JSONException  {
-		JSONObject obj = new JSONObject();
-		obj.append(XPCEConstants.PREDICATE, toJSON());
 		return obj;
 	}
 }

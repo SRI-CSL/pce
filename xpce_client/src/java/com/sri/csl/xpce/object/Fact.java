@@ -9,11 +9,11 @@ import com.sri.csl.xpce.json.XPCEConstants;
 
 public class Fact extends Atom {
 
-	public Fact(PredicateDecl pred, Object... params) throws XPCException {
+	public Fact(PredicateDecl pred, Constant... params) {
 		super(pred, params);
 	}
 
-	public Fact(PredicateDecl pred, Constant... params) {
+	public Fact(PredicateDecl pred, Object... params) throws XPCException {
 		super(pred, params);
 	}	
 

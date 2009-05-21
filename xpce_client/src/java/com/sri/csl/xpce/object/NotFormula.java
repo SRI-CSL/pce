@@ -12,20 +12,20 @@ public class NotFormula extends Formula {
 		formula = f;
 	}
 
-	public JSONObject toJSON() throws JSONException {
-		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.NOT, formula.toJSON());
-		return obj;
+	public boolean equals(Object obj) {
+		if ( !(obj instanceof NotFormula) ) return false;
+		NotFormula other = (NotFormula)obj;
+		return formula.equals(other.getInner());
 	}
 
 	public Formula getInner() {
 		return formula;
 	}
 	
-	public boolean equals(Object obj) {
-		if ( !(obj instanceof NotFormula) ) return false;
-		NotFormula other = (NotFormula)obj;
-		return formula.equals(other.getInner());
+	public JSONObject toJSON() throws JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put(XPCEConstants.NOT, formula.toJSON());
+		return obj;
 	}
 
 	public String toString() {

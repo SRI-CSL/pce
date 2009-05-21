@@ -30,12 +30,12 @@ public class Result {
 		return err;
 	}
 
-	public String getWarning() {
-		return warn;
-	}
-	
 	public Object getResult() {
 		return result;
+	}
+	
+	public String getWarning() {
+		return warn;
 	}
 
 	public boolean succeeded() {

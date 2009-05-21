@@ -15,13 +15,12 @@ public class IffFormula extends Formula {
 		second = f2;
 	}
 
-	public JSONObject toJSON() throws JSONException {
-		JSONObject obj = new JSONObject();
-		JSONArray arr = new JSONArray();
-		arr.put(first.toJSON());
-		arr.put(second.toJSON());
-		obj.put(XPCEConstants.IFF, arr);
-		return obj;
+	public boolean equals(Object obj) {
+		if ( !(obj instanceof IffFormula) ) return false;
+		IffFormula other = (IffFormula)obj;
+		if ( first.equals(other.getFirst()) && second.equals(other.getSecond()) ) return true;
+		if ( second.equals(other.getFirst()) && first.equals(other.getSecond()) ) return true;
+		return false;
 	}
 
 	public Formula getFirst() {
@@ -32,12 +31,13 @@ public class IffFormula extends Formula {
 		return second;
 	}	
 	
-	public boolean equals(Object obj) {
-		if ( !(obj instanceof IffFormula) ) return false;
-		IffFormula other = (IffFormula)obj;
-		if ( first.equals(other.getFirst()) && second.equals(other.getSecond()) ) return true;
-		if ( second.equals(other.getFirst()) && first.equals(other.getSecond()) ) return true;
-		return false;
+	public JSONObject toJSON() throws JSONException {
+		JSONObject obj = new JSONObject();
+		JSONArray arr = new JSONArray();
+		arr.put(first.toJSON());
+		arr.put(second.toJSON());
+		obj.put(XPCEConstants.IFF, arr);
+		return obj;
 	}
 
 	public String toString() {

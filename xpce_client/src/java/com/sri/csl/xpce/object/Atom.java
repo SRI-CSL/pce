@@ -13,16 +13,21 @@ import com.sri.csl.exception.XPCException;
 import com.sri.csl.xpce.json.XPCEConstants;
 
 public class Atom extends Formula {
-	protected String functor;
 	protected ArrayList<Term> argument = new ArrayList<Term>();
+	protected String functor;
 	
-	public Atom(String functor, Term... params) {
-		this.functor = functor;
-		for (Term p: params) argument.add(p);
+	// The best way to define a new Atom:
+	public Atom(PredicateDecl pred, Object... params) throws XPCException {
+		this.functor = pred.getFunctor();
+		if ( params.length != pred.getArgumentsTypes().size() ) {
+			throw new XPCException("Number of input paramaters does not match the number of input parameters in the Predicate definition");
+		}
+		for (int i=0; i<params.length;i++) 
+			argument.add(new Constant(params[i]));
 	}
 
-	public Atom(String functor, List<Term> params) {
-		this.functor = functor;
+	public Atom(PredicateDecl pred, Term... params) {
+		this.functor = pred.getFunctor();
 		for (Term p: params) argument.add(p);
 	}
 
@@ -38,6 +43,11 @@ public class Atom extends Formula {
 	    }
 	}
 	
+	public Atom(String functor, List<Term> params) {
+		this.functor = functor;
+		for (Term p: params) argument.add(p);
+	}
+
 	public Atom(String functor, Object... params) {
 		this.functor = functor;
 		for (Object p: params) {
@@ -47,23 +57,31 @@ public class Atom extends Formula {
 				argument.add(new Constant(p));
 		}
 	}
-
-	public Atom(PredicateDecl pred, Term... params) {
-		this.functor = pred.getFunctor();
+	
+	
+	public Atom(String functor, Term... params) {
+		this.functor = functor;
 		for (Term p: params) argument.add(p);
 	}
-	
-	
-	// The best way to define a new Atom:
-	public Atom(PredicateDecl pred, Object... params) throws XPCException {
-		this.functor = pred.getFunctor();
-		if ( params.length != pred.getArgumentsTypes().size() ) {
-			throw new XPCException("Number of input paramaters does not match the number of input parameters in the Predicate definition");
-		}
-		for (int i=0; i<params.length;i++) 
-			argument.add(new Constant(params[i]));
-	}
 
+	public boolean equals(Object obj) {
+		if ( !(obj instanceof Atom) ) return false;
+		Atom other = (Atom)obj;
+		if ( !functor.equals(other.getFunctor()) || argument.size()!=other.argument.size() ) return false;
+		
+		for (int i = 0; i< argument.size(); i++)
+			if ( !argument.get(i).equals(other.argument.get(i)) ) return false;
+		return true;
+	}
+	
+	public Object getArgument(int index) {
+		return argument.get(index);
+	}
+	
+	public String getFunctor() {
+		return functor;
+	}
+	
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.FUNCTOR, functor);
@@ -74,24 +92,6 @@ public class Atom extends Formula {
 		JSONObject obj1 = new JSONObject();
 		obj1.put(XPCEConstants.ATOM, obj);		
 		return obj1;
-	}
-	
-	public String getFunctor() {
-		return functor;
-	}
-	
-	public Object getArgument(int index) {
-		return argument.get(index);
-	}
-	
-	public boolean equals(Object obj) {
-		if ( !(obj instanceof Atom) ) return false;
-		Atom other = (Atom)obj;
-		if ( !functor.equals(other.getFunctor()) || argument.size()!=other.argument.size() ) return false;
-		
-		for (int i = 0; i< argument.size(); i++)
-			if ( !argument.get(i).equals(other.argument.get(i)) ) return false;
-		return true;
 	}
 	
 	

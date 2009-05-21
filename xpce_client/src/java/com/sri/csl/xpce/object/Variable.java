@@ -8,12 +8,12 @@ import com.sri.csl.xpce.json.XPCEConstants;
 public class Variable extends Term {
 	protected String name;
 	
-	public Variable(String name) {
-		this.name = name;
-	}
-	
 	public Variable(JSONObject obj) throws JSONException {
 		name = obj.getString(XPCEConstants.VARIABLE);
+	}
+	
+	public Variable(String name) {
+		this.name = name;
 	}
 
 	public JSONObject toJSON() throws JSONException {

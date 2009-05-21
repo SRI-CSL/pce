@@ -10,8 +10,6 @@ import com.sri.csl.exception.XPCException;
 import com.sri.csl.xpce.json.XPCEConstants;
 
 public abstract class Formula {
-	public abstract JSONObject toJSON() throws JSONException;
-	
 	public static Formula createFromJSON(JSONObject obj) throws JSONException, XPCException {
 		if ( obj.has(XPCEConstants.ATOM) ) {
 			JSONObject obj2 = obj.getJSONObject(XPCEConstants.ATOM);
@@ -38,10 +36,6 @@ public abstract class Formula {
 		} else {
 			throw new XPCException("Format error in JSON object " + obj);
 		}
-	}
-
-	public boolean equals(Object o) {
-		return false;
 	}
 	
 	public static void main(String args[]) {
@@ -75,6 +69,12 @@ public abstract class Formula {
 			rr.printStackTrace();
 		}		
 	}
+
+	public boolean equals(Object o) {
+		return false;
+	}
+	
+	public abstract JSONObject toJSON() throws JSONException;
 
 
 }

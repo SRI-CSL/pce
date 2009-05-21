@@ -23,110 +23,6 @@ import com.sri.csl.xpce.object.Sort;
 
 public class XpceClient {
 	
-	protected URL xpceServerURL;
-	protected XmlRpcClient xmlrpcClient = null;
-	
-	public XpceClient(String serverURL) {
-	    try {
-	    	xpceServerURL = new URL(serverURL);
-		    XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-	    	config.setServerURL(xpceServerURL);
-		    xmlrpcClient = new XmlRpcClient();
-		    xmlrpcClient.setConfig(config);
-	    } catch (MalformedURLException m) {
-	    	m.printStackTrace();
-	    }
-	}
-	
-	public Object command(String command) throws XmlRpcException, XPCException {
-    	return xmlrpcClient.execute(XPCEConstants.XPCECOMMAND, new Object[] {command});
-	}
-	
-	public boolean addSort(String sort) throws XmlRpcException, XPCException, JSONException {
-		return execute(XPCEConstants.XPCEADDSORT, new Sort(sort).toJSON()).succeeded();
-	}
-	
-	public boolean addSort(Sort sort) throws XmlRpcException, XPCException, JSONException {
-		return execute(XPCEConstants.XPCEADDSORT, sort.toJSON()).succeeded();
-	}
-	
-	public boolean addPredicate(PredicateDecl p) throws XmlRpcException, XPCException, JSONException {
-		return execute(XPCEConstants.XPCEADDPREDICATE, p.toJSON()).succeeded();
-	}
-	
-	public boolean addConstant(Constant c) throws XmlRpcException, XPCException, JSONException {
-		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.SORT, c.getSort().getName());
-		JSONArray names = new JSONArray();
-		names.put(c.getName());
-		obj.put(XPCEConstants.NAMES, names);
-		return execute(XPCEConstants.XPCEADDCONSTANTS, obj).succeeded();
-	}
-	
-	public boolean addConstant(Sort sort, String... names) throws XmlRpcException, XPCException, JSONException {
-		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.SORT, sort.getName());
-		obj.put(XPCEConstants.NAMES, new JSONArray(names));
-		return execute(XPCEConstants.XPCEADDCONSTANTS, obj).succeeded();
-	}
-	public boolean assertFact(Fact f) throws XmlRpcException, XPCException, JSONException {
-		return execute(XPCEConstants.XPCEASSERT, f.toJSON()).succeeded();
-	}
-	
-	public boolean add(Formula formula, double weight, String source) throws XmlRpcException, XPCException, JSONException {
-		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.FORMULA, formula);
-		obj.put(XPCEConstants.WEIGHT, weight);
-		obj.put(XPCEConstants.SOURCE, source);
-		return execute(XPCEConstants.XPCEADD, obj).succeeded();
-	}
-		
-	public Map<Formula, Float> ask(Formula formula, float threshold, int numberOfResults) throws XmlRpcException, XPCException, JSONException {
-		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.FORMULA, formula);
-		obj.put(XPCEConstants.THRESHOLD, threshold);
-		obj.put(XPCEConstants.RESULTNUMBERS, numberOfResults);
-		JSONArray pairs = (JSONArray)execute(XPCEConstants.XPCEASK, obj).getResult();
-		Map<Formula, Float> result = new HashMap<Formula, Float>();
-		for (int i = 0 ; i < pairs.length() ; i++) {
-			JSONObject pair = pairs.getJSONObject(i);
-			Formula formul = Formula.createFromJSON(pair.getJSONObject(XPCEConstants.FORMULA));
-			Float probability = (float)pair.getDouble(XPCEConstants.PROBABILITY);
-			result.put(formul, probability);
-		}
-		return result;
-	}
-	
-	public boolean mcsat(float sa_probability, float samp_temperature, float rvar_probability, int max_flips, int max_extra_flips, int max_samples) throws XmlRpcException, XPCException, JSONException {
-		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.SAPROBABILITY, sa_probability);
-		obj.put(XPCEConstants.SAMPTEMPERATURE, samp_temperature);
-		obj.put(XPCEConstants.RVARPROBABILITY, rvar_probability);
-		obj.put(XPCEConstants.MAXFLIPS, max_flips);
-		obj.put(XPCEConstants.MAXEXTRAFLIPS, max_extra_flips);
-		obj.put(XPCEConstants.MAXSAMPLES, max_samples);
-		return execute(XPCEConstants.XPCEMCSAT, obj).succeeded();
-	}
-		
-	public boolean reset(String reset) throws XmlRpcException, XPCException, JSONException {
-		if ( !reset.equalsIgnoreCase(XPCEConstants.ALL) && reset.equalsIgnoreCase(XPCEConstants.PROBABILITIES) ) 
-			throw new XPCException("Unknown Reset Type");
-		return execute(XPCEConstants.XPCERESET, reset.toLowerCase()).succeeded();
-	}
-		
-	public boolean retract(String source) throws XmlRpcException, XPCException, JSONException {
-		return execute(XPCEConstants.XPCERETRACT, source).succeeded();
-	}
-		
-	public boolean load(String filename) throws XmlRpcException, XPCException, JSONException {
-		return execute(XPCEConstants.XPCERETRACT, filename).succeeded();
-	}
-		
-	private Result execute(String command, Object... params) throws XmlRpcException, JSONException, XPCException {
-		JSONObject jsonResult = (JSONObject)xmlrpcClient.execute(command, params);
-		return new Result(jsonResult);	
-	}
-	
 	public static void main(String[] args) {
 	    XpceClient client = new XpceClient("http://localhost:8080/RPC2");
     	Object ret;
@@ -147,5 +43,111 @@ public class XpceClient {
 	    }catch (Exception e) {
 	    	e.printStackTrace();
 	    }
+	}
+	protected XmlRpcClient xmlrpcClient = null;
+	
+	protected URL xpceServerURL;
+	
+	public XpceClient(String serverURL) {
+	    try {
+	    	xpceServerURL = new URL(serverURL);
+		    XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+	    	config.setServerURL(xpceServerURL);
+		    xmlrpcClient = new XmlRpcClient();
+		    xmlrpcClient.setConfig(config);
+	    } catch (MalformedURLException m) {
+	    	m.printStackTrace();
+	    }
+	}
+	
+	public boolean add(Formula formula, double weight, String source) throws XmlRpcException, XPCException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put(XPCEConstants.FORMULA, formula);
+		obj.put(XPCEConstants.WEIGHT, weight);
+		obj.put(XPCEConstants.SOURCE, source);
+		return execute(XPCEConstants.XPCEADD, obj).succeeded();
+	}
+	
+	public boolean addConstant(Constant c) throws XmlRpcException, XPCException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put(XPCEConstants.SORT, c.getSort().getName());
+		JSONArray names = new JSONArray();
+		names.put(c.getName());
+		obj.put(XPCEConstants.NAMES, names);
+		return execute(XPCEConstants.XPCEADDCONSTANTS, obj).succeeded();
+	}
+	
+	public boolean addConstant(Sort sort, String... names) throws XmlRpcException, XPCException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put(XPCEConstants.SORT, sort.getName());
+		obj.put(XPCEConstants.NAMES, new JSONArray(names));
+		return execute(XPCEConstants.XPCEADDCONSTANTS, obj).succeeded();
+	}
+	
+	public boolean addPredicate(PredicateDecl p) throws XmlRpcException, XPCException, JSONException {
+		return execute(XPCEConstants.XPCEADDPREDICATE, p.toJSON()).succeeded();
+	}
+	
+	public boolean addSort(Sort sort) throws XmlRpcException, XPCException, JSONException {
+		return execute(XPCEConstants.XPCEADDSORT, sort.toJSON()).succeeded();
+	}
+	public boolean addSort(String sort) throws XmlRpcException, XPCException, JSONException {
+		return execute(XPCEConstants.XPCEADDSORT, new Sort(sort).toJSON()).succeeded();
+	}
+	
+	public Map<Formula, Float> ask(Formula formula, float threshold, int numberOfResults) throws XmlRpcException, XPCException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put(XPCEConstants.FORMULA, formula);
+		obj.put(XPCEConstants.THRESHOLD, threshold);
+		obj.put(XPCEConstants.RESULTNUMBERS, numberOfResults);
+		JSONArray pairs = (JSONArray)execute(XPCEConstants.XPCEASK, obj).getResult();
+		Map<Formula, Float> result = new HashMap<Formula, Float>();
+		for (int i = 0 ; i < pairs.length() ; i++) {
+			JSONObject pair = pairs.getJSONObject(i);
+			Formula formul = Formula.createFromJSON(pair.getJSONObject(XPCEConstants.FORMULA));
+			Float probability = (float)pair.getDouble(XPCEConstants.PROBABILITY);
+			result.put(formul, probability);
+		}
+		return result;
+	}
+		
+	public boolean assertFact(Fact f) throws XmlRpcException, XPCException, JSONException {
+		return execute(XPCEConstants.XPCEASSERT, f.toJSON()).succeeded();
+	}
+	
+	public Object command(String command) throws XmlRpcException, XPCException {
+    	return xmlrpcClient.execute(XPCEConstants.XPCECOMMAND, new Object[] {command});
+	}
+		
+	private Result execute(String command, Object... params) throws XmlRpcException, JSONException, XPCException {
+		Object[] newParams = new Object[params.length];
+		for (int i=0 ; i<params.length ; i++) newParams[i] = params[i].toString(); 
+		JSONObject jsonResult = (JSONObject)xmlrpcClient.execute(command, newParams);
+		return new Result(jsonResult);	
+	}
+		
+	public boolean load(String filename) throws XmlRpcException, XPCException, JSONException {
+		return execute(XPCEConstants.XPCERETRACT, filename).succeeded();
+	}
+		
+	public boolean mcsat(float sa_probability, float samp_temperature, float rvar_probability, int max_flips, int max_extra_flips, int max_samples) throws XmlRpcException, XPCException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put(XPCEConstants.SAPROBABILITY, sa_probability);
+		obj.put(XPCEConstants.SAMPTEMPERATURE, samp_temperature);
+		obj.put(XPCEConstants.RVARPROBABILITY, rvar_probability);
+		obj.put(XPCEConstants.MAXFLIPS, max_flips);
+		obj.put(XPCEConstants.MAXEXTRAFLIPS, max_extra_flips);
+		obj.put(XPCEConstants.MAXSAMPLES, max_samples);
+		return execute(XPCEConstants.XPCEMCSAT, obj).succeeded();
+	}
+		
+	public boolean reset(String reset) throws XmlRpcException, XPCException, JSONException {
+		if ( !reset.equalsIgnoreCase(XPCEConstants.ALL) && reset.equalsIgnoreCase(XPCEConstants.PROBABILITIES) ) 
+			throw new XPCException("Unknown Reset Type");
+		return execute(XPCEConstants.XPCERESET, reset.toLowerCase()).succeeded();
+	}
+	
+	public boolean retract(String source) throws XmlRpcException, XPCException, JSONException {
+		return execute(XPCEConstants.XPCERETRACT, source).succeeded();
 	}
 }

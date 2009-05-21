@@ -9,6 +9,12 @@ public class Constant extends Term {
 	protected Object name;
 	protected Sort sort;
 		
+	public Constant(JSONObject obj) throws JSONException {
+		name = obj.get(XPCEConstants.CONST);
+		if ( obj.has(XPCEConstants.SORT) )
+			sort = new Sort(obj.getString(XPCEConstants.SORT));
+	}
+
 	public Constant(Object name) {
 		this.name = name;
 		this.sort = null;
@@ -17,12 +23,6 @@ public class Constant extends Term {
 	public Constant(Object name, Sort sort) {
 		this.name = name;
 		this.sort = sort;
-	}
-
-	public Constant(JSONObject obj) throws JSONException {
-		name = obj.get(XPCEConstants.CONST);
-		if ( obj.has(XPCEConstants.SORT) )
-			sort = new Sort(obj.getString(XPCEConstants.SORT));
 	}
 
 	public Object getName() {
