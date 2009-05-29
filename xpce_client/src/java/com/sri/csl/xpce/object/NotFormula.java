@@ -12,6 +12,7 @@ public class NotFormula extends Formula {
 		formula = f;
 	}
 
+	@Override
 	public boolean equals(Object obj) {
 		if ( !(obj instanceof NotFormula) ) return false;
 		NotFormula other = (NotFormula)obj;
@@ -22,12 +23,14 @@ public class NotFormula extends Formula {
 		return formula;
 	}
 	
+	@Override
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.NOT, formula.toJSON());
 		return obj;
 	}
 
+	@Override
 	public String toString() {
 		return XPCEConstants.NEGATIONPREFIX + formula;
 	}

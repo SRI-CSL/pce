@@ -10,10 +10,13 @@ import com.sri.csl.exception.XPCException;
 import com.sri.csl.xpce.json.XPCEConstants;
 
 public abstract class Formula {
+	private	enum State {Begin, NonAtomicBegin, AtomicBegin, TermsBegin};
+
+	
 	public static Formula createFromJSON(JSONObject obj) throws JSONException, XPCException {
 		if ( obj.has(XPCEConstants.ATOM) ) {
 			JSONObject obj2 = obj.getJSONObject(XPCEConstants.ATOM);
-			String functor =  obj2.getString(XPCEConstants.FUNCTOR);
+			String functor =  obj2.getString(XPCEConstants.PREDICATE);
 			JSONArray params = obj2.getJSONArray(XPCEConstants.ARGUMENTS);
 			ArrayList<Term> argument = new ArrayList<Term>();
 			for (int i=0 ; i<params.length() ; i++)
@@ -37,6 +40,41 @@ public abstract class Formula {
 			throw new XPCException("Format error in JSON object " + obj);
 		}
 	}
+	
+	public static Formula createFromString(String str) throws XPCException {
+		State state = State.Begin;
+		Formula[] formula = new Formula[2];
+		int index = 0;
+		String tmp;
+		char ch;
+		int i, j;
+		str = str.trim();
+	    for (i=0 ; i<str.length() ; i++) {
+	    	ch = str.charAt(i);
+	    	System.out.println(" => " + ch);
+	    	switch ( state ) {
+	    	case Begin:
+	    		if ( ch == ' ' || ch == '\t' )
+	    			continue;
+	    		else if ( ch == '(' )
+	    			state = State.NonAtomicBegin;
+	    		else if ( ((ch >= 'a') && (ch <= 'z')) || ((ch >= 'A') && (ch <= 'Z')) )
+	    			state = State.AtomicBegin;
+	    		else
+	    			throw new XPCException("Parse Error at position " + i);
+	    		break;
+	    	case AtomicBegin:
+	    		if ( ((ch >= 'a') && (ch <= 'z')) || ((ch >= 'A') && (ch <= 'Z')) ) {
+	    			tmp = str.substring(i, str.indexOf(')', i));
+	    		} else
+	    			throw new XPCException("Parse Error at position " + i);
+	    		formula[index++] = new Atom(tmp);
+	    		break;
+	    	}
+	    }
+		return null;
+	}
+
 	
 	public static void main(String args[]) {
 		Atom r = new Atom("family(bob, $X, tom, rose)");
@@ -70,6 +108,7 @@ public abstract class Formula {
 		}		
 	}
 
+	@Override
 	public boolean equals(Object o) {
 		return false;
 	}

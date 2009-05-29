@@ -15,6 +15,7 @@ public class OrFormula extends Formula {
 		second = f2;
 	}
 
+	@Override
 	public boolean equals(Object obj) {
 		if ( !(obj instanceof OrFormula) ) return false;
 		OrFormula other = (OrFormula)obj;
@@ -31,6 +32,7 @@ public class OrFormula extends Formula {
 		return second;
 	}	
 	
+	@Override
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
 		JSONArray arr = new JSONArray();
@@ -40,6 +42,7 @@ public class OrFormula extends Formula {
 		return obj;
 	}
 
+	@Override
 	public String toString() {
 		return "(" + first + " | " + second + ")";
 	}

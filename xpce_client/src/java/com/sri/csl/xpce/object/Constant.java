@@ -33,6 +33,7 @@ public class Constant extends Term {
 		return sort;
 	}
 	
+	@Override
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.CONST, name);
@@ -41,6 +42,7 @@ public class Constant extends Term {
 		return obj;
 	}
 	
+	@Override
 	public String toString() {
 		return name.toString();
 	}

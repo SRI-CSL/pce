@@ -64,6 +64,7 @@ public class Atom extends Formula {
 		for (Term p: params) argument.add(p);
 	}
 
+	@Override
 	public boolean equals(Object obj) {
 		if ( !(obj instanceof Atom) ) return false;
 		Atom other = (Atom)obj;
@@ -82,9 +83,10 @@ public class Atom extends Formula {
 		return functor;
 	}
 	
+	@Override
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.FUNCTOR, functor);
+		obj.put(XPCEConstants.PREDICATE, functor);
 		JSONArray params = new JSONArray();
 		for (Term p: argument) params.put(p.toJSON()) ;
 		obj.put(XPCEConstants.ARGUMENTS, params);
@@ -95,6 +97,7 @@ public class Atom extends Formula {
 	}
 	
 	
+	@Override
 	public String toString() {
 		String str = functor + "(";
 		StringBuffer buffer = new StringBuffer();

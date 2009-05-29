@@ -16,12 +16,14 @@ public class Variable extends Term {
 		this.name = name;
 	}
 
+	@Override
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.VARIABLE, name);
 		return obj;
 	}
 
+	@Override
 	public String toString() {
 		return XPCEConstants.VARIABLEPREFIX + name;
 	}	

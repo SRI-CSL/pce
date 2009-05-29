@@ -17,9 +17,10 @@ public class Fact extends Atom {
 		super(pred, params);
 	}	
 
+	@Override
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.FUNCTOR, functor);
+		obj.put(XPCEConstants.PREDICATE, functor);
 		JSONArray params = new JSONArray();
 		for (Term p: argument) params.put(p.toJSON()) ;
 		obj.put(XPCEConstants.ARGUMENTS, params);

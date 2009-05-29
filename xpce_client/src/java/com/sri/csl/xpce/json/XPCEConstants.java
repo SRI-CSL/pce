@@ -10,7 +10,7 @@ public class XPCEConstants {
 	public static final String CONST = "const";
 	public static final String FACT = "fact";
 	public static final String FORMULA = "formula";
-	public static final String FUNCTOR = "functor";
+	public static final String FORMULAINSTANCE = "formula-instance";
 	public static final String IFF = "iff";
 	public static final String IMPLIES = "implies";
 	public static final String MAXEXTRAFLIPS = "max_extra_flips";
@@ -26,12 +26,13 @@ public class XPCEConstants {
 	public static final String PROBABILITIES = "probabilities";
 	public static final String PROBABILITY = "probability";
 	public static final String RESET = "reset";
-	public static final String RESULTNUMBERS = "#result";
+	public static final String RESULTNUMBERS = "maxresults";
 	public static final String RVARPROBABILITY = "rvar_probability";
 	public static final String SAMPTEMPERATURE = "samp_temperature";
 	public static final String SAPROBABILITY = "sa_probability";
 	public static final String SORT = "sort";
 	public static final String SOURCE = "source";
+	public static final String SUBST = "subst";
 	public static final String SUPER = "super";
 	public static final String THRESHOLD = "threshold";
 	public static final String VARIABLE = "var";
