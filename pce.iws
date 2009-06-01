@@ -37,15 +37,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" readonly="true" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/pce.ipr" afterPath="$PROJECT_DIR$/pce.ipr" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/autoTest/data/empty.mcsat" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/xpce_client/xpce_client.iml" afterPath="$PROJECT_DIR$/xpce_client/xpce_client.iml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/EmptyTests.java" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/SimpleTests.java" afterPath="$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/SimpleTests.java" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/AbstractXpceTestFixture.java" afterPath="$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/AbstractXpceTestFixture.java" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/autoTest/autoTest.iml" afterPath="$PROJECT_DIR$/autoTest/autoTest.iml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/autoTest/build.xml" afterPath="$PROJECT_DIR$/autoTest/build.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/pce.iws" />
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/NauticalTests.java" />
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/autoTest/data/nautical.mcsat" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/pce.iws" afterPath="$PROJECT_DIR$/pce.iws" />
     </list>
   </component>
   <component name="ChangesViewManager" flattened_view="true" show_ignored="false" />
@@ -114,6 +108,19 @@
   <component name="DebuggerManager">
     <line_breakpoints>
       <breakpoint url="file://$PROJECT_DIR$/xpce_client/src/java/com/sri/csl/xpce/xmlrpc/XpceClient.java" line="123" class="com.sri.csl.xpce.xmlrpc.XpceClient" package="com.sri.csl.xpce.xmlrpc">
+        <option name="ENABLED" value="true" />
+        <option name="LOG_ENABLED" value="false" />
+        <option name="LOG_EXPRESSION_ENABLED" value="false" />
+        <option name="SUSPEND_POLICY" value="SuspendAll" />
+        <option name="COUNT_FILTER_ENABLED" value="false" />
+        <option name="COUNT_FILTER" value="0" />
+        <option name="CONDITION_ENABLED" value="false" />
+        <option name="CLASS_FILTERS_ENABLED" value="false" />
+        <option name="INSTANCE_FILTERS_ENABLED" value="false" />
+        <option name="CONDITION" value="" />
+        <option name="LOG_MESSAGE" value="" />
+      </breakpoint>
+      <breakpoint url="file://$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/AbstractXpceTestFixture.java" line="31" class="com.sri.csl.xpceTests.AbstractXpceTestFixture" package="com.sri.csl.xpceTests">
         <option name="ENABLED" value="true" />
         <option name="LOG_ENABLED" value="false" />
         <option name="LOG_EXPRESSION_ENABLED" value="false" />
@@ -205,16 +212,25 @@
       <file leaf-file-name="AbstractXpceTestFixture.java" pinned="false" current="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/AbstractXpceTestFixture.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="53" column="40" selection-start="1669" selection-end="1669" vertical-scroll-proportion="0.0">
+            <state line="31" column="0" selection-start="980" selection-end="980" vertical-scroll-proportion="0.0">
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="XpceClient.java" pinned="false" current="true" current-in-tab="true">
+      <file leaf-file-name="XpceClient.java" pinned="false" current="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/xpce_client/src/java/com/sri/csl/xpce/xmlrpc/XpceClient.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="130" column="73" selection-start="5044" selection-end="5044" vertical-scroll-proportion="0.759366">
+            <state line="124" column="50" selection-start="4875" selection-end="4875" vertical-scroll-proportion="0.0">
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="NauticalTests.java" pinned="false" current="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/NauticalTests.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state line="5" column="27" selection-start="130" selection-end="130" vertical-scroll-proportion="0.0">
               <folding />
             </state>
           </provider>
@@ -229,10 +245,10 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="ReflectiveCallable.class" pinned="false" current="false" current-in-tab="false">
+      <file leaf-file-name="ReflectiveCallable.class" pinned="false" current="true" current-in-tab="true">
         <entry file="jar://$PROJECT_DIR$/autoTest/lib/junit-4.6.jar!/org/junit/internal/runners/model/ReflectiveCallable.class">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="11" column="40" selection-start="397" selection-end="397" vertical-scroll-proportion="0.0">
+            <state line="11" column="40" selection-start="397" selection-end="397" vertical-scroll-proportion="0.23977433">
               <folding />
             </state>
           </provider>
@@ -267,7 +283,38 @@
     <option name="LAST_EDITED_TAB_NAME" />
   </component>
   <component name="PackagesPane">
-    <subPane />
+    <subPane>
+      <PATH>
+        <PATH_ELEMENT>
+          <option name="myItemId" value="pce" />
+          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PackageViewProjectNode" />
+        </PATH_ELEMENT>
+      </PATH>
+      <PATH>
+        <PATH_ELEMENT>
+          <option name="myItemId" value="pce" />
+          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PackageViewProjectNode" />
+        </PATH_ELEMENT>
+        <PATH_ELEMENT>
+          <option name="myItemId" value="autoTest" />
+          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PackageViewModuleNode" />
+        </PATH_ELEMENT>
+      </PATH>
+      <PATH>
+        <PATH_ELEMENT>
+          <option name="myItemId" value="pce" />
+          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PackageViewProjectNode" />
+        </PATH_ELEMENT>
+        <PATH_ELEMENT>
+          <option name="myItemId" value="autoTest" />
+          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PackageViewModuleNode" />
+        </PATH_ELEMENT>
+        <PATH_ELEMENT>
+          <option name="myItemId" value="com.sri.csl.xpceTests" />
+          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PackageElementNode" />
+        </PATH_ELEMENT>
+      </PATH>
+    </subPane>
   </component>
   <component name="PerforceChangeBrowserSettings">
     <option name="USE_CLIENT_FILTER" value="true" />
@@ -310,44 +357,13 @@
     <ConfirmationsSetting value="0" id="Remove" />
   </component>
   <component name="ProjectPane">
-    <subPane>
-      <PATH>
-        <PATH_ELEMENT>
-          <option name="myItemId" value="pce" />
-          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-        </PATH_ELEMENT>
-      </PATH>
-      <PATH>
-        <PATH_ELEMENT>
-          <option name="myItemId" value="pce" />
-          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-        </PATH_ELEMENT>
-        <PATH_ELEMENT>
-          <option name="myItemId" value="xpce_client" />
-          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewModuleNode" />
-        </PATH_ELEMENT>
-      </PATH>
-      <PATH>
-        <PATH_ELEMENT>
-          <option name="myItemId" value="pce" />
-          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-        </PATH_ELEMENT>
-        <PATH_ELEMENT>
-          <option name="myItemId" value="xpce_client" />
-          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewModuleNode" />
-        </PATH_ELEMENT>
-        <PATH_ELEMENT>
-          <option name="myItemId" value="xpce_client" />
-          <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-        </PATH_ELEMENT>
-      </PATH>
-    </subPane>
+    <subPane />
   </component>
   <component name="ProjectReloadState">
     <option name="STATE" value="0" />
   </component>
   <component name="ProjectView">
-    <navigator currentView="ProjectPane" proportions="0.16666667" version="1" splitterProportion="0.5">
+    <navigator currentView="PackagesPane" proportions="0.16666667" version="1" splitterProportion="0.5">
       <flattenPackages />
       <showMembers />
       <showModules />
@@ -375,6 +391,11 @@
     <property name="options.searchVisible" value="true" />
     <property name="dynamic.classpath" value="false" />
     <property name="options.splitter.details.proportions" value="0.2" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="com.sri.csl.xpceTests" />
+    </key>
   </component>
   <component name="RunManager" selected="JUnit.PCE Tests">
     <configuration default="true" type="Remote" factoryName="Remote">
@@ -610,7 +631,7 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="160" y="15" width="1368" height="1068" extended-state="0" />
+    <frame x="240" y="11" width="1368" height="1068" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info id="Data Sources" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="3" side_tool="false" />
@@ -783,23 +804,9 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/AbstractXpceTestFixture.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="53" column="40" selection-start="1669" selection-end="1669" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/xpce_client/src/java/org/json/JSONObject.java">
       <provider selected="true" editor-type-id="text-editor">
         <state line="88" column="13" selection-start="4309" selection-end="4309" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="jar://$PROJECT_DIR$/autoTest/lib/junit-4.6.jar!/org/junit/internal/runners/model/ReflectiveCallable.class">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="11" column="40" selection-start="397" selection-end="397" vertical-scroll-proportion="0.0">
           <folding />
         </state>
       </provider>
@@ -811,9 +818,30 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/NauticalTests.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="5" column="27" selection-start="130" selection-end="130" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/xpce_client/src/java/com/sri/csl/xpce/xmlrpc/XpceClient.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="130" column="73" selection-start="5044" selection-end="5044" vertical-scroll-proportion="0.759366">
+        <state line="124" column="50" selection-start="4875" selection-end="4875" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/autoTest/src/java/com/sri/csl/xpceTests/AbstractXpceTestFixture.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="31" column="0" selection-start="980" selection-end="980" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$PROJECT_DIR$/autoTest/lib/junit-4.6.jar!/org/junit/internal/runners/model/ReflectiveCallable.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="11" column="40" selection-start="397" selection-end="397" vertical-scroll-proportion="0.23977433">
           <folding />
         </state>
       </provider>

@@ -1,0 +1,42 @@
+# Created by Chris Connolly
+
+sort time;
+const monday, tuesday, wednesday, thursday, friday, saturday, sunday: time;
+predicate day_before(time, time) direct;
+assert day_before(monday,tuesday);
+assert day_before(tuesday,wednesday);
+assert day_before(wednesday,thursday);
+assert day_before(thursday,friday);
+assert day_before(friday,saturday);
+assert day_before(saturday,sunday);
+
+sort water;
+predicate plus_change_at(water, time) direct;
+const r001c072: water;
+assert plus_change_at(r001c072, tuesday);
+
+predicate high_wind(water, time) indirect;
+predicate direction_changed(water, time, time) indirect;
+add high_wind(r001c072, monday) 8.0;
+add high_wind(r001c072, tuesday) 8.0;
+add high_wind(r001c072, saturday) 8.0;
+add direction_changed(r001c072, monday, tuesday) 8.0;
+
+predicate vessel_present(water, time) indirect;
+predicate vessel_drift_at(water, time) indirect;
+predicate surface_clutter_at(water, time) indirect;
+predicate regatta_at(water, time) indirect;
+add [X, T] vessel_present(X, T) 0.8;
+
+add [X, T] high_wind(X,T) and plus_change_at(X,T) and not vessel_present(X,T)
+         implies surface_clutter_at(X,T)
+    1.5;
+
+add [X, T1, T2] day_before(T1,T2) and high_wind(X,T1) and high_wind(X,T2)
+              and direction_changed(X,T1,T2) and plus_change_at(X,T2)
+and vessel_present(X,T2) implies vessel_drift_at(X,T2)
+    2.0;
+
+add [X] plus_change_at(X,tuesday) and vessel_present(X,tuesday)
+      implies regatta_at(X,tuesday)
+    2.0; 
