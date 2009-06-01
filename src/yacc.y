@@ -248,50 +248,51 @@ bool yy_check_float(char *str) {
       safe_free(wt);
     }
   };
-  void yy_add_decl (input_clause_t *clause, char *wt, char *source) {
-    input_command.kind = ADD_CLAUSE;
-    input_command.decl.add_decl.clause = clause;
-    input_command.decl.add_decl.source = source;
-    if (strcmp(wt, "DBL_MAX") == 0) {
-      input_command.decl.add_decl.weight = DBL_MAX;
-    } else {
-      input_command.decl.add_decl.weight = atof(wt);
-      safe_free(wt);
-    }
-  };
-  void yy_ask_fdecl (input_formula_t *formula, char *numsamp, char *thresholdstr) {
-    double threshold;
-    input_command.kind = ASK;
-    input_command.decl.ask_fdecl.formula = formula;
-    if (numsamp == NULL) {
-      input_command.decl.ask_fdecl.num_samples = get_max_samples();
-    } else if (yy_check_int(numsamp)) {
-      input_command.decl.ask_fdecl.num_samples = atoi(numsamp);
+  
+void yy_add_decl (input_clause_t *clause, char *wt, char *source) {
+  input_command.kind = ADD_CLAUSE;
+  input_command.decl.add_decl.clause = clause;
+  input_command.decl.add_decl.source = source;
+  if (strcmp(wt, "DBL_MAX") == 0) {
+    input_command.decl.add_decl.weight = DBL_MAX;
+  } else {
+    input_command.decl.add_decl.weight = atof(wt);
+    safe_free(wt);
+  }
+};
+  
+void yy_ask_fdecl (input_formula_t *formula, char *thresholdstr, char *numresultstr) {
+  double threshold;
+
+  input_command.kind = ASK;
+  input_command.decl.ask_fdecl.formula = formula;
+  if (thresholdstr == NULL) {
+    input_command.decl.ask_fdecl.threshold = 0;
+  } else {
+    threshold = atof(thresholdstr);
+    if (0.0 <= threshold && threshold <= 1.0) {
+      input_command.decl.ask_fdecl.threshold = threshold;
     } else {
       free_formula(formula);
-      safe_free(numsamp);
+      safe_free(numresultstr);
       safe_free(thresholdstr);
-      yyerror("ask: NUMBER_OF_SAMPLES must be an integer");
+      yyerror("ask: THRESHOLD must be between 0.0 and 1.0");
+      return;
     }
-    safe_free(numsamp);
-    if (thresholdstr == NULL) {
-      input_command.decl.ask_fdecl.threshold = 0;
-    } else if (strcmp(thresholdstr,"BEST") == 0) {
-      input_command.decl.ask_fdecl.threshold = -1;
+    safe_free(thresholdstr);
+    if (numresultstr == NULL) {
+      input_command.decl.ask_fdecl.numresults = 0; // Zero means no limit
+    } else if (yy_check_int(numresultstr)) {
+      input_command.decl.ask_fdecl.numresults = atoi(numresultstr);
     } else {
-      threshold = atof(thresholdstr);
-      if (0.0 <= threshold && threshold <= 1.0) {
-	input_command.decl.ask_fdecl.threshold = threshold;
-      } else {
-	free_formula(formula);
-	safe_free(numsamp);
-	safe_free(thresholdstr);
-	yyerror("ask: THRESHOLD must be between 0.0 and 1.0");
-	return;
-      }
+      free_formula(formula);
+      safe_free(numresultstr);
       safe_free(thresholdstr);
+      yyerror("ask: NUMRESULTS must be an integer");
     }
-  };
+    safe_free(numresultstr);
+  }
+};
   
 //   void yy_ask_decl (input_clause_t *clause, char *thresholdstr, char *allstr, char *numsamp) {
 //     double threshold;
@@ -512,7 +513,7 @@ void yy_mcsat_params_decl (char **params) {
   int32_t ival;
 }
 
-%type <str> arg NAME NUM STRING addwt oarg oname onum onumorbest retractarg
+%type <str> arg NAME NUM STRING addwt oarg oname onum retractarg
 %type <strs> arguments variables oarguments
 %type <formula> formula
 %type <fmla> fmla
@@ -565,7 +566,7 @@ decl: SORT NAME {yy_sort_decl($2);}
     | ADD_CLAUSE clause addwt oname {yy_add_decl($2, $3, $4);}
 //    | ASK_CLAUSE clause NUM oarg oarg {yy_ask_decl($2, $3, $4, $5);}
     | ADD formula addwt oname {yy_add_fdecl($2, $3, $4);}
-    | ASK formula onum onumorbest {yy_ask_fdecl($2, $3, $4);}
+    | ASK formula onum onum {yy_ask_fdecl($2, $3, $4);}
     | MCSAT oarguments {yy_mcsat_decl($2);}
     | MCSAT_PARAMS oarguments {yy_mcsat_params_decl($2);}
     | RESET resetarg {yy_reset($2);}
@@ -674,7 +675,6 @@ addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
 
 oname: /* empty */ {$$=NULL;} | NAME;
 onum: /* empty */ {$$=NULL;} | NUM;
-onumorbest: /* empty */ {$$=NULL;} | NUM | BEST {$$="BEST"};
 
 %%
 

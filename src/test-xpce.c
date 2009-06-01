@@ -1,8 +1,11 @@
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 #include <xmlrpc-c/base.h>
 #include <xmlrpc-c/client.h>
+#include <xmlrpc.h>
+#include <xmlrpc_client.h>
 
 #include "xmlrpc-config.h"  /* information about this build environment */
 
@@ -38,6 +41,10 @@ int main(int const argc, const char ** const argv ATTR_UNUSED) {
   int32_t i;
   xmlrpc_env env;
   const char * const serverUrl = "http://localhost:8080/RPC2";
+
+  struct xmlrpc_clientparms clientParms;
+  struct xmlrpc_curl_xportparms curlParms;
+
   //xargs *xmlrpc_array_new(envP);
 
   if (argc-1 > 0) {
@@ -47,9 +54,20 @@ int main(int const argc, const char ** const argv ATTR_UNUSED) {
 
   /* Initialize our error-handling environment. */
   xmlrpc_env_init(&env);
+  xmlrpc_client_setup_global_const(&env);
 
+  curlParms.network_interface = NULL;
+  curlParms.no_ssl_verifypeer = false;
+  curlParms.no_ssl_verifyhost = false;
+  curlParms.user_agent        = "XPCE Test Client/1.0";
+ 
+  clientParms.transport          = "curl";
+  clientParms.transportparmsP    = &curlParms;
+  clientParms.transportparm_size = XMLRPC_CXPSIZE(user_agent);
+ 
   /* Start up our XML-RPC client library. */
-  xmlrpc_client_init2(&env, XMLRPC_CLIENT_NO_FLAGS, NAME, VERSION, NULL, 0);
+  xmlrpc_client_init2(&env, XMLRPC_CLIENT_NO_FLAGS, NAME, VERSION, &clientParms,
+		      XMLRPC_CPSIZE(transportparm_size));
   die_if_fault_occurred(&env);
 
   run_pce_command(&env, serverUrl, "sort entity;");
@@ -75,6 +93,7 @@ int main(int const argc, const char ** const argv ATTR_UNUSED) {
     
   /* Shutdown our XML-RPC client library. */
   xmlrpc_client_cleanup();
+  xmlrpc_client_teardown_global_const();
   fprintf(stderr, "done\n");
 
   return 0;

@@ -36,8 +36,8 @@ enum {
 // };
 
 static struct option long_options[] = {
-  {"help", no_argument, &show_help, 'h'},
-  {"interactive", no_argument, &interactive, 'i'},
+  {"help", no_argument, (int *)&show_help, 'h'},
+  {"interactive", no_argument, (int *)&interactive, 'i'},
   {"lazy", required_argument, 0, LAZY_OPTION},
   {"strict", required_argument, 0, STRICT_OPTION},
   {"verbosity", required_argument, 0, 'v'},

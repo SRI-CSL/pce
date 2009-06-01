@@ -60,8 +60,7 @@ typedef struct input_add_fdecl_s {
 typedef struct input_ask_fdecl_s {
   input_formula_t *formula;
   double threshold;
-  bool all;
-  int32_t num_samples;
+  int32_t numresults;
 } input_ask_fdecl_t;
 
 typedef struct input_add_decl_s {
@@ -219,5 +218,9 @@ extern void free_var_entries(var_entry_t **vars);
 
 extern void free_fmla(input_fmla_t *fmla);
 extern void free_formula(input_formula_t *formula);
+
+extern input_fmla_t *yy_fmla(int32_t op, input_fmla_t *arg1, input_fmla_t *arg2);
+extern input_fmla_t *yy_atom_to_fmla (input_atom_t *atom);
+extern input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
 
 #endif /* __INPUT_H */     

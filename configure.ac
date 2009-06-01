@@ -51,7 +51,7 @@ AC_CHECK_PROG(STRIP,strip,strip)
 AC_PROG_YACC
 
 dnl
-dnl Need xmlrpc-c for xpce
+dnl Need xmlrpc-c and json for xpce
 dnl --------------------------------------------
 AC_CHECK_PROG(XMLRPCCCONFIG,xmlrpc-c-config,xmlrpc-c-config)
 if test "x$XMLRPCCCONFIG" != x; then
@@ -60,7 +60,8 @@ if test "x$XMLRPCCCONFIG" != x; then
    echo "XMLRPC_SERVER_LIBS = ${XMLRPC_SERVER_LIBS}"
    echo "XMLRPC_CLIENT_LIBS = ${XMLRPC_CLIENT_LIBS}"
 fi
-   
+
+AC_CHECK_LIB([json], [json_tokener_parse])
 
 dnl
 dnl OAA Libraries (optional, but needed for PCE)

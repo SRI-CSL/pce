@@ -493,6 +493,26 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
   return 0;
 }
 
+void print_ask_results (input_formula_t *fmla, samp_table_t *table) {
+  samp_query_instance_t *qinst;
+  int32_t i, j, *qsubst;
+  char *cname;
+  
+  printf("%d results:\n", ask_buffer.size);
+  for (i = 0; i < ask_buffer.size; i++) {
+    qinst = ask_buffer.data[i];
+    qsubst = qinst->subst;
+    for (j = 0; fmla->vars[j] != NULL; j++) {
+      cname = const_name(qsubst[j], &table->const_table);
+      printf(" %s <- %s\n", fmla->vars[j]->name, cname);
+    }
+    printf("\n");
+    print_query_instance(qinst, table, 0, true);
+    output(" : % 5.3f\n", query_probability(ask_buffer.data[i], table));
+    fflush(stdout);
+  }
+}
+
 extern void dumptable(int32_t tbl, samp_table_t *table) {
   switch (tbl) {
   case ALL: {
@@ -629,8 +649,12 @@ extern bool read_eval(samp_table_t *table) {
     }
     case ASK: {
       input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
-      cprintf(1, "Clausifying formula\n");
-      ask_cnf(decl.formula, decl.num_samples, decl.threshold);
+      cprintf(1, "ask: clausifying formula\n");
+      ask_cnf(decl.formula, decl.threshold, decl.numresults);
+      // Results are in ask_buffer - print them out
+      print_ask_results(decl.formula, table);
+      // Now clear out the query_instance table for the next query
+      reset_query_instance_table(&table->query_instance_table);
       break;
     }
       //       case ASK_CLAUSE: {

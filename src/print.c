@@ -548,6 +548,8 @@ double query_probability(samp_query_instance_t *qinst, samp_table_t *table) {
   double diff;
 
   // diff subtracts off the sampling number when the query was introduced
+  printf("num_samples = %d, sampling_num = %d\n",
+	 atom_table->num_samples, qinst->sampling_num);
   diff = (double) (atom_table->num_samples - qinst->sampling_num);
   if (diff > 0) {
     return (double) (qinst->pmodel/diff);

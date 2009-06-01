@@ -8,6 +8,9 @@
 #include "print.h"
 #include "vectors.h"
 #include "lazysamplesat.h"
+#include "cnf.h"
+
+pvector_t ask_buffer = {0, 0, NULL};
 
 extern samp_table_t samp_table;
 
@@ -392,7 +395,7 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
 // Generates the CNF form of a formula, and updates the clause table (if no
 // variables) or the rule table.
 
-void add_cnf(input_formula_t *formula, double weight) {
+void add_cnf(input_formula_t *formula, double weight, char *source) {
   rule_table_t *rule_table = &samp_table.rule_table;
   pred_table_t *pred_table = &samp_table.pred_table;
   int32_t i, j, current_rule, num_lits, num_vars, atom_idx;
@@ -462,17 +465,16 @@ static int cmp_pmodels(const void *p1, const void *p2) {
   return n1 < n2 ? 1 : n1 > n2 ? -1 : 0;
 }
 
-pvector_t ask_buffer = {0, 0, NULL};
-
 
 // Generates the CNF form of a formula, and updates the query and
 // query_instance tables.  These are analogous to the rule and clause
 // tables, respectively.  Thus queries without variables are immediately
 // added to the query_instance table, while queries with variables are
 // added to the query table, and instances of them are generated as needed
-// and added to the query_intsance table.
+// and added to the query_instance table.
+// Result is a sorted list of samp_query_instance_t's in the ask_buffer.
 
-void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
+void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
   query_instance_table_t *query_instance_table;
   rule_literal_t ***lits;
   samp_query_t *query;
@@ -485,7 +487,7 @@ void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
   if (lits == NULL) {
     return;
   }
-  // Temporarily add all instances of the query to the query_instance_table
+  // Add all instances of the query to the query_instance_table
   query = (samp_query_t *) safe_malloc(sizeof(samp_query_t));
   for (i = 0; lits[i] != NULL; i++) {}
   query->num_clauses = i;
@@ -503,47 +505,34 @@ void ask_cnf(input_formula_t *formula, int32_t num_samples, double threshold) {
     // Run the specified number of samples
     lazy_mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
 		get_rvar_probability(), get_max_flips(),
-		get_max_extra_flips(), num_samples);
+		get_max_extra_flips(), get_max_samples());
   } else {
     // Run the specified number of samples
     mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
 	   get_rvar_probability(), get_max_flips(),
-	   get_max_extra_flips(), num_samples);
+	   get_max_extra_flips(), get_max_samples());
   }
   query_instance_table = &samp_table.query_instance_table;
-  // Print the result according to whether threshold is set
-  if (threshold >= 0) {
-    // Collect those above the threshold, sort, and print
-    // First convert threshold to a number for fast compare
-    tnum = threshold * num_samples;
-    if (ask_buffer.data == NULL) {
-      init_pvector(&ask_buffer, 16);
-    } else {
-      pvector_reset(&ask_buffer);
-    }
-    for (i = 0; i < query_instance_table->num_queries; i++) {
-      qinst = query_instance_table->query_inst[i];
-      if (qinst->pmodel >= tnum) {
-	pvector_push(&ask_buffer, qinst);
-      }
-    }
-    qsort(&ask_buffer.data[0], ask_buffer.size, sizeof(samp_query_instance_t *), cmp_pmodels);
-    for (i = 0; i < ask_buffer.size; i++) {
-      print_query_instance(ask_buffer.data[i], &samp_table, 0, true);
-      output(" : % 5.3f\n", query_probability(ask_buffer.data[i], &samp_table));
-      fflush(stdout);
-    }
+  // Collect those above the threshold, sort, and print
+  // First convert threshold to a number for fast compare
+  tnum = threshold * get_max_samples();
+  if (ask_buffer.data == NULL) {
+    init_pvector(&ask_buffer, 16);
   } else {
-    // Simply find the best and print it, ignoring threshold
-    best = query_instance_table->query_inst[0];
-    for (i = 1; i < query_instance_table->num_queries; i++) {
-      qinst = query_instance_table->query_inst[i];
-      if (best == NULL || best->pmodel < qinst->pmodel) {
-	best = qinst;
-      }
-    }
-    print_query_instance(best, &samp_table, 0, true);
+    pvector_reset(&ask_buffer);
   }
-  // Now clear out the query_instance table for the next query
-  reset_query_instance_table(query_instance_table);
+  for (i = 0; i < query_instance_table->num_queries; i++) {
+    qinst = query_instance_table->query_inst[i];
+    if (qinst->pmodel >= tnum) {
+      pvector_push(&ask_buffer, qinst);
+    }
+  }
+  qsort(&ask_buffer.data[0], ask_buffer.size,
+	sizeof(samp_query_instance_t *), cmp_pmodels);
+  if (maxresults > 0 && ask_buffer.size > maxresults) {
+    ask_buffer.size = maxresults;
+  }
+  // Callers have to manage the query_instance table
+  // To clear it out for the next query, call the following
+  // reset_query_instance_table(query_instance_table);
 }

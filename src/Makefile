@@ -43,7 +43,7 @@ src_c := array_hash_map.c cnf.c gcd.c hash_functions.c input.c \
          memsize.c samplesat.c lazysamplesat.c string_heap.c tables.c \
          symbol_tables.c utils.c vectors.c parser.c print.c yacc.tab.c
 ifneq ($(XMLRPC_SERVER_LIBS),)
-src_c := $(src_c) xpce.c test-xpce.c test-xpce2.c
+src_c := $(src_c) xpce.c test-xpce.c test-xpce2.c xpce-client.c
 endif
 ifneq ($(OAACFLAGS),)
 src_c := $(src_c) pce.c reduced_pce.c
@@ -93,7 +93,8 @@ libmcsat_def=$(libdir)/libmcsat.def
 # binaries
 binaries := $(bindir)/mcsat$(EXEEXT)
 ifneq ($(XMLRPC_SERVER_LIBS),)
-binaries := $(binaries) $(bindir)/xpce$(EXEEXT) $(bindir)/test-xpce$(EXEEXT) $(bindir)/test-xpce2$(EXEEXT) 
+binaries := $(binaries) $(bindir)/xpce$(EXEEXT) $(bindir)/test-xpce$(EXEEXT) \
+            $(bindir)/test-xpce2$(EXEEXT) $(bindir)/xpce-client$(EXEEXT)
 endif
 ifneq ($(OAACFLAGS),)
 binaries := $(binaries) $(bindir)/pce$(EXEEXT) $(bindir)/reduced_pce$(EXEEXT)
@@ -342,6 +343,8 @@ $(bindir)/xpce$(EXEEXT): $(objdir)/xpce.o $(libmcsat)
 $(bindir)/test-xpce$(EXEEXT): $(objdir)/test-xpce.o $(libmcsat)
 	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(XMLRPC_CLIENT_LIBS)
 $(bindir)/test-xpce2$(EXEEXT): $(objdir)/test-xpce2.o $(libmcsat)
+	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(XMLRPC_CLIENT_LIBS)
+$(bindir)/xpce-client$(EXEEXT): $(objdir)/xpce-client.o $(libmcsat)
 	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(XMLRPC_CLIENT_LIBS)
 endif
 
