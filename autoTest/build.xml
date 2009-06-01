@@ -12,9 +12,11 @@
         <property name="xpceClient.targetjar" location="${xpceClient.jar.dir}/xpceClient.jar"/>
 
         <!-- Properties for accessing xpce server.-->
-        <!-- Change this when the C code moves PCE-9 -->
+        <!-- Change this when the C code moves, see PCE-9 -->
         <property name="standalone.dir" location="${trunk.dir}"/>
-        <property name="standalone.bin.dir" location="${standalone.dir}/build/i686-pc-cygwin-debug/bin"/>
+        <!-- Using the release version of PCE now, change this property to
+             i686-pc-cygwin-debug if you want to run against debug server. -->
+        <property name="standalone.bin.dir" location="${standalone.dir}/build/i686-pc-cygwin-release/bin"/>
         <property name="xpceServer.exe" location="${standalone.bin.dir}/xpce.exe"/>
         <!-- Must be the same as com.sri.csl.xpceTests.AbstractXpceTestFixture.SERVER_PORT -->
         <property name="xpceServer.port" value="8080"/>
@@ -51,14 +53,14 @@
         </path>
     </target>
     
-    <target name="start-server" depends="init">
+    <target name="start-server" depends="init" description="Start the PCE XmlRpc server">
         <echo message="Starting PCE XmlRpc server on port ${xpceServer.port}..."/>
         <exec executable="${xpceServer.exe}" spawn="true" >
             <arg value="${xpceServer.port}"/>
         </exec>
     </target>
 
-    <target name="stop-server" depends="init">
+    <target name="stop-server" depends="init" description="Stop the PCE XmlRpc server">
         <echo message="Stopping PCE XmlRpc server..."/>
         <exec executable="${bash.exe}" failonerror="false" dir="${bin.dir}">
             <arg value="-e"/>

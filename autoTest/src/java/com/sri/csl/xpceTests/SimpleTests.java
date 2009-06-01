@@ -1,12 +1,11 @@
 package com.sri.csl.xpceTests;
 
 import org.junit.*;
-import static org.junit.Assert.*;
 
 public class SimpleTests extends AbstractXpceTestFixture {
     @BeforeClass
     public static void oneTimeSetUp() throws Exception {
-        loadFile("food1.mcsat");
+        initWithFile("food1.mcsat");
     }
 
     @Test

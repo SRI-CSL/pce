@@ -1,0 +1,9 @@
+sort X;
+sort Y;
+
+const a,b: X;
+const c,d: Y;
+
+predicate dummy(X,Y) indirect;
+
+
