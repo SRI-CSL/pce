@@ -18,9 +18,10 @@ public class Result {
 			err = obj.getString(XPCEConstants.XPCEERROR);
 			throw new XPCException(err);
 		}
-		if ( obj.has(XPCEConstants.XPCEWARNING) )
+		if ( obj.has(XPCEConstants.XPCEWARNING) ) {
 			warn = obj.getString(XPCEConstants.XPCEWARNING);
 			System.out.println(warn);
+		}
 		// TODO: result should be translated from JSON to the proper object
 		if ( obj.has(XPCEConstants.XPCERESULT) )
 			result = obj.get(XPCEConstants.XPCERESULT);

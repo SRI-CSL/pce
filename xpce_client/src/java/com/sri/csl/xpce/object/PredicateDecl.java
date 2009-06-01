@@ -1,6 +1,7 @@
 package com.sri.csl.xpce.object;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.json.JSONArray;
@@ -58,11 +59,23 @@ public class PredicateDecl {
 	
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
-		obj.append(XPCEConstants.PREDICATE, functor);
+		obj.put(XPCEConstants.PREDICATE, functor);
 		JSONArray params = new JSONArray();
 		for (Sort p: argumentType) params.put(p.getName()) ;
-		obj.append(XPCEConstants.ARGUMENTS, params);
-		obj.append(XPCEConstants.OBSERVABLE, observable);
+		obj.put(XPCEConstants.ARGUMENTS, params);
+		obj.put(XPCEConstants.OBSERVABLE, observable);
 		return obj;
+	}
+	
+	public String toString() {
+		String str = functor + "(";
+		StringBuffer buffer = new StringBuffer();
+		Iterator<Sort> iter = argumentType.iterator();
+		while (iter.hasNext()) {
+			buffer.append(iter.next());
+			if (iter.hasNext())	buffer.append(", ");
+		}
+		return str + buffer + ")";
+		
 	}
 }

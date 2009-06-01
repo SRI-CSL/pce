@@ -14,29 +14,42 @@ import org.json.JSONObject;
 import com.sri.csl.exception.XPCException;
 import com.sri.csl.xpce.json.Result;
 import com.sri.csl.xpce.json.XPCEConstants;
+import com.sri.csl.xpce.object.Atom;
 import com.sri.csl.xpce.object.Constant;
 import com.sri.csl.xpce.object.Fact;
 import com.sri.csl.xpce.object.Formula;
 import com.sri.csl.xpce.object.FormulaAndProbability;
+import com.sri.csl.xpce.object.ImpliesFormula;
 import com.sri.csl.xpce.object.PredicateDecl;
 import com.sri.csl.xpce.object.Sort;
+import com.sri.csl.xpce.object.Variable;
 
 public class XpceClient {
 	
 	public static void main(String[] args) {
 	    XpceClient client = new XpceClient("http://localhost:8080/RPC2");
-    	Object ret;
 	    try {
 	    	Sort person = new Sort("Person");
 	    	client.addSort(person);
 	    	client.addConstant(person, "bob", "tom", "lisa", "rose");
-	    	client.addPredicate(new PredicateDecl("married", person, person));
-	    	client.addPredicate(new PredicateDecl("likes", new Sort[] {person, person}, false));
-	    	Formula f = null;
-	    	client.add(f, 3.2, "TestClient");
+	    	PredicateDecl pred1 = new PredicateDecl("married", person, person);
+	    	PredicateDecl pred2 = new PredicateDecl("likes", new Sort[] {person, person}, false);
+	    	client.addPredicate(pred1);
+	    	client.addPredicate(pred2);
+	    	Fact fact1 = new Fact(pred1, "bob", "lisa");
+	    	Fact fact2 = new Fact(pred1, "tom", "rose");
+	    	client.assertFact(fact1);
+	    	client.assertFact(fact2);
+	    	Atom a1 = new Atom(pred1, new Variable("X"), new Variable("Y"));
+	    	Atom a2 = new Atom(pred2, new Variable("X"), new Variable("Y"));
+	    	ImpliesFormula f = new ImpliesFormula(a1, a2);
+	    	client.add(f, 3.2, "XpceClient");
 	    	
-	    	ret = client.command("mcsat 0.01, 20.0, 0.01, 30, 500;");
-	    	System.out.println("Return Value:" + ret);
+	    	client.mcsat();
+	    	
+	    	Atom question = new Atom(pred2, "bob", "lisa");
+	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.5, 2);
+	    	System.out.println("Return Value:" + answers);
 	    	
 	    	//Thread.sleep(10000);
 	    	
@@ -62,7 +75,7 @@ public class XpceClient {
 	
 	public boolean add(Formula formula, double weight, String source) throws XmlRpcException, XPCException, JSONException {
 		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.FORMULA, formula);
+		obj.put(XPCEConstants.FORMULA, formula.toJSON());
 		obj.put(XPCEConstants.WEIGHT, weight);
 		obj.put(XPCEConstants.SOURCE, source);
 		return execute(XPCEConstants.XPCEADD, obj).succeeded();
@@ -95,12 +108,12 @@ public class XpceClient {
 		return execute(XPCEConstants.XPCEADDSORT, new Sort(sort).toJSON()).succeeded();
 	}
 	
-	public ArrayList<FormulaAndProbability> ask(Formula formula, float threshold, int numberOfResults) throws XmlRpcException, XPCException, JSONException {
+	public ArrayList<FormulaAndProbability> ask(Formula formula, double threshold, int numberOfResults) throws XmlRpcException, XPCException, JSONException {
 		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.FORMULA, formula);
+		obj.put(XPCEConstants.FORMULA, formula.toJSON());
 		obj.put(XPCEConstants.THRESHOLD, threshold);
 		obj.put(XPCEConstants.RESULTNUMBERS, numberOfResults);
-		JSONArray results = (JSONArray)execute(XPCEConstants.XPCEASK, obj).getResult();
+		JSONArray results = new JSONArray(execute(XPCEConstants.XPCEASK, obj).getResult());
 		ArrayList<FormulaAndProbability> faps = new ArrayList<FormulaAndProbability>();
 		for (int i = 0 ; i < results.length() ; i++) {
 			JSONObject res = results.getJSONObject(i);
@@ -120,8 +133,10 @@ public class XpceClient {
 		
 	private Result execute(String command, Object... params) throws XmlRpcException, JSONException, XPCException {
 		Object[] newParams = new Object[params.length];
-		for (int i=0 ; i<params.length ; i++) newParams[i] = params[i].toString(); 
-		JSONObject jsonResult = (JSONObject)xmlrpcClient.execute(command, newParams);
+		for (int i=0 ; i<params.length ; i++) newParams[i] = params[i].toString();
+		System.out.println("Executing " + command + " - " + newParams);
+		Object xmlRpcResult = xmlrpcClient.execute(command, newParams);
+		JSONObject jsonResult = new JSONObject(xmlRpcResult);
 		return new Result(jsonResult);	
 	}
 		
