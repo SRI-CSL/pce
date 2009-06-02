@@ -26,10 +26,10 @@ public class PredicateDecl {
 		for (Sort p: parType) argumentType.add(p);
 	}
 
-	public PredicateDecl(String functor, Sort[] parType, boolean obs) {
+	public PredicateDecl(boolean observable, String functor, Sort... parType) {
 		this.functor = functor;
 		for (Sort p: parType) argumentType.add(p);
-		observable = obs;
+		this.observable = observable;
 	}
 
 	public PredicateDecl(String functor, String... parType) {

@@ -15,6 +15,7 @@ public class FormulaAndProbability {
 	protected double probability;
 	protected Map<Variable, Constant> subst;
 	
+	@SuppressWarnings("unchecked")
 	public FormulaAndProbability(Formula original, JSONObject obj) throws JSONException, XPCException {
 		instance = Formula.createFromJSON(obj.getJSONObject(XPCEConstants.FORMULAINSTANCE));
 		this.original = original;

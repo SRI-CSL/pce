@@ -23,41 +23,13 @@ import com.sri.csl.xpce.object.ImpliesFormula;
 import com.sri.csl.xpce.object.PredicateDecl;
 import com.sri.csl.xpce.object.Sort;
 import com.sri.csl.xpce.object.Variable;
+import org.apache.log4j.Logger;
+import org.apache.log4j.BasicConfigurator;
 
 public class XpceClient {
 	
-	public static void main(String[] args) {
-	    XpceClient client = new XpceClient("http://localhost:8080/RPC2");
-	    try {
-	    	Sort person = new Sort("Person");
-	    	client.addSort(person);
-	    	client.addConstant(person, "bob", "tom", "lisa", "rose");
-	    	PredicateDecl pred1 = new PredicateDecl("married", person, person);
-	    	PredicateDecl pred2 = new PredicateDecl("likes", new Sort[] {person, person}, false);
-	    	client.addPredicate(pred1);
-	    	client.addPredicate(pred2);
-	    	Fact fact1 = new Fact(pred1, "bob", "lisa");
-	    	Fact fact2 = new Fact(pred1, "tom", "rose");
-	    	client.assertFact(fact1);
-	    	client.assertFact(fact2);
-	    	Atom a1 = new Atom(pred1, new Variable("X"), new Variable("Y"));
-	    	Atom a2 = new Atom(pred2, new Variable("X"), new Variable("Y"));
-	    	ImpliesFormula f = new ImpliesFormula(a1, a2);
-	    	client.add(f, 3.2, "XpceClient");
-	    	
-	    	client.mcsat();
-	    	
-	    	Atom question = new Atom(pred2, "bob", "lisa");
-	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.5, 2);
-	    	System.out.println("Return Value:" + answers);
-	    	
-	    	//Thread.sleep(10000);
-	    	
-	    }catch (Exception e) {
-	    	e.printStackTrace();
-	    }
-	}
 	protected XmlRpcClient xmlrpcClient = null;
+	private static final Logger logger = Logger.getLogger(XpceClient.class);
 	
 	protected URL xpceServerURL;
 	
@@ -134,9 +106,10 @@ public class XpceClient {
 	private Result execute(String command, Object... params) throws XmlRpcException, JSONException, XPCException {
 		Object[] newParams = new Object[params.length];
 		for (int i=0 ; i<params.length ; i++) newParams[i] = params[i].toString();
-		System.out.println("Executing " + command + " - " + newParams);
+		logger.debug("Executing " + command);
 		Object xmlRpcResult = xmlrpcClient.execute(command, newParams);
 		JSONObject jsonResult = new JSONObject(xmlRpcResult);
+		logger.debug("Result: " + jsonResult);
 		return new Result(jsonResult);	
 	}
 		
@@ -169,5 +142,36 @@ public class XpceClient {
 	
 	public boolean retract(String source) throws XmlRpcException, XPCException, JSONException {
 		return execute(XPCEConstants.XPCERETRACT, source).succeeded();
+	}
+
+	public static void main(String[] args) {
+	    XpceClient client = new XpceClient("http://localhost:8080/RPC2");
+	    BasicConfigurator.configure();
+	    try {
+	    	Sort person = new Sort("Person");
+	    	client.addSort(person);
+	    	client.addConstant(person, "bob", "tom", "lisa", "rose");
+	    	PredicateDecl pred1 = new PredicateDecl("married", person, person);
+	    	PredicateDecl pred2 = new PredicateDecl(false, "likes", person, person);
+	    	client.addPredicate(pred1);
+	    	client.addPredicate(pred2);
+	    	Fact fact1 = new Fact(pred1, "bob", "lisa");
+	    	Fact fact2 = new Fact(pred1, "tom", "rose");
+	    	client.assertFact(fact1);
+	    	client.assertFact(fact2);
+	    	Atom a1 = new Atom(pred1, new Variable("X"), new Variable("Y"));
+	    	Atom a2 = new Atom(pred2, new Variable("X"), new Variable("Y"));
+	    	ImpliesFormula f = new ImpliesFormula(a1, a2);
+	    	client.add(f, 3.2, "XpceClient");
+	    	
+	    	client.mcsat();
+	    	
+	    	Atom question = new Atom(pred2, "bob", "lisa");
+	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.5, 2);
+	    	System.out.println("Return Value:" + answers);
+	    	
+	    }catch (Exception e) {
+	    	e.printStackTrace();
+	    }
 	}
 }
