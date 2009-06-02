@@ -17,5 +17,5 @@ public abstract class Term {
 		}
 	}
 	
-	public abstract JSONObject toJSON() throws JSONException;
+	public abstract Object toJSON() throws JSONException;
 }

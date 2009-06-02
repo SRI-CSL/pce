@@ -23,7 +23,7 @@ public class Atom extends Formula {
 			throw new XPCException("Number of input paramaters does not match the number of input parameters in the Predicate definition");
 		}
 		for (int i=0; i<params.length;i++) 
-			argument.add(new Constant(params[i]));
+			argument.add(new Constant(params[i].toString()));
 	}
 
 	public Atom(PredicateDecl pred, Term... params) {
@@ -54,7 +54,7 @@ public class Atom extends Formula {
 			if ( p instanceof Constant || p instanceof Variable )
 				argument.add((Term)p);
 			else
-				argument.add(new Constant(p));
+				argument.add(new Constant(p.toString()));
 		}
 	}
 	

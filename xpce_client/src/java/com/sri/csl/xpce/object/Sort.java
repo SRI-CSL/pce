@@ -52,7 +52,7 @@ public class Sort {
 	
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.SORT, name);
+		obj.put(XPCEConstants.NAME, name);
 		if ( superSort != null ) obj.put(XPCEConstants.SUPER, superSort.getName());
 		return obj;
 	}

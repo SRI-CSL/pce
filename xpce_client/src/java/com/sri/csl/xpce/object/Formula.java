@@ -47,7 +47,7 @@ public abstract class Formula {
 		int index = 0;
 		String tmp;
 		char ch;
-		int i, j;
+		int i;
 		str = str.trim();
 	    for (i=0 ; i<str.length() ; i++) {
 	    	ch = str.charAt(i);

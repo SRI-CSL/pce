@@ -4,6 +4,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Logger;
 import org.apache.xmlrpc.XmlRpcException;
 import org.apache.xmlrpc.client.XmlRpcClient;
 import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
@@ -12,7 +14,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.sri.csl.exception.XPCException;
-import com.sri.csl.xpce.json.Result;
+import com.sri.csl.xpce.json.XPCERespond;
 import com.sri.csl.xpce.json.XPCEConstants;
 import com.sri.csl.xpce.object.Atom;
 import com.sri.csl.xpce.object.Constant;
@@ -23,8 +25,6 @@ import com.sri.csl.xpce.object.ImpliesFormula;
 import com.sri.csl.xpce.object.PredicateDecl;
 import com.sri.csl.xpce.object.Sort;
 import com.sri.csl.xpce.object.Variable;
-import org.apache.log4j.Logger;
-import org.apache.log4j.BasicConfigurator;
 
 public class XpceClient {
 	
@@ -103,14 +103,19 @@ public class XpceClient {
     	return xmlrpcClient.execute(XPCEConstants.XPCECOMMAND, new Object[] {command});
 	}
 		
-	private Result execute(String command, Object... params) throws XmlRpcException, JSONException, XPCException {
+	private XPCERespond execute(String command, Object... params) throws XmlRpcException, JSONException, XPCException {
 		Object[] newParams = new Object[params.length];
-		for (int i=0 ; i<params.length ; i++) newParams[i] = params[i].toString();
-		logger.debug("Executing " + command);
+		StringBuffer paramStr = new StringBuffer();
+		for (int i=0 ; i<params.length ; i++) {
+			newParams[i] = params[i].toString();
+			paramStr.append(params[i].toString());
+		}
+		logger.debug("Executing " + command + " - " + paramStr);
 		Object xmlRpcResult = xmlrpcClient.execute(command, newParams);
-		JSONObject jsonResult = new JSONObject(xmlRpcResult);
+		Object firstItem = ((Object[])xmlRpcResult)[0];
+		JSONObject jsonResult = new JSONObject(firstItem.toString());
 		logger.debug("Result: " + jsonResult);
-		return new Result(jsonResult);	
+		return new XPCERespond(jsonResult);	
 	}
 		
 	public boolean load(String filename) throws XmlRpcException, XPCException, JSONException {
@@ -165,9 +170,10 @@ public class XpceClient {
 	    	client.add(f, 3.2, "XpceClient");
 	    	
 	    	client.mcsat();
+	    	Thread.sleep(1000);
 	    	
 	    	Atom question = new Atom(pred2, "bob", "lisa");
-	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.5, 2);
+	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.0, 2);
 	    	System.out.println("Return Value:" + answers);
 	    	
 	    }catch (Exception e) {
