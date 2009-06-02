@@ -111,28 +111,16 @@ int main(int const argc, const char ** const argv ATTR_UNUSED) {
   die_if_fault_occurred(&env);
 
   // sort entity;
-  cmd = json_tokener_parse("{\"sort\": \"entity\"}");
-  //cmd = json_object_new_object();
-  //json_object_object_add(cmd, "name", json_object_new_string("entity"));
+  cmd = json_tokener_parse("{\"name\": \"entity\"}");
   run_xpce_command(&env, serverUrl, "xpce.sort", cmd);
-
   // subsort email entity;
-  cmd = json_tokener_parse("{\"sort\": \"email\", \"super\": \"entity\"}");
-  //cmd = json_object_new_object();
-  //json_object_object_add(cmd, "sub", json_object_new_string("email"));
-  //json_object_object_add(cmd, "super", json_object_new_string("entity"));
+  cmd = json_tokener_parse("{\"name\": \"email\", \"super\": \"entity\"}");
   run_xpce_command(&env, serverUrl, "xpce.sort", cmd);
   // subsort task entity;
-  cmd = json_tokener_parse("{\"sort\": \"task\", \"super\": \"entity\"}");
-  //cmd = json_object_new_object();
-  //json_object_object_add(cmd, "sub", json_object_new_string("email"));
-  //json_object_object_add(cmd, "super", json_object_new_string("entity"));
+  cmd = json_tokener_parse("{\"name\": \"task\", \"super\": \"entity\"}");
   run_xpce_command(&env, serverUrl, "xpce.sort", cmd);
   // subsort person entity;
-  cmd = json_tokener_parse("{\"sort\": \"person\", \"super\": \"entity\"}");
-  //cmd = json_object_new_object();
-  //json_object_object_add(cmd, "sub", json_object_new_string("person"));
-  //json_object_object_add(cmd, "super", json_object_new_string("entity"));
+  cmd = json_tokener_parse("{\"name\": \"person\", \"super\": \"entity\"}");
   run_xpce_command(&env, serverUrl, "xpce.sort", cmd);
   // predicate emailfrom(email,person) direct;
   cmd = json_tokener_parse("{\"predicate\": \"emailfrom\", \"arguments\": [\"email\", \"person\"], \"observable\": true}");
@@ -152,6 +140,9 @@ int main(int const argc, const char ** const argv ATTR_UNUSED) {
   // assert emailfrom(em1,pe1);
   cmd = json_tokener_parse("{\"fact\": {\"predicate\": \"emailfrom\", \"arguments\": [\"em1\", \"pe1\"]}}");
   run_xpce_command(&env, serverUrl, "xpce.assert", cmd);
+  // Should get an error
+  cmd = json_tokener_parse("{\"formula\": \"(married($X, $Y) => likes($X, $Y))\", \"weight\": 2}");
+  run_xpce_command(&env, serverUrl, "xpce.add", cmd);
   // add [em] emailfrom(em,pe1) implies hastask(em, ta1) 2;
   cmd = json_tokener_parse("{\"formula\": {\"implies\": [{\"atom\": {\"predicate\": \"emailfrom\", \"arguments\": [{\"var\": \"em\"}, {\"const\": \"pe1\"}]}}, {\"atom\": {\"predicate\": \"hastask\", \"arguments\": [{\"var\": \"em\"}, {\"const\": \"ta1\"}]}}]}, \"weight\": 2}");
   run_xpce_command(&env, serverUrl, "xpce.add", cmd);

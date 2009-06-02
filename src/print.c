@@ -119,7 +119,6 @@ void mcsat_err(const char *fmt, ...) {
     out_size = vsnprintf(NULL, 0, fmt, argp); // Number of chars not include trailing '\0'
     va_end(argp);
     string_buffer_resize(out_size);
-    string_buffer_resize(out_size);
     index = string_buffer.size;
     va_start(argp, fmt);
     vsnprintf(&string_buffer.string[index], out_size+1, fmt, argp);

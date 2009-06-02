@@ -138,7 +138,14 @@ xpce_result(xmlrpc_env * const envP,
 // Similar to above, but simply creates an error version
 static xmlrpc_value *
 xpce_error(xmlrpc_env * const envP, char *err) {
-  return xpce_result(envP, NULL, err, NULL);
+  // Check if mcsat_err was called
+  // Note that we ignore err in that case
+  if (mcsat_error == 1) {
+    return xpce_result(envP, NULL, get_output_from_string_buffer(), NULL);
+    mcsat_error = 0;
+  } else {
+    return xpce_result(envP, NULL, err, NULL);
+  }
 }
 
 static xmlrpc_value *
@@ -151,11 +158,11 @@ xpce_sort(xmlrpc_env * const envP,
 
   printf("In xpce.sort\n");
   sortdecl = xpce_parse_decl(envP, paramArrayP);
-  // sortdecl should be of the form  {"sort": NAME, "super": NAME}, where super is optional
-  sortobj = json_object_object_get(sortdecl, "sort");
+  // sortdecl should be of the form  {"name": NAME, "super": NAME}, where super is optional
+  sortobj = json_object_object_get(sortdecl, "name");
   if (sortobj == NULL) {
     printf("Returning error\n");
-    return xpce_error(envP, "Bad argument: expected {\"sort\": NAME}");
+    return xpce_error(envP, "Bad argument: expected {\"name\": NAME}");
   }
   sort = json_object_get_string(sortobj);
   superobj = json_object_object_get(sortdecl, "super");
@@ -408,7 +415,8 @@ json_formula_to_input_fmla(struct json_object *jfmla) {
   input_atom_t *atom;
   
   if (! json_object_is_type(jfmla, json_type_object)) {
-    mcsat_err("Expected a FORMULA");
+    mcsat_err("Expected a FORMULA\n");
+    return NULL;
   }
   if ((args = json_object_object_get(jfmla, "not")) != NULL) {
     if ((arg1 = json_formula_to_input_fmla(args)) != NULL) {
@@ -543,7 +551,10 @@ xpce_add(xmlrpc_env * const envP,
   if (fmlaobj == NULL) {
     return xpce_error(envP, "Bad argument: expected {\"formula\": FORMULA}");
   }
-  fmla = json_formula_to_input_formula(fmlaobj);
+  if ((fmla = json_formula_to_input_formula(fmlaobj)) == NULL) {
+    return xpce_error(envP, NULL);
+  }
+
   weightobj = json_object_object_get(adddecl, "weight");
   // If weight is NULL, use DBL_MAX
   if (weightobj == NULL) {
@@ -612,7 +623,7 @@ subst_into_json_atom(struct json_object *atom,
   }
   nval = json_object_new_object();
   json_object_object_add(nval, "predicate",
-			 json_object_object_get(atom, "predicate"));
+			 json_object_object_get(val, "predicate"));
   json_object_object_add(nval, "arguments", nargs);
   
   natom = json_object_new_object();
@@ -845,7 +856,8 @@ xpce_command(xmlrpc_env * const envP,
 
 
 int main(int const argc, const char ** const argv) {
-  
+
+  mcsat_error = 0;
   init_samp_table(&samp_table);
 
   struct xmlrpc_method_info3 const methodInfoCommand
