@@ -3,12 +3,15 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <pthread.h>
 #include "memalloc.h"
 #include "utils.h"
 #include "tables.h"
 #include "print.h"
 
 #define INIT_STRING_BUFFER_SIZE 32
+
+pthread_mutex_t pmutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct string_buffer_s {
   uint32_t capacity;
@@ -114,7 +117,7 @@ void mcsat_err(const char *fmt, ...) {
     vprintf(fmt, argp);
     va_end(argp);
   } else {
-    va_start(argp, fmt);
+    pthread_mutex_lock(&pmutex);
     va_start(argp, fmt);
     out_size = vsnprintf(NULL, 0, fmt, argp); // Number of chars not include trailing '\0'
     va_end(argp);
@@ -125,6 +128,7 @@ void mcsat_err(const char *fmt, ...) {
     va_end(argp);
     string_buffer.size += out_size;
     mcsat_error = 1;
+    pthread_mutex_unlock(&pmutex);
   }
 }
 

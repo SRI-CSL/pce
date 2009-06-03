@@ -67,7 +67,7 @@ void run_xpce_command(xmlrpc_env *const env,
   if (env->fault_occurred) {
     fprintf(stderr, "Error: %s\n", env->fault_string);
   } else {
-    xmlrpc_decompose_value(env, resultP, "(s)", &result);
+    xmlrpc_decompose_value(env, resultP, "s", &result);
     print_result(json_tokener_parse(result));
     xmlrpc_DECREF(resultP);
   }

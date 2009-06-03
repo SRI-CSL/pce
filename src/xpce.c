@@ -9,6 +9,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <float.h>
+#include <pthread.h>
 
 #include <json/json.h>
 
@@ -29,6 +30,8 @@
 #include "lazysamplesat.h"
 
 extern int yyparse ();
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // sort-decl := {"sort": NAME, "super": NAME} # "super" is optional,
 //                     # so this call can declare a sort or a subsort
@@ -132,7 +135,7 @@ xpce_result(xmlrpc_env * const envP,
   if (warn != NULL) {
     json_object_object_add(ret, "warning", json_object_new_string(warn));
   }
-  return xmlrpc_build_value(envP, "(s)", json_object_to_json_string(ret));
+  return xmlrpc_build_value(envP, "s", json_object_to_json_string(ret));
 }
 
 // Similar to above, but simply creates an error version
@@ -161,18 +164,19 @@ xpce_sort(xmlrpc_env * const envP,
   // sortdecl should be of the form  {"name": NAME, "super": NAME}, where super is optional
   sortobj = json_object_object_get(sortdecl, "name");
   if (sortobj == NULL) {
-    printf("Returning error\n");
     return xpce_error(envP, "Bad argument: expected {\"name\": NAME}");
   }
   sort = json_object_get_string(sortobj);
   superobj = json_object_object_get(sortdecl, "super");
   if (superobj == NULL) {
+    pthread_mutex_lock(&mutex);
     add_sort(&samp_table.sort_table, sort);
-    fprintf(stderr, "Added sort %s\n", sort);
+    pthread_mutex_unlock(&mutex);
   } else {
     super = json_object_get_string(superobj);
+    pthread_mutex_lock(&mutex);
     add_subsort(&samp_table.sort_table, sort, super);
-    fprintf(stderr, "Added subsort %s of supersort %s\n", sort, super);
+    pthread_mutex_unlock(&mutex);
   }
   return xpce_result(envP, NULL, NULL, NULL);
 }
@@ -213,7 +217,9 @@ xpce_predicate(xmlrpc_env * const envP,
   sorts[i] = NULL;
   observable = json_object_get_boolean(observableobj);
   fprintf(stderr, "Adding predicate %s\n", pred);
+  pthread_mutex_lock(&mutex);
   add_predicate(pred, sorts, observable, &samp_table);
+  pthread_mutex_unlock(&mutex);
   safe_free(sorts);
   return xpce_result(envP, NULL, NULL, NULL);
 }
@@ -241,7 +247,9 @@ xpce_constdecl(xmlrpc_env * const envP,
   for (i = 0; i < json_object_array_length(namesobj); i++) {
     nameobj = json_object_array_get_idx(namesobj, i);
     name = json_object_get_string(nameobj);
+    pthread_mutex_lock(&mutex);
     add_constant(name, sort, &samp_table);
+    pthread_mutex_unlock(&mutex);
   }
   return xpce_result(envP, NULL, NULL, NULL);
 }
@@ -514,7 +522,9 @@ xpce_assert(xmlrpc_env * const envP,
   if (factobj == NULL) {
     return xpce_error(envP, "Bad argument: expected FACT");
   }
-  atom = json_fact_to_input_atom(factobj);
+  if ((atom = json_fact_to_input_atom(factobj)) == NULL) {
+    return xpce_error(envP, NULL);
+  }
   // OK if source is NULL
   sourceobj = json_object_object_get(assertdecl, "source");
   if (sourceobj == NULL) {
@@ -526,7 +536,9 @@ xpce_assert(xmlrpc_env * const envP,
     source = json_object_get_string(sourceobj);
   }
   if (atom != NULL) {
+    pthread_mutex_lock(&mutex);
     assert_atom(&samp_table, atom, source);
+    pthread_mutex_unlock(&mutex);
   }
   return xpce_result(envP, NULL, NULL, NULL);
 }
@@ -579,7 +591,9 @@ xpce_add(xmlrpc_env * const envP,
     source = json_object_get_string(sourceobj);
   }
   if (fmla != NULL) {
+    pthread_mutex_lock(&mutex);
     add_cnf(fmla, weight, source);
+    pthread_mutex_unlock(&mutex);
   }
   return xpce_result(envP, NULL, NULL, NULL);
 }
@@ -723,6 +737,7 @@ xpce_ask(xmlrpc_env * const envP,
     maxresults = json_object_get_int(maxresultsobj);
   }
   if (fmla != NULL) {
+    pthread_mutex_lock(&mutex);
     ask_cnf(fmla, threshold, maxresults);
     // Results are in ask_buffer - create JSON objects representing the instances
     // E.g., [{"subst": {"x": "Dan", "y": "Ron"}, "formula-instance": FORMULA}, ...] 
@@ -750,6 +765,7 @@ xpce_ask(xmlrpc_env * const envP,
     }
     // Now clear out the query_instance table for the next query
     reset_query_instance_table(&samp_table.query_instance_table);
+    pthread_mutex_unlock(&mutex);
   }
   return xpce_result(envP, answer, NULL, NULL);
 }
@@ -762,6 +778,7 @@ xpce_mcsat(xmlrpc_env * const envP,
 	   void * const channelInfo ATTR_UNUSED) {
 
   // No need to parse, just run MCSAT and return warnings or errors
+  pthread_mutex_lock(&mutex);
   if (lazy_mcsat()) {
     lazy_mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
 		get_rvar_probability(), get_max_flips(),
@@ -771,6 +788,7 @@ xpce_mcsat(xmlrpc_env * const envP,
 	   get_rvar_probability(), get_max_flips(),
 	   get_max_extra_flips(), get_max_samples());
   }
+  pthread_mutex_unlock(&mutex);
   
   return xpce_result(envP, NULL, NULL, NULL);
 }
@@ -825,6 +843,7 @@ xpce_command(xmlrpc_env * const envP,
   if (envP->fault_occurred)
     return NULL;
 
+  pthread_mutex_lock(&mutex);
   fprintf(stderr, "Got cmd %s\n", cmd);
   //in = fmemopen((void *)cmd, strlen (cmd), "r");
   //input_stack_push_stream(in, (char *)cmd);
@@ -837,6 +856,7 @@ xpce_command(xmlrpc_env * const envP,
   read_eval(&samp_table);
   fprintf(stderr, "Processed cmd %s\n", cmd);
   output = get_output_from_string_buffer();
+  pthread_mutex_unlock(&mutex);
   if (mcsat_error == 1) {
     xmlrpc_env_set_fault(envP, 1, output);
     return NULL;
