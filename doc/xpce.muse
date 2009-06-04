@@ -151,6 +151,6 @@ ARGUMENTS := [ARGUMENT++',']
 CONSTANTS := [CONSTANT++',']
 NUM := ['+'|'-'] simple floating point number
 NAME := chars except whitespace parens ':' ',' ';'
-ARGUMENT := {"const":  CONSTANT} | {"var":  NAME}
+ARGUMENT := CONSTANT | {"var":  NAME}
 CONSTANT := NAME
 </example>
