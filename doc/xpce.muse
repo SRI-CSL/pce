@@ -1,4 +1,4 @@
-#author Shankar Natarajan, Bruno Dutertre, and Sam Owre
+#author Shahin Saadati, Sam Owre, Shankar Natarajan, and Bruno Dutertre
 #desc User Manual for mcsat
 #title XPCE User Manual
 
