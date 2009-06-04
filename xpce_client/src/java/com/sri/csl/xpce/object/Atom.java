@@ -22,8 +22,11 @@ public class Atom extends Formula {
 		if ( params.length != pred.getArgumentsTypes().size() ) {
 			throw new XPCException("Number of input paramaters does not match the number of input parameters in the Predicate definition");
 		}
-		for (int i=0; i<params.length;i++) 
-			argument.add(new Constant(params[i].toString()));
+		for (int i=0; i<params.length;i++)
+			if ( params[i] instanceof Variable )
+				argument.add((Variable)params[i]);
+			else
+				argument.add(new Constant(params[i].toString()));
 	}
 
 	public Atom(PredicateDecl pred, Term... params) {
@@ -86,7 +89,7 @@ public class Atom extends Formula {
 	@Override
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.PREDICATE, functor);
+		obj.put(XPCEConstants.PREDICATEFUNCTOR, functor);
 		JSONArray params = new JSONArray();
 		for (Term p: argument) params.put(p.toJSON()) ;
 		obj.put(XPCEConstants.ARGUMENTS, params);

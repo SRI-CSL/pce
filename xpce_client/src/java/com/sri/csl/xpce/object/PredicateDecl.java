@@ -59,7 +59,7 @@ public class PredicateDecl {
 	
 	public JSONObject toJSON() throws JSONException {
 		JSONObject obj = new JSONObject();
-		obj.put(XPCEConstants.PREDICATE, functor);
+		obj.put(XPCEConstants.PREDICATEFUNCTOR, functor);
 		JSONArray params = new JSONArray();
 		for (Sort p: argumentType) params.put(p.getName()) ;
 		obj.put(XPCEConstants.ARGUMENTS, params);

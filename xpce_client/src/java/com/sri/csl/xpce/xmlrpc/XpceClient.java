@@ -83,9 +83,9 @@ public class XpceClient {
 	public ArrayList<FormulaAndProbability> ask(Formula formula, double threshold, int numberOfResults) throws XmlRpcException, XPCException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.FORMULA, formula.toJSON());
-		obj.put(XPCEConstants.THRESHOLD, threshold);
+		obj.put(XPCEConstants.THRESHOLD, (double)threshold);
 		obj.put(XPCEConstants.RESULTNUMBERS, numberOfResults);
-		JSONArray results = new JSONArray(execute(XPCEConstants.XPCEASK, obj).getResult());
+		JSONArray results = (JSONArray)execute(XPCEConstants.XPCEASK, obj).getResult();
 		ArrayList<FormulaAndProbability> faps = new ArrayList<FormulaAndProbability>();
 		for (int i = 0 ; i < results.length() ; i++) {
 			JSONObject res = results.getJSONObject(i);
@@ -112,8 +112,7 @@ public class XpceClient {
 		}
 		logger.debug("Executing " + command + " - " + paramStr);
 		Object xmlRpcResult = xmlrpcClient.execute(command, newParams);
-		Object firstItem = ((Object[])xmlRpcResult)[0];
-		JSONObject jsonResult = new JSONObject(firstItem.toString());
+		JSONObject jsonResult = new JSONObject(xmlRpcResult.toString());
 		logger.debug("Result: " + jsonResult);
 		return new XPCERespond(jsonResult);	
 	}
@@ -172,8 +171,8 @@ public class XpceClient {
 	    	client.mcsat();
 	    	Thread.sleep(1000);
 	    	
-	    	Atom question = new Atom(pred2, "bob", "lisa");
-	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.0, 2);
+	    	Atom question = new Atom(pred2, "bob", new Variable("Z"));
+	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.01, 2);
 	    	System.out.println("Return Value:" + answers);
 	    	
 	    }catch (Exception e) {

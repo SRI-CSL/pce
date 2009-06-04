@@ -23,6 +23,7 @@ public class XPCEConstants {
 	public static final String OBSERVABLE = "observable";
 	public static final String OR = "or";
 	public static final String PREDICATE = "predicate";
+	public static final String PREDICATEFUNCTOR = "predicate";
 	public static final String PROBABILITIES = "probabilities";
 	public static final String PROBABILITY = "probability";
 	public static final String RESET = "reset";

@@ -61,4 +61,8 @@ public class FormulaAndProbability {
 	public Map<Variable, Constant> getAllSubst() {
 		return subst;
 	}
+	
+	public String toString() {
+		return "" + instance + " -- " + probability;
+	}
 }

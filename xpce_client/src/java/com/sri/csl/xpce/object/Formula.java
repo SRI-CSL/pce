@@ -16,12 +16,20 @@ public abstract class Formula {
 	public static Formula createFromJSON(JSONObject obj) throws JSONException, XPCException {
 		if ( obj.has(XPCEConstants.ATOM) ) {
 			JSONObject obj2 = obj.getJSONObject(XPCEConstants.ATOM);
-			String functor =  obj2.getString(XPCEConstants.PREDICATE);
+			String functor =  obj2.getString(XPCEConstants.PREDICATEFUNCTOR);
 			JSONArray params = obj2.getJSONArray(XPCEConstants.ARGUMENTS);
 			ArrayList<Term> argument = new ArrayList<Term>();
 			for (int i=0 ; i<params.length() ; i++)
-				argument.add(Term.createFromJSON(params.getJSONObject(i)));
+				argument.add(Term.createFromJSON(params.get(i)));
 			return new Atom(functor, argument);
+		} else if ( obj.has(XPCEConstants.FACT) ) {
+				JSONObject obj2 = obj.getJSONObject(XPCEConstants.FACT);
+				String functor =  obj2.getString(XPCEConstants.PREDICATEFUNCTOR);
+				JSONArray params = obj2.getJSONArray(XPCEConstants.ARGUMENTS);
+				ArrayList<Term> argument = new ArrayList<Term>();
+				for (int i=0 ; i<params.length() ; i++)
+					argument.add(Term.createFromJSON(params.get(i)));
+				return new Atom(functor, argument);
 		} else if ( obj.has(XPCEConstants.OR) ) {
 			JSONArray formulas = obj.getJSONArray(XPCEConstants.OR);
 			return new OrFormula(Formula.createFromJSON(formulas.getJSONObject(0)), Formula.createFromJSON(formulas.getJSONObject(1)));

@@ -4,17 +4,19 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.sri.csl.exception.XPCException;
-import com.sri.csl.xpce.json.XPCEConstants;
 
 public abstract class Term {
-	public static Term createFromJSON(JSONObject obj) throws JSONException, XPCException {
-		if ( obj.has(XPCEConstants.VARIABLE) ) {
-			return new Variable(obj);
-		} else if ( obj.has(XPCEConstants.CONST) ) {
-			return new Constant(obj);
-		} else {
-			throw new XPCException("Format error in JSON Term " + obj);
-		}
+	protected String name;	
+	
+	public static Term createFromJSON(Object obj) throws JSONException, XPCException {
+		if ( obj instanceof JSONObject )
+			return new Variable((JSONObject)obj);
+		else
+			return new Constant(obj.toString());
+	}
+	
+	public String getName() {
+		return name;
 	}
 	
 	public abstract Object toJSON() throws JSONException;

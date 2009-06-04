@@ -6,7 +6,6 @@ import org.json.JSONObject;
 import com.sri.csl.xpce.json.XPCEConstants;
 
 public class Variable extends Term {
-	protected String name;
 	
 	public Variable(JSONObject obj) throws JSONException {
 		name = obj.getString(XPCEConstants.VARIABLE);
