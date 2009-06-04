@@ -151,6 +151,8 @@ int main(int const argc, const char ** const argv ATTR_UNUSED) {
   // ask [e, p] emailfrom(e, p) and hastask(e, ta1);
   cmd = json_tokener_parse("{\"formula\": {\"and\": [{\"atom\": {\"predicate\": \"emailfrom\", \"arguments\": [{\"var\": \"e\"}, {\"var\": \"p\"}]}}, {\"atom\": {\"predicate\": \"hastask\", \"arguments\": [{\"var\": \"e\"}, \"ta1\"]}}]}, \"threshold\": 0.2}");
   run_xpce_command(&env, serverUrl, "xpce.ask", cmd);
+  cmd = json_tokener_parse("{\"formula\": {\"and\": [{\"atom\": {\"predicate\": \"emailfrom\", \"arguments\": [{\"var\": \"e\"}, {\"var\": \"p\"}]}}, {\"atom\": {\"predicate\": \"hastask\", \"arguments\": [{\"var\": \"e\"}, \"ta1\"]}}]}, \"threshold\": 0.0}");
+  run_xpce_command(&env, serverUrl, "xpce.ask", cmd);
   
   run_pce_command(&env, serverUrl, "dumptable;");
     

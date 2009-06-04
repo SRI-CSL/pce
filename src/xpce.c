@@ -709,11 +709,18 @@ xpce_ask(xmlrpc_env * const envP,
   if (thresholdobj == NULL) {
     threshold = 0.0;
   } else {
-    if (!json_object_is_type(thresholdobj, json_type_double)) {
-      mcsat_err("Bad argument: \"threshold\" should be DOUBLE\n");
+    if (json_object_is_type(thresholdobj, json_type_double)) {
+      threshold = json_object_get_double(thresholdobj);
+    } else if (json_object_is_type(thresholdobj, json_type_int)) {
+      threshold = json_object_get_int(thresholdobj);
+    } else {
+      mcsat_err("Bad argument: \"threshold\" should be DOUBLE or INT\n");
       return xpce_result(envP, NULL);
     }
-    threshold = json_object_get_double(thresholdobj);
+  }
+  if (threshold < 0.0 || threshold > 1.0) {
+    mcsat_err("Threshold should be a probability value between 0.0 and 1.0");
+    return xpce_result(envP, NULL);
   }
   // OK if maxresults is NULL
   maxresultsobj = json_object_object_get(askdecl, "maxresults");
