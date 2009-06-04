@@ -1,6 +1,17 @@
 #ifndef __PRINT_H
 #define __PRINT_H 1
 
+typedef struct string_buffer_s {
+  uint32_t capacity;
+  uint32_t size;
+  char *string;
+} string_buffer_t;
+
+extern bool output_to_string;
+extern string_buffer_t output_buffer;
+extern string_buffer_t error_buffer;
+extern string_buffer_t warning_buffer;
+
 /*
  * - A verbosity_level controls the amount of output produced
  *   it's set to 1 by default. Can be changed via set_verbosity_level
@@ -8,14 +19,15 @@
  *   cprintf(level, <format>, ...) does nothing if level > verbosity_level
  *   otherwise, it's the same as printf(<format>, ...)
  */
+
 extern void set_verbosity_level(int32_t level);
 extern int32_t get_verbosity_level();
 extern void cprintf(int32_t level, const char *fmt, ...);
-extern void set_output_to_string (bool v);
-extern char *get_output_from_string_buffer ();
+
 extern void output(const char *fmt, ...);
-extern int32_t mcsat_error;
 extern void mcsat_err(const char *fmt, ...);
+extern void mcsat_warn(const char *fmt, ...);
+extern char * get_string_from_buffer(string_buffer_t *strbuf);
 
 extern void dump_sort_table (samp_table_t *table);
 extern void dump_pred_table (samp_table_t *table);

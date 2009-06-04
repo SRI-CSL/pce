@@ -1,6 +1,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
+#include <float.h>
 #include "memalloc.h"
 #include "utils.h"
 #include "yacc.tab.h"
@@ -389,7 +390,62 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
     free_var_entries(cvars);
   }
 }
-      
+
+bool vars_equal(var_entry_t *v1, var_entry_t *v2) {
+  return (v1->sort_index == v2->sort_index)
+    && (strcmp(v1->name, v2->name) == 0);
+}
+
+bool clause_vars_equal(int32_t nvars, var_entry_t **v1, var_entry_t **v2) {
+  int32_t i;
+
+  for (i = 0; i < nvars; i++) {
+    if (! vars_equal(v1[i], v2[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool samp_atoms_equal(samp_atom_t *a1, samp_atom_t *a2) {
+  int32_t i, arity;
+  
+  if (a1->pred == a2->pred) {
+    arity = pred_arity(a1->pred, &samp_table.pred_table);
+    for (i = 0; i < arity; i++) {
+      if (a1->args[i] != a2->args[i]) {
+	return false;
+      }
+    }
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool lits_equal(rule_literal_t *l1, rule_literal_t *l2) {
+  return (l1->neg == l2->neg)
+    && samp_atoms_equal(l1->atom, l2->atom);
+}
+
+bool clause_lits_equal(int32_t nlits, rule_literal_t **l1, rule_literal_t **l2) {
+  int32_t i;
+
+  for (i = 0; i < nlits; i++) {
+    if (! lits_equal(l1[i], l2[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool clauses_equal(samp_rule_t *c1, samp_rule_t *c2) {
+  return
+    (c1->num_vars == c2->num_vars)
+    && (clause_vars_equal(c1->num_vars, c1->vars, c2->vars))
+    && (c1->num_lits == c2->num_lits)
+    && (clause_lits_equal(c1->num_lits, c1->literals, c2->literals));
+}
       
 
 // Generates the CNF form of a formula, and updates the clause table (if no
@@ -400,7 +456,7 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
   pred_table_t *pred_table = &samp_table.pred_table;
   int32_t i, j, current_rule, num_lits, num_vars, atom_idx;
   rule_literal_t ***lits, *lit;
-  samp_rule_t *clause;
+  samp_rule_t *clause, *found;
 
   // Returns the literals, and sets the sort of the variables
   lits = cnf_pos(formula->fmla, formula->vars);
@@ -438,15 +494,35 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
       //set_clause_variables(clause);
       clause->num_vars = num_vars;
       set_fmla_clause_variables(clause, formula->vars);
-      clause->weight = weight;
-      rule_table_resize(rule_table);
-      current_rule = rule_table->num_rules;      
-      rule_table->samp_rules[current_rule] = clause;
-      rule_table->num_rules++;
-      all_rule_instances(current_rule, &samp_table);
-      for (j = 0; j < num_lits; j++) {
-	int32_t pred = lits[i][j]->atom->pred;
-	add_rule_to_pred(pred_table, pred, current_rule);
+      found = NULL;
+      // Now check if clause is in the table
+      for (j = 0; j < rule_table->num_rules; j++) {
+	if (clauses_equal(rule_table->samp_rules[j], clause)) {
+	  found = rule_table->samp_rules[j];
+	  break;
+	}
+      }
+      if (found == NULL) {
+	clause->weight = weight;
+	rule_table_resize(rule_table);
+	current_rule = rule_table->num_rules;      
+	rule_table->samp_rules[current_rule] = clause;
+	rule_table->num_rules++;
+	all_rule_instances(current_rule, &samp_table);
+	for (j = 0; j < num_lits; j++) {
+	  int32_t pred = lits[i][j]->atom->pred;
+	  add_rule_to_pred(pred_table, pred, current_rule);
+	}
+      } else {
+	printf("Giving a warning\n");
+	mcsat_warn("Rule was seen before, adding weights\n");
+	if (found->weight != DBL_MAX) {
+	  if (weight == DBL_MAX) {
+	    found->weight = DBL_MAX;
+	  } else {
+	    found->weight += weight;
+	  }
+	}
       }
     }
     safe_free(lits);
@@ -478,7 +554,7 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
   query_instance_table_t *query_instance_table;
   rule_literal_t ***lits;
   samp_query_t *query;
-  samp_query_instance_t *qinst, *best;
+  samp_query_instance_t *qinst;
   double tnum;
   int32_t i;
 

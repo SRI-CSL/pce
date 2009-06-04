@@ -13,11 +13,11 @@
 
 pthread_mutex_t pmutex = PTHREAD_MUTEX_INITIALIZER;
 
-typedef struct string_buffer_s {
-  uint32_t capacity;
-  uint32_t size;
-  char *string;
-} string_buffer_t;
+bool output_to_string = false;
+
+string_buffer_t output_buffer = {0, 0, NULL};
+string_buffer_t error_buffer = {0, 0, NULL};
+string_buffer_t warning_buffer = {0, 0, NULL};
 
 static int32_t verbosity_level = 1;
 
@@ -39,60 +39,55 @@ void cprintf(int32_t level, const char *fmt, ...){
   }
 }
 
-static bool output_to_string = false;
-
-static string_buffer_t string_buffer = {0, 0, NULL};
-
-extern void set_output_to_string (bool v) {
-  output_to_string = v;
-}
-
-extern char *get_output_from_string_buffer () {
+extern char *get_string_from_buffer (string_buffer_t *strbuf) {
   char *new;
-  if (string_buffer.size == 0) {
+  if (strbuf->size == 0) {
     return "";
   } else {
-    new = (char *) safe_malloc((string_buffer.size+1) * sizeof(char));
-    strcpy(new,string_buffer.string);
+    new = (char *) safe_malloc((strbuf->size+1) * sizeof(char));
+    strcpy(new, strbuf->string);
+    strbuf->size = 0;
     return new;
-    string_buffer.size = 0;
   }
 }
 
-void string_buffer_resize (int32_t delta) {
-  if (string_buffer.capacity == 0) {
-    string_buffer.string = (char *)
+void string_buffer_resize (string_buffer_t *strbuf, int32_t delta) {
+  if (strbuf->capacity == 0) {
+    strbuf->string = (char *)
       safe_malloc(INIT_STRING_BUFFER_SIZE * sizeof(char));
-    string_buffer.capacity = INIT_STRING_BUFFER_SIZE;
+    strbuf->capacity = INIT_STRING_BUFFER_SIZE;
   }
-  uint32_t size = string_buffer.size;
-  uint32_t capacity = string_buffer.capacity;
+  uint32_t size = strbuf->size;
+  uint32_t capacity = strbuf->capacity;
   if (size+delta >= capacity){
     if (MAX_SIZE(sizeof(char), 0) - capacity <= delta){
       out_of_memory();
     }
     capacity += delta;
-    string_buffer.string = (char *)
-      safe_realloc(string_buffer.string, capacity * sizeof(char));
-    string_buffer.capacity = capacity;
+    strbuf->string = (char *)
+      safe_realloc(strbuf->string, capacity * sizeof(char));
+    strbuf->capacity = capacity;
   }
 }
 
+// Output to stdout or output_buffer
 extern void output(const char *fmt, ...) {
   int32_t out_size, index;
   va_list argp;
   
   if (output_to_string) {
+    pthread_mutex_lock(&pmutex);
     // Find out how big it will be
     va_start(argp, fmt);
     out_size = vsnprintf(NULL, 0, fmt, argp); // Number of chars not include trailing '\0'
     va_end(argp);
-    string_buffer_resize(out_size);
-    index = string_buffer.size;
+    string_buffer_resize(&output_buffer, out_size);
+    index = output_buffer.size;
     va_start(argp, fmt);
-    vsnprintf(&string_buffer.string[index], out_size+1, fmt, argp);
+    vsnprintf(&output_buffer.string[index], out_size+1, fmt, argp);
     va_end(argp);
-    string_buffer.size += out_size;
+    output_buffer.size += out_size;
+    pthread_mutex_unlock(&pmutex);
   } else {
     va_start(argp, fmt);
     vprintf(fmt, argp);
@@ -100,35 +95,51 @@ extern void output(const char *fmt, ...) {
   }
 }
 
-// Very simple error handling.  If mcsat_err is set to -1, then simply
-// does a printf.  Otherwise uses the string buffer to save the error,
-// and sets mcsat_err flag to 1.  It is up to the caller to set it
-// to 0 and check if it is 1 after calls to mcsat functions, then
-// use get_output_from_string_buffer to get a copy of the string.
-
-extern int32_t mcsat_error = -1;
-
+// Errors to stderr or error_buffer
 void mcsat_err(const char *fmt, ...) {
   va_list argp;
   int32_t out_size, index;
 
-  if (mcsat_error == -1) {
-    va_start(argp, fmt);
-    vprintf(fmt, argp);
-    va_end(argp);
-  } else {
+  if (output_to_string) {
     pthread_mutex_lock(&pmutex);
     va_start(argp, fmt);
     out_size = vsnprintf(NULL, 0, fmt, argp); // Number of chars not include trailing '\0'
     va_end(argp);
-    string_buffer_resize(out_size);
-    index = string_buffer.size;
+    string_buffer_resize(&error_buffer, out_size);
+    index = error_buffer.size;
     va_start(argp, fmt);
-    vsnprintf(&string_buffer.string[index], out_size+1, fmt, argp);
+    vsnprintf(&error_buffer.string[index], out_size+1, fmt, argp);
     va_end(argp);
-    string_buffer.size += out_size;
-    mcsat_error = 1;
+    error_buffer.size += out_size;
     pthread_mutex_unlock(&pmutex);
+  } else {
+    va_start(argp, fmt);
+    vfprintf(stderr, fmt, argp);
+    va_end(argp);
+  }
+}
+
+// Errors to stdout or warning_buffer
+void mcsat_warn(const char *fmt, ...) {
+  va_list argp;
+  int32_t out_size, index;
+
+  if (output_to_string) {
+    pthread_mutex_lock(&pmutex);
+    va_start(argp, fmt);
+    out_size = vsnprintf(NULL, 0, fmt, argp); // Number of chars not include trailing '\0'
+    va_end(argp);
+    string_buffer_resize(&warning_buffer, out_size);
+    index = warning_buffer.size;
+    va_start(argp, fmt);
+    vsnprintf(&warning_buffer.string[index], out_size+1, fmt, argp);
+    va_end(argp);
+    warning_buffer.size += out_size;
+    pthread_mutex_unlock(&pmutex);
+  } else {
+    va_start(argp, fmt);
+    vprintf(fmt, argp);
+    va_end(argp);
   }
 }
 
