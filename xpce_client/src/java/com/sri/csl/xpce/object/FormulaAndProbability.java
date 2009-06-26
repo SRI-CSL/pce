@@ -42,11 +42,11 @@ public class FormulaAndProbability {
 		return probability;
 	}
 	
-	public Constant getValue(String var) {
+	public Constant getValueForVariable(String var) {
 		return subst.get(new Variable(var));
 	}
 	
-	public Constant getValue(Variable var) {
+	public Constant getValueForVariable(Variable var) {
 		return subst.get(var);
 	}
 	

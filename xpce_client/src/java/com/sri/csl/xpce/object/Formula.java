@@ -1,13 +1,18 @@
 package com.sri.csl.xpce.object;
 
+import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 
+import org.antlr.runtime.ANTLRInputStream;
+import org.antlr.runtime.CommonTokenStream;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.sri.csl.exception.XPCException;
 import com.sri.csl.xpce.json.XPCEConstants;
+import com.sri.csl.xpce.parser.FormulaLexer;
+import com.sri.csl.xpce.parser.FormulaParser;
 
 public abstract class Formula {
 	private	enum State {Begin, NonAtomicBegin, AtomicBegin, TermsBegin};
@@ -83,8 +88,23 @@ public abstract class Formula {
 		return null;
 	}
 
-	
 	public static void main(String args[]) {
+		String formulaStr = "-Father($Bob, Tom)";
+		ByteArrayInputStream stream = new ByteArrayInputStream(formulaStr.getBytes());
+		try {
+			ANTLRInputStream input = new ANTLRInputStream(stream);
+			FormulaLexer lexer   = new FormulaLexer(input);
+	        CommonTokenStream tokens = new CommonTokenStream(lexer);
+			FormulaParser parser = new FormulaParser(tokens);
+			Formula a = parser.formula();
+			System.out.print("Formula is " + a);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public static void main2(String args[]) {
 		Atom r = new Atom("family(bob, $X, tom, rose)");
 		System.out.println("r is: " + r);
 		PredicateDecl p1 = new PredicateDecl("Father", "Person", "Person");

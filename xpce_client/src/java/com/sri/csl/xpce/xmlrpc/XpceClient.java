@@ -14,14 +14,15 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.sri.csl.exception.XPCException;
-import com.sri.csl.xpce.json.XPCERespond;
 import com.sri.csl.xpce.json.XPCEConstants;
+import com.sri.csl.xpce.json.XPCERespond;
 import com.sri.csl.xpce.object.Atom;
 import com.sri.csl.xpce.object.Constant;
 import com.sri.csl.xpce.object.Fact;
 import com.sri.csl.xpce.object.Formula;
 import com.sri.csl.xpce.object.FormulaAndProbability;
 import com.sri.csl.xpce.object.ImpliesFormula;
+import com.sri.csl.xpce.object.NotFormula;
 import com.sri.csl.xpce.object.PredicateDecl;
 import com.sri.csl.xpce.object.Sort;
 import com.sri.csl.xpce.object.Variable;
@@ -172,7 +173,10 @@ public class XpceClient {
 	    	Thread.sleep(1000);
 	    	
 	    	Atom question = new Atom(pred2, "bob", new Variable("Z"));
-	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.01, 2);
+	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.01, 10);
+	    	System.out.println("Return Value:" + answers);
+	    	
+	    	answers = client.ask(new NotFormula(question), 0.01, 10);
 	    	System.out.println("Return Value:" + answers);
 	    	
 	    }catch (Exception e) {

@@ -60,8 +60,7 @@ public class Atom extends Formula {
 				argument.add(new Constant(p.toString()));
 		}
 	}
-	
-	
+		
 	public Atom(String functor, Term... params) {
 		this.functor = functor;
 		for (Term p: params) argument.add(p);
