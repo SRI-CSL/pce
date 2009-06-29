@@ -89,7 +89,7 @@ public abstract class Formula {
 	}
 
 	public static void main(String args[]) {
-		String formulaStr = "-Father($Bob, Tom)";
+		String formulaStr = "-Father($Bob, \"Tom Jones\")";
 		ByteArrayInputStream stream = new ByteArrayInputStream(formulaStr.getBytes());
 		try {
 			ANTLRInputStream input = new ANTLRInputStream(stream);

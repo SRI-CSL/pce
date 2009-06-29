@@ -3,6 +3,7 @@ grammar Formula;
 options {
     language=Java;
     backtrack=true;
+    memoize=true;
 }
 
 tokens {
@@ -95,7 +96,7 @@ atom returns [Atom f]
     @init {
     String functor = ""; 
     ArrayList<Term> terms = new ArrayList<Term>(); }:
-    ID {functor = $ID.text; }
+    ID1 {functor = $ID1.text; }
         LPAR 
         t=term { terms.add(t); }
         (
@@ -113,21 +114,25 @@ term returns [Term t]:
 
 variable returns [Variable v]:
     '$'
-    ID {v = new Variable($ID.text);};
+    ID1 {v = new Variable($ID1.text);};
 
 constant returns [Constant c]:
-    ID {c = new Constant($ID.text);}
+    ID1 {c = new Constant($ID1.text);}
     |
-    QUOTE
-    ID {c = new Constant($ID.text);}
-    QUOTE
+    CONST1 {c = new Constant($CONST1.text);}
+    |
+    CONST2 {c = new Constant($CONST2.text);}
     ;
     
 /*------------------------------------------------------------------
  * LEXER RULES
  *------------------------------------------------------------------*/
 
-ID      :   ('a'..'z'|'A'..'Z') ('_'|'0'..'9'|'a'..'z'|'A'..'Z')* ;
+DIGIT	 :   '0'..'9';
+ALPHA	 :   'a'..'z'|'A'..'Z';
+ID1   	 :   ALPHA (DIGIT|ALPHA|'_')* ;
+CONST1   :   DIGIT (DIGIT|ALPHA|'_'|'.'|':'|'/'|'\\')*;
+CONST2   :   QUOTE (DIGIT|ALPHA|'_'|'.'|':'|'/'|'\\'|' ')+  QUOTE;
 NEWLINE :   '\r'? '\n' ;
 WS  :   (' '|'\t')+ {skip();} ;
 

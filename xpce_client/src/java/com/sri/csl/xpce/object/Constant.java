@@ -5,7 +5,10 @@ public class Constant extends Term {
 	protected Sort sort;
 
 	public Constant(String name) {
-		this.name = name;
+		if ( name.startsWith("\"") )
+			this.name = name.substring(1,name.length()-1);
+		else
+			this.name = name;
 		this.sort = null;
 	}
 
@@ -24,6 +27,8 @@ public class Constant extends Term {
 	}
 	
 	public String toString() {
+		if ( name.indexOf(' ') > -1 )
+			return "\"" + name + "\"";
 		return name;
 	}
 }
