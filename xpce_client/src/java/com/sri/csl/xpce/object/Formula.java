@@ -83,5 +83,6 @@ public abstract class Formula {
 	}
 		
 	public abstract JSONObject toJSON() throws JSONException;
-
+	
+	public abstract boolean equals(Object obj);
 }

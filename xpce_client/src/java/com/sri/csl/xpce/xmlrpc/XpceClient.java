@@ -164,7 +164,7 @@ public class XpceClient {
 	    	Fact fact2 = new Fact(pred1, "tom", "rose");
 	    	client.assertFact(fact1);
 	    	client.assertFact(fact2);
-	    	Atom a1 = new Atom(pred1, new Variable("X"), new Variable("Y"));
+	    	Atom a1 = (Atom)Formula.createFromString("married($X, $Y)");
 	    	Atom a2 = new Atom(pred2, new Variable("X"), new Variable("Y"));
 	    	ImpliesFormula f = new ImpliesFormula(a1, a2);
 	    	client.add(f, 3.2, "XpceClient");
@@ -172,11 +172,12 @@ public class XpceClient {
 	    	client.mcsat();
 	    	Thread.sleep(1000);
 	    	
-	    	Atom question = new Atom(pred2, "bob", new Variable("Z"));
-	    	ArrayList<FormulaAndProbability> answers = client.ask(question, 0.01, 10);
+	    	Formula question1 = Formula.createFromString("-likes('bob', $Z)");
+	    	ArrayList<FormulaAndProbability> answers = client.ask(question1, 0.01, 10);
 	    	System.out.println("Return Value:" + answers);
 	    	
-	    	answers = client.ask(new NotFormula(question), 0.01, 10);
+	    	Formula question2 = Formula.createFromString("likes('bob', 'tom') | likes('bob', 'lisa')");
+	    	answers = client.ask(new NotFormula(question2), 0.01, 10);
 	    	System.out.println("Return Value:" + answers);
 	    	
 	    }catch (Exception e) {
