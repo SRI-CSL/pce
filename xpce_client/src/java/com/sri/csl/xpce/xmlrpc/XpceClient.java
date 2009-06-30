@@ -177,6 +177,9 @@ public class XpceClient {
 	    	System.out.println("Return Value:" + answers);
 	    	
 	    	Formula question2 = Formula.createFromString("likes('bob', 'tom') | likes('bob', 'lisa')");
+	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') & likes('bob', 'lisa')");
+	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') => likes('bob', 'lisa')");
+	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') <=> likes('bob', 'lisa')");
 	    	answers = client.ask(new NotFormula(question2), 0.01, 10);
 	    	System.out.println("Return Value:" + answers);
 	    	
