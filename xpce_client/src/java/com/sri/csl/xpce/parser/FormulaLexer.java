@@ -1,17 +1,22 @@
 package com.sri.csl.xpce.parser;
 
-// $ANTLR 3.1.2 C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g 2009-06-29 16:28:49
+// $ANTLR 3.1.2 C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g 2009-06-30 15:19:10
 
-import org.antlr.runtime.*;
-import java.util.Stack;
-import java.util.List;
-import java.util.ArrayList;
+import org.antlr.runtime.BaseRecognizer;
+import org.antlr.runtime.CharStream;
+import org.antlr.runtime.DFA;
+import org.antlr.runtime.EarlyExitException;
+import org.antlr.runtime.Lexer;
+import org.antlr.runtime.MismatchedSetException;
+import org.antlr.runtime.RecognitionException;
+import org.antlr.runtime.RecognizerSharedState;
 
 public class FormulaLexer extends Lexer {
     public static final int IFF=7;
     public static final int IMPLIES=6;
-    public static final int T__20=20;
+    public static final int CONST=15;
     public static final int NOT=8;
+    public static final int FUNCTOR=13;
     public static final int AND=4;
     public static final int EOF=-1;
     public static final int ALPHA=17;
@@ -22,10 +27,8 @@ public class FormulaLexer extends Lexer {
     public static final int COMMA=12;
     public static final int OR=5;
     public static final int RPAR=11;
-    public static final int ID1=13;
+    public static final int VAR=14;
     public static final int DIGIT=16;
-    public static final int CONST2=15;
-    public static final int CONST1=14;
 
     // delegates
     // delegators
@@ -45,11 +48,10 @@ public class FormulaLexer extends Lexer {
         try {
             int _type = AND;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:7:5: ( 'and' )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:7:7: 'and'
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:7:5: ( '&' )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:7:7: '&'
             {
-            match("and"); 
-
+            match('&'); 
 
             }
 
@@ -66,11 +68,10 @@ public class FormulaLexer extends Lexer {
         try {
             int _type = OR;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:8:4: ( 'or' )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:8:6: 'or'
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:8:4: ( '|' )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:8:6: '|'
             {
-            match("or"); 
-
+            match('|'); 
 
             }
 
@@ -149,10 +150,10 @@ public class FormulaLexer extends Lexer {
         try {
             int _type = QUOTE;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:12:7: ( '\\\"' )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:12:9: '\\\"'
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:12:7: ( '\\'' )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:12:9: '\\''
             {
-            match('\"'); 
+            match('\''); 
 
             }
 
@@ -224,33 +225,13 @@ public class FormulaLexer extends Lexer {
     }
     // $ANTLR end "COMMA"
 
-    // $ANTLR start "T__20"
-    public final void mT__20() throws RecognitionException {
-        try {
-            int _type = T__20;
-            int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:16:7: ( '$' )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:16:9: '$'
-            {
-            match('$'); 
-
-            }
-
-            state.type = _type;
-            state.channel = _channel;
-        }
-        finally {
-        }
-    }
-    // $ANTLR end "T__20"
-
     // $ANTLR start "DIGIT"
     public final void mDIGIT() throws RecognitionException {
         try {
             int _type = DIGIT;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:131:8: ( '0' .. '9' )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:131:12: '0' .. '9'
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:91:8: ( '0' .. '9' )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:91:12: '0' .. '9'
             {
             matchRange('0','9'); 
 
@@ -269,7 +250,7 @@ public class FormulaLexer extends Lexer {
         try {
             int _type = ALPHA;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:132:8: ( 'a' .. 'z' | 'A' .. 'Z' )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:92:8: ( 'a' .. 'z' | 'A' .. 'Z' )
             // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
             {
             if ( (input.LA(1)>='A' && input.LA(1)<='Z')||(input.LA(1)>='a' && input.LA(1)<='z') ) {
@@ -292,22 +273,23 @@ public class FormulaLexer extends Lexer {
     }
     // $ANTLR end "ALPHA"
 
-    // $ANTLR start "ID1"
-    public final void mID1() throws RecognitionException {
+    // $ANTLR start "VAR"
+    public final void mVAR() throws RecognitionException {
         try {
-            int _type = ID1;
+            int _type = VAR;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:133:9: ( ALPHA ( DIGIT | ALPHA | '_' )* )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:133:13: ALPHA ( DIGIT | ALPHA | '_' )*
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:93:6: ( '$' ALPHA ( ALPHA | DIGIT | '_' | '.' )* )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:93:10: '$' ALPHA ( ALPHA | DIGIT | '_' | '.' )*
             {
+            match('$'); 
             mALPHA(); 
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:133:19: ( DIGIT | ALPHA | '_' )*
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:93:20: ( ALPHA | DIGIT | '_' | '.' )*
             loop1:
             do {
                 int alt1=2;
                 int LA1_0 = input.LA(1);
 
-                if ( ((LA1_0>='0' && LA1_0<='9')||(LA1_0>='A' && LA1_0<='Z')||LA1_0=='_'||(LA1_0>='a' && LA1_0<='z')) ) {
+                if ( (LA1_0=='.'||(LA1_0>='0' && LA1_0<='9')||(LA1_0>='A' && LA1_0<='Z')||LA1_0=='_'||(LA1_0>='a' && LA1_0<='z')) ) {
                     alt1=1;
                 }
 
@@ -316,7 +298,7 @@ public class FormulaLexer extends Lexer {
             	case 1 :
             	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
             	    {
-            	    if ( (input.LA(1)>='0' && input.LA(1)<='9')||(input.LA(1)>='A' && input.LA(1)<='Z')||input.LA(1)=='_'||(input.LA(1)>='a' && input.LA(1)<='z') ) {
+            	    if ( input.LA(1)=='.'||(input.LA(1)>='0' && input.LA(1)<='9')||(input.LA(1)>='A' && input.LA(1)<='Z')||input.LA(1)=='_'||(input.LA(1)>='a' && input.LA(1)<='z') ) {
             	        input.consume();
 
             	    }
@@ -343,24 +325,24 @@ public class FormulaLexer extends Lexer {
         finally {
         }
     }
-    // $ANTLR end "ID1"
+    // $ANTLR end "VAR"
 
-    // $ANTLR start "CONST1"
-    public final void mCONST1() throws RecognitionException {
+    // $ANTLR start "FUNCTOR"
+    public final void mFUNCTOR() throws RecognitionException {
         try {
-            int _type = CONST1;
+            int _type = FUNCTOR;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:134:10: ( DIGIT ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' )* )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:134:14: DIGIT ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' )*
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:94:10: ( ALPHA ( ALPHA | DIGIT | '_' | '.' )* )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:94:14: ALPHA ( ALPHA | DIGIT | '_' | '.' )*
             {
-            mDIGIT(); 
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:134:20: ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' )*
+            mALPHA(); 
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:94:20: ( ALPHA | DIGIT | '_' | '.' )*
             loop2:
             do {
                 int alt2=2;
                 int LA2_0 = input.LA(1);
 
-                if ( ((LA2_0>='.' && LA2_0<=':')||(LA2_0>='A' && LA2_0<='Z')||LA2_0=='\\'||LA2_0=='_'||(LA2_0>='a' && LA2_0<='z')) ) {
+                if ( (LA2_0=='.'||(LA2_0>='0' && LA2_0<='9')||(LA2_0>='A' && LA2_0<='Z')||LA2_0=='_'||(LA2_0>='a' && LA2_0<='z')) ) {
                     alt2=1;
                 }
 
@@ -369,7 +351,7 @@ public class FormulaLexer extends Lexer {
             	case 1 :
             	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
             	    {
-            	    if ( (input.LA(1)>='.' && input.LA(1)<=':')||(input.LA(1)>='A' && input.LA(1)<='Z')||input.LA(1)=='\\'||input.LA(1)=='_'||(input.LA(1)>='a' && input.LA(1)<='z') ) {
+            	    if ( input.LA(1)=='.'||(input.LA(1)>='0' && input.LA(1)<='9')||(input.LA(1)>='A' && input.LA(1)<='Z')||input.LA(1)=='_'||(input.LA(1)>='a' && input.LA(1)<='z') ) {
             	        input.consume();
 
             	    }
@@ -396,18 +378,18 @@ public class FormulaLexer extends Lexer {
         finally {
         }
     }
-    // $ANTLR end "CONST1"
+    // $ANTLR end "FUNCTOR"
 
-    // $ANTLR start "CONST2"
-    public final void mCONST2() throws RecognitionException {
+    // $ANTLR start "CONST"
+    public final void mCONST() throws RecognitionException {
         try {
-            int _type = CONST2;
+            int _type = CONST;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:135:10: ( QUOTE ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' | ' ' )+ QUOTE )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:135:14: QUOTE ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' | ' ' )+ QUOTE
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:95:10: ( QUOTE ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' | ' ' )+ QUOTE )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:95:14: QUOTE ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' | ' ' )+ QUOTE
             {
             mQUOTE(); 
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:135:20: ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' | ' ' )+
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:95:20: ( DIGIT | ALPHA | '_' | '.' | ':' | '/' | '\\\\' | ' ' )+
             int cnt3=0;
             loop3:
             do {
@@ -455,17 +437,17 @@ public class FormulaLexer extends Lexer {
         finally {
         }
     }
-    // $ANTLR end "CONST2"
+    // $ANTLR end "CONST"
 
     // $ANTLR start "NEWLINE"
     public final void mNEWLINE() throws RecognitionException {
         try {
             int _type = NEWLINE;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:136:9: ( ( '\\r' )? '\\n' )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:136:13: ( '\\r' )? '\\n'
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:96:10: ( ( '\\r' )? '\\n' )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:96:14: ( '\\r' )? '\\n'
             {
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:136:13: ( '\\r' )?
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:96:14: ( '\\r' )?
             int alt4=2;
             int LA4_0 = input.LA(1);
 
@@ -474,7 +456,7 @@ public class FormulaLexer extends Lexer {
             }
             switch (alt4) {
                 case 1 :
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:136:13: '\\r'
+                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:96:14: '\\r'
                     {
                     match('\r'); 
 
@@ -500,10 +482,10 @@ public class FormulaLexer extends Lexer {
         try {
             int _type = WS;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:137:5: ( ( ' ' | '\\t' )+ )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:137:9: ( ' ' | '\\t' )+
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:97:5: ( ( ' ' | '\\t' )+ )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:97:9: ( ' ' | '\\t' )+
             {
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:137:9: ( ' ' | '\\t' )+
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:97:9: ( ' ' | '\\t' )+
             int cnt5=0;
             loop5:
             do {
@@ -554,8 +536,8 @@ public class FormulaLexer extends Lexer {
     // $ANTLR end "WS"
 
     public void mTokens() throws RecognitionException {
-        // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:8: ( AND | OR | IMPLIES | IFF | NOT | QUOTE | LPAR | RPAR | COMMA | T__20 | DIGIT | ALPHA | ID1 | CONST1 | CONST2 | NEWLINE | WS )
-        int alt6=17;
+        // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:8: ( AND | OR | IMPLIES | IFF | NOT | QUOTE | LPAR | RPAR | COMMA | DIGIT | ALPHA | VAR | FUNCTOR | CONST | NEWLINE | WS )
+        int alt6=16;
         alt6 = dfa6.predict(input);
         switch (alt6) {
             case 1 :
@@ -622,56 +604,49 @@ public class FormulaLexer extends Lexer {
                 }
                 break;
             case 10 :
-                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:55: T__20
-                {
-                mT__20(); 
-
-                }
-                break;
-            case 11 :
-                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:61: DIGIT
+                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:55: DIGIT
                 {
                 mDIGIT(); 
 
                 }
                 break;
-            case 12 :
-                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:67: ALPHA
+            case 11 :
+                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:61: ALPHA
                 {
                 mALPHA(); 
 
                 }
                 break;
-            case 13 :
-                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:73: ID1
+            case 12 :
+                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:67: VAR
                 {
-                mID1(); 
+                mVAR(); 
+
+                }
+                break;
+            case 13 :
+                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:71: FUNCTOR
+                {
+                mFUNCTOR(); 
 
                 }
                 break;
             case 14 :
-                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:77: CONST1
+                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:79: CONST
                 {
-                mCONST1(); 
+                mCONST(); 
 
                 }
                 break;
             case 15 :
-                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:84: CONST2
-                {
-                mCONST2(); 
-
-                }
-                break;
-            case 16 :
-                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:91: NEWLINE
+                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:85: NEWLINE
                 {
                 mNEWLINE(); 
 
                 }
                 break;
-            case 17 :
-                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:99: WS
+            case 16 :
+                // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:93: WS
                 {
                 mWS(); 
 
@@ -685,50 +660,40 @@ public class FormulaLexer extends Lexer {
 
     protected DFA6 dfa6 = new DFA6(this);
     static final String DFA6_eotS =
-        "\1\uffff\2\20\3\uffff\1\23\4\uffff\1\25\1\20\2\uffff\1\21\2\uffff"+
-        "\1\30\4\uffff\1\31\2\uffff";
+        "\6\uffff\1\17\4\uffff\1\21\7\uffff";
     static final String DFA6_eofS =
-        "\32\uffff";
+        "\23\uffff";
     static final String DFA6_minS =
-        "\1\11\2\60\3\uffff\1\40\4\uffff\1\56\1\60\2\uffff\1\144\2\uffff"+
-        "\1\60\4\uffff\1\60\2\uffff";
+        "\1\11\5\uffff\1\40\4\uffff\1\56\7\uffff";
     static final String DFA6_maxS =
-        "\3\172\3\uffff\1\172\4\uffff\2\172\2\uffff\1\144\2\uffff\1\172"+
-        "\4\uffff\1\172\2\uffff";
+        "\1\174\5\uffff\1\172\4\uffff\1\172\7\uffff";
     static final String DFA6_acceptS =
-        "\3\uffff\1\3\1\4\1\5\1\uffff\1\7\1\10\1\11\1\12\2\uffff\1\20\1"+
-        "\21\1\uffff\1\14\1\15\1\uffff\1\6\1\17\1\13\1\16\1\uffff\1\2\1\1";
+        "\1\uffff\1\1\1\2\1\3\1\4\1\5\1\uffff\1\7\1\10\1\11\1\12\1\uffff"+
+        "\1\14\1\17\1\20\1\6\1\16\1\13\1\15";
     static final String DFA6_specialS =
-        "\32\uffff}>";
+        "\23\uffff}>";
     static final String[] DFA6_transitionS = {
-            "\1\16\1\15\2\uffff\1\15\22\uffff\1\16\1\uffff\1\6\1\uffff\1"+
-            "\12\3\uffff\1\7\1\10\2\uffff\1\11\1\5\2\uffff\12\13\2\uffff"+
-            "\1\4\1\3\3\uffff\32\14\6\uffff\1\1\15\14\1\2\13\14",
-            "\12\21\7\uffff\32\21\4\uffff\1\21\1\uffff\15\21\1\17\14\21",
-            "\12\21\7\uffff\32\21\4\uffff\1\21\1\uffff\21\21\1\22\10\21",
-            "",
-            "",
-            "",
-            "\1\24\15\uffff\15\24\6\uffff\32\24\1\uffff\1\24\2\uffff\1"+
-            "\24\1\uffff\32\24",
+            "\1\16\1\15\2\uffff\1\15\22\uffff\1\16\3\uffff\1\14\1\uffff"+
+            "\1\1\1\6\1\7\1\10\2\uffff\1\11\1\5\2\uffff\12\12\2\uffff\1\4"+
+            "\1\3\3\uffff\32\13\6\uffff\32\13\1\uffff\1\2",
             "",
             "",
             "",
             "",
-            "\15\26\6\uffff\32\26\1\uffff\1\26\2\uffff\1\26\1\uffff\32"+
-            "\26",
-            "\12\21\7\uffff\32\21\4\uffff\1\21\1\uffff\32\21",
             "",
-            "",
-            "\1\27",
-            "",
-            "",
-            "\12\21\7\uffff\32\21\4\uffff\1\21\1\uffff\32\21",
+            "\1\20\15\uffff\15\20\6\uffff\32\20\1\uffff\1\20\2\uffff\1"+
+            "\20\1\uffff\32\20",
             "",
             "",
             "",
             "",
-            "\12\21\7\uffff\32\21\4\uffff\1\21\1\uffff\32\21",
+            "\1\22\1\uffff\12\22\7\uffff\32\22\4\uffff\1\22\1\uffff\32"+
+            "\22",
+            "",
+            "",
+            "",
+            "",
+            "",
             "",
             ""
     };
@@ -763,7 +728,7 @@ public class FormulaLexer extends Lexer {
             this.transition = DFA6_transition;
         }
         public String getDescription() {
-            return "1:1: Tokens : ( AND | OR | IMPLIES | IFF | NOT | QUOTE | LPAR | RPAR | COMMA | T__20 | DIGIT | ALPHA | ID1 | CONST1 | CONST2 | NEWLINE | WS );";
+            return "1:1: Tokens : ( AND | OR | IMPLIES | IFF | NOT | QUOTE | LPAR | RPAR | COMMA | DIGIT | ALPHA | VAR | FUNCTOR | CONST | NEWLINE | WS );";
         }
     }
  

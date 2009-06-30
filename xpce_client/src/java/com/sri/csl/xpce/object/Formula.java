@@ -1,10 +1,12 @@
 package com.sri.csl.xpce.object;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 
 import org.antlr.runtime.ANTLRInputStream;
 import org.antlr.runtime.CommonTokenStream;
+import org.antlr.runtime.RecognitionException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -54,94 +56,32 @@ public abstract class Formula {
 		}
 	}
 	
-	public static Formula createFromString(String str) throws XPCException {
-		State state = State.Begin;
-		Formula[] formula = new Formula[2];
-		int index = 0;
-		String tmp;
-		char ch;
-		int i;
-		str = str.trim();
-	    for (i=0 ; i<str.length() ; i++) {
-	    	ch = str.charAt(i);
-	    	System.out.println(" => " + ch);
-	    	switch ( state ) {
-	    	case Begin:
-	    		if ( ch == ' ' || ch == '\t' )
-	    			continue;
-	    		else if ( ch == '(' )
-	    			state = State.NonAtomicBegin;
-	    		else if ( ((ch >= 'a') && (ch <= 'z')) || ((ch >= 'A') && (ch <= 'Z')) )
-	    			state = State.AtomicBegin;
-	    		else
-	    			throw new XPCException("Parse Error at position " + i);
-	    		break;
-	    	case AtomicBegin:
-	    		if ( ((ch >= 'a') && (ch <= 'z')) || ((ch >= 'A') && (ch <= 'Z')) ) {
-	    			tmp = str.substring(i, str.indexOf(')', i));
-	    		} else
-	    			throw new XPCException("Parse Error at position " + i);
-	    		formula[index++] = new Atom(tmp);
-	    		break;
-	    	}
-	    }
-		return null;
+	public static Formula createFromString(String str) throws IOException, RecognitionException {
+		ByteArrayInputStream stream = new ByteArrayInputStream(str.getBytes());
+		ANTLRInputStream input = new ANTLRInputStream(stream);
+		FormulaLexer lexer   = new FormulaLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+		FormulaParser parser = new FormulaParser(tokens);
+		return parser.formula();
 	}
 
 	public static void main(String args[]) {
-		String formulaStr = "-Father($Bob, \"Tom Jones\")";
-		ByteArrayInputStream stream = new ByteArrayInputStream(formulaStr.getBytes());
 		try {
-			ANTLRInputStream input = new ANTLRInputStream(stream);
-			FormulaLexer lexer   = new FormulaLexer(input);
-	        CommonTokenStream tokens = new CommonTokenStream(lexer);
-			FormulaParser parser = new FormulaParser(tokens);
-			Formula a = parser.formula();
-			System.out.print("Formula is " + a);
+			Formula f1 = new NotFormula(new Atom("Age", "Sam", new Variable("x")));
+			Formula f2 = Formula.createFromString("-Father('Bob', 'Tom Jones')");
+			Formula f3 = Formula.createFromString("(Married($x, $y) & Likes($x, $y))");
+			Formula f4 = Formula.createFromString(f1.toString());
+			Formula f5 = Formula.createFromString(f2.toString());
+			Formula f6 = Formula.createFromString(f3.toString());
+			
+			System.out.println("" + f4);
+			System.out.println("" + f5);
+			System.out.println("" + f6);
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
-	
-	public static void main2(String args[]) {
-		Atom r = new Atom("family(bob, $X, tom, rose)");
-		System.out.println("r is: " + r);
-		PredicateDecl p1 = new PredicateDecl("Father", "Person", "Person");
-		PredicateDecl p2 = new PredicateDecl("Male", "Person");
-		Atom a1, a2, a3;
-		try {
-			a1 = new Atom(p1, "Bob", "Sam");
-			a2 = new Atom(p2, "Sam");
-			a3 = new Atom("Age", "Sam", new Variable("x"));
-			NotFormula na3 = new NotFormula(a3);
-			OrFormula f = new OrFormula(a1, a2);
-			ImpliesFormula f2 = new ImpliesFormula(na3, f);
-			AndFormula f1 = new AndFormula(f2, f);
-			AndFormula f3 = new AndFormula(f, f2);
-			System.out.println("Formula f1 is: " + f1);
-			System.out.println("Formula f3 is: " + f3);
-			System.out.println("\nFormula f1(JSON) is: " + f1.toJSON());
-			System.out.println("Formula f3(JSON) is: " + f3.toJSON());
-
-			Formula ff = Formula.createFromJSON(f1.toJSON());
-			System.out.println("\nFormula ff is: " + ff);
-			
-			if ( f1.equals(f3) )
-				System.out.println("\nf1 and f3 are equal");
-			else
-				System.out.println("\nf1 and f3 are NOT equal");
-		} catch (Exception rr) {
-			rr.printStackTrace();
-		}		
-	}
-
-	@Override
-	public boolean equals(Object o) {
-		return false;
-	}
-	
+		
 	public abstract JSONObject toJSON() throws JSONException;
-
 
 }

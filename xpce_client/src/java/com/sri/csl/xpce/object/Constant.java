@@ -5,7 +5,7 @@ public class Constant extends Term {
 	protected Sort sort;
 
 	public Constant(String name) {
-		if ( name.startsWith("\"") )
+		if ( name.startsWith("\'") )
 			this.name = name.substring(1,name.length()-1);
 		else
 			this.name = name;
@@ -27,8 +27,6 @@ public class Constant extends Term {
 	}
 	
 	public String toString() {
-		if ( name.indexOf(' ') > -1 )
-			return "\"" + name + "\"";
-		return name;
+		return "\'" + name + "\'";
 	}
 }

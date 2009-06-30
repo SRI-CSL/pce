@@ -12,7 +12,10 @@ public class Variable extends Term {
 	}
 	
 	public Variable(String name) {
-		this.name = name;
+		if ( name.startsWith(XPCEConstants.VARIABLEPREFIX) )
+			this.name = name.substring(1);
+		else
+			this.name = name;
 	}
 
 	@Override
