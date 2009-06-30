@@ -44,12 +44,12 @@
         <!-- java classpaths -->
         <path id="buildpath">
             <fileset dir="${xpceClient.lib.dir}" includes="*.jar"/>
-            <files includes="${xpceClient.targetjar}"/>
+            <fileset dir="${xpceClient.jar.dir}" includes="xpceClient.jar"/>
             <fileset dir="${lib.dir}" includes="*.jar"/>
         </path>
         <path id="runpath">
             <path refid="buildpath"/>
-            <files includes="${dest.targetjar}"/>
+            <fileset dir="${dest.jar.dir}" includes="xpceClientTests.jar"/>
         </path>
     </target>
     
@@ -95,6 +95,7 @@
     <target name="compile" depends="build-xpceClient"
         description="Compiles all java files">
         <mkdir dir="${dest.classes.dir}"/>
+
         <javac listfiles="true" optimize="on" debug="off" fork="true" memoryMaximumSize="256m" verbose="off"
                srcdir="${src.dir}" destdir="${dest.classes.dir}">
             <classpath refid="buildpath"/>
