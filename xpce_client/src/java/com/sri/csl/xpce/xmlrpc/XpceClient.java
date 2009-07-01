@@ -155,7 +155,7 @@ public class XpceClient {
 	    try {
 	    	Sort person = new Sort("Person");
 	    	client.addSort(person);
-	    	client.addConstant(person, "bob", "tom", "lisa", "rose");
+	    	client.addConstant(person, "bob", "tom jones", "lisa", "rose");
 	    	PredicateDecl pred1 = new PredicateDecl("married", person, person);
 	    	PredicateDecl pred2 = new PredicateDecl(false, "likes", person, person);
 	    	client.addPredicate(pred1);
@@ -172,11 +172,11 @@ public class XpceClient {
 	    	client.mcsat();
 	    	Thread.sleep(1000);
 	    	
-	    	Formula question1 = Formula.createFromString("-likes('bob', $Z)");
+	    	Formula question1 = Formula.createFromString("-likes(bob, $Z)");
 	    	ArrayList<FormulaAndProbability> answers = client.ask(question1, 0.01, 10);
 	    	System.out.println("Return Value:" + answers);
 	    	
-	    	Formula question2 = Formula.createFromString("likes('bob', 'tom') | likes('bob', 'lisa')");
+	    	Formula question2 = Formula.createFromString("likes(bob, 'tom jones') | likes(bob, lisa)");
 	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') & likes('bob', 'lisa')");
 	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') => likes('bob', 'lisa')");
 	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') <=> likes('bob', 'lisa')");
