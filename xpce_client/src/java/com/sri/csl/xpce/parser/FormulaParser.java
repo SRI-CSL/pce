@@ -1,51 +1,44 @@
-// $ANTLR 3.1.2 C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g 2009-06-30 15:19:09
+// $ANTLR 3.1.2 C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g 2009-07-01 16:38:38
 
 package com.sri.csl.xpce.parser;
 
+import com.sri.csl.xpce.object.Formula;
+import com.sri.csl.xpce.object.Atom;
+import com.sri.csl.xpce.object.NotFormula;
+import com.sri.csl.xpce.object.AndFormula;
+import com.sri.csl.xpce.object.OrFormula;
+import com.sri.csl.xpce.object.ImpliesFormula;
+import com.sri.csl.xpce.object.IffFormula;
+import com.sri.csl.xpce.object.Term;
+import com.sri.csl.xpce.object.Constant;
+import com.sri.csl.xpce.object.Variable;
 import java.util.ArrayList;
 
-import org.antlr.runtime.BitSet;
-import org.antlr.runtime.EarlyExitException;
-import org.antlr.runtime.MismatchedSetException;
-import org.antlr.runtime.NoViableAltException;
-import org.antlr.runtime.Parser;
-import org.antlr.runtime.RecognitionException;
-import org.antlr.runtime.RecognizerSharedState;
-import org.antlr.runtime.Token;
-import org.antlr.runtime.TokenStream;
 
-import com.sri.csl.xpce.object.AndFormula;
-import com.sri.csl.xpce.object.Atom;
-import com.sri.csl.xpce.object.Constant;
-import com.sri.csl.xpce.object.Formula;
-import com.sri.csl.xpce.object.IffFormula;
-import com.sri.csl.xpce.object.ImpliesFormula;
-import com.sri.csl.xpce.object.NotFormula;
-import com.sri.csl.xpce.object.OrFormula;
-import com.sri.csl.xpce.object.Term;
-import com.sri.csl.xpce.object.Variable;
+import org.antlr.runtime.*;
+import java.util.Stack;
+import java.util.List;
+import java.util.ArrayList;
 
 public class FormulaParser extends Parser {
     public static final String[] tokenNames = new String[] {
-        "<invalid>", "<EOR>", "<DOWN>", "<UP>", "AND", "OR", "IMPLIES", "IFF", "NOT", "QUOTE", "LPAR", "RPAR", "COMMA", "FUNCTOR", "VAR", "CONST", "DIGIT", "ALPHA", "NEWLINE", "WS"
+        "<invalid>", "<EOR>", "<DOWN>", "<UP>", "AND", "OR", "IMPLIES", "IFF", "NOT", "QUOTE", "LPAR", "RPAR", "COMMA", "FUNCONS", "VAR", "CONST", "NEWLINE", "WS"
     };
+    public static final int FUNCONS=13;
     public static final int IFF=7;
-    public static final int IMPLIES=6;
-    public static final int CONST=15;
-    public static final int NOT=8;
-    public static final int FUNCTOR=13;
-    public static final int AND=4;
-    public static final int EOF=-1;
-    public static final int ALPHA=17;
     public static final int QUOTE=9;
-    public static final int WS=19;
+    public static final int WS=17;
+    public static final int IMPLIES=6;
+    public static final int NEWLINE=16;
     public static final int LPAR=10;
-    public static final int NEWLINE=18;
     public static final int COMMA=12;
+    public static final int CONST=15;
     public static final int OR=5;
     public static final int RPAR=11;
     public static final int VAR=14;
-    public static final int DIGIT=16;
+    public static final int NOT=8;
+    public static final int AND=4;
+    public static final int EOF=-1;
 
     // delegates
     // delegators
@@ -83,7 +76,7 @@ public class FormulaParser extends Parser {
                 int alt1=2;
                 int LA1_0 = input.LA(1);
 
-                if ( (LA1_0==NOT||LA1_0==LPAR||LA1_0==FUNCTOR) ) {
+                if ( (LA1_0==NOT||LA1_0==LPAR||LA1_0==FUNCONS) ) {
                     alt1=1;
                 }
 
@@ -144,7 +137,7 @@ public class FormulaParser extends Parser {
             // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:44:28: (at= atom | ( NOT nf= formula ) | ( LPAR f1= formula op= ( AND | OR | IMPLIES | IFF ) f2= formula RPAR ) )
             int alt2=3;
             switch ( input.LA(1) ) {
-            case FUNCTOR:
+            case FUNCONS:
                 {
                 alt2=1;
                 }
@@ -225,12 +218,19 @@ public class FormulaParser extends Parser {
 
                     state._fsp--;
 
-                    if (op.getType()==AND) f=new AndFormula(f1, f2);
-                         		 else if (op.getType()==OR) f=new OrFormula(f1, f2);
-                         		 else if (op.getType()==IMPLIES) f=new ImpliesFormula(f1, f2);
-                         		 else if (op.getType()==IFF) f=new IffFormula(f1, f2);
-                         		 else { System.out.println("Bad operator: " + op); f = null; }
-                         		 
+                    switch (op.getType()) { 
+                         		   case AND:
+                         		   	f=new AndFormula(f1, f2); break;
+                         		   case OR:
+                         		   	f=new OrFormula(f1, f2); break;
+                         		   case IMPLIES:
+                         		   	f=new ImpliesFormula(f1, f2); break;
+                         		   case IFF:
+                         		   	f=new IffFormula(f1, f2); break;
+                         		   default:
+                         		   	System.out.println("Bad operator: " + op); f = null; break;
+                         		   }
+                         		
                     match(input,RPAR,FOLLOW_RPAR_in_formula255); 
 
                     }
@@ -253,11 +253,11 @@ public class FormulaParser extends Parser {
 
 
     // $ANTLR start "atom"
-    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:61:1: atom returns [Atom f] : FUNCTOR LPAR t= term ( COMMA t= term )* RPAR ;
+    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:68:1: atom returns [Atom f] : FUNCONS LPAR t= term ( COMMA t= term )* RPAR ;
     public final Atom atom() throws RecognitionException {
         Atom f = null;
 
-        Token FUNCTOR1=null;
+        Token FUNCONS1=null;
         Term t = null;
 
 
@@ -265,11 +265,11 @@ public class FormulaParser extends Parser {
             String functor = ""; 
             ArrayList<Term> terms = new ArrayList<Term>(); 
         try {
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:64:53: ( FUNCTOR LPAR t= term ( COMMA t= term )* RPAR )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:65:5: FUNCTOR LPAR t= term ( COMMA t= term )* RPAR
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:71:53: ( FUNCONS LPAR t= term ( COMMA t= term )* RPAR )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:72:5: FUNCONS LPAR t= term ( COMMA t= term )* RPAR
             {
-            FUNCTOR1=(Token)match(input,FUNCTOR,FOLLOW_FUNCTOR_in_atom280); 
-            functor = (FUNCTOR1!=null?FUNCTOR1.getText():null); 
+            FUNCONS1=(Token)match(input,FUNCONS,FOLLOW_FUNCONS_in_atom280); 
+            functor = (FUNCONS1!=null?FUNCONS1.getText():null); 
             match(input,LPAR,FOLLOW_LPAR_in_atom292); 
             pushFollow(FOLLOW_term_in_atom305);
             t=term();
@@ -277,7 +277,7 @@ public class FormulaParser extends Parser {
             state._fsp--;
 
              terms.add(t); 
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:68:9: ( COMMA t= term )*
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:75:9: ( COMMA t= term )*
             loop3:
             do {
                 int alt3=2;
@@ -290,7 +290,7 @@ public class FormulaParser extends Parser {
 
                 switch (alt3) {
             	case 1 :
-            	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:69:13: COMMA t= term
+            	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:76:13: COMMA t= term
             	    {
             	    match(input,COMMA,FOLLOW_COMMA_in_atom331); 
             	    pushFollow(FOLLOW_term_in_atom348);
@@ -326,7 +326,7 @@ public class FormulaParser extends Parser {
 
 
     // $ANTLR start "term"
-    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:76:1: term returns [Term t] : (v= variable | c= constant );
+    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:83:1: term returns [Term t] : (v= variable | c= constant );
     public final Term term() throws RecognitionException {
         Term t = null;
 
@@ -336,14 +336,14 @@ public class FormulaParser extends Parser {
 
 
         try {
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:76:22: (v= variable | c= constant )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:83:22: (v= variable | c= constant )
             int alt4=2;
             int LA4_0 = input.LA(1);
 
             if ( (LA4_0==VAR) ) {
                 alt4=1;
             }
-            else if ( (LA4_0==CONST) ) {
+            else if ( (LA4_0==FUNCONS||LA4_0==CONST) ) {
                 alt4=2;
             }
             else {
@@ -354,7 +354,7 @@ public class FormulaParser extends Parser {
             }
             switch (alt4) {
                 case 1 :
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:77:5: v= variable
+                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:84:5: v= variable
                     {
                     pushFollow(FOLLOW_variable_in_term404);
                     v=variable();
@@ -366,7 +366,7 @@ public class FormulaParser extends Parser {
                     }
                     break;
                 case 2 :
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:79:5: c= constant
+                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:86:5: c= constant
                     {
                     pushFollow(FOLLOW_constant_in_term420);
                     c=constant();
@@ -392,15 +392,15 @@ public class FormulaParser extends Parser {
 
 
     // $ANTLR start "variable"
-    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:81:1: variable returns [Variable v] : VAR ;
+    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:88:1: variable returns [Variable v] : VAR ;
     public final Variable variable() throws RecognitionException {
         Variable v = null;
 
         Token VAR2=null;
 
         try {
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:81:30: ( VAR )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:82:5: VAR
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:88:30: ( VAR )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:89:5: VAR
             {
             VAR2=(Token)match(input,VAR,FOLLOW_VAR_in_variable437); 
             v = new Variable((VAR2!=null?VAR2.getText():null));
@@ -420,21 +420,49 @@ public class FormulaParser extends Parser {
 
 
     // $ANTLR start "constant"
-    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:84:1: constant returns [Constant c] : CONST ;
+    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:91:1: constant returns [Constant c] : ( FUNCONS | CONST );
     public final Constant constant() throws RecognitionException {
         Constant c = null;
 
-        Token CONST3=null;
+        Token FUNCONS3=null;
+        Token CONST4=null;
 
         try {
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:84:30: ( CONST )
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:85:5: CONST
-            {
-            CONST3=(Token)match(input,CONST,FOLLOW_CONST_in_constant454); 
-            c = new Constant((CONST3!=null?CONST3.getText():null));
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:91:30: ( FUNCONS | CONST )
+            int alt5=2;
+            int LA5_0 = input.LA(1);
+
+            if ( (LA5_0==FUNCONS) ) {
+                alt5=1;
+            }
+            else if ( (LA5_0==CONST) ) {
+                alt5=2;
+            }
+            else {
+                NoViableAltException nvae =
+                    new NoViableAltException("", 5, 0, input);
+
+                throw nvae;
+            }
+            switch (alt5) {
+                case 1 :
+                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:92:5: FUNCONS
+                    {
+                    FUNCONS3=(Token)match(input,FUNCONS,FOLLOW_FUNCONS_in_constant454); 
+                    c = new Constant((FUNCONS3!=null?FUNCONS3.getText():null));
+
+                    }
+                    break;
+                case 2 :
+                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:94:5: CONST
+                    {
+                    CONST4=(Token)match(input,CONST,FOLLOW_CONST_in_constant468); 
+                    c = new Constant((CONST4!=null?CONST4.getText():null));
+
+                    }
+                    break;
 
             }
-
         }
         catch (RecognitionException re) {
             reportError(re);
@@ -460,15 +488,16 @@ public class FormulaParser extends Parser {
     public static final BitSet FOLLOW_set_in_formula229 = new BitSet(new long[]{0x0000000000002D00L});
     public static final BitSet FOLLOW_formula_in_formula246 = new BitSet(new long[]{0x0000000000000800L});
     public static final BitSet FOLLOW_RPAR_in_formula255 = new BitSet(new long[]{0x0000000000000002L});
-    public static final BitSet FOLLOW_FUNCTOR_in_atom280 = new BitSet(new long[]{0x0000000000000400L});
-    public static final BitSet FOLLOW_LPAR_in_atom292 = new BitSet(new long[]{0x000000000000C000L});
+    public static final BitSet FOLLOW_FUNCONS_in_atom280 = new BitSet(new long[]{0x0000000000000400L});
+    public static final BitSet FOLLOW_LPAR_in_atom292 = new BitSet(new long[]{0x000000000000E000L});
     public static final BitSet FOLLOW_term_in_atom305 = new BitSet(new long[]{0x0000000000001800L});
-    public static final BitSet FOLLOW_COMMA_in_atom331 = new BitSet(new long[]{0x000000000000C000L});
+    public static final BitSet FOLLOW_COMMA_in_atom331 = new BitSet(new long[]{0x000000000000E000L});
     public static final BitSet FOLLOW_term_in_atom348 = new BitSet(new long[]{0x0000000000001800L});
     public static final BitSet FOLLOW_RPAR_in_atom372 = new BitSet(new long[]{0x0000000000000002L});
     public static final BitSet FOLLOW_variable_in_term404 = new BitSet(new long[]{0x0000000000000002L});
     public static final BitSet FOLLOW_constant_in_term420 = new BitSet(new long[]{0x0000000000000002L});
     public static final BitSet FOLLOW_VAR_in_variable437 = new BitSet(new long[]{0x0000000000000002L});
-    public static final BitSet FOLLOW_CONST_in_constant454 = new BitSet(new long[]{0x0000000000000002L});
+    public static final BitSet FOLLOW_FUNCONS_in_constant454 = new BitSet(new long[]{0x0000000000000002L});
+    public static final BitSet FOLLOW_CONST_in_constant468 = new BitSet(new long[]{0x0000000000000002L});
 
 }

@@ -50,19 +50,26 @@ formula returns [Formula f]:
     (LPAR
      f1=formula
      op=(AND|OR|IMPLIES|IFF)
-     f2=formula {if (op.getType()==AND) f=new AndFormula(f1, f2);
-     		 else if (op.getType()==OR) f=new OrFormula(f1, f2);
-     		 else if (op.getType()==IMPLIES) f=new ImpliesFormula(f1, f2);
-     		 else if (op.getType()==IFF) f=new IffFormula(f1, f2);
-     		 else { System.out.println("Bad operator: " + op); f = null; }
-     		 }
+     f2=formula {switch (op.getType()) { 
+     		   case AND:
+     		   	f=new AndFormula(f1, f2); break;
+     		   case OR:
+     		   	f=new OrFormula(f1, f2); break;
+     		   case IMPLIES:
+     		   	f=new ImpliesFormula(f1, f2); break;
+     		   case IFF:
+     		   	f=new IffFormula(f1, f2); break;
+     		   default:
+     		   	System.out.println("Bad operator: " + op); f = null; break;
+     		   }
+     		}
      RPAR);
 
 atom returns [Atom f]
     @init {
     String functor = ""; 
     ArrayList<Term> terms = new ArrayList<Term>(); }:
-    FUNCTOR {functor = $FUNCTOR.text; }
+    FUNCONS {functor = $FUNCONS.text; }
         LPAR 
         t=term { terms.add(t); }
         (
@@ -82,17 +89,17 @@ variable returns [Variable v]:
     VAR {v = new Variable($VAR.text);};
 
 constant returns [Constant c]:
+    FUNCONS {c = new Constant($FUNCONS.text);}
+    |
     CONST {c = new Constant($CONST.text);};
     
 /*------------------------------------------------------------------
  * LEXER RULES
  *------------------------------------------------------------------*/
 
-DIGIT	 :   '0'..'9';
-ALPHA	 :   'a'..'z'|'A'..'Z';
-VAR	 :   '$' ALPHA (ALPHA|DIGIT|'_'|'.')*;
-FUNCTOR  :   ALPHA (ALPHA|DIGIT|'_'|'.')*;
-CONST    :   QUOTE (DIGIT|ALPHA|'_'|'.'|':'|'/'|'\\'|' ')+  QUOTE;
+VAR	 :   '$' 'a'..'z'|'A'..'Z' ('a'..'z'|'A'..'Z'|'0'..'9'|'_'|'.')*;
+FUNCONS  :   'a'..'z'|'A'..'Z' ('a'..'z'|'A'..'Z'|'0'..'9'|'_'|'.')*;
+CONST    :   QUOTE ('0'..'9'|'a'..'z'|'A'..'Z'|'_'|'.'|':'|'/'|'\\'|' ')+  QUOTE;
 NEWLINE  :   '\r'? '\n' ;
 WS	 :   (' '|'\t')+ {skip();} ;
 

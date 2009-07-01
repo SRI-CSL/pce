@@ -67,16 +67,16 @@ public abstract class Formula {
 
 	public static void main(String args[]) {
 		try {
-			Formula f1 = new NotFormula(new Atom("Age", "Sam", new Variable("x")));
-			Formula f2 = Formula.createFromString("-Father('Bob', 'Tom Jones')");
-			Formula f3 = Formula.createFromString("(Married($x, $y) & Likes($x, $y))");
-			Formula f4 = Formula.createFromString(f1.toString());
+			//Formula f1 = new NotFormula(new Atom("Age", "Sam", new Variable("x")));
+			Formula f2 = Formula.createFromString("f(m, 'Tom Jones')");
+			//Formula f3 = Formula.createFromString("(Married($x, $y) & Likes($x, $y))");
+			//Formula f4 = Formula.createFromString(f1.toString());
 			Formula f5 = Formula.createFromString(f2.toString());
-			Formula f6 = Formula.createFromString(f3.toString());
+			//Formula f6 = Formula.createFromString(f3.toString());
 			
-			System.out.println("" + f4);
+			//System.out.println("" + f4);
 			System.out.println("" + f5);
-			System.out.println("" + f6);
+			//System.out.println("" + f6);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

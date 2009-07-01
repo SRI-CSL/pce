@@ -27,6 +27,8 @@ public class Constant extends Term {
 	}
 	
 	public String toString() {
-		return "\'" + name + "\'";
+		if ( name.indexOf(' ') > -1 )
+			return "\'" + name + "\'";
+		return name;
 	}
 }
