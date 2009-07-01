@@ -1,6 +1,6 @@
 package com.sri.csl.xpce.parser;
 
-// $ANTLR 3.1.2 C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g 2009-07-01 16:38:38
+// $ANTLR 3.1.2 C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g 2009-07-01 16:46:21
 
 import org.antlr.runtime.*;
 import java.util.Stack;
@@ -224,73 +224,55 @@ public class FormulaLexer extends Lexer {
         try {
             int _type = VAR;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:100:6: ( '$' 'a' .. 'z' | 'A' .. 'Z' ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )* )
-            int alt2=2;
-            int LA2_0 = input.LA(1);
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:100:6: ( '$' ( 'a' .. 'z' | 'A' .. 'Z' ) ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )* )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:100:10: '$' ( 'a' .. 'z' | 'A' .. 'Z' ) ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )*
+            {
+            match('$'); 
+            if ( (input.LA(1)>='A' && input.LA(1)<='Z')||(input.LA(1)>='a' && input.LA(1)<='z') ) {
+                input.consume();
 
-            if ( (LA2_0=='$') ) {
-                alt2=1;
-            }
-            else if ( ((LA2_0>='A' && LA2_0<='Z')) ) {
-                alt2=2;
             }
             else {
-                NoViableAltException nvae =
-                    new NoViableAltException("", 2, 0, input);
+                MismatchedSetException mse = new MismatchedSetException(null,input);
+                recover(mse);
+                throw mse;}
 
-                throw nvae;
-            }
-            switch (alt2) {
-                case 1 :
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:100:10: '$' 'a' .. 'z'
-                    {
-                    match('$'); 
-                    matchRange('a','z'); 
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:100:34: ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )*
+            loop1:
+            do {
+                int alt1=2;
+                int LA1_0 = input.LA(1);
 
-                    }
-                    break;
-                case 2 :
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:100:23: 'A' .. 'Z' ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )*
-                    {
-                    matchRange('A','Z'); 
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:100:32: ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )*
-                    loop1:
-                    do {
-                        int alt1=2;
-                        int LA1_0 = input.LA(1);
-
-                        if ( (LA1_0=='.'||(LA1_0>='0' && LA1_0<='9')||(LA1_0>='A' && LA1_0<='Z')||LA1_0=='_'||(LA1_0>='a' && LA1_0<='z')) ) {
-                            alt1=1;
-                        }
+                if ( (LA1_0=='.'||(LA1_0>='0' && LA1_0<='9')||(LA1_0>='A' && LA1_0<='Z')||LA1_0=='_'||(LA1_0>='a' && LA1_0<='z')) ) {
+                    alt1=1;
+                }
 
 
-                        switch (alt1) {
-                    	case 1 :
-                    	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
-                    	    {
-                    	    if ( input.LA(1)=='.'||(input.LA(1)>='0' && input.LA(1)<='9')||(input.LA(1)>='A' && input.LA(1)<='Z')||input.LA(1)=='_'||(input.LA(1)>='a' && input.LA(1)<='z') ) {
-                    	        input.consume();
+                switch (alt1) {
+            	case 1 :
+            	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
+            	    {
+            	    if ( input.LA(1)=='.'||(input.LA(1)>='0' && input.LA(1)<='9')||(input.LA(1)>='A' && input.LA(1)<='Z')||input.LA(1)=='_'||(input.LA(1)>='a' && input.LA(1)<='z') ) {
+            	        input.consume();
 
-                    	    }
-                    	    else {
-                    	        MismatchedSetException mse = new MismatchedSetException(null,input);
-                    	        recover(mse);
-                    	        throw mse;}
-
-
-                    	    }
-                    	    break;
-
-                    	default :
-                    	    break loop1;
-                        }
-                    } while (true);
+            	    }
+            	    else {
+            	        MismatchedSetException mse = new MismatchedSetException(null,input);
+            	        recover(mse);
+            	        throw mse;}
 
 
-                    }
-                    break;
+            	    }
+            	    break;
+
+            	default :
+            	    break loop1;
+                }
+            } while (true);
+
 
             }
+
             state.type = _type;
             state.channel = _channel;
         }
@@ -304,72 +286,54 @@ public class FormulaLexer extends Lexer {
         try {
             int _type = FUNCONS;
             int _channel = DEFAULT_TOKEN_CHANNEL;
-            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:101:10: ( 'a' .. 'z' | 'A' .. 'Z' ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )* )
-            int alt4=2;
-            int LA4_0 = input.LA(1);
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:101:10: ( ( 'a' .. 'z' | 'A' .. 'Z' ) ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )* )
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:101:14: ( 'a' .. 'z' | 'A' .. 'Z' ) ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )*
+            {
+            if ( (input.LA(1)>='A' && input.LA(1)<='Z')||(input.LA(1)>='a' && input.LA(1)<='z') ) {
+                input.consume();
 
-            if ( ((LA4_0>='a' && LA4_0<='z')) ) {
-                alt4=1;
-            }
-            else if ( ((LA4_0>='A' && LA4_0<='Z')) ) {
-                alt4=2;
             }
             else {
-                NoViableAltException nvae =
-                    new NoViableAltException("", 4, 0, input);
+                MismatchedSetException mse = new MismatchedSetException(null,input);
+                recover(mse);
+                throw mse;}
 
-                throw nvae;
-            }
-            switch (alt4) {
-                case 1 :
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:101:14: 'a' .. 'z'
-                    {
-                    matchRange('a','z'); 
+            // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:101:34: ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )*
+            loop2:
+            do {
+                int alt2=2;
+                int LA2_0 = input.LA(1);
 
-                    }
-                    break;
-                case 2 :
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:101:23: 'A' .. 'Z' ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )*
-                    {
-                    matchRange('A','Z'); 
-                    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:101:32: ( 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '.' )*
-                    loop3:
-                    do {
-                        int alt3=2;
-                        int LA3_0 = input.LA(1);
-
-                        if ( (LA3_0=='.'||(LA3_0>='0' && LA3_0<='9')||(LA3_0>='A' && LA3_0<='Z')||LA3_0=='_'||(LA3_0>='a' && LA3_0<='z')) ) {
-                            alt3=1;
-                        }
+                if ( (LA2_0=='.'||(LA2_0>='0' && LA2_0<='9')||(LA2_0>='A' && LA2_0<='Z')||LA2_0=='_'||(LA2_0>='a' && LA2_0<='z')) ) {
+                    alt2=1;
+                }
 
 
-                        switch (alt3) {
-                    	case 1 :
-                    	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
-                    	    {
-                    	    if ( input.LA(1)=='.'||(input.LA(1)>='0' && input.LA(1)<='9')||(input.LA(1)>='A' && input.LA(1)<='Z')||input.LA(1)=='_'||(input.LA(1)>='a' && input.LA(1)<='z') ) {
-                    	        input.consume();
+                switch (alt2) {
+            	case 1 :
+            	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
+            	    {
+            	    if ( input.LA(1)=='.'||(input.LA(1)>='0' && input.LA(1)<='9')||(input.LA(1)>='A' && input.LA(1)<='Z')||input.LA(1)=='_'||(input.LA(1)>='a' && input.LA(1)<='z') ) {
+            	        input.consume();
 
-                    	    }
-                    	    else {
-                    	        MismatchedSetException mse = new MismatchedSetException(null,input);
-                    	        recover(mse);
-                    	        throw mse;}
-
-
-                    	    }
-                    	    break;
-
-                    	default :
-                    	    break loop3;
-                        }
-                    } while (true);
+            	    }
+            	    else {
+            	        MismatchedSetException mse = new MismatchedSetException(null,input);
+            	        recover(mse);
+            	        throw mse;}
 
 
-                    }
-                    break;
+            	    }
+            	    break;
+
+            	default :
+            	    break loop2;
+                }
+            } while (true);
+
 
             }
+
             state.type = _type;
             state.channel = _channel;
         }
@@ -388,18 +352,18 @@ public class FormulaLexer extends Lexer {
             {
             mQUOTE(); 
             // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:102:20: ( '0' .. '9' | 'a' .. 'z' | 'A' .. 'Z' | '_' | '.' | ':' | '/' | '\\\\' | ' ' )+
-            int cnt5=0;
-            loop5:
+            int cnt3=0;
+            loop3:
             do {
-                int alt5=2;
-                int LA5_0 = input.LA(1);
+                int alt3=2;
+                int LA3_0 = input.LA(1);
 
-                if ( (LA5_0==' '||(LA5_0>='.' && LA5_0<=':')||(LA5_0>='A' && LA5_0<='Z')||LA5_0=='\\'||LA5_0=='_'||(LA5_0>='a' && LA5_0<='z')) ) {
-                    alt5=1;
+                if ( (LA3_0==' '||(LA3_0>='.' && LA3_0<=':')||(LA3_0>='A' && LA3_0<='Z')||LA3_0=='\\'||LA3_0=='_'||(LA3_0>='a' && LA3_0<='z')) ) {
+                    alt3=1;
                 }
 
 
-                switch (alt5) {
+                switch (alt3) {
             	case 1 :
             	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
             	    {
@@ -417,12 +381,12 @@ public class FormulaLexer extends Lexer {
             	    break;
 
             	default :
-            	    if ( cnt5 >= 1 ) break loop5;
+            	    if ( cnt3 >= 1 ) break loop3;
                         EarlyExitException eee =
-                            new EarlyExitException(5, input);
+                            new EarlyExitException(3, input);
                         throw eee;
                 }
-                cnt5++;
+                cnt3++;
             } while (true);
 
             mQUOTE(); 
@@ -446,13 +410,13 @@ public class FormulaLexer extends Lexer {
             // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:103:14: ( '\\r' )? '\\n'
             {
             // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:103:14: ( '\\r' )?
-            int alt6=2;
-            int LA6_0 = input.LA(1);
+            int alt4=2;
+            int LA4_0 = input.LA(1);
 
-            if ( (LA6_0=='\r') ) {
-                alt6=1;
+            if ( (LA4_0=='\r') ) {
+                alt4=1;
             }
-            switch (alt6) {
+            switch (alt4) {
                 case 1 :
                     // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:103:14: '\\r'
                     {
@@ -484,18 +448,18 @@ public class FormulaLexer extends Lexer {
             // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:104:9: ( ' ' | '\\t' )+
             {
             // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:104:9: ( ' ' | '\\t' )+
-            int cnt7=0;
-            loop7:
+            int cnt5=0;
+            loop5:
             do {
-                int alt7=2;
-                int LA7_0 = input.LA(1);
+                int alt5=2;
+                int LA5_0 = input.LA(1);
 
-                if ( (LA7_0=='\t'||LA7_0==' ') ) {
-                    alt7=1;
+                if ( (LA5_0=='\t'||LA5_0==' ') ) {
+                    alt5=1;
                 }
 
 
-                switch (alt7) {
+                switch (alt5) {
             	case 1 :
             	    // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:
             	    {
@@ -513,12 +477,12 @@ public class FormulaLexer extends Lexer {
             	    break;
 
             	default :
-            	    if ( cnt7 >= 1 ) break loop7;
+            	    if ( cnt5 >= 1 ) break loop5;
                         EarlyExitException eee =
-                            new EarlyExitException(7, input);
+                            new EarlyExitException(5, input);
                         throw eee;
                 }
-                cnt7++;
+                cnt5++;
             } while (true);
 
             skip();
@@ -535,9 +499,9 @@ public class FormulaLexer extends Lexer {
 
     public void mTokens() throws RecognitionException {
         // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:8: ( AND | OR | IMPLIES | IFF | NOT | QUOTE | LPAR | RPAR | COMMA | VAR | FUNCONS | CONST | NEWLINE | WS )
-        int alt8=14;
-        alt8 = dfa8.predict(input);
-        switch (alt8) {
+        int alt6=14;
+        alt6 = dfa6.predict(input);
+        switch (alt6) {
             case 1 :
                 // C:\\pce\\xpce_client\\src\\java\\com\\sri\\csl\\xpce\\parser\\Formula.g:1:10: AND
                 {
@@ -642,74 +606,70 @@ public class FormulaLexer extends Lexer {
     }
 
 
-    protected DFA8 dfa8 = new DFA8(this);
-    static final String DFA8_eotS =
-        "\6\uffff\1\17\4\uffff\1\12\5\uffff\1\12";
-    static final String DFA8_eofS =
-        "\22\uffff";
-    static final String DFA8_minS =
-        "\1\11\5\uffff\1\40\4\uffff\1\56\5\uffff\1\56";
-    static final String DFA8_maxS =
-        "\1\174\5\uffff\1\172\4\uffff\1\172\5\uffff\1\172";
-    static final String DFA8_acceptS =
-        "\1\uffff\1\1\1\2\1\3\1\4\1\5\1\uffff\1\7\1\10\1\11\1\12\1\uffff"+
-        "\1\13\1\15\1\16\1\6\1\14\1\uffff";
-    static final String DFA8_specialS =
-        "\22\uffff}>";
-    static final String[] DFA8_transitionS = {
-            "\1\16\1\15\2\uffff\1\15\22\uffff\1\16\3\uffff\1\12\1\uffff"+
+    protected DFA6 dfa6 = new DFA6(this);
+    static final String DFA6_eotS =
+        "\6\uffff\1\16\11\uffff";
+    static final String DFA6_eofS =
+        "\20\uffff";
+    static final String DFA6_minS =
+        "\1\11\5\uffff\1\40\11\uffff";
+    static final String DFA6_maxS =
+        "\1\174\5\uffff\1\172\11\uffff";
+    static final String DFA6_acceptS =
+        "\1\uffff\1\1\1\2\1\3\1\4\1\5\1\uffff\1\7\1\10\1\11\1\12\1\13\1"+
+        "\15\1\16\1\6\1\14";
+    static final String DFA6_specialS =
+        "\20\uffff}>";
+    static final String[] DFA6_transitionS = {
+            "\1\15\1\14\2\uffff\1\14\22\uffff\1\15\3\uffff\1\12\1\uffff"+
             "\1\1\1\6\1\7\1\10\2\uffff\1\11\1\5\16\uffff\1\4\1\3\3\uffff"+
-            "\32\13\6\uffff\32\14\1\uffff\1\2",
+            "\32\13\6\uffff\32\13\1\uffff\1\2",
             "",
             "",
             "",
             "",
             "",
-            "\1\20\15\uffff\15\20\6\uffff\32\20\1\uffff\1\20\2\uffff\1"+
-            "\20\1\uffff\32\20",
-            "",
-            "",
-            "",
-            "",
-            "\1\21\1\uffff\12\21\7\uffff\32\21\4\uffff\1\21\1\uffff\32"+
-            "\21",
+            "\1\17\15\uffff\15\17\6\uffff\32\17\1\uffff\1\17\2\uffff\1"+
+            "\17\1\uffff\32\17",
             "",
             "",
             "",
             "",
             "",
-            "\1\21\1\uffff\12\21\7\uffff\32\21\4\uffff\1\21\1\uffff\32"+
-            "\21"
+            "",
+            "",
+            "",
+            ""
     };
 
-    static final short[] DFA8_eot = DFA.unpackEncodedString(DFA8_eotS);
-    static final short[] DFA8_eof = DFA.unpackEncodedString(DFA8_eofS);
-    static final char[] DFA8_min = DFA.unpackEncodedStringToUnsignedChars(DFA8_minS);
-    static final char[] DFA8_max = DFA.unpackEncodedStringToUnsignedChars(DFA8_maxS);
-    static final short[] DFA8_accept = DFA.unpackEncodedString(DFA8_acceptS);
-    static final short[] DFA8_special = DFA.unpackEncodedString(DFA8_specialS);
-    static final short[][] DFA8_transition;
+    static final short[] DFA6_eot = DFA.unpackEncodedString(DFA6_eotS);
+    static final short[] DFA6_eof = DFA.unpackEncodedString(DFA6_eofS);
+    static final char[] DFA6_min = DFA.unpackEncodedStringToUnsignedChars(DFA6_minS);
+    static final char[] DFA6_max = DFA.unpackEncodedStringToUnsignedChars(DFA6_maxS);
+    static final short[] DFA6_accept = DFA.unpackEncodedString(DFA6_acceptS);
+    static final short[] DFA6_special = DFA.unpackEncodedString(DFA6_specialS);
+    static final short[][] DFA6_transition;
 
     static {
-        int numStates = DFA8_transitionS.length;
-        DFA8_transition = new short[numStates][];
+        int numStates = DFA6_transitionS.length;
+        DFA6_transition = new short[numStates][];
         for (int i=0; i<numStates; i++) {
-            DFA8_transition[i] = DFA.unpackEncodedString(DFA8_transitionS[i]);
+            DFA6_transition[i] = DFA.unpackEncodedString(DFA6_transitionS[i]);
         }
     }
 
-    class DFA8 extends DFA {
+    class DFA6 extends DFA {
 
-        public DFA8(BaseRecognizer recognizer) {
+        public DFA6(BaseRecognizer recognizer) {
             this.recognizer = recognizer;
-            this.decisionNumber = 8;
-            this.eot = DFA8_eot;
-            this.eof = DFA8_eof;
-            this.min = DFA8_min;
-            this.max = DFA8_max;
-            this.accept = DFA8_accept;
-            this.special = DFA8_special;
-            this.transition = DFA8_transition;
+            this.decisionNumber = 6;
+            this.eot = DFA6_eot;
+            this.eof = DFA6_eof;
+            this.min = DFA6_min;
+            this.max = DFA6_max;
+            this.accept = DFA6_accept;
+            this.special = DFA6_special;
+            this.transition = DFA6_transition;
         }
         public String getDescription() {
             return "1:1: Tokens : ( AND | OR | IMPLIES | IFF | NOT | QUOTE | LPAR | RPAR | COMMA | VAR | FUNCONS | CONST | NEWLINE | WS );";
