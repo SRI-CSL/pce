@@ -205,7 +205,7 @@ public class XpceClient {
 	    	client.addPredicate(pred1);
 	    	client.addPredicate(pred2);
 	    	Fact fact1 = new Fact(pred1, "bob", "lisa");
-	    	Fact fact2 = new Fact(pred1, "tom", "rose");
+	    	Fact fact2 = new Fact(pred1, "tom jones", "rose");
 	    	client.assertFact(fact1);
 	    	client.assertFact(fact2);
 	    	Atom a1 = (Atom)Formula.create("married($X, $Y)");
