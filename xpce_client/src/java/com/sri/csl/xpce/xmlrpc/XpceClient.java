@@ -46,6 +46,11 @@ public class XpceClient {
 	    }
 	}
 	
+	/** Adds a formula to xpce server.
+	 * @param formula	the formula 
+	 * @param weight	the weight of the formula
+	 * @param source	the name of the client that is adding this formula
+	 */
 	public boolean add(Formula formula, double weight, String source) throws XmlRpcException, XPCException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.FORMULA, formula.toJSON());
@@ -54,6 +59,9 @@ public class XpceClient {
 		return execute(XPCEConstants.XPCEADD, obj).succeeded();
 	}
 	
+	/** Defines a new constant and adds it to xpce server.
+	 * @param c		the constant
+	 */
 	public boolean addConstant(Constant c) throws XmlRpcException, XPCException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.SORT, c.getSort().getName());
@@ -63,6 +71,10 @@ public class XpceClient {
 		return execute(XPCEConstants.XPCEADDCONSTANTS, obj).succeeded();
 	}
 	
+	/** Defines one or more new constants and adds them to xpce server.
+	 * @param sort		the sort of the new constant
+	 * @param names		the constant(s)
+	 */
 	public boolean addConstant(Sort sort, String... names) throws XmlRpcException, XPCException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.SORT, sort.getName());
@@ -70,22 +82,37 @@ public class XpceClient {
 		return execute(XPCEConstants.XPCEADDCONSTANTS, obj).succeeded();
 	}
 	
+	/** Defines a new predicate and adds it to xpce server.
+	 * @param p		the predicate
+	 */
 	public boolean addPredicate(PredicateDecl p) throws XmlRpcException, XPCException, JSONException {
 		return execute(XPCEConstants.XPCEADDPREDICATE, p.toJSON()).succeeded();
 	}
 	
+	/** Defines a new sort and adds it to xpce server.
+	 * @param sort		the sort
+	 */
 	public boolean addSort(Sort sort) throws XmlRpcException, XPCException, JSONException {
 		return execute(XPCEConstants.XPCEADDSORT, sort.toJSON()).succeeded();
 	}
+
+	/** Defines a new sort and adds it to xpce server.
+	 * @param sort		the sort
+	 */
 	public boolean addSort(String sort) throws XmlRpcException, XPCException, JSONException {
 		return execute(XPCEConstants.XPCEADDSORT, new Sort(sort).toJSON()).succeeded();
 	}
 	
-	public ArrayList<FormulaAndProbability> ask(Formula formula, double threshold, int numberOfResults) throws XmlRpcException, XPCException, JSONException {
+	/** Quesries the xpce server for the probability of a given formula.
+	 * @param formula		the formula
+	 * @param threshold		the threshold for the probability of desired instances of the given formula (the value should be between 0 and 1)
+	 * @param maxResults	maximum number of instances to be returned
+	 */
+	public ArrayList<FormulaAndProbability> ask(Formula formula, double threshold, int maxResults) throws XmlRpcException, XPCException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put(XPCEConstants.FORMULA, formula.toJSON());
 		obj.put(XPCEConstants.THRESHOLD, (double)threshold);
-		obj.put(XPCEConstants.RESULTNUMBERS, numberOfResults);
+		obj.put(XPCEConstants.RESULTNUMBERS, maxResults);
 		JSONArray results = (JSONArray)execute(XPCEConstants.XPCEASK, obj).getResult();
 		ArrayList<FormulaAndProbability> faps = new ArrayList<FormulaAndProbability>();
 		for (int i = 0 ; i < results.length() ; i++) {
@@ -96,10 +123,16 @@ public class XpceClient {
 		return faps;
 	}
 		
+	/** Asserts a new fact (an atom with no variable) to xpce server.
+	 * @param f		the fact
+	 */
 	public boolean assertFact(Fact f) throws XmlRpcException, XPCException, JSONException {
 		return execute(XPCEConstants.XPCEASSERT, f.toJSON()).succeeded();
 	}
 	
+	/** Passes a mcsat formatted command to xpce server.
+	 * @param command		the command in mcsat format (e.g. "sort Person;")
+	 */
 	public Object command(String command) throws XmlRpcException, XPCException {
     	return xmlrpcClient.execute(XPCEConstants.XPCECOMMAND, new Object[] {command});
 	}
@@ -118,13 +151,18 @@ public class XpceClient {
 		return new XPCERespond(jsonResult);	
 	}
 		
+	/** Commands xpce server to read all the lines of a text file and load them in.
+	 * @param filename		the full path to the file
+	 */
 	public boolean load(String filename) throws XmlRpcException, XPCException, JSONException {
 		return execute(XPCEConstants.XPCERETRACT, filename).succeeded();
 	}
 
+	/** Requests xpce server to compute the probabilities.
+	 */
 	public boolean mcsat() throws XmlRpcException, XPCException, JSONException {
 		return execute(XPCEConstants.XPCEMCSAT).succeeded();
-}
+	}
 
 
 	/*	public boolean mcsat(float sa_probability, float samp_temperature, float rvar_probability, int max_flips, int max_extra_flips, int max_samples) throws XmlRpcException, XPCException, JSONException {
@@ -139,12 +177,18 @@ public class XpceClient {
 	}
 */
 	
+	/** Resets xpce server.
+	 * @param reset		one of "all" or "probabilities"
+	 */
 	public boolean reset(String reset) throws XmlRpcException, XPCException, JSONException {
 		if ( !reset.equalsIgnoreCase(XPCEConstants.ALL) && reset.equalsIgnoreCase(XPCEConstants.PROBABILITIES) ) 
 			throw new XPCException("Unknown Reset Type");
 		return execute(XPCEConstants.XPCERESET, reset.toLowerCase()).succeeded();
 	}
 	
+	/** Retracts what is added by a given client.
+	 * @param source		the client name
+	 */
 	public boolean retract(String source) throws XmlRpcException, XPCException, JSONException {
 		return execute(XPCEConstants.XPCERETRACT, source).succeeded();
 	}
@@ -164,7 +208,7 @@ public class XpceClient {
 	    	Fact fact2 = new Fact(pred1, "tom", "rose");
 	    	client.assertFact(fact1);
 	    	client.assertFact(fact2);
-	    	Atom a1 = (Atom)Formula.createFromString("married($X, $Y)");
+	    	Atom a1 = (Atom)Formula.create("married($X, $Y)");
 	    	Atom a2 = new Atom(pred2, new Variable("X"), new Variable("Y"));
 	    	ImpliesFormula f = new ImpliesFormula(a1, a2);
 	    	client.add(f, 3.2, "XpceClient");
@@ -172,11 +216,11 @@ public class XpceClient {
 	    	client.mcsat();
 	    	Thread.sleep(1000);
 	    	
-	    	Formula question1 = Formula.createFromString("-likes(bob, $Z)");
+	    	Formula question1 = Formula.create("-likes(bob, $Z)");
 	    	ArrayList<FormulaAndProbability> answers = client.ask(question1, 0.01, 10);
 	    	System.out.println("Return Value:" + answers);
 	    	
-	    	Formula question2 = Formula.createFromString("likes(bob, 'tom jones') | likes(bob, lisa)");
+	    	Formula question2 = Formula.create("likes(bob, 'tom jones') | likes(bob, lisa)");
 	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') & likes('bob', 'lisa')");
 	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') => likes('bob', 'lisa')");
 	    	//Formula question2 = Formula.createFromString("likes('bob', 'tom') <=> likes('bob', 'lisa')");

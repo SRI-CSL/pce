@@ -17,7 +17,7 @@ public class FormulaAndProbability {
 	
 	@SuppressWarnings("unchecked")
 	public FormulaAndProbability(Formula original, JSONObject obj) throws JSONException, XPCException {
-		instance = Formula.createFromJSON(obj.getJSONObject(XPCEConstants.FORMULAINSTANCE));
+		instance = Formula.create(obj.getJSONObject(XPCEConstants.FORMULAINSTANCE));
 		this.original = original;
 		probability = obj.getDouble(XPCEConstants.PROBABILITY);
 		JSONObject subs = obj.getJSONObject(XPCEConstants.SUBST);

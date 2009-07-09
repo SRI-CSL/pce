@@ -17,10 +17,10 @@ import com.sri.csl.xpce.parser.FormulaLexer;
 import com.sri.csl.xpce.parser.FormulaParser;
 
 public abstract class Formula {
-	private	enum State {Begin, NonAtomicBegin, AtomicBegin, TermsBegin};
-
-	
-	public static Formula createFromJSON(JSONObject obj) throws JSONException, XPCException {
+	/** Creates a formula from a given JSON representation.
+	 * @param obj		the JSON object
+	 */
+	public static Formula create(JSONObject obj) throws JSONException, XPCException {
 		if ( obj.has(XPCEConstants.ATOM) ) {
 			JSONObject obj2 = obj.getJSONObject(XPCEConstants.ATOM);
 			String functor =  obj2.getString(XPCEConstants.PREDICATEFUNCTOR);
@@ -39,24 +39,30 @@ public abstract class Formula {
 				return new Atom(functor, argument);
 		} else if ( obj.has(XPCEConstants.OR) ) {
 			JSONArray formulas = obj.getJSONArray(XPCEConstants.OR);
-			return new OrFormula(Formula.createFromJSON(formulas.getJSONObject(0)), Formula.createFromJSON(formulas.getJSONObject(1)));
+			return new OrFormula(Formula.create(formulas.getJSONObject(0)), Formula.create(formulas.getJSONObject(1)));
 		} else if ( obj.has(XPCEConstants.AND) ) {
 			JSONArray formulas = obj.getJSONArray(XPCEConstants.AND);
-			return new AndFormula(Formula.createFromJSON(formulas.getJSONObject(0)), Formula.createFromJSON(formulas.getJSONObject(1)));
+			return new AndFormula(Formula.create(formulas.getJSONObject(0)), Formula.create(formulas.getJSONObject(1)));
 		} else if ( obj.has(XPCEConstants.IMPLIES) ) {
 			JSONArray formulas = obj.getJSONArray(XPCEConstants.IMPLIES);
-			return new ImpliesFormula(Formula.createFromJSON(formulas.getJSONObject(0)), Formula.createFromJSON(formulas.getJSONObject(1)));
+			return new ImpliesFormula(Formula.create(formulas.getJSONObject(0)), Formula.create(formulas.getJSONObject(1)));
 		} else if ( obj.has(XPCEConstants.IFF) ) {
 			JSONArray formulas = obj.getJSONArray(XPCEConstants.IFF);
-			return new IffFormula(Formula.createFromJSON(formulas.getJSONObject(0)), Formula.createFromJSON(formulas.getJSONObject(1)));
+			return new IffFormula(Formula.create(formulas.getJSONObject(0)), Formula.create(formulas.getJSONObject(1)));
 		} else if ( obj.has(XPCEConstants.NOT) ) {
-			return new NotFormula(Formula.createFromJSON(obj.getJSONObject(XPCEConstants.NOT)));
+			return new NotFormula(Formula.create(obj.getJSONObject(XPCEConstants.NOT)));
 		} else {
 			throw new XPCException("Format error in JSON object " + obj);
 		}
 	}
 	
-	public static Formula createFromString(String str) throws IOException, RecognitionException {
+	/** Creates a formula from a string.<br>
+	 * Example:<br>
+	 * 		Formula.create("(-FatherOf(Bob, Rose) & MotherOf('Anna Smith', Rose))");<br>
+	 * 		Formula.create("(Married($x, $y) => Likes($x, $y))");<br>
+	 * @param str		the string representation of the formula
+	 */
+	public static Formula create(String str) throws IOException, RecognitionException {
 		ByteArrayInputStream stream = new ByteArrayInputStream(str.getBytes());
 		ANTLRInputStream input = new ANTLRInputStream(stream);
 		FormulaLexer lexer   = new FormulaLexer(input);
@@ -68,11 +74,11 @@ public abstract class Formula {
 	public static void main(String args[]) {
 		try {
 			Formula f1 = new NotFormula(new Atom("Age", "Sam", new Variable("x")));
-			Formula f2 = Formula.createFromString("Father(Bob, 'Tom Jones')");
-			Formula f3 = Formula.createFromString("(Married($x, $y) & Likes($x, $y))");
-			Formula f4 = Formula.createFromString(f1.toString());
-			Formula f5 = Formula.createFromString(f2.toString());
-			Formula f6 = Formula.createFromString(f3.toString());
+			Formula f2 = Formula.create("Father(Bob, 'Tom Jones')");
+			Formula f3 = Formula.create("(Married($x, $y) & Likes($x, $y))");
+			Formula f4 = Formula.create(f1.toString());
+			Formula f5 = Formula.create(f2.toString());
+			Formula f6 = Formula.create(f3.toString());
 			
 			System.out.println("" + f4);
 			System.out.println("" + f5);
