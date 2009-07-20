@@ -723,7 +723,7 @@ void query_instance_table_resize(query_instance_table_t *table) {
 void reset_query_instance_table(query_instance_table_t *table) {
   int32_t i;
   for (i = 0; i < table->num_queries; i++) {
-    safe_free(table->query_inst[i]);
+    free_samp_query_instance(table->query_inst[i]);
   }
   table->num_queries = 0;
 }

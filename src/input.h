@@ -218,7 +218,12 @@ extern void free_var_entries(var_entry_t **vars);
 
 extern void free_fmla(input_fmla_t *fmla);
 extern void free_formula(input_formula_t *formula);
-
+extern void free_samp_atom(samp_atom_t *atom);
+extern void free_rule_literal(rule_literal_t *lit);
+extern void free_rule_literals(rule_literal_t **lit);
+extern void free_samp_query(samp_query_t *query);
+extern void free_samp_query_instance(samp_query_instance_t *qinst);
+  
 extern input_fmla_t *yy_fmla(int32_t op, input_fmla_t *arg1, input_fmla_t *arg2);
 extern input_fmla_t *yy_atom_to_fmla (input_atom_t *atom);
 extern input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);

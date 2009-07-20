@@ -501,7 +501,7 @@ extern void dump_rule_table (samp_table_t *samp_table) {
 }
 
 extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,
-				 int32_t indent, bool include_prob) {
+				 int32_t indent, bool newlinesp) {
   atom_table_t *atom_table;
   samp_literal_t **lit;
   int32_t i, j, samp_atom;
@@ -509,7 +509,19 @@ extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *tab
   atom_table = &table->atom_table;
   lit = qinst->lit;
   for (i = 0; lit[i] != NULL; i++) {
-    if (i != 0) output(")\n& ("); else output("  (");
+    if (i != 0) {
+      if (newlinesp) {
+	output(")\n& (");
+      } else {
+	output(") & (");
+      }
+    } else {
+      if (newlinesp) {
+	output("  (");
+      } else {
+	output(" (");
+      }
+    }
     for (j = 0; lit[i][j] != -1; j++) {
       if (j != 0) output(" | ");
       samp_atom = var_of(lit[i][j]);
@@ -518,9 +530,6 @@ extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *tab
     }
   }
   output(")");
-  if (include_prob) {
-    output(" : % 5.3f\n", query_probability(qinst, table));
-  }
 }
 
 extern void dump_query_instance_table (samp_table_t *samp_table) {
@@ -537,7 +546,8 @@ extern void dump_query_instance_table (samp_table_t *samp_table) {
   output("--------------------------------------------------------------------------------\n");
   for(i=0; i<nqueries; i++) {
     qinst = query_instance_table->query_inst[i];
-    print_query_instance(qinst, samp_table, nwdth+17, false);
+    print_query_instance(qinst, samp_table, nwdth+17, true);
+    output(" : % 5.3f\n", query_probability(qinst, samp_table));
     output("\n");
   }
   output("-------------------------------------------------------------------------------\n");
@@ -562,8 +572,8 @@ double query_probability(samp_query_instance_t *qinst, samp_table_t *table) {
   double diff;
 
   // diff subtracts off the sampling number when the query was introduced
-  printf("num_samples = %d, sampling_num = %d\n",
-	 atom_table->num_samples, qinst->sampling_num);
+  cprintf(2,"num_samples = %d, sampling_num = %d\n",
+	  atom_table->num_samples, qinst->sampling_num);
   diff = (double) (atom_table->num_samples - qinst->sampling_num);
   if (diff > 0) {
     return (double) (qinst->pmodel/diff);

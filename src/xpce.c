@@ -12,6 +12,7 @@
 #include <pthread.h>
 
 #include <json/json.h>
+#include <json/json_object_private.h>
 
 #include <xmlrpc-c/base.h>
 #include <xmlrpc-c/server.h>
@@ -32,6 +33,8 @@
 extern int yyparse ();
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static xmlrpc_server_abyss_t * serverToTerminateP;
 
 // sort-decl := {"sort": NAME, "super": NAME} # "super" is optional,
 //                     # so this call can declare a sort or a subsort
@@ -103,14 +106,34 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 struct json_object *
 xpce_parse_decl(xmlrpc_env * const envP,
 		xmlrpc_value * const paramArrayP) {
-  const char *declstr;
+  char *declstr;
+  //  char *declcopy;
+  struct json_object *decl;
+  
   xmlrpc_decompose_value(envP, paramArrayP, "(s)", &declstr);
   if (envP->fault_occurred)
     return NULL;
-  
-  return json_tokener_parse((char *)declstr);
+  decl = json_tokener_parse(declstr);
+  safe_free(declstr);
+  return decl;
 }
 
+// Recursively call jsaon_object_put to free up objects
+void json_object_put_all(struct json_object *obj) {
+  int32_t i;
+  struct json_object_iter iter;
+  
+  if (json_object_is_type(obj, json_type_array)) {
+    for (i = 0; i < json_object_array_length(obj); i++) {
+      json_object_put_all(json_object_array_get_idx(obj, i));
+    }
+  } else if (json_object_is_type(obj, json_type_object)) {
+    json_object_object_foreachC(obj, iter) {
+      json_object_put_all(iter.val);
+    }
+  }
+  json_object_put(obj);
+}
 
 // Creates a JSON object of form
 //  {"result": RESULT, "error": ERROR_STRING, "warning": WARNING_STRING}
@@ -119,7 +142,8 @@ static xmlrpc_value *
 xpce_result(xmlrpc_env * const envP,
 	    struct json_object *result) {
   struct json_object *ret;
-  char *err, *warn;
+  xmlrpc_value *xret;
+  char *err, *warn, *retstr;
   
   ret = json_object_new_object();
   if (result != NULL) {
@@ -135,7 +159,10 @@ xpce_result(xmlrpc_env * const envP,
     json_object_object_add(ret, "warning", json_object_new_string(warn));
     safe_free(warn);
   }
-  return xmlrpc_build_value(envP, "s", json_object_to_json_string(ret));
+  retstr = json_object_to_json_string(ret);
+  xret = xmlrpc_build_value(envP, "s", retstr);
+  json_object_put(ret);
+  return xret;
 }
 
 static xmlrpc_value *
@@ -152,6 +179,7 @@ xpce_sort(xmlrpc_env * const envP,
   sortobj = json_object_object_get(sortdecl, "name");
   if (sortobj == NULL) {
     mcsat_err("Bad argument: expected {\"name\": NAME}\n");
+    json_object_put(sortdecl);
     return xpce_result(envP, NULL);
   }
   sort = json_object_get_string(sortobj);
@@ -167,6 +195,7 @@ xpce_sort(xmlrpc_env * const envP,
     add_subsort(&samp_table.sort_table, sort, super);
     pthread_mutex_unlock(&mutex);
   }
+  json_object_put(sortdecl);
   return xpce_result(envP, NULL);
 }
 
@@ -186,17 +215,20 @@ xpce_predicate(xmlrpc_env * const envP,
   // should have form {"predicate": NAME, "arguments": NAMES, "observable": BOOL}
   if (envP->fault_occurred) {
     mcsat_err("Bad argument: expected {\"predicate\": NAME, \"arguments\": NAMES, \"observable\": BOOL}\n");
+    json_object_put(preddecl);
     return xpce_result(envP, NULL);
   }
   if ((predobj = json_object_object_get(preddecl, "predicate")) == NULL
       || (argsobj = json_object_object_get(preddecl, "arguments")) == NULL
       || (observableobj = json_object_object_get(preddecl, "observable")) == NULL) {
     mcsat_err("Bad argument: expected {\"predicate\": NAME, \"arguments\": NAMES, \"observable\": BOOL}\n");
+    json_object_put(preddecl);
     return xpce_result(envP, NULL);
   }
   pred = json_object_get_string(predobj);
   if (!json_object_is_type(argsobj, json_type_array)) {
     mcsat_err("Bad arguments, should be array of names\n");
+    json_object_put(preddecl);
     return xpce_result(envP, NULL);
   }
   sorts = safe_malloc((json_object_array_length(argsobj) + 1) * sizeof(char *));
@@ -210,6 +242,7 @@ xpce_predicate(xmlrpc_env * const envP,
   add_predicate(pred, sorts, observable, &samp_table);
   pthread_mutex_unlock(&mutex);
   safe_free(sorts);
+  json_object_put(preddecl);
   return xpce_result(envP, NULL);
 }
 
@@ -230,6 +263,7 @@ xpce_constdecl(xmlrpc_env * const envP,
       || !json_object_is_type(namesobj, json_type_array)
       || (sortobj = json_object_object_get(constdecl, "sort")) == NULL) {
     mcsat_err("xpce.const: expected {\"names\": NAMES, \"sort\": NAME}\n");
+    json_object_put(constdecl);
     return xpce_result(envP, NULL);
   }
   sort = json_object_get_string(sortobj);
@@ -240,18 +274,21 @@ xpce_constdecl(xmlrpc_env * const envP,
     add_constant(name, sort, &samp_table);
     pthread_mutex_unlock(&mutex);
   }
+  json_object_put(constdecl);
   return xpce_result(envP, NULL);
 }
 
 char * xpce_json_valid_name(struct json_object *obj) {
-  char * str;
+  char *str;
   
   if (!json_object_is_type(obj, json_type_string)) {
     return NULL;
   }
   str = json_object_get_string(obj);
   // Need to check for valid ID here
-  return str;
+  
+  // Make a copy
+  return strdup(str);
 }
 
 char ** xpce_json_constant_array(struct json_object *obj) {
@@ -285,7 +322,7 @@ void push_new_var(char *var) {
       return;
     }
   }
-  pvector_push(&formula_vars, var);
+  pvector_push(&formula_vars, strdup(var));
 }
 
 char **copy_formula_vars() {
@@ -378,6 +415,7 @@ json_fact_to_input_atom(struct json_object *jfact) {
     return NULL;
   }
   atom = (input_atom_t *) safe_malloc(sizeof(input_atom_t));
+  
   atom->pred = pred;
   atom->args = args;
   return atom;
@@ -452,10 +490,14 @@ json_binary_prop_to_input_fmla(int32_t op, struct json_object *args) {
   if (json_object_is_type(args, json_type_array)
       && (json_object_array_length(args) == 2)) {
     if ((arg1 = json_formula_to_input_fmla
-	 (json_object_array_get_idx(args, 0))) != NULL
-	&& (arg2 = json_formula_to_input_fmla
-	    (json_object_array_get_idx(args, 1))) != NULL) {
-      return yy_fmla(op, arg1, arg2);
+	 (json_object_array_get_idx(args, 0))) != NULL) {
+      if ((arg2 = json_formula_to_input_fmla
+	   (json_object_array_get_idx(args, 1))) != NULL) {
+	return yy_fmla(op, arg1, arg2);
+      } else {
+	free_fmla(arg1);
+	return NULL;
+      }
     } else {
       return NULL;
     }
@@ -474,7 +516,8 @@ input_formula_t *json_formula_to_input_formula(struct json_object *jfmla) {
   if (fmla == NULL) {
     return NULL;
   } else {
-    return yy_formula(copy_formula_vars(), fmla);
+    pvector_push(&formula_vars, NULL);
+    return yy_formula((char **)formula_vars.data, fmla);
   }
 }
   
@@ -493,15 +536,18 @@ xpce_assert(xmlrpc_env * const envP,
   assertdecl = xpce_parse_decl(envP, paramArrayP);
   if (!json_object_is_type(assertdecl, json_type_object)) {
     mcsat_err("Bad argument: expected FACT\n");
+    json_object_put(assertdecl);
     return xpce_result(envP, NULL);
   }
     
   factobj = json_object_object_get(assertdecl, "fact");
   if (factobj == NULL) {
     mcsat_err("Bad argument: expected FACT");
+    json_object_put(assertdecl);
     return xpce_result(envP, NULL);
   }
   if ((atom = json_fact_to_input_atom(factobj)) == NULL) {
+    json_object_put(assertdecl);
     return xpce_result(envP, NULL);
   }
   // OK if source is NULL
@@ -511,15 +557,17 @@ xpce_assert(xmlrpc_env * const envP,
   } else {
     if ((source = xpce_json_valid_name(sourceobj)) == NULL) {
       mcsat_err("Source is not a valid NAME\n");
+      json_object_put(assertdecl);
       return xpce_result(envP, NULL);
     }
     source = json_object_get_string(sourceobj);
   }
-  if (atom != NULL) {
-    pthread_mutex_lock(&mutex);
-    assert_atom(&samp_table, atom, source);
-    pthread_mutex_unlock(&mutex);
-  }
+  pthread_mutex_lock(&mutex);
+  assert_atom(&samp_table, atom, source);
+  pthread_mutex_unlock(&mutex);
+
+  json_object_put(assertdecl);
+  free_atom(atom);
   return xpce_result(envP, NULL);
 }
 
@@ -537,15 +585,18 @@ xpce_add(xmlrpc_env * const envP,
   adddecl = xpce_parse_decl(envP, paramArrayP);
   if (!json_object_is_type(adddecl, json_type_object)) {
     mcsat_err("Bad argument: expected {\"formula\": FORMULA, \"weight\": NUM, \"source\": NAME}\n");
+    json_object_put(adddecl);
     return xpce_result(envP, NULL);
   }
-    
+  
   fmlaobj = json_object_object_get(adddecl, "formula");
   if (fmlaobj == NULL) {
     mcsat_err("Bad argument: expected {\"formula\": FORMULA}\n");
+    json_object_put(adddecl);
     return xpce_result(envP, NULL);
   }
   if ((fmla = json_formula_to_input_formula(fmlaobj)) == NULL) {
+    json_object_put(adddecl);
     return xpce_result(envP, NULL);
   }
 
@@ -560,6 +611,7 @@ xpce_add(xmlrpc_env * const envP,
       weight = json_object_get_int(weightobj);
     } else {
       mcsat_err("Bad argument: \"weight\" should be DOUBLE\n");
+      json_object_put(adddecl);
       return xpce_result(envP, NULL);
     }
   }
@@ -570,15 +622,17 @@ xpce_add(xmlrpc_env * const envP,
   } else {
     if ((source = xpce_json_valid_name(sourceobj)) == NULL) {
       mcsat_err("Source is not a valid NAME\n");
+      json_object_put(adddecl);
       return xpce_result(envP, NULL);
     }
     source = json_object_get_string(sourceobj);
   }
-  if (fmla != NULL) {
-    pthread_mutex_lock(&mutex);
-    add_cnf(fmla, weight, source);
-    pthread_mutex_unlock(&mutex);
-  }
+  pthread_mutex_lock(&mutex);
+  add_cnf(fmla, weight, source);
+  pthread_mutex_unlock(&mutex);
+  
+  free_formula(fmla);
+  json_object_put(adddecl);
   return xpce_result(envP, NULL);
 }
 
@@ -593,7 +647,7 @@ struct json_object *
 subst_into_json_atom(struct json_object *atom,
 		     var_entry_t **vars,
 		     int32_t *qsubst) {
-  struct json_object *val, *natom, *nval, *args, *nargs, *arg, *nconst, *var;
+  struct json_object *val, *natom, *nval, *args, *nargs, *arg, *pred, *nconst, *var;
   char *cname;
   int32_t i, j;
 
@@ -607,7 +661,7 @@ subst_into_json_atom(struct json_object *atom,
       for (j = 0; vars[j] != NULL; j++) {
 	if (strcmp(vars[j]->name, json_object_get_string(var)) == 0) {
 	  cname = const_name(qsubst[j], &samp_table.const_table);
-	  nconst = json_object_new_string(cname);
+	  nconst = json_object_new_string(strdup(cname));
 	  json_object_array_add(nargs,nconst);
 	  break;
 	}
@@ -615,12 +669,15 @@ subst_into_json_atom(struct json_object *atom,
       // Check that we found the variable
       assert(vars[j] != NULL);
     } else {
-      json_object_array_add(nargs, arg);
+      cname = json_object_get_string(arg);
+      nconst = json_object_new_string(strdup(cname));
+      json_object_array_add(nargs, nconst);
     }
   }
   nval = json_object_new_object();
+  pred = json_object_object_get(val, "predicate");
   json_object_object_add(nval, "predicate",
-			 json_object_object_get(val, "predicate"));
+			 json_object_new_string(strdup(json_object_get_string(pred))));
   json_object_object_add(nval, "arguments", nargs);
   
   natom = json_object_new_object();
@@ -634,20 +691,25 @@ subst_into_json_fmla(struct json_object *fmla,
 		     int32_t *subst) {
   struct json_object *nfmla, *args, *nargs;
 
-  nfmla = json_object_new_object();
+  nfmla = NULL;
   if ((args = json_object_object_get(fmla, "not")) != NULL) {
+    nfmla = json_object_new_object();
     nargs = subst_into_json_fmla(args, vars, subst);
     json_object_object_add(nfmla, "not", nargs);
   } else if ((args = json_object_object_get(fmla, "and")) != NULL) {
+    nfmla = json_object_new_object();
     nargs = subst_into_json_tuple(args, vars, subst);
     json_object_object_add(nfmla, "and", nargs);
   } else if ((args = json_object_object_get(fmla, "or")) != NULL) {
+    nfmla = json_object_new_object();
     nargs = subst_into_json_tuple(args, vars, subst);
     json_object_object_add(nfmla, "or", nargs);
   } else if ((args = json_object_object_get(fmla, "implies")) != NULL) {
+    nfmla = json_object_new_object();
     nargs = subst_into_json_tuple(args, vars, subst);
     json_object_object_add(nfmla, "implies", nargs);
   } else if ((args = json_object_object_get(fmla, "iff")) != NULL) {
+    nfmla = json_object_new_object();
     nargs = subst_into_json_tuple(args, vars, subst);
     json_object_object_add(nfmla, "iff", nargs);
   } else if ((args = json_object_object_get(fmla, "atom")) != NULL) {
@@ -690,18 +752,23 @@ xpce_ask(xmlrpc_env * const envP,
   char *cname;
 
   printf("In xpce.ask\n");
+  // Get JSON form
   askdecl = xpce_parse_decl(envP, paramArrayP);
   if (!json_object_is_type(askdecl, json_type_object)) {
     mcsat_err("Bad argument: expected {\"formula\": FORMULA, \"threshold\": NUM, \"maxresults\": NAME}\n");
+    json_object_put(askdecl);
     return xpce_result(envP, NULL);
   }
   fmlaobj = json_object_object_get(askdecl, "formula");
   if (fmlaobj == NULL) {
     mcsat_err("Bad argument: expected {\"formula\": FORMULA}");
+    json_object_put(askdecl);
     return xpce_result(envP, NULL);
   }
+  // Convert JSON formula to input_formula_t
   fmla = json_formula_to_input_formula(fmlaobj);
   if (fmla == NULL) {
+    json_object_put(askdecl);
     return xpce_result(envP, NULL);
   }
   thresholdobj = json_object_object_get(askdecl, "threshold");
@@ -715,11 +782,13 @@ xpce_ask(xmlrpc_env * const envP,
       threshold = json_object_get_int(thresholdobj);
     } else {
       mcsat_err("Bad argument: \"threshold\" should be DOUBLE or INT\n");
+      json_object_put(askdecl);
       return xpce_result(envP, NULL);
     }
   }
   if (threshold < 0.0 || threshold > 1.0) {
     mcsat_err("Threshold should be a probability value between 0.0 and 1.0");
+    json_object_put(askdecl);
     return xpce_result(envP, NULL);
   }
   // OK if maxresults is NULL
@@ -729,14 +798,17 @@ xpce_ask(xmlrpc_env * const envP,
   } else {
     if (!json_object_is_type(maxresultsobj, json_type_int)) {
       mcsat_err("\"maxresults\" should be INT\n");
+      json_object_put(askdecl);
       return xpce_result(envP, NULL);
     }
     maxresults = json_object_get_int(maxresultsobj);
   }
+  // Get a lock
   pthread_mutex_lock(&mutex);
+  // Now ask - sets up query tables and runs mcsat
   ask_cnf(fmla, threshold, maxresults);
   // Results are in ask_buffer - create JSON objects representing the instances
-  // E.g., [{"subst": {"x": "Dan", "y": "Ron"}, "formula-instance": FORMULA}, ...] 
+  // E.g., [{"subst": {"x": "Dan", "y": "Ron"}, "formula-instance": FORMULA, "probability": 0.7}, ...]
   answer = json_object_new_array();
   for (i = 0; i < ask_buffer.size; i++) {
     qinst = ask_buffer.data[i];
@@ -746,7 +818,7 @@ xpce_ask(xmlrpc_env * const envP,
     for (j = 0; fmla->vars[j] != NULL; j++) {
       cname = const_name(qsubst[j], &samp_table.const_table);
       json_object_object_add(fsubst, fmla->vars[j]->name,
-			     json_object_new_string(cname));
+			     json_object_new_string(strdup(cname)));
     }
     json_object_object_add(finfo, "subst", fsubst);
     // Now to get the formula instance
@@ -761,6 +833,8 @@ xpce_ask(xmlrpc_env * const envP,
   // Now clear out the query_instance table for the next query
   reset_query_instance_table(&samp_table.query_instance_table);
   pthread_mutex_unlock(&mutex);
+  free_formula(fmla);
+  json_object_put(askdecl);
   return xpce_result(envP, answer);
 }
 
@@ -823,6 +897,18 @@ xpce_dumptable(xmlrpc_env * const envP,
 }
 
 static xmlrpc_value *
+xpce_quit(xmlrpc_env * const envP,
+	  xmlrpc_value * const paramArrayP,
+	  void * const serverInfo ATTR_UNUSED,
+	  void * const channelInfo ATTR_UNUSED) {
+
+  // No need to parse params, just exit
+  xmlrpc_server_abyss_terminate(envP, serverToTerminateP);
+  return xpce_result(envP, NULL);
+}
+
+
+static xmlrpc_value *
 xpce_command(xmlrpc_env * const envP,
 	     xmlrpc_value * const paramArrayP,
 	     void * const serverInfo ATTR_UNUSED,
@@ -861,6 +947,7 @@ xpce_command(xmlrpc_env * const envP,
     } else {
       //fprintf(stderr, "Returning string value of size %d: %s\n", (int)strlen(output), output);
       value = xmlrpc_build_value(envP, "s", output);
+      safe_free(output);
       // Should be safe to free the string after this, here we simply set the index to 0
     }
     fprintf(stderr, "Returning value\n");
@@ -900,10 +987,14 @@ int main(int const argc, const char ** const argv) {
 //     = {"xpce.retract", &xpce_retract};
 //   struct xmlrpc_method_info3 const methodInfoDumptable
 //     = {"xpce.dumptable",&xpce_dumptable};
+  struct xmlrpc_method_info3 const methodInfoQuit
+    = {"xpce.quit", &xpce_quit};
   
   xmlrpc_server_abyss_parms serverparm;
-  xmlrpc_registry * registryP;
+  xmlrpc_registry *registryP;
   xmlrpc_env env;
+  xmlrpc_server_abyss_t *serverP;
+  xmlrpc_server_abyss_sig *oldHandlersP;
   
   if (argc-1 != 1) {
     fprintf(stderr, "You must specify 1 argument:  The TCP port "
@@ -916,8 +1007,11 @@ int main(int const argc, const char ** const argv) {
   // Initialize the error structure
   xmlrpc_env_init(&env);
   
-  registryP = xmlrpc_registry_new(&env);
+  // Global initialization (needed to use xmlrpc_server_abyss_t objects)
+  xmlrpc_server_abyss_global_init(&env);
   
+  // Register methods
+  registryP = xmlrpc_registry_new(&env);
   xmlrpc_registry_add_method3(&env, registryP, &methodInfoCommand);
   xmlrpc_registry_add_method3(&env, registryP, &methodInfoSort);
   xmlrpc_registry_add_method3(&env, registryP, &methodInfoPredicate);
@@ -930,6 +1024,7 @@ int main(int const argc, const char ** const argv) {
 //   xmlrpc_registry_add_method3(&env, registryP, &methodInfoReset);
 //   xmlrpc_registry_add_method3(&env, registryP, &methodInfoRetract);
 //   xmlrpc_registry_add_method3(&env, registryP, &methodInfoDumptable);
+  xmlrpc_registry_add_method3(&env, registryP, &methodInfoQuit);
   
   /* In the modern form of the Abyss API, we supply parameters in memory
      like a normal API.  We select the modern form by setting
@@ -940,11 +1035,28 @@ int main(int const argc, const char ** const argv) {
   serverparm.port_number      = atoi(argv[1]);
   serverparm.log_file_name    = "/tmp/xmlpce_log";
 
+  // log_file_name is the last parameter set above
+  xmlrpc_server_abyss_create(&env, &serverparm, XMLRPC_APSIZE(log_file_name), &serverP);
+
+  xmlrpc_server_abyss_setup_sig(&env, serverP, &oldHandlersP);
+
+  serverToTerminateP = serverP;
+  
   printf("Running XPCE server...\n");
 
-  xmlrpc_server_abyss(&env, &serverparm, XMLRPC_APSIZE(log_file_name));
+  /* xmlrpc_server_abyss_run_server() returns when terminated */
+
+  xmlrpc_server_abyss_run_server(&env, serverP);
+  
+  //  xmlrpc_server_abyss(&env, &serverparm, XMLRPC_APSIZE(log_file_name));
   
   /* xmlrpc_server_abyss() never returns */
-  
+
+  xmlrpc_server_abyss_restore_sig(oldHandlersP);
+
+  xmlrpc_server_abyss_destroy(serverP);
+
+  xmlrpc_server_abyss_global_term();
+    
   return 0;
 }

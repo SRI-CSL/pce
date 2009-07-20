@@ -32,7 +32,7 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
   sort_table_t *sort_table = &samp_table.sort_table;
   const_table_t *const_table = &samp_table.const_table;
   int32_t i, j, num_args, pred_val, pred_idx, const_idx, *psig, vsig, subsig, vlen;
-  char *pred, *var, *cname;
+  char *pred, *cname;
   samp_atom_t *atom;
   rule_literal_t *lit;
   
@@ -72,7 +72,7 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 	if (subsig != vsig) {
 	  if (subsig == -1) {
 	    mcsat_err("Variable %s used with incompatible sorts %s and %s",
-		      var, sort_table->entries[vsig].name,
+		      vars[j]->name, sort_table->entries[vsig].name,
 		      sort_table->entries[psig[i]].name);
 	    return NULL;
 	}
@@ -301,6 +301,7 @@ var_entry_t **copy_variables(var_entry_t **vars) {
   var_entry_t **cvars;
   int32_t i, numvars;
 
+  if (vars == NULL) return NULL;
   for (numvars = 0; vars[numvars] != NULL; numvars++) {}
   cvars = (var_entry_t **) safe_malloc(numvars * sizeof(var_entry_t *));
   for (i = 0; i < numvars; i++) {
@@ -558,6 +559,7 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
   double tnum;
   int32_t i;
 
+  ask_buffer.size = 0;
   // Returns the literals, and sets the sort of the variables
   lits = cnf_pos(formula->fmla, formula->vars);
   if (lits == NULL) {
@@ -573,10 +575,11 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
     for (i = 0; formula->vars[i] != NULL; i++) {}
     query->num_vars = i;
   }
-  query->vars = formula->vars;
+  query->vars = copy_variables(formula->vars);
   query->literals = lits;
   // Get the instances into the query_instance_table
   all_query_instances(query, &samp_table);
+  
   if (lazy_mcsat()) {
     // Run the specified number of samples
     lazy_mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
@@ -608,6 +611,7 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
   if (maxresults > 0 && ask_buffer.size > maxresults) {
     ask_buffer.size = maxresults;
   }
+  free_samp_query(query);
   // Callers have to manage the query_instance table
   // To clear it out for the next query, call the following
   // reset_query_instance_table(query_instance_table);

@@ -59,9 +59,10 @@ static void help () {
 mcsat computes marginal probabilities based on facts and weighted assertions.\n\n\
 Usage: %s [OPTION]... [FILE]...\n\n\
   Interactive If no FILE is provided,\n\
-  Otherwise FILEs are read and %s exits\n\
+  Otherwise FILEs are read and %s exits without --interactive option\n\
 Options:\n\
   -h, -?, --help           print this help and exit\n\
+  -i,     --interactive    run interactively\n\
           --lazy=BOOL      whether to use lazy version (true)\n\
           --strict=BOOL    whether to require declarations for all constants (true)\n\
   -v,     --verbosity=NUM  sets the verbosity level\n\

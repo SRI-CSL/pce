@@ -205,16 +205,19 @@ void free_literals (input_literal_t **lit) {
 }
 
 void free_fmla (input_fmla_t *fmla) {
+  input_comp_fmla_t *cfmla;
+  
   if (fmla->kind == ATOM) {
     free_atom(fmla->ufmla->atom);
   } else {
-    input_comp_fmla_t *cfmla = fmla->ufmla->cfmla;
-    input_fmla_t *arg1 = (input_fmla_t *) cfmla->arg1;
-    free_fmla(arg1);
+    cfmla = fmla->ufmla->cfmla;
+    free_fmla((input_fmla_t *) cfmla->arg1);
     if (cfmla->arg2 != NULL) {
       free_fmla((input_fmla_t *) cfmla->arg2);
     }
+    safe_free(cfmla);
   }
+  safe_free(fmla->ufmla);
   safe_free(fmla);
 }
 
@@ -244,6 +247,48 @@ void free_clause(input_clause_t *clause) {
   free_strings(clause->variables);
   free_literals(clause->literals);
   safe_free(clause);
+}
+
+void free_samp_atom(samp_atom_t *atom) {
+  safe_free(atom);
+}
+
+void free_rule_literal(rule_literal_t *lit) {
+  free_samp_atom(lit->atom);
+  safe_free(lit);
+}
+
+void free_rule_literals(rule_literal_t **lit) {
+  int32_t i;
+
+  for (i = 0; lit[i] != NULL; i++) {
+    free_rule_literal(lit[i]);
+  }
+  safe_free(lit);
+}
+
+void free_samp_query(samp_query_t *query) {
+  int32_t i;
+  
+  for (i = 0; i < query->num_vars; i++) {
+    free_var_entry(query->vars[i]);
+  }
+  for (i = 0; i < query->num_clauses; i++) {
+    free_rule_literals(query->literals[i]);
+  }
+  safe_free(query->literals);
+  safe_free(query);
+}
+
+void free_samp_query_instance(samp_query_instance_t *qinst) {
+  int32_t i;
+  
+  safe_free(qinst->subst);
+  for (i = 0; qinst->lit[i] != NULL; i++) {
+    safe_free(qinst->lit[i]);
+  }
+  safe_free(qinst->lit);
+  safe_free(qinst);
 }
 
 void show_help(int32_t topic) {
@@ -498,17 +543,22 @@ void print_ask_results (input_formula_t *fmla, samp_table_t *table) {
   int32_t i, j, *qsubst;
   char *cname;
   
-  printf("%d results:\n", ask_buffer.size);
+  printf("\n%d results:\n", ask_buffer.size);
   for (i = 0; i < ask_buffer.size; i++) {
     qinst = ask_buffer.data[i];
     qsubst = qinst->subst;
-    for (j = 0; fmla->vars[j] != NULL; j++) {
-      cname = const_name(qsubst[j], &table->const_table);
-      printf(" %s <- %s\n", fmla->vars[j]->name, cname);
+    printf("[");
+    if (fmla->vars != NULL) {
+      for (j = 0; fmla->vars[j] != NULL; j++) {
+	if (j != 0) printf(", ");
+	cname = const_name(qsubst[j], &table->const_table);
+	printf("%s <- %s", fmla->vars[j]->name, cname);
+      }
     }
+    printf("]");
+    output("% 5.3f:", query_probability(ask_buffer.data[i], table));
+    print_query_instance(qinst, table, 0, false);
     printf("\n");
-    print_query_instance(qinst, table, 0, true);
-    output(" : % 5.3f\n", query_probability(ask_buffer.data[i], table));
     fflush(stdout);
   }
 }
@@ -649,7 +699,7 @@ extern bool read_eval(samp_table_t *table) {
     }
     case ASK: {
       input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
-      cprintf(1, "ask: clausifying formula\n");
+      cprintf(2, "ask: clausifying formula\n");
       ask_cnf(decl.formula, decl.threshold, decl.numresults);
       // Results are in ask_buffer - print them out
       print_ask_results(decl.formula, table);

@@ -155,6 +155,8 @@ int main(int const argc, const char ** const argv ATTR_UNUSED) {
   run_xpce_command(&env, serverUrl, "xpce.ask", cmd);
   
   run_pce_command(&env, serverUrl, "dumptable;");
+
+  run_xpce_command(&env, serverUrl, "xpce.quit", NULL);  
     
   /* Clean up our error-handling environment. */
   xmlrpc_env_clean(&env);

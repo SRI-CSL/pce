@@ -1882,7 +1882,9 @@ int32_t substit_rule(samp_rule_t *rule,
 		     substit_entry_t *substs,
 		     samp_table_t *table){
   const_table_t *const_table = &(table->const_table);
+  atom_table_t *atom_table = &(table->atom_table);
   pred_table_t *pred_table = &(table->pred_table);
+  array_hmap_pair_t *atom_map;
   int32_t i;
   for(i=0; i<rule->num_vars; i++){
     if (substs[i].const_index == -1) {
@@ -1917,12 +1919,20 @@ int32_t substit_rule(samp_rule_t *rule,
 	new_atom->args[j] = substs[-(argidx + 1)].const_index;
       }
     }
+    atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
+				    arity+1, //+1 for pred
+				    (int32_t *) new_atom);
     int32_t added_atom = add_internal_atom(table, new_atom);
     if (added_atom == -1){
       // This shouldn't happen, but if it does, we need to free up space
+      safe_free(new_atom);
       mcsat_err("substit: Bad atom\n");
       return -1;
     }
+    //if (atom_map != NULL) {
+      // already had the atom - free it
+      safe_free(new_atom);
+      //}
     clause_buffer.data[i] = lit->neg ? neg_lit(added_atom) : pos_lit(added_atom);
   }
   return add_internal_clause(table, clause_buffer.data, rule->num_lits,
@@ -2185,6 +2195,7 @@ int32_t add_subst_query_instance(samp_literal_t **litinst, substit_entry_t *subs
   qindex = i;
   if (i < query_instance_table->num_queries) {
     // Already have this instance - just associate it with the query
+    safe_free(litinst);
   } else {
     query_instance_table_resize(query_instance_table);
     qinst = (samp_query_instance_t *) safe_malloc(sizeof(samp_query_instance_t));
@@ -2270,9 +2281,11 @@ int32_t substit_query(samp_query_t *query,
       }
       if (added_atom == -1){
 	// This shouldn't happen, but if it does, we need to free up space
+	free_samp_atom(new_atom);
 	mcsat_err("substit: Bad atom\n");
 	return -1;
       }
+      free_samp_atom(new_atom);
       litinst[i][j] = lit[i][j]->neg ? neg_lit(added_atom) : pos_lit(added_atom);
     }
     litinst[i][j] = -1; // end-marker - NULL doesn't work
@@ -2297,7 +2310,7 @@ bool check_query_instance(samp_query_t *query, samp_table_t *table) {
       predicate = atom->pred; 
       arity = pred_arity(predicate, pred_table);
       rule_atom_buffer_resize(arity);
-      rule_atom = (samp_atom_t *) &rule_atom_buffer.data;
+      rule_atom = (samp_atom_t *) rule_atom_buffer.data;
       rule_atom->pred = predicate; 
       for (k = 0; k < arity; k++){//copy each instantiated argument
 	if (atom->args[k] < 0){
