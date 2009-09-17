@@ -193,14 +193,14 @@ void free_strings (char **string) {
 
 bool subsort_p(int32_t sig1, int32_t sig2, sort_table_t *sort_table) {
   int32_t i;
-  sort_entry_t *ent2;
+  sort_entry_t *ent1;
   if (sig1 == sig2) {
     return true;
   }
-  ent2 = &sort_table->entries[sig2];
-  if (ent2->supersorts != NULL) {
-    for (i = 0; ent2->supersorts[i] != -1; i++) {
-      if (ent2->supersorts[i] == sig1) {
+  ent1 = &sort_table->entries[sig1];
+  if (ent1->supersorts != NULL) {
+    for (i = 0; ent1->supersorts[i] != -1; i++) {
+      if (ent1->supersorts[i] == sig2) {
 	return true;
       }
     }
