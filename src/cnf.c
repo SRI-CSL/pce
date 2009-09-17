@@ -515,7 +515,6 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
 	  add_rule_to_pred(pred_table, pred, current_rule);
 	}
       } else {
-	printf("Giving a warning\n");
 	mcsat_warn("Rule was seen before, adding weights\n");
 	if (found->weight != DBL_MAX) {
 	  if (weight == DBL_MAX) {
@@ -556,7 +555,6 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
   rule_literal_t ***lits;
   samp_query_t *query;
   samp_query_instance_t *qinst;
-  double tnum;
   int32_t i;
 
   ask_buffer.size = 0;
@@ -593,8 +591,6 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
   }
   query_instance_table = &samp_table.query_instance_table;
   // Collect those above the threshold, sort, and print
-  // First convert threshold to a number for fast compare
-  tnum = threshold * get_max_samples();
   if (ask_buffer.data == NULL) {
     init_pvector(&ask_buffer, 16);
   } else {
@@ -602,7 +598,7 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
   }
   for (i = 0; i < query_instance_table->num_queries; i++) {
     qinst = query_instance_table->query_inst[i];
-    if (qinst->pmodel >= tnum) {
+    if (query_probability(qinst, &samp_table) >= threshold) {
       pvector_push(&ask_buffer, qinst);
     }
   }
