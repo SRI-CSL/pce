@@ -525,7 +525,8 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
   // Need to see if name in var_table
   if (var_index(cnst, var_table) == -1) {
     cprintf(2, "Adding const %s\n", cnst);
-    if (add_const(cnst, sort, table) != -1) {
+    // add_const returns -1 for error, 1 for already exists, 0 for new
+    if (add_const(cnst, sort, table) == 0) {
       int32_t cidx = const_index(cnst, const_table);
       // We don't invoke this in add_const, as this is eager.
       // Last arg says this is not lazy.
