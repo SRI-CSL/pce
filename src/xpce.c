@@ -751,9 +751,9 @@ xpce_ask(xmlrpc_env * const envP,
   int32_t maxresults, i, j, *qsubst;
   char *cname;
 
-  printf("In xpce.ask\n");
   // Get JSON form
   askdecl = xpce_parse_decl(envP, paramArrayP);
+  cprintf(1, "In xpce.ask:\n  %s\n", json_object_to_json_string(askdecl));
   if (!json_object_is_type(askdecl, json_type_object)) {
     mcsat_err("Bad argument: expected {\"formula\": FORMULA, \"threshold\": NUM, \"maxresults\": NAME}\n");
     json_object_put(askdecl);
