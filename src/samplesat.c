@@ -1881,9 +1881,10 @@ void mc_sat(samp_table_t *table, double sa_probability,
 int32_t substit_rule(samp_rule_t *rule,
 		     substit_entry_t *substs,
 		     samp_table_t *table){
-  const_table_t *const_table = &(table->const_table);
-  atom_table_t *atom_table = &(table->atom_table);
-  pred_table_t *pred_table = &(table->pred_table);
+  const_table_t *const_table = &table->const_table;
+  sort_table_t *sort_table = &table->sort_table;
+  atom_table_t *atom_table = &table->atom_table;
+  pred_table_t *pred_table = &table->pred_table;
   array_hmap_pair_t *atom_map;
   int32_t i;
   for(i=0; i<rule->num_vars; i++){
@@ -1894,7 +1895,7 @@ int32_t substit_rule(samp_rule_t *rule,
     }
     int32_t vsort = rule->vars[i]->sort_index;
     int32_t csort = const_sort_index(substs[i].const_index, const_table);
-    if (vsort != csort) {
+    if (! subsort_p(csort, vsort, sort_table)) {
       mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
       return -1;
     }
@@ -2222,9 +2223,10 @@ int32_t add_subst_query_instance(samp_literal_t **litinst, substit_entry_t *subs
 int32_t substit_query(samp_query_t *query,
 		      substit_entry_t *substs,
 		      samp_table_t *table) {
-  const_table_t *const_table = &(table->const_table);
-  pred_table_t *pred_table = &(table->pred_table);
-  atom_table_t *atom_table = &(table->atom_table);
+  const_table_t *const_table = &table->const_table;
+  sort_table_t *sort_table = &table->sort_table;
+  pred_table_t *pred_table = &table->pred_table;
+  atom_table_t *atom_table = &table->atom_table;
   samp_atom_t *new_atom;
   int32_t i, j, k, vsort, csort, arity, argidx, added_atom;
   rule_literal_t ***lit;
@@ -2238,7 +2240,7 @@ int32_t substit_query(samp_query_t *query,
     }
     vsort = query->vars[i]->sort_index;
     csort = const_sort_index(substs[i].const_index, const_table);
-    if (vsort != csort) {
+    if (! subsort_p(csort, vsort, sort_table)) {
       mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
       return -1;
     }
