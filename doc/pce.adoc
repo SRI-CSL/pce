@@ -9,7 +9,7 @@
 == Introduction
 
 The Probability Consistency Engine (PCE) is a system for performing
-probabilistic inference in Markov Logic <<MarkovLogic,Markov Logic>> using
+probabilistic inference in <<MarkovLogic,Markov Logic>> using
 Markov Chain Monte Carlo (MCMC) methods.  PCE uses the <<MCSAT,MCSat>> and
 <<LazyMCSAT,Lazy MCSat>> algorithms and was originally developed as part
 of the <<CALO,CALO>> project, where it was used to provide marginal
@@ -94,15 +94,16 @@ description of the available commands.
 
 *Usage:*:: `mcsat [OPTION]... [FILE]...`
 
-[format="csv", cols="1,2"]
+[format="csv", cols="1,2,4"]
 |=================================
-*Option*, *Effect*
-`-h   -?   --help`,  Print a summary of the options
-`-i   --interactive`, Run interactively
-`--lazy=BOOL`, use the lazy version (default `false`)
-`--strict=BOOL`, require declarations for all constants (default `true`)
-`-v NUM   --verbosity=NUM`, sets the verbosity level
-`-V   --version`, prints the version number and exits
+*Option*,, *Effect*
+`-h -?`, `--help`,  Print a summary of the options
+`-i`, `--interactive`, Run interactively
+`-s NUM`, `--seed=NUM`, Run with the given pseudorandom seed
+,`--lazy=BOOL`, Use the lazy version (default `false`)
+,`--strict=BOOL`, Require declarations for all constants (default `true`)
+`-v NUM`, `--verbosity=NUM`, Sets the verbosity level
+`-V`, `--version`, Prints the version number and exits
 |=================================
 
 
@@ -116,7 +117,9 @@ This is in EBNF notation, with the following conventions:
   (i.e., all characters except for...)
 - `?`, `*`, and `+` may be used to indicate zero or one, zero or more, and
   one or more, respectively.  If these are preceded by a separator (e.g.,
-  a comma), it means the entries are separated accordingly.
+  a comma), it means the entries are separated accordingly.  Thus
+  `nt := term,+` is equivalent to `nt := term | term ',' nt`, and
+  `LITERAL|+` means any number of literals separated by vertical bars.
 
 -----
 FORMULA := FMLA
@@ -199,6 +202,7 @@ indirect predicates.  Internally, direct predicates satisfy the closed
 world assumption, and indirect predicates do not.
 
 *Syntax:*:: `predicate NAME ( NAMES ) IND ;`
+
 where `IND` is "`direct`", "`indirect`", or omitted, defaulting to "`direct`".
 
 *Example:*:: `predicate fileHasTask(File, Task) indirect;`
@@ -227,13 +231,15 @@ Add is used to introduce weighted formulas and rules.  Rules include
 variables, which are introduced before the formula.
 
 *Syntax*:: `add FORMULA WT ;`
-`add [ VARIABLES ] FORMULA WT ;`
+
+ :: `add [ VARIABLES ] FORMULA WT ;`
 
 where `WT` is an optional floating point weight.  If weight is missing,
 the clause or rule is considered as a "hard" clause or rule. (This is
 the same as having infinite weight).
 
 *Example*:: `add fileHasTask(fi22, ta1)  1.286;`
+
 adds a weighted ground clause.
 
 -------------------
@@ -252,13 +258,15 @@ attached(F, E) \Rightarrow emailHasTask(E, T)$]
 Similar to `add`, but uses clauses instead of formulas.
 
 *Syntax*:: `add_clause CLAUSE WT ;`
-`add ( VARIABLES ) CLAUSE WT ;`
+
+ :: `add ( VARIABLES ) CLAUSE WT ;`
 
 where `WT` is an optional floating point weight.  If weight is missing,
 the clause or rule is considered as a "hard" clause or rule. (This is
 the same as having infinite weight).
 
 *Example*:: `add_clause fileHasTask(fi22, ta1)  1.286;`
+
 adds a weighted ground clause.
 
 -------------------
@@ -288,10 +296,13 @@ returned - unless it is 0, in which case all instances above the
    Note that the instances of the `FORMULA` are in clausal form, and in
    general will not be a syntactic match.
 
-*Syntax:*:: `ask FORMULA THRESHOLD MAXRESULTS ;` +
-`ask [ VARIABLES ] FORMULA THRESHOLD MAXRESULTS ;`
-- `THRESHOLD` is a number between 0.0 and 1.0 inclusive; default 0.0
-- `MAXRESULTS` is a nonnegative integer, default 0
+*Syntax:*:: `ask FORMULA THRESHOLD MAXRESULTS ;`
+
+ :: `ask [ VARIABLES ] FORMULA THRESHOLD MAXRESULTS ;`
+
+where
+ - `THRESHOLD` is a number between 0.0 and 1.0 inclusive; default 0.0
+ - `MAXRESULTS` is a nonnegative integer, default 0
 
 *Example:*::
 +ask [e, p] emailfrom(e, p) and hastask(e, ta1) 0.5 2;+
@@ -312,24 +323,28 @@ Runs the MCSAT process, running samples as described in
 
 *Syntax*:: `mcsat`
 
+`mcsat_params` is used to set MCSAT parameters.
+
 
 ==== mcsat_params
 
 Displays or sets the parameters controlling the MCSAT algorithm.
+Parameters that are set keep their value until set to another value.
 
-*Syntax*:: `mcsat_params NUMS`
+*Syntax*:: `mcsat_params NUMS ;`
 
-where NUMS is a comma-separated list of numbers, representing, in order:
+where NUMS is a comma-separated list of numbers, some of which may be
+omitted.  The numbers represent, in order:
 
-[format="csv",cols="2,^2,^1,12"]
+[format="csv",cols="4,^2,^1,10"]
 |=================================
 *Parameter*, *Type*, *Default*, *Description*
+`max_samples`, nat, 100, number of samples generated  
 `sa_probability`, 0.0 .. 1.0, 0.5, probability of a simulated annealing step
 `samp_temperature`, > 0.0, 0.91, temperature for simulated annealing
 `rvar_probability`, 0.0 .. 1.0, 0.2, probability used by a walksat step (see Note) 
-`max_flips`, nat, 1000, bound on the number of sample_sat steps
-`max_extra_flips`, nat, 10, number of samplesat steps performed after a model is found
-`max_samples`, nat, 1000, number of samples generated  
+`max_flips`, nat, 1000, bound on the number of flipped variables
+`max_extra_flips`, nat, 10, number of extra flips performed after a model is found
 |=================================
 
 [NOTE]
@@ -340,7 +355,10 @@ with probability (1-rvar_probability), that variable is the one that
 results in minimal increase of the number of unsat clauses.
 ============================
 
-Parameters may be omitted, but to set one all preceding ones must also be given.
+*Example:*::
++mcsat_params , , , .3;+
+
+sets the `rvar_probability` to `0.3`.
 
 ==== reset
 
