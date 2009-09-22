@@ -18,19 +18,19 @@ extern void free_parse_data();
 extern int yydebug;
 
 // MCSAT parameters
+#define DEFAULT_MAX_SAMPLES 100
 #define DEFAULT_SA_PROBABILITY .5
 #define DEFAULT_SAMP_TEMPERATURE 0.91
 #define DEFAULT_RVAR_PROBABILITY .2
 #define DEFAULT_MAX_FLIPS 1000
 #define DEFAULT_MAX_EXTRA_FLIPS 10
-#define DEFAULT_MAX_SAMPLES 100
 
+static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 static double sa_probability = DEFAULT_SA_PROBABILITY;
 static double samp_temperature = DEFAULT_SAMP_TEMPERATURE;
 static double rvar_probability = DEFAULT_RVAR_PROBABILITY;
 static int32_t max_flips = DEFAULT_MAX_FLIPS;
 static int32_t max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
-static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 
 static bool strict_consts = true;
 static bool lazy = false;
@@ -39,6 +39,9 @@ input_clause_buffer_t input_clause_buffer = {0, 0, NULL};
 input_literal_buffer_t input_literal_buffer = {0, 0, NULL};
 input_atom_buffer_t input_atom_buffer = {0, 0, NULL};
 
+int32_t get_max_samples() {
+  return max_samples;
+}
 double get_sa_probability() {
   return sa_probability;
 }
@@ -54,10 +57,10 @@ int32_t get_max_flips() {
 int32_t get_max_extra_flips() {
   return max_extra_flips;
 }
-int32_t get_max_samples() {
-  return max_samples;
-}
 
+void set_max_samples(int32_t m) {
+  max_samples = m;
+}
 void set_sa_probability(double d) {
   sa_probability = d;
 }
@@ -72,9 +75,6 @@ void set_max_flips(int32_t m) {
 }
 void set_max_extra_flips(int32_t m) {
   max_extra_flips = m;
-}
-void set_max_samples(int32_t m) {
-  max_samples = m;
 }
 
 bool strict_constants() {
@@ -424,15 +424,15 @@ For example:\n\
 mcsat_params [NUM++','];\n\
   Sets the MCSAT parameters.  With no arguments, displays the current values.\n\
 mcsat NUMs are optional, and represent, in order:\n\
+  max_samples (int): Number of samples to take\n\
   sa_probability (double): Prob of taking simulated annealing step\n\
   samp_temperature (double): Simulated annealing temperature\n\
   rvar_probability (double): Prob of flipping a random variable\n\
                              in non-simulated annealing step\n\
   max_flips (int): Max number of variable flips to find a model\n\
   max_extra_flips (int): Max number of extra flips to try\n\
-  max_samples (int): Number of samples to take\n\
 Example:\n\
-  mcsat_params .8,,,1000;\n\
+  mcsat_params ,.8,,1000;\n\
     Sets sa_probability to .8, max_flips to 1000, and keeps other parameter values.\n\
 ");
     break;
@@ -718,20 +718,20 @@ extern bool read_eval(samp_table_t *table) {
 	
       output("Calling %sMCSAT with parameters (set using mcsat_params):\n",
 	     lazy_mcsat() ? "LAZY_" : "");
+      output(" max_samples = %"PRId32"\n", get_max_samples());
       output(" sa_probability = %f\n", get_sa_probability());
       output(" samp_temperature = %f\n", get_samp_temperature());
       output(" rvar_probability = %f\n", get_rvar_probability());
       output(" max_flips = %"PRId32"\n", get_max_flips());
       output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
-      output(" max_samples = %"PRId32"\n", get_max_samples());
       if (lazy_mcsat()) {
-	lazy_mc_sat(table, get_sa_probability(), get_samp_temperature(),
-		    get_rvar_probability(), get_max_flips(),
-		    get_max_extra_flips(), get_max_samples());
+	lazy_mc_sat(table, get_max_samples(), get_sa_probability(),
+		    get_samp_temperature(), get_rvar_probability(),
+		    get_max_flips(), get_max_extra_flips());
       } else {
-	mc_sat(table, get_sa_probability(), get_samp_temperature(),
-	       get_rvar_probability(), get_max_flips(),
-	       get_max_extra_flips(), get_max_samples());
+	mc_sat(table, get_max_samples(), get_sa_probability(),
+	       get_samp_temperature(), get_rvar_probability(),
+	       get_max_flips(), get_max_extra_flips());
       }
       output("\n");
       break;
@@ -740,14 +740,19 @@ extern bool read_eval(samp_table_t *table) {
       input_mcsat_params_decl_t decl = input_command.decl.mcsat_params_decl;
       if (decl.num_params == 0) {
 	output("MCSAT param values:\n");
+	output(" max_samples = %"PRId32"\n", get_max_samples());
 	output(" sa_probability = %f\n", get_sa_probability());
 	output(" samp_temperature = %f\n", get_samp_temperature());
 	output(" rvar_probability = %f\n", get_rvar_probability());
 	output(" max_flips = %"PRId32"\n", get_max_flips());
 	output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
-	output(" max_samples = %"PRId32"\n", get_max_samples());
       } else {
 	output("Setting MCSAT parameters:\n");
+	if (decl.max_samples >= 0) {
+	  output(" max_samples was %"PRId32", now %"PRId32"\n",
+		 get_max_samples(), decl.max_samples);
+	  set_max_samples(decl.max_samples);
+	}
 	if (decl.sa_probability >= 0) {
 	  output(" sa_probability was %f, now %f\n",
 		 get_sa_probability(), decl.sa_probability);
@@ -772,11 +777,6 @@ extern bool read_eval(samp_table_t *table) {
 	  output(" max_extra_flips was %"PRId32", now %"PRId32"\n",
 		 get_max_extra_flips(), decl.max_extra_flips);
 	  set_max_extra_flips(decl.max_extra_flips);
-	}
-	if (decl.max_samples >= 0) {
-	  output(" max_samples was %"PRId32", now %"PRId32"\n",
-		 get_max_samples(), decl.max_samples);
-	  set_max_samples(decl.max_samples);
 	}
       }
       output("\n");

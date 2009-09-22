@@ -77,22 +77,22 @@ typedef struct input_ask_decl_s {
 } input_ask_decl_t;
 
 // typedef struct input_mcsat_decl_s {
+//   int32_t max_samples;
 //   double sa_probability;
 //   double samp_temperature;
 //   double rvar_probability;
 //   int32_t max_flips;
 //   int32_t max_extra_flips;
-//   int32_t max_samples;
 // } input_mcsat_decl_t;
 
 typedef struct input_mcsat_params_decl_s {
   int32_t num_params;
+  int32_t max_samples;
   double sa_probability;
   double samp_temperature;
   double rvar_probability;
   int32_t max_flips;
   int32_t max_extra_flips;
-  int32_t max_samples;
 } input_mcsat_params_decl_t;
 
 typedef struct input_reset_decl_s {
@@ -182,19 +182,19 @@ extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t
 extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
 extern void dumptable(int32_t tbl, samp_table_t *table);
 
+extern int32_t get_max_samples();
 extern double get_sa_probability();
 extern double get_samp_temperature();
 extern double get_rvar_probability();
 extern int32_t get_max_flips();
 extern int32_t get_max_extra_flips();
-extern int32_t get_max_samples();
 
+extern void set_max_samples(int32_t m);
 extern void set_sa_probability(double d);
 extern void set_samp_temperature(double d);
 extern void set_rvar_probability(double d);
 extern void set_max_flips(int32_t m);
 extern void set_max_extra_flips(int32_t m);
-extern void set_max_samples(int32_t m);
 
 extern bool strict_constants();
 extern void set_strict_constants(bool val);

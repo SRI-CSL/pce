@@ -357,10 +357,18 @@ void yy_mcsat_params_decl (char **params) {
     yyerror("mcsat_params: too many args");
   }
   input_command.decl.mcsat_params_decl.num_params = arglen;
-  // sa_probability
+  // max_samples
   if (arglen > 0 && strcmp(params[0], "") != 0) {
-    if (yy_check_float(params[0])) {
-      double prob = atof(params[0]);
+    if (yy_check_int(params[0])) {
+      input_command.decl.mcsat_params_decl.max_samples = atoi(params[0]);
+    }
+  } else {
+    input_command.decl.mcsat_params_decl.max_samples = -1;
+  }
+  // sa_probability
+  if (arglen > 1 && strcmp(params[1], "") != 0) {
+    if (yy_check_float(params[1])) {
+      double prob = atof(params[1]);
       if (0.0 <= prob && prob <= 1.0) {
 	input_command.decl.mcsat_params_decl.sa_probability = prob;
       } else {
@@ -371,9 +379,9 @@ void yy_mcsat_params_decl (char **params) {
     input_command.decl.mcsat_params_decl.sa_probability = -1;
   }
   // samp_temperature
-  if (arglen > 1 && strcmp(params[1], "") != 0) {
-    if (yy_check_float(params[1])) {
-      double temp = atof(params[1]);
+  if (arglen > 2 && strcmp(params[2], "") != 0) {
+    if (yy_check_float(params[2])) {
+      double temp = atof(params[2]);
       if (temp > 0.0) {
 	input_command.decl.mcsat_params_decl.samp_temperature = temp;
       } else {
@@ -384,9 +392,9 @@ void yy_mcsat_params_decl (char **params) {
     input_command.decl.mcsat_params_decl.samp_temperature = -1;
   }
   // rvar_probability
-  if (arglen > 2 && strcmp(params[2], "") != 0) {
-    if (yy_check_float(params[2])) {
-      double prob = atof(params[2]);
+  if (arglen > 3 && strcmp(params[3], "") != 0) {
+    if (yy_check_float(params[3])) {
+      double prob = atof(params[3]);
       if (0.0 <= prob && prob <= 1.0) {
 	input_command.decl.mcsat_params_decl.rvar_probability = prob;
       } else {
@@ -397,28 +405,20 @@ void yy_mcsat_params_decl (char **params) {
     input_command.decl.mcsat_params_decl.rvar_probability = -1;
   }
   // max_flips
-  if (arglen > 3 && strcmp(params[3], "") != 0) {
-    if (yy_check_int(params[3])) {
-      input_command.decl.mcsat_params_decl.max_flips = atoi(params[3]);
+  if (arglen > 4 && strcmp(params[4], "") != 0) {
+    if (yy_check_int(params[4])) {
+      input_command.decl.mcsat_params_decl.max_flips = atoi(params[4]);
     }
   } else {
     input_command.decl.mcsat_params_decl.max_flips = -1;
   }
   // max_extra_flips
-  if (arglen > 4 && strcmp(params[4], "") != 0) {
-    if (yy_check_int(params[4])) {
-      input_command.decl.mcsat_params_decl.max_extra_flips = atoi(params[4]);
+  if (arglen > 5 && strcmp(params[5], "") != 0) {
+    if (yy_check_int(params[5])) {
+      input_command.decl.mcsat_params_decl.max_extra_flips = atoi(params[5]);
     }
   } else {
     input_command.decl.mcsat_params_decl.max_extra_flips = -1;
-  }
-  // max_samples
-  if (arglen > 5 && strcmp(params[5], "") != 0) {
-    if (yy_check_int(params[5])) {
-      input_command.decl.mcsat_params_decl.max_samples = atoi(params[5]);
-    }
-  } else {
-    input_command.decl.mcsat_params_decl.max_samples = -1;
   }
   free_strings(params);
 };

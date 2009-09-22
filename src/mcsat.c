@@ -24,10 +24,12 @@ static const char *program_name;
 static int32_t show_version;
 static int32_t show_help;
 static int32_t interactive;
+static int32_t mcsat_seed;
 
 enum {
   LAZY_OPTION = CHAR_MAX + 1,
-  STRICT_OPTION
+  STRICT_OPTION,
+  SEED_OPTION
 };
 
 // enum subcommand {
@@ -38,6 +40,7 @@ enum {
 static struct option long_options[] = {
   {"help", no_argument, (int *)&show_help, 'h'},
   {"interactive", no_argument, (int *)&interactive, 'i'},
+  {"seed", required_argument, 0, SEED_OPTION},
   {"lazy", required_argument, 0, LAZY_OPTION},
   {"strict", required_argument, 0, STRICT_OPTION},
   {"verbosity", required_argument, 0, 'v'},
@@ -63,6 +66,7 @@ Usage: %s [OPTION]... [FILE]...\n\n\
 Options:\n\
   -h, -?, --help           print this help and exit\n\
   -i,     --interactive    run interactively\n\
+  -s,     --seed=NUM       use given random seed\n\
           --lazy=BOOL      whether to use lazy version (true)\n\
           --strict=BOOL    whether to require declarations for all constants (true)\n\
   -v,     --verbosity=NUM  sets the verbosity level\n\
@@ -71,7 +75,7 @@ Options:\n\
   exit(0);
 }
 
-#define OPTION_STRING "ihVv:"
+#define OPTION_STRING "ihs:Vv:"
 
 // static void set_subcommand_option (enum subcommand subcommand) {
 //   if (subcommand_option != subcommand) {
@@ -96,6 +100,16 @@ static void decode_options(int argc, char **argv) {
       break;
     case 'h':
       show_help = 1;
+      break;
+    case 's':
+    case SEED_OPTION:
+      for(i=0; optarg[i] != '\0'; i++){
+	if (! isdigit(optarg[i])) {
+	  mcsat_err("Error: seed must be an integer\n");
+	  exit(1);
+	}
+      }
+      srand(atoi(optarg));
       break;
     case LAZY_OPTION:
       if ((strcasecmp(optarg, "true") == 0) || (strcasecmp(optarg, "t") == 0) || (strcmp(optarg, "1") == 0)) {

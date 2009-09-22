@@ -580,14 +580,14 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
   
   if (lazy_mcsat()) {
     // Run the specified number of samples
-    lazy_mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
-		get_rvar_probability(), get_max_flips(),
-		get_max_extra_flips(), get_max_samples());
+    lazy_mc_sat(&samp_table, get_max_samples(), get_sa_probability(),
+		get_samp_temperature(), get_rvar_probability(),
+		get_max_flips(), get_max_extra_flips());
   } else {
     // Run the specified number of samples
-    mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
-	   get_rvar_probability(), get_max_flips(),
-	   get_max_extra_flips(), get_max_samples());
+    mc_sat(&samp_table, get_max_samples(), get_sa_probability(),
+	   get_samp_temperature(), get_rvar_probability(),
+	   get_max_flips(), get_max_extra_flips());
   }
   query_instance_table = &samp_table.query_instance_table;
   // Collect those above the threshold, sort, and print

@@ -848,13 +848,13 @@ xpce_mcsat(xmlrpc_env * const envP,
   // No need to parse, just run MCSAT and return warnings or errors
   pthread_mutex_lock(&mutex);
   if (lazy_mcsat()) {
-    lazy_mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
-		get_rvar_probability(), get_max_flips(),
-		get_max_extra_flips(), get_max_samples());
+    lazy_mc_sat(&samp_table, get_max_samples(), get_sa_probability(),
+		get_samp_temperature(), get_rvar_probability(),
+		get_max_flips(), get_max_extra_flips());
   } else {
-    mc_sat(&samp_table, get_sa_probability(), get_samp_temperature(),
-	   get_rvar_probability(), get_max_flips(),
-	   get_max_extra_flips(), get_max_samples());
+    mc_sat(&samp_table, get_max_samples(), get_sa_probability(),
+	   get_samp_temperature(), get_rvar_probability(),
+	   get_max_flips(), get_max_extra_flips());
   }
   pthread_mutex_unlock(&mutex);
   

@@ -88,7 +88,8 @@ extern void output(const char *fmt, ...) {
     va_end(argp);
     output_buffer.size += out_size;
     pthread_mutex_unlock(&pmutex);
-  } else {
+  }
+  if (!output_to_string || verbosity_level > 1) {
     va_start(argp, fmt);
     vprintf(fmt, argp);
     va_end(argp);
@@ -112,7 +113,8 @@ void mcsat_err(const char *fmt, ...) {
     va_end(argp);
     error_buffer.size += out_size;
     pthread_mutex_unlock(&pmutex);
-  } else {
+  }
+  if (!output_to_string || verbosity_level > 1) {
     va_start(argp, fmt);
     vfprintf(stderr, fmt, argp);
     va_end(argp);
@@ -136,7 +138,8 @@ void mcsat_warn(const char *fmt, ...) {
     va_end(argp);
     warning_buffer.size += out_size;
     pthread_mutex_unlock(&pmutex);
-  } else {
+  }
+  if (!output_to_string || verbosity_level > 1) {
     va_start(argp, fmt);
     vprintf(fmt, argp);
     va_end(argp);

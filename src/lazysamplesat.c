@@ -341,10 +341,10 @@ void lazy_sample_sat(samp_table_t *table, double sa_probability,
  * Parameter for mc_sat:
  * - max_samples = number of samples generated
  */
-void lazy_mc_sat(samp_table_t *table, double sa_probability,
-		 double samp_temperature, double rvar_probability,
-		 uint32_t max_flips, uint32_t max_extra_flips,
-		 uint32_t max_samples){
+void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
+		 double sa_probability, double samp_temperature,
+		 double rvar_probability, uint32_t max_flips,
+		 uint32_t max_extra_flips){
   int32_t conflict;
   uint32_t i;
 
