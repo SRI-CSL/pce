@@ -264,14 +264,17 @@ void print_atoms(samp_table_t *table){
   output("--------------------------------------------------------------------------------\n");
 }
 
-void print_clause(samp_clause_t *clause, samp_table_t *table){
+void print_literal(samp_literal_t lit, samp_table_t *table) {
   atom_table_t *atom_table = &table->atom_table;
+  if (is_neg(lit)) output("~");
+  print_atom(atom_table->atom[lit], table);
+}
+
+void print_clause(samp_clause_t *clause, samp_table_t *table) {
   int32_t i;
-  for (i = 0; i<clause->numlits; i++){
+  for (i = 0; i<clause->numlits; i++) {
     if (i != 0) output(" | ");
-    int32_t samp_atom = var_of(clause->disjunct[i]);
-    if (is_neg(clause->disjunct[i])) output("~");
-    print_atom(atom_table->atom[samp_atom], table);
+    print_literal(var_of(clause->disjunct[i]), table);
   }
 }
 

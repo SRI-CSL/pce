@@ -35,6 +35,8 @@ extern void dump_atom_table (samp_table_t *table);
 extern void dump_clause_table (samp_table_t *table);
 extern void dump_rule_table (samp_table_t *samp_table);
 
+extern void print_literal(samp_literal_t lit, samp_table_t *table);
+extern void print_clause(samp_clause_t *clause, samp_table_t *table);
 extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,
 				 int32_t indent, bool include_prob);
 

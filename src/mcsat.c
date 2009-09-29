@@ -24,7 +24,6 @@ static const char *program_name;
 static int32_t show_version;
 static int32_t show_help;
 static int32_t interactive;
-static int32_t mcsat_seed;
 
 enum {
   LAZY_OPTION = CHAR_MAX + 1,

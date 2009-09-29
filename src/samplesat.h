@@ -80,8 +80,8 @@ extern void cost_flip_unfixed_variable(samp_table_t *table,
 				       int32_t *dcost, 
 				       int32_t var);
 
-extern void flip_unfixed_variable(samp_table_t *table,
-				  int32_t var);
+extern int32_t flip_unfixed_variable(samp_table_t *table,
+				     int32_t var);
 
 extern int32_t choose_clause_var(samp_table_t *table,
 				 samp_clause_t *link,
@@ -111,7 +111,7 @@ extern int32_t get_fixable_literal(samp_truth_value_t *assignment,
 			    samp_literal_t *disjunct,
 			    int32_t numlits);
 
-extern void scan_unsat_clauses(samp_table_t *table);
+extern int32_t scan_unsat_clauses(samp_table_t *table);
 
 extern int32_t negative_unit_propagate(samp_table_t *table);
   
@@ -129,8 +129,8 @@ extern int32_t init_sample_sat(samp_table_t *table);
 
 int32_t reset_sample_sat(samp_table_t *table);
 
-void sample_sat_body(samp_table_t *table, double sa_probability,
-		     double samp_temperature, double rvar_probability);
+int32_t sample_sat_body(samp_table_t *table, double sa_probability,
+			double samp_temperature, double rvar_probability);
 
 void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
