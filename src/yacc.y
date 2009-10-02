@@ -684,10 +684,12 @@ int isidentchar(int c) {
 }
 
 int yygetc(parse_input_t *input) {
+  int c;
   if (input->kind == INFILE) {
     return getc(input->input.in_file.fps);
   } else {
-    return input->input.in_string.string[input->input.in_string.index++];
+    c = input->input.in_string.string[input->input.in_string.index++];
+    return c == '\0' ? EOF : c;
   }
 }
 
@@ -722,7 +724,7 @@ int skip_white_space_and_comments (void) {
       do {
 	c = yygetc(parse_input);
 	++yylloc.last_column;
-      } while (c != '\n' && c != EOF && c != '\0');
+      } while (c != '\n' && c != EOF);
     } else {
       return c;
     }
