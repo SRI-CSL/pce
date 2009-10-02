@@ -722,7 +722,7 @@ int skip_white_space_and_comments (void) {
       do {
 	c = yygetc(parse_input);
 	++yylloc.last_column;
-      } while (c != '\n' && c != EOF);
+      } while (c != '\n' && c != EOF && c != '\0');
     } else {
       return c;
     }
