@@ -461,6 +461,9 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
 
   // Returns the literals, and sets the sort of the variables
   lits = cnf_pos(formula->fmla, formula->vars);
+  if (!lits) {
+    return;
+  }
   
   if (formula->vars == NULL) {
     // No variables, just assert the clauses
