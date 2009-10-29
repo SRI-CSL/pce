@@ -1121,11 +1121,14 @@ void kill_clauses(samp_table_t *table){
  */
 int32_t fix_lit_true(samp_table_t *table, int32_t lit){
   int32_t var = var_of(lit);
+  uint32_t sign = sign_of_lit(lit);
   atom_table_t *atom_table = &(table->atom_table);
   samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment]; 
 
   if (fixed_tval(assignment[var])){
-    if (assigned_false(assignment[var])){
+    if (sign
+	? assigned_true(assignment[var])
+	: assigned_false(assignment[var])){
       return -1;//Conflict: The unit literal can't be fixed true,
        //since it is fixed false
     }
@@ -1147,11 +1150,14 @@ int32_t fix_lit_true(samp_table_t *table, int32_t lit){
 
 int32_t fix_lit_false(samp_table_t *table, int32_t lit){
   int32_t var = var_of(lit);
+  uint32_t sign = sign_of_lit(lit);
   atom_table_t *atom_table = &(table->atom_table);
   samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment]; 
 
   if (fixed_tval(assignment[var])){
-    if (assigned_true(assignment[var]))
+    if (sign
+	? assigned_false(assignment[var])
+	: assigned_true(assignment[var]))
 	return -1; //Conflict: The unit literal can't be fixed false,
                            //since it is fixed true
   } else {
@@ -1192,12 +1198,14 @@ int32_t negative_unit_propagate(samp_table_t *table){
       if (link->weight >= 0){ //must be a unit clause
 	// FIXME
 	conflict = fix_lit_true(table, link->disjunct[0]);
-	if (conflict == -1) return -1;
+	if (conflict == -1)
+	  return -1;
       } else { //we have a negative weight clause
 	i = 0;
 	while (i < link->numlits) {
 	  conflict = fix_lit_false(table, link->disjunct[i++]);
-	  if (conflict == -1) return -1;
+	  if (conflict == -1)
+	    return -1;
 	}
       }
       link_ptr = &link->link;
