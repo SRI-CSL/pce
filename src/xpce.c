@@ -962,6 +962,11 @@ int main(int const argc, const char ** const argv) {
   // Force output, mcsat_err, and mcsat_warn to save to buffer (see print.c)
   output_to_string = true; 
   init_samp_table(&samp_table);
+  input_stack_push_file("");
+  yylloc.first_line = 1;
+  yylloc.first_column = 0;
+  yylloc.last_line = 1;
+  yylloc.last_column = 0;
 
   struct xmlrpc_method_info3 const methodInfoCommand
     = {"xpce.command", &xpce_command};
