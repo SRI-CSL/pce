@@ -1,0 +1,66 @@
+# disease diagnosis
+
+sort state;
+const yes, no, borderline: state;
+
+sort person;
+#const aaron, bob, charlie, devon, erhan, fred, gordon, han: person;
+const bob: person;
+
+predicate highbloodpressure(state, person) direct;
+predicate highcholestorol(state, person) direct;
+predicate diabetic(state, person) direct;
+predicate age50(state, person) direct;
+predicate disease(state, person) indirect;
+
+#assert highbloodpressure(yes, aaron);
+assert highbloodpressure(yes, bob);
+#assert highbloodpressure(yes, charlie);
+#assert highbloodpressure(yes, devon);
+#assert highbloodpressure(no, erhan);
+#assert highbloodpressure(no, fred);
+#assert highbloodpressure(no, gordon);
+#assert highbloodpressure(no, han);
+
+#assert highcholestorol(no, aaron);
+assert highcholestorol(no, bob);
+#assert highcholestorol(no, charlie);
+#assert highcholestorol(no, devon);
+#assert highcholestorol(yes, erhan);
+#assert highcholestorol(yes, fred);
+#assert highcholestorol(yes, gordon);
+#assert highcholestorol(yes, han);
+
+#assert diabetic(yes, aaron);
+assert diabetic(no, bob);
+#assert diabetic(yes, charlie);
+#assert diabetic(no, devon);
+#assert diabetic(yes, erhan);
+#assert diabetic(no, fred);
+#assert diabetic(yes, gordon);
+#assert diabetic(no, han);
+
+#assert age50(no, aaron);
+assert age50(yes, bob);
+#assert age50(no, charlie);
+#assert age50(yes, devon);
+#assert age50(no, erhan);
+#assert age50(yes, fred);
+#assert age50(no, gordon);
+#assert age50(yes, han);
+
+#rule 4 - contradiction to rule 1
+add [X] highbloodpressure(yes,X) and age50(yes,X) implies disease(no,X) 5.0;
+# rule 1
+add [X] highbloodpressure(yes,X) and age50(yes,X) implies disease(yes,X) 5.0;
+# rule 2
+#add [X] highbloodpressure(yes,X) and highcholestorol(yes,X) implies disease(yes,X) 0.1;
+# rule 3
+#add [X] highbloodpressure(yes,X) and diabetic(yes,X) implies disease(yes,X) 1.5;
+#rule 4 - contradiction to rule 1
+#add [X] highbloodpressure(yes,X) and age50(yes,X) implies disease(no,X) 5.0;
+add [X] not disease(yes,X) iff disease(no,X);
+
+mcsat_params 1000000,,,,100;
+mcsat;
+dumptable atom;

@@ -1,0 +1,37 @@
+# %%%
+# % dervied family relations - son and daughter
+# %%%
+
+sort sex;
+const male, female: sex;
+
+sort person;
+# const bob, eric, michael, allen, jane, kellie, mary, diane: person;
+const bob, eric, jane, kellie: person;
+
+predicate gender(person,sex) direct;
+assert gender(bob, male);
+assert gender(eric, male);
+#assert gender(michael, male);
+#assert gender(allen, male);
+# assert gender(allen, female);
+assert gender(jane, female);
+assert gender(kellie, female);
+#assert gender(mary, female);
+#assert gender(diane, female);
+
+predicate child(person, person) direct;
+assert child(eric, bob);
+assert child(kellie, jane);
+
+predicate son(person, person) indirect;
+predicate daughter(person, person) indirect;
+
+add [X, Y] child(X,Y) and gender(X, male) implies son(X,Y);
+add [X, Y] child(X,Y) and gender(X, female) implies daughter(X,Y);
+add [X, Y] gender(X, male) implies not daughter(X, Y);
+add [X, Y] gender(X, female) implies not son(X, Y);
+
+mcsat_params 10000;
+mcsat;
+dumptable atom;

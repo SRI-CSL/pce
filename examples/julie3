@@ -1,0 +1,90 @@
+#disease diagnosis based on symptoms
+#hbp: high blood pressure
+#hc: high cholestorol
+#di: diabetic
+#sm: smoking
+#ow: over weight
+#fh: family history
+
+sort state;
+const yes, no, borderline: state;
+
+sort symptom;
+const hbp, hc, di, sm, ow, fh: symptom;
+
+sort person;
+const aaron, bob, charlie, devon, erhan, fred, gordon, han: person;
+
+predicate suffers(symptom, person) direct;
+predicate disease(state, person) indirect;
+
+assert suffers(hbp, aaron);
+assert suffers(hc, aaron);
+assert suffers(sm, aaron);
+
+assert suffers(hc, bob);
+assert suffers(di, bob);
+assert suffers(sm, bob);
+
+assert suffers(di, charlie);
+assert suffers(sm, charlie);
+assert suffers(ow, charlie);
+
+assert suffers(sm, devon);
+assert suffers(ow, devon);
+assert suffers(fh, devon);
+
+assert suffers(ow, erhan);
+assert suffers(fh, erhan);
+assert suffers(hbp, erhan);
+
+assert suffers(fh, fred);
+assert suffers(hbp, fred);
+assert suffers(hc, fred);
+
+assert suffers(hbp, gordon);
+assert suffers(di, gordon);
+assert suffers(ow, gordon);
+
+assert suffers(hc, han);
+assert suffers(sm, han);
+assert suffers(fh, han);
+
+# rules 1
+add [X] suffers(hbp,X) implies disease(yes,X) 0.1;
+add [X] suffers(hc,X) implies disease(yes,X) 0.1;
+add [X] suffers(di,X) implies disease(yes,X) 0.2;
+add [X] suffers(sm,X) implies disease(yes,X) 0.2;
+add [X] suffers(ow,X) implies disease(yes,X) 0.1;
+add [X] suffers(fh,X) implies disease(yes,X) 0.3;
+
+# rules 2
+add [X] suffers(hbp,X) and suffers(hc,X) implies disease(yes,X) 0.15;
+add [X] suffers(hbp,X) and suffers(di,X) implies disease(yes,X) 0.25;
+add [X] suffers(hbp,X) and suffers(sm,X) implies disease(yes,X) 0.25;
+add [X] suffers(hbp,X) and suffers(ow,X) implies disease(yes,X) 0.15;
+add [X] suffers(hbp,X) and suffers(fh,X) implies disease(yes,X) 0.35;
+
+add [X] suffers(hc,X) and suffers(di,X) implies disease(yes,X) 0.25;
+add [X] suffers(hc,X) and suffers(sm,X) implies disease(yes,X) 0.25;
+add [X] suffers(hc,X) and suffers(ow,X) implies disease(yes,X) 0.15;
+add [X] suffers(hc,X) and suffers(fh,X) implies disease(yes,X) 0.35;
+
+add [X] suffers(di,X) and suffers(sm,X) implies disease(yes,X) 0.35;
+add [X] suffers(di,X) and suffers(ow,X) implies disease(yes,X) 0.25;
+add [X] suffers(di,X) and suffers(fh,X) implies disease(yes,X) 0.45;
+
+add [X] suffers(sm,X) and suffers(ow,X) implies disease(yes,X) 0.25;
+add [X] suffers(sm,X) and suffers(fh,X) implies disease(yes,X) 0.45;
+
+add [X] suffers(ow,X) and suffers(fh,X) implies disease(yes,X) 0.35;
+
+# rule 3
+add [X] suffers(hc,X) and suffers(sm,X) and suffers(fh,X) implies disease(yes,X) 0.5;
+
+# rule 4
+#add [X] suffers(hc,X) and suffers(sm,X) and suffers(fh,X) implies disease(no,X) 0.5;
+
+mcsat;
+dumptable atom;
+

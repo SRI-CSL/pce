@@ -1,0 +1,13 @@
+sort Patient;
+const a, b: Patient;
+predicate testedPositive(Patient) indirect;
+predicate diseased(Patient) indirect;
+add [x] testedPositive(x) or ~diseased(x) 4.605;
+add [x] ~testedPositive(x) or ~diseased(x) .01;
+add [x] testedPositive(x) or diseased(b) .001;
+add [x] ~testedPositive(x) or diseased(x) 6.9;
+add [x] ~diseased(x) 6.907;
+add [x]  diseased(x) .001;
+assert testedPositive(a);
+mcsat_params 50000, 0.01, 20.0, 0.01, 30;
+mcsat; dumptables all;

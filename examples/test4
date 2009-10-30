@@ -1,0 +1,13 @@
+sort email;
+sort task;
+sort person;
+predicate emailfrom(email,person) direct;
+predicate hastask(email,task) indirect;
+const em1,em2: email;
+const ta1,ta2: task;
+const pe1,pe2: person;
+assert emailfrom(em1,pe1);
+add [e] emailfrom(e,pe1) implies hastask(e, ta1) 2;
+mcsat;
+dumptable;
+ask [e, p] emailfrom(e, p) or hastask(e, ta1);

@@ -1,0 +1,44 @@
+# %%%
+# % dervied family relations - son and daughter
+# %%%
+
+sort sex;
+const male, female: sex;
+
+sort person;
+const bob, eric, michael, allen, jane, kellie, mary, diane: person;
+
+predicate gender(person,sex) direct;
+assert gender(bob, male);
+assert gender(eric, male);
+assert gender(michael, male);
+assert gender(allen, male);
+#Xpce crash a few times after I added this contradicting ground fact.
+#I am not sure if the crash and the contradiction are actually #related.
+#assert gender(allen, female);
+assert gender(jane, female);
+assert gender(kellie, female);
+assert gender(mary, female);
+assert gender(diane, female);
+
+predicate child(person, person) direct;
+assert child(allen, bob);
+assert child(diane, jane);
+
+predicate son(person, person) indirect;
+predicate daughter(person, person) indirect;
+
+# this rule rules out X being both son and daughter of Y
+add [X, Y] not son(X,Y) iff daughter(X,Y);
+
+# these 2 rules cause all females to be each other's daughter
+# likewise all males to be each other's son
+#add [X,Y] son(X,Y) iff gender(X,male);
+#add [X,Y] daughter(X,Y) iff gender(X,female);
+
+add [X, Y] child(X,Y) and gender(X, male) implies son(X,Y);
+add [X, Y] child(X,Y) and gender(X, female) implies daughter(X,Y);
+
+
+mcsat;
+dumptable atom;

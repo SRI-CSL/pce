@@ -1,0 +1,15 @@
+sort Person;
+const D, J: Person;
+predicate hurt(Person) indirect;
+predicate collision(Person, Person) indirect;
+predicate concussion(Person) indirect;
+add collision(D, J);
+add ~collision(D, J) or hurt(D) .693;
+add ~collision(D, J) or ~hurt(D) .693;
+add ~collision(D, J) or hurt(J) .693;
+add ~collision(D, J) or ~hurt(J) .693;
+add [x] ~concussion(x) or hurt(x);
+add ~hurt(D);
+ask [x] concussion(x);
+mcsat_params 20000, 0.01, 20.0, 0.01, 30;
+mcsat; dumptables all;

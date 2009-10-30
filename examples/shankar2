@@ -1,0 +1,18 @@
+sort Door;
+const a, b, c: Door;
+predicate car(Door) indirect;
+add car(a) .405;
+add ~car(a) 1.098;
+add car(b) .405;
+add ~car(b) 1.098;
+add car(c)  .405;
+add ~car(c) 1.098;
+mcsat_params 20000, 0.01, 20.0, 0.01, 30;
+mcsat; dumptables all;
+mcsat; dumptables all;
+add ~car(a) or ~car(b);
+add ~car(b) or ~car(c);
+add ~car(c) or ~car(a);
+add car(b) or ~car(c) or win(switch);
+add car(c) or ~car(b) or win(switch);
+add car(b) or car(c) or ~win(switch);
