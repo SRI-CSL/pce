@@ -249,6 +249,12 @@ rule_literal_t ***cnf_pos(input_fmla_t *fmla, var_entry_t **vars) {
     } else if (op == AND) {
       return cnf_union(cnf_pos(cfmla->arg1, vars),
 		       cnf_pos(cfmla->arg2, vars));
+    } else if (op == XOR) {
+      // CNF(A xor B) = CNF(A /\ not(B)) X CNF(not(A) /\ B)
+      return cnf_product(cnf_union(cnf_pos(cfmla->arg1, vars),
+				   cnf_neg(cfmla->arg2, vars)),
+			 cnf_union(cnf_neg(cfmla->arg1, vars),
+				   cnf_pos(cfmla->arg2, vars)));
     } else if (op == IFF) {
       // CNF(A iff B) = CNF(A /\ B) X CNF(not(A) /\ not(B))
       return cnf_product(cnf_union(cnf_pos(cfmla->arg1, vars),
@@ -284,6 +290,12 @@ rule_literal_t ***cnf_neg(input_fmla_t *fmla, var_entry_t **vars) {
     } else if (op == AND) {
       return cnf_product(cnf_neg(cfmla->arg1, vars),
 			 cnf_neg(cfmla->arg2, vars));
+    } else if (op == XOR) {
+      // CNF(not(A xor B)) = CNF(not(A) \/ B) U CNF(A \/ not(B))
+      return cnf_union(cnf_product(cnf_neg(cfmla->arg1, vars),
+				   cnf_pos(cfmla->arg2, vars)),
+		       cnf_product(cnf_pos(cfmla->arg1, vars),
+				   cnf_neg(cfmla->arg2, vars)));
     } else if (op == IFF) {
       // CNF(not(A iff B)) = CNF(A \/ B) U CNF(not(A) \/ not(B))
       return cnf_union(cnf_product(cnf_pos(cfmla->arg1, vars),
@@ -447,6 +459,27 @@ bool clauses_equal(samp_rule_t *c1, samp_rule_t *c2) {
     && (c1->num_lits == c2->num_lits)
     && (clause_lits_equal(c1->num_lits, c1->literals, c2->literals));
 }
+
+// Checks clauses to see that they all involve at least one indirect atom
+// Returns -1 if so, otherwise the index to the clause that fails
+int32_t all_clauses_involve_indirects(rule_literal_t ***lits) {
+  int32_t i, j;
+  bool found;
+
+  for (i = 0; lits[i] != NULL; i++) {
+    found = false;
+    for (j = 0; lits[i][j] != NULL; j++) {
+      if (!pred_epred(lits[i][j]->atom->pred)) {
+	found = true;
+	break;
+      }
+    }
+    if (!found) {
+      return i;
+    }
+  }
+  return -1;
+}
       
 
 // Generates the CNF form of a formula, and updates the clause table (if no
@@ -463,6 +496,10 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
   lits = cnf_pos(formula->fmla, formula->vars);
   if (!lits) {
     return;
+  }
+
+  if (all_clauses_involve_indirects(lits) != -1) {
+    mcsat_err("cnf error: add should include at least one indirect atom in each clause.\n");
   }
   
   if (formula->vars == NULL) {
