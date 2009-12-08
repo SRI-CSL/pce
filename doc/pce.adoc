@@ -71,11 +71,30 @@ direct and indirect predicates along with their associated weights.
 PCE is then queried for formula patterns, new samples are run, and the
 formula instances are output, along with their marginal probabilities.
 
-== Obtaining and Executing PCE
+== Obtaining, Building, and Executing PCE
 
 .Obtaining PCE
 PCE is currently available only on request; contact
 mailto:owre@csl.sri.com[] for details.
+
+.Building PCE
+Building the standalone executable requires a normal Unix development
+environment (e.g., Make, GCC, and ld).  Simply cd to the PCE install
+directory and run `make bin`, which will create an executable in
+`build/PLATFORM-release/bin/mcsat`, where `PLATFORM` is specific to your
+CPU and operating system.
+
+For XPCE, you will need to install json-c
+(download from http://oss.metaparadigm.com/json-c/[] and follow the
+README), and XMLRPC-C (get the SVN copy from 
+http://xmlrpc-c.sourceforge.net/downloading.php[] and follow the README)
+make sure to use `make install` for both of these (as root, or using
+sudo), and that `xmlrpc-c-config` is in your path.  Then run `./configure` and
+`make bin` as before.  In addition to the standalone `mcsat`, there should
+also be an `xpce` executable, along with some test clients.
+
+The OAA version is specific to CALO, and probably not needed.  If you
+really want to get it, contact owre@csl.sri.com.
 
 .Executing PCE
 The PCE standalone MCSAT is associated with the `mcsat` executable, XPCE
