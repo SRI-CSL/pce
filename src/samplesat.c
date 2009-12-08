@@ -225,9 +225,15 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom,
   char *in_predicate = current_atom->pred;
   int32_t pred_id = pred_index(in_predicate, pred_table);
   
-  if (pred_id == -1) return -1;
+  if (pred_id == -1) {
+    mcsat_err("assert: Predicate %s not found\n", in_predicate);
+    return -1;
+  }
   pred_id = pred_val_to_index(pred_id);
-  if (pred_id >= 0) return -1;
+  if (pred_id >= 0) {
+    mcsat_err("assert: May not assert atoms with indirect predicate %s\n", in_predicate);
+    return -1;
+  }
   int32_t atom_index = add_atom(table, current_atom);
   if (atom_index == -1){
     return -1;
@@ -2066,13 +2072,11 @@ bool check_clause_instance(samp_table_t *table,
 	return false;//atom is inactive
       }
       if (rule->literals[i]->neg &&
-	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
-	  == v_fixed_false){
+	  assignment[atom_map->val] == v_fixed_false){
 	return false;//literal is fixed true
       }
       if (!rule->literals[i]->neg &&
-	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
-	  == v_fixed_true){
+	  assignment[atom_map->val] == v_fixed_true){
 	return false;//literal is fixed true
       }
     }
