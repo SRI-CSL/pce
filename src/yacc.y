@@ -438,9 +438,6 @@ void yy_mcsat_params_decl (char **params) {
     input_command.kind = LOAD;
     input_command.decl.load_decl.file = name;
   };
-  void yy_test () {
-    input_command.kind = TEST;
-  };
   void yy_verbosity (char *level) {
     int32_t i;
     for (i=0; level[i] != '\0'; i++) {
@@ -487,12 +484,12 @@ void yy_mcsat_params_decl (char **params) {
 %token DUMPTABLE
 %token LOAD
 %token VERBOSITY
-%token TEST
 %token HELP
 %token QUIT
 %left IFF
 %right IMPLIES
 %left OR
+%left XOR
 %left AND
 %nonassoc NOT
 %token NAME
@@ -574,8 +571,8 @@ decl: SORT NAME {yy_sort_decl($2);}
     | DUMPTABLE table {yy_dumptables($2);}
     | LOAD STRING {yy_load($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
-    | TEST {yy_test(@1);}
-    | HELP cmd {yy_help($2);}
+// Need to reference @$ in order for locations to be generated
+    | HELP cmd {@$;yy_help($2);}
     ;
 
 cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
@@ -609,28 +606,11 @@ fmla: atom {$$ = yy_atom_to_fmla($1);}
     | fmla IFF fmla {$$ = yy_fmla(IFF, $1, $3);}
     | fmla IMPLIES fmla {$$ = yy_fmla(IMPLIES, $1, $3);}
     | fmla OR fmla {$$ = yy_fmla(OR, $1, $3);}
+    | fmla XOR fmla {$$ = yy_fmla(XOR, $1, $3);}
     | fmla AND fmla {$$ = yy_fmla(AND, $1, $3);}
     | NOT fmla {$$ = yy_fmla(NOT, $2, NULL);}
     | '(' fmla ')' {$$ = $2;}
     ;
-
-// formula: iff_formula {$$ = yy_formula(NULL, $1);}
-//        | '(' variables ')' iff_formula {$$ = yy_formula($2, $4);};
-
-// iff_formula: implies_formula
-//            | iff_formula IFF implies_formula {yy_fmla(IFF, $1, $3);};
-
-// implies_formula: or_formula
-//                | implies_formula IMPLIES or_formula {yy_fmla(IMPLIES, $1, $3);};
-
-// or_formula: and_formula
-//           | or_formula OR and_formula {yy_fmla(OR, $1, $3);};
-
-// and_formula: not_formula
-//            | and_formula AND not_formula {yy_fmla(AND, $1, $3);};
-
-// not_formula: atom {$$ = yy_atom_to_fmla($1);}
-//            | NOT not_formula {yy_fmla(NOT, $2, NULL);};
 
 clause: literals {$$ = yy_clause(NULL, $1);};
       | '(' variables ')'
@@ -829,8 +809,6 @@ int yylex (void) {
       return LOAD;
     else if (strcasecmp(yylval.str, "VERBOSITY") == 0)
       return VERBOSITY;
-    else if (strcasecmp(yylval.str, "TEST") == 0)
-      return TEST;
     else if (strcasecmp(yylval.str, "HELP") == 0)
       return HELP;
     else if (strcasecmp(yylval.str, "QUIT") == 0)
@@ -847,6 +825,8 @@ int yylex (void) {
       return IMPLIES;
     else if (strcasecmp(yylval.str, "OR") == 0)
       return OR;
+    else if (strcasecmp(yylval.str, "XOR") == 0)
+      return XOR;
     else if (strcasecmp(yylval.str, "AND") == 0)
       return AND;
     else if (strcasecmp(yylval.str, "NOT") == 0)
@@ -856,6 +836,21 @@ int yylex (void) {
     strcpy(nstr, yylval.str);
     yylval.str = nstr;
     return NAME;
+  }
+  if (c == '=') {
+    c = yygetc(parse_input);
+    if (c == '>') {
+      return IMPLIES;
+    } else {
+      yyungetc(c, parse_input);
+      --yylloc.last_column;
+      nstr = (char *) safe_malloc(2 * sizeof(char));
+      nstr[0] = '=';
+      nstr[1] = '\0';
+      strcpy(nstr, yylval.str);
+      yylval.str = nstr;
+      return NAME;
+    }
   }
   if (c == '\"') {
     // At the moment, escapes not recognized
@@ -898,11 +893,33 @@ int yylex (void) {
   /* return end-of-file  */
   if (c == EOF) return QUIT;
   /* return single chars */
-  if (c == '~') {
-    return NOT;
-  } else {
+  if (c == '~') return NOT;
+  if (isspace(c) || c == ',' ||  c == ';' || c == '(' || c == ')' || c == '[' || c == ']'
+      || c == ':' || c == '\0' || c == EOF) {
     return c;
   }
+  /* If we get here, simply collect until space, comma, paren, bracket, semicolon, \0, EOF
+     and return a NAME */
+  yystrbuf[i++] = c;
+  do {
+    c = yygetc(parse_input);
+    ++yylloc.last_column;      
+    if (isspace(c) || c == ',' || c == ';' || c == '(' || c == ')' || c == '[' || c == ']'
+	|| c == ':' || c == '\0' || c == EOF) {
+      break;
+    } else {
+      yystrbuf[i++] = c;
+    }
+  } while (true);
+  yyungetc(c, parse_input);
+  --yylloc.last_column;
+  yystrbuf[i] = '\0';
+  nstr = (char *) safe_malloc((strlen(yystrbuf)+1) * sizeof(char));
+  strcpy(nstr, yystrbuf);
+  yylval.str = nstr;
+  //printf("returning %s\n", nstr);
+  //fflush(stdout);
+  return NAME;
 }
 
 
@@ -985,10 +1002,6 @@ void free_verbosity_decl_data() {
   // Nothing to do here
 }
 
-void free_testdecl_data() {
-  // Nothing to do here
-}
-
 void free_help_decl_data() {
   // Nothing to do here
 }
@@ -1065,10 +1078,6 @@ void free_parse_data () {
   }
   case VERBOSITY: {
     free_verbosity_decl_data();
-    break;
-  }
-  case TEST: {
-    free_testdecl_data();
     break;
   }
   case HELP: {
