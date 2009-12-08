@@ -468,6 +468,8 @@ json_formula_to_input_fmla(struct json_object *jfmla) {
     return json_binary_prop_to_input_fmla(OR, args);
   } else if ((args = json_object_object_get(jfmla, "implies")) != NULL) {
     return json_binary_prop_to_input_fmla(IMPLIES, args);
+  } else if ((args = json_object_object_get(jfmla, "xor")) != NULL) {
+    return json_binary_prop_to_input_fmla(XOR, args);
   } else if ((args = json_object_object_get(jfmla, "iff")) != NULL) {
     return json_binary_prop_to_input_fmla(IFF, args);
   } else if ((args = json_object_object_get(jfmla, "atom")) != NULL) {
@@ -477,7 +479,7 @@ json_formula_to_input_fmla(struct json_object *jfmla) {
       return yy_atom_to_fmla(atom);
     }
   } else {
-    mcsat_err("Expected a FORMULA starting with \"not\", \"and\", \"or\", \"implies\", \"iff\", or \"atom\":\n %s",
+    mcsat_err("Expected a FORMULA starting with \"not\", \"and\", \"or\", \"implies\", \"xor\",\"iff\", or \"atom\":\n %s",
 	      json_object_to_json_string(jfmla));
     return NULL;
   }
@@ -503,7 +505,7 @@ json_binary_prop_to_input_fmla(int32_t op, struct json_object *args) {
     }
   } else {
     mcsat_err("'%s' expects two arguments\n",
-	      op==AND?"and":op==OR?"or":op==IMPLIES?"implies":"iff");
+	      op==AND?"and":op==OR?"or":op==IMPLIES?"implies":op==XOR?"xor":"iff");
     return NULL;
   }
 }
@@ -708,6 +710,10 @@ subst_into_json_fmla(struct json_object *fmla,
     nfmla = json_object_new_object();
     nargs = subst_into_json_tuple(args, vars, subst);
     json_object_object_add(nfmla, "implies", nargs);
+  } else if ((args = json_object_object_get(fmla, "xor")) != NULL) {
+    nfmla = json_object_new_object();
+    nargs = subst_into_json_tuple(args, vars, subst);
+    json_object_object_add(nfmla, "xor", nargs);
   } else if ((args = json_object_object_get(fmla, "iff")) != NULL) {
     nfmla = json_object_new_object();
     nargs = subst_into_json_tuple(args, vars, subst);
