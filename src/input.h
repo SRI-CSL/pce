@@ -209,8 +209,6 @@ extern input_clause_t *new_input_clause ();
 extern input_literal_t *new_input_literal ();
 extern input_atom_t *new_input_atom ();
 
-extern void test (samp_table_t *table);
-
 extern void free_atom(input_atom_t *atom);
 extern void free_clause(input_clause_t *clause);
 
