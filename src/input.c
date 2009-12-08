@@ -301,11 +301,10 @@ Input grammar:\n\
  subsort NAME NAME ';'\n\
  predicate ATOM [direct|indirect] ';'\n\
  const NAME++',' ':' NAME ';'\n\
- atom ATOM ';'\n\
  assert ATOM ';'\n\
- add FORMULA [NUM [NAME]] ';'\n\
+ add FORMULA [WEIGHT [SOURCE]] ';'\n\
  add_clause CLAUSE [NUM [NAME]] ';'\n\
- ask FORMULA NUM [NUM | best] ';'\n\
+ ask FORMULA [THRESHOLD [NUMRESULTS]] ';'\n\
  mcsat ';'\n\
  mcsat_params [NUM]**',' ';'\n\
  reset [all | probabilities] ';'\n\
@@ -369,7 +368,7 @@ with the given WEIGHT (a floating point number) and associated with the SOURCE\n
 Ground clauses are added to the clause table, and clauses with variables are\n\
 added to the rule table.  For a ground clause, the formula is an atom\n\
 (i.e., predicate applied to constants), or a boolean expression\n\
-built using NOT, AND, OR, IMPLIES (or =>), IFF, and parentheses.\n\
+built using NOT, AND, OR, IMPLIES (or =>), XOR, IFF, and parentheses.\n\
 A rule is similar, but involves variables, which are in square brackets\n\
 before the boolean formula.\n\
 For example:\n\
@@ -826,10 +825,6 @@ extern bool read_eval(samp_table_t *table) {
       cprintf(1, "Setting verbosity to %"PRId32"\n", decl.level);
       break;
     }
-    case TEST: {
-      test(table);
-      break;
-    }
     case HELP: {
       input_help_decl_t decl = input_command.decl.help_decl;
       show_help(decl.command);
@@ -866,16 +861,4 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 
 extern void load_mcsat_file(char *file, samp_table_t *table) {
   read_eval_print_loop(file, table);
-}
-
-// This is a placeholder - useful for debugging purposes.
-// Will be invoked when 'TEST;' is given to the read_eval_print_loop
-void test (samp_table_t *table) {
-  rule_table_t *rule_table = &(table->rule_table);
-  int32_t i;
-  for (i = 0; i<rule_table->num_rules; i++) {
-    all_rule_instances(i, table);
-  }
-  dump_rule_table(table);
-  dump_clause_table(table);
 }
