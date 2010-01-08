@@ -88,7 +88,7 @@ input_fmla_t *yy_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2) {
   fmla->ufmla = ufmla;
   ufmla->cfmla = cfmla;
   cfmla->op = op;
-  cfmla->arg1 = (input_fmla_t *) arg1;
+  cfmla->arg1 = arg1;
   cfmla->arg2 = arg2;
   return fmla;
 };
