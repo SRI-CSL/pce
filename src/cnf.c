@@ -157,17 +157,18 @@ static rule_literal_t *** cnf_literal(input_atom_t *atom, var_entry_t **vars,
 
 static rule_literal_t ***cnf_product(rule_literal_t ***c1,
 				     rule_literal_t ***c2) {
-  int32_t i, j, ii, jj, len1, len2, cnflen1, cnflen2, idx;
+  int32_t psize, i, j, ii, jj, len1, len2, cnflen1, cnflen2, idx;
   rule_literal_t ***productcnf;
   rule_literal_t **conjunct;
 
   if (c1 == NULL || c2 == NULL) {
     return NULL;
   }
-  for (cnflen1 = 0; c1[cnflen1] != 0; cnflen1++) {}
-  for (cnflen2 = 0; c1[cnflen2] != 0; cnflen2++) {}
+  for (cnflen1 = 0; c1[cnflen1] != NULL; cnflen1++) {}
+  for (cnflen2 = 0; c2[cnflen2] != NULL; cnflen2++) {}
+  psize = (cnflen1 * cnflen2) + 1;
   productcnf = (rule_literal_t ***)
-    safe_malloc((cnflen1 * cnflen2 + 1) * sizeof(rule_literal_t **));
+    safe_malloc(psize * sizeof(rule_literal_t **));
   idx = 0;
   for (i = 0; c1[i] != NULL; i++) {
     for (len1 = 0; c1[i][len1] != NULL; len1++) {}
