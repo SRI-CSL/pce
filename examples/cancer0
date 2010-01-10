@@ -1,0 +1,15 @@
+
+sort C;
+const A, B: C;
+predicate Friends(C, C) indirect;
+predicate Smoking(C) indirect;
+predicate Cancer(C) indirect;
+
+# Smoking causes cancer.
+add [x] Smoking(x) => Cancer(x)  0.8;
+# If two people are friends, either both smoke or neither does.
+add [x, y] Friends(x, y) implies (Smoking(x) iff Smoking(y))  1.1;
+
+mcsat_params 1000000;
+mcsat;
+dumptable atom;
