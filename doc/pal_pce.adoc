@@ -1,0 +1,777 @@
+//:listdef-labeled.style: horizontal
+= PROBABILITY CONSISTENCY ENGINE
+:author: Sam Owre
+:authors: Sam Owre, Natarajan Shankar, Bruno Dutertre, and Shahin Saadati
+:email: owre@csl.sri.com
+:revdate: July 2009
+:revnumber: 1.0
+
+The Probability Consistency Engine (PCE) is a system for performing
+probabilistic inference.  A typical use for PCE is to take the rules and
+assertions provided by various learners and classifiers, as well as facts
+and a priori knowledge, and to compute marginal probabilities for
+properties of interest.  Given a set of weighted rules and facts, it
+performs sampling to determine marginal probabilities.  It can be run
+online, thus accumulating new facts and rules in real time.  PCE is
+useful in situations where rules and assertions are inherently
+probabilistic, for example in biology or computational linguistics, or
+where expert systems have traditionally been applied.
+
+== Overview
+[[pce-description]]
+
+PCE was designed for the Cognitive Assistant that Learns and Organizes
+(<<CALO>>,<<Learners>>) system, where it integrates multiple learning
+components with a Markov Logic inference engine.  PCE is based on
+<<MarkovLogic,Markov Logic>>, and uses the <<MCSAT,MCSat>> and
+<<LazyMCSAT,Lazy MCSat>> methods to compute marginal probabilities.  Both
+MCSat and Lazy MCSat are variants of Markov Chain Monte Carlo (MCMC)
+sampling.
+
+Many algorithms were tried before settling on this approach, but were found
+to be inadequate.  The first attempt was to use the Yices SMT solver.  As
+the rules and assertions are provided from different learners and
+classifiers, they are often inconsistent, and it was difficult to find
+consistent subsets.  This led to an extension of Yices incorporating
+Weighted Max-SAT, a technique for finding the model with the highest
+weight.  This was better, but in addition to being computationally
+expensive and hence incomplete, it assigns a truth value to all formulas,
+including those that cannot be inferred.  What was desired was a list of
+possible outcomes, ordered by their probabilities, not simply one answer.
+The naive generalization is to produce all possible models and take the
+probability of a formula as the percentage of those models in which it is
+true; but this was never seriously considered as there are currently no
+practical algorithms for this approach.  MCSat works by incrementally
+building models, doing sampling as in MCMC, but ensuring that only clauses
+that are consistent with the model so far are retained.  This is both
+practical, and can be made as accurate as desired by simply extending the
+number of samples taken.  The original implementation of these ideas is in
+<<Alchemy>>, but CALO requires a fast online algorithm, which led to the
+development of PCE.
+
+PCE was developed for CALO, which is the main application to date.  It has
+representations for entities such as people, emails, projects, meetings,
+and folders, and several different learning components.  These learners
+create rules and assertions that, for example, decide what project an
+email was related to, and who should attend a meeting.  When a new email
+arrives, MCSAT computes marginal probabilities regarding the new email and
+provides suggestions, e.g., the email belongs to a specific project with a
+given probability.  The user's choice is fed back to the learners, allowing
+them to make adjustments accordingly and update the rules and assertions
+to PCE.
+
+PCE is currently being used in a machine learning project, where again it
+is used as a kind of harness for various learners and classifiers.  There
+are many other possible applications, including prediction, Bayesian
+analysis, cooperative learning, language analysis, probabilistic bounded
+model checking, timing and failure analysis, and probabilistic
+optimization.
+
+The input to PCE consists of sorts which are arranged in a subsort
+hierarchy, constants of specific sorts, direct and indirect predicates
+over these sorts, atomic facts asserting a direct predicate of specific
+constants, and rules which are universally quantified formulas in both the
+direct and indirect predicates along with their associated weights.  A
+direct predicate is one that is observable, e.g., that email was received
+from a specific email address, with a specific content.  An indirect
+predicate is one that can only be inferred, e.g., that the email is
+associated with a particular project.  PCE is then queried for formula
+patterns, new samples are run, and the formula instances are output, along
+with their marginal probabilities.
+
+The direct atoms, i.e., atoms with direct predicates are only true when
+they have been added as hard facts.  The closed world assumption applies,
+so unasserted direct atoms are treated as false.  Given the truth
+assignment to the hard facts, the MCSAT procedures construct an initial
+model, i.e., an assignment of truth values to atoms, satisfying the hard
+facts.  From this model, PCE generates a sequence of sampled models using
+MCMC sampling.  In each step, clauses are selected that are satisfied in
+the current model.  A subset of these clauses is chosen based on the
+weights so that clauses with higher weights are picked with higher
+probability.  The sampling algorithm (SampleSAT) is then used to construct
+a random model of the chosen subset of clauses.  This algorithm starts
+with a random truth assignment and interleaves _simulated annealing_ with
+_WalkSAT_ steps to converge on an assignment that satisfies all the chosen
+clauses.  The simulated annealing step picks a random variable and flips
+its truth value if this reduces the weight of the unsatisfied clauses.
+With some probability, the flip is executed even when the weight is not
+reduced so as to move the search out of a local minimum.  In the WalkSAT
+step, a random unsatisfied clause is chosen and the atom corresponding to
+a random literal is flipped.  The algorithm implemented in PCE is an
+online variant of the one used by the <<Alchemy,Alchemy>> system.
+
+== Prerequisites
+
+- http://oss.metaparadigm.com/json-c/[]
+
+- http://xmlrpc-c.sourceforge.net/downloading.php[]
+
+// === Building PCE
+
+// Building the standalone executable requires a normal Unix development
+// environment (e.g., Make, GCC, and ld).  Simply cd to the PCE install
+// directory and run `make bin`, which will create an executable in
+// `build/PLATFORM-release/bin/mcsat`, where `PLATFORM` is specific to your
+// CPU and operating system.
+
+// For XPCE, you will need to install json-c (download from
+// http://oss.metaparadigm.com/json-c/[] and follow the README), and the SVN
+// version of XMLRPC-C (see the README in
+// http://xmlrpc-c.sourceforge.net/downloading.php[]) make sure to use `make
+// install` for both of these (as root, or using sudo), and that
+// `xmlrpc-c-config` is in your path.  Then run `./configure` and `make bin`
+// as before.  In addition to the standalone `mcsat`, there should also be an
+// `xpce` executable, along with some test clients.
+
+== Executing PCE
+
+The PCE system currently consists of two separate programs, though the
+difference is in the API, not in the underlying consistency engine
+described above.
+
+mcsat::
+    This is the most basic executable, typically run interactively in a shell,
+    taking commands from the user or files and providing feedback
+    directly.  It is useful for learning about the system and performing
+    experiments.
+xpce::
+    This is an XML-RPC server, and uses JSON for the data encoding.  Its
+    primary advantage it that it can handle multiple remote clients
+    concurrently.
+
+The standalone PCE is associated with the `mcsat` executable and the
+XML-RPC PCE server is associated with `xpce`.  These are available for
+Windows (under cygwin, with `.exe` extensions), MacOS X, and Linux.  Below
+is the information needed to run each one.
+
+== MCSAT
+
+The basic system is called `mcsat` (or `mcsat.exe`) in the `bin`
+subdirectory.  This can be run in batch mode or interactively.  Commands
+are then either provided in a file or entered at the `mcsat>` prompt,
+followed by a semicolon.  To quit, enter `quit;`, and enter `help;` for a
+brief description of the available commands.
+
+=== Executing `mcsat`
+
+*Usage:*:: `mcsat [OPTION]... [FILE]...`
+
+[format="csv", cols="1,2,4"]
+|=================================
+*Option*,, *Effect*
+`-h -?`, `--help`,  Print a summary of the options
+`-i`, `--interactive`, Run interactively, even if FILE is provided
+`-s NUM`, `--seed=NUM`, Run with the given pseudorandom seed
+,`--lazy=BOOL`, Use the lazy version (default `false`)
+,`--strict=BOOL`, Require declarations for all constants (default `true`)
+`-v NUM`, `--verbosity=NUM`, Sets the verbosity level
+`-V`, `--version`, Prints the version number and exits
+|=================================
+
+Normally, if files are provided MCSAT runs the commands in the files and
+terminates.  This only makes sense if the file includes the `ask` or
+`dumptable` commands, as otherwise there is no useful output. If the
+interactive flag is provided, or no file is given, then MCSAT runs through
+any provided files and prompts for more input.  Note that a file may also
+be loaded interactively using the `load` command described below.
+
+=== MCSAT Syntax
+[[MCSATSyntax]]
+
+The commands that follow refer to the syntax described here.
+This is in EBNF notation, with the following conventions:
+
+- Terminals are in single quotes, and are case-insensitive
+- Parentheses are used for grouping, '++(^++' is used for complementation
+  (i.e., all characters except for...)
+- `?`, `*`, and `+` may be used to indicate zero or one, zero or more, and
+  one or more, respectively.  If these are preceded by a separator (e.g.,
+  a comma), it means the entries are separated accordingly.  Thus
+  `nt := term,+` is equivalent to `nt := term | term ',' nt`, and
+  `LITERAL|+` means any number of literals separated by vertical bars.
+
+-----
+FORMULA := FMLA
+         | '[' VAR,* ']' FMLA
+	 
+FMLA := ATOM
+      | FMLA 'iff' FMLA
+      | FMLA 'implies' FMLA
+      | FMLA 'or' FMLA
+      | FMLA 'xor' FMLA
+      | FMLA 'and' FMLA
+      | NOT FMLA
+      | '(' FMLA ')'
+
+CLAUSE := LITERAL|+
+        | '(' VAR,+ ')' LITERAL|+
+
+LITERAL := ATOM | NOT ATOM	
+
+ATOM := PREDICATE '(' ARGUMENT,* ')'
+
+VAR := NAME
+PREDICATE := NAME
+ARGUMENT := NAME | NUM
+NOT := 'not' | '~'
+
+STRING := Anything between double quotes: "a" or between single quotes: 'a'
+
+NAME := ALPHA (^ DELIM | CNTRL | COMMENT )*
+NUM := ( DIGIT | '.' | '+' | '-' ) ( DIGIT | '.' )*
+       must contain at least on DIGIT, at most one '.'
+
+ALPHA := 'a' | ... | 'z' | 'A' | ... | 'Z'
+DIGIT := '0' | ... | '9'
+DELIM := ' ' | '(' | ')' | '[' | ']' | '|' | ',' | ';' | ':'
+CNTRL := non-printing (control) characters
+COMMENT := '#' to end of line
+-----
+
+Note that the precedence of the operators is given by the order, e.g.,
+`and` binds tighter than `xor`.  All are left associative except
+`implies`, which is right associative.
+
+=== MCSAT Commands
+
+MCSAT has a simple syntax.  Names (identifiers) start with a letter,
+followed by any character other than parentheses, commas, semicolon,
+colon, vertical bar, space, or control characters.  Numbers are simple
+floating point numbers: an optional plus or minus, followed by digits
+and an optional decimal point.  Whitespace is ignored.
+
+Atoms are predicates applied to constants, e.g., `p(x, y, z)`.  As
+described below, predicates have an arity and a signature.  Literals are
+atoms or negated atoms, where the tilde "`~`" is used for negation.
+Clauses are disjunctions of literals, separated by vertical bars "`|`".
+
+Commands are case-insensitive, and terminated with a semicolon.
+
+=== MCSAT Commands
+
+==== sort
+
+MCSAT uses sorts - sorts are pairwise disjoint or subsorts (see
+below) and introduced with the `sort` or `subsort` command.
+
+*Syntax:*:: `sort NAME;`
+
+*Example:*:: `sort File;`
+
+==== subsort
+
+The effect of the subsort command is that every constant belonging to a
+subsort also belongs to the supersort.  Subsorts are technically not
+needed, but can make a difference in memory usage (and hence speed).  This
+is because the system builds up all possible atoms, based on the predicate
+signatures and constants, and this can get quite large.  Simple sorts
+often work, but, for example, there might be rules about people, email,
+files, and projects.  People, email, and files can all belong to projects,
+and of course email is from people and can contain files.  With subsorts,
+this can be modeled as
+-----
+sort Entity;
+sort Project;
+subsort People Entity;
+subsort Email Entity;
+subsort Files Entity;
+predicate email_from(Email, People);
+predicate email_contains(Email, File);
+predicate in_project(Entity, Project);
+-----
+With 2 each of People, Email, Files, and Projects, this leads to 20
+atoms (4 each for `email_from` and `email_contains`, and 12 for
+`in_project`).  If just Entities are used, there would be 84 atoms (now 36
+each for `email_from` and `email_contains`).
+
+Subsorts are useful beyond the memory usage, as without them rules such as
+-----
+add [m, p] email_from(m, p) implies (is_email(m) and is_person(p))
+-----
+
+*Syntax:*:: `subsort` `NAME` `NAME` `;`
+
+*Example:*:: `subsort File Entity;`
+
+==== predicate
+
+MCSAT supports predicates of any arity, but the sort signature must be
+given.  MCSAT also makes a distinction between direct (observable), and
+indirect predicates.  Internally, direct predicates satisfy the closed
+world assumption, and indirect predicates do not.
+
+*Syntax:*:: `predicate NAME ( NAMES ) IND ;`
+
+where `IND` is "`direct`", "`indirect`", or omitted, defaulting to "`direct`".
+
+*Example:*:: `predicate fileHasTask(File, Task) indirect;`
+ 
+==== const
+
+Sorts are empty initially, the `const` command is used to introduce
+elements of a given sort.
+
+*Syntax:*:: `const` `NAMES` `:` `NAME` `;`
+
+*Example:*:: `const fi8, fi22, fi23: File`
+
+==== assert
+
+Similar to atom, but used to introduce facts.  Note that negative literals
+may not be asserted, and the predicate must be direct.
+
+*Syntax:*:: `assert ATOM ;`
+
+*Example:*:: `assert fileHasTask(fi8, ta1);`
+
+==== add
+
+Add is used to introduce weighted formulas and rules.  Rules include
+variables, which are introduced before the formula.
+
+*Syntax*:: `add FORMULA WT ;`
+
+ :: `add [ VARIABLES ] FORMULA WT ;`
+
+where `WT` is an optional floating point weight.  If weight is missing,
+the clause or rule is considered as a "hard" clause or rule. (This is
+the same as having infinite weight).
+
+*Example*:: `add fileHasTask(fi22, ta1)  1.286;`
+
+adds a weighted ground clause.
+
+-------------------
+add [File, Email, Task]
+        fileHasTask(File, Task) and attached(File, Email)
+      implies emailHasTask(Email, Task);
+-------------------
+adds a rule with infinite weight.  This is essentially asserting the
+axiom
+
+latexmath:[$\forall F, E, T: fileHasTask(F, T) \,\wedge\,
+attached(F, E) \Rightarrow emailHasTask(E, T)$]
+
+==== add_caluse
+
+Similar to `add`, but uses clauses instead of formulas.
+
+*Syntax*:: `add_clause CLAUSE WT ;`
+
+ :: `add ( VARIABLES ) CLAUSE WT ;`
+
+where `WT` is an optional floating point weight.  If weight is missing,
+the clause or rule is considered as a "hard" clause or rule. (This is
+the same as having infinite weight).
+
+*Example*:: `add_clause fileHasTask(fi22, ta1)  1.286;`
+
+adds a weighted ground clause.
+
+-------------------
+add (File, Email, Task)
+        ~fileHasTask(File, Task) | ~attached(File, Email)
+      | emailHasTask(Email, Task);
+-------------------
+adds a rule with infinite weight.  This is essentially asserting the
+axiom
+
+latexmath:[$\forall F, E, T: fileHasTask(F, T) \,\wedge\,
+attached(F, E) \Rightarrow emailHasTask(E, T)$]
+
+==== ask
+
+Creates instances of the `FORMULA`, runs MCSAT sampling to get marginal
+probabilities, and prints the results, sorted according to probability
+(highest to lowest).  Only returns results whose marginal probabilities
+are greater than or equal to the `THRESHOLD`, and at most `MAXRESULTS` are
+returned - unless it is 0, in which case all instances above the
+`THRESHOLD` are returned.  The results are of the form 
+----
+   n results:
+   [x <- c, ...] prob: clause_instance
+   ...
+----
+   Note that the instances of the `FORMULA` are in clausal form, and in
+   general will not be a syntactic match.
+
+*Syntax:*:: `ask FORMULA THRESHOLD MAXRESULTS ;`
+
+ :: `ask [ VARIABLES ] FORMULA THRESHOLD MAXRESULTS ;`
+
+where
+ - `THRESHOLD` is a number between 0.0 and 1.0 inclusive; default 0.0
+ - `MAXRESULTS` is a nonnegative integer, default 0
+
+*Example:*::
++ask [e, p] emailfrom(e, p) and hastask(e, ta1) 0.5 2;+
+
+returns the (at most) 2 instances with probability at least .5, for
+example
+----
+2 results:
+[e <- em1, p <- pe1] 1.000: (emailfrom(em1, pe1) | hastask(em1, ta1))
+[e <- em1, p <- pe2] 0.871: (emailfrom(em1, pe2) | hastask(em1, ta1))
+----
+
+
+==== mcsat
+
+Runs the MCSAT process, generating samples as described above.
+
+*Syntax*:: `mcsat`
+
+`mcsat_params` is used to set MCSAT parameters.
+
+
+==== mcsat_params
+
+Displays or sets the parameters controlling the MCSAT algorithm.
+Parameters that are set keep their value until set to another value.
+
+*Syntax*:: `mcsat_params NUMS ;`
+
+where NUMS is a comma-separated list of numbers, some of which may be
+omitted.  The numbers represent, in order:
+
+[format="csv",cols="4,^2,^1,10"]
+|=================================
+*Parameter*, *Type*, *Default*, *Description*
+`max_samples`, nat, 100, number of samples generated  
+`sa_probability`, 0.0 .. 1.0, 0.5, probability of a simulated annealing step
+`samp_temperature`, > 0.0, 0.91, temperature for simulated annealing
+`rvar_probability`, 0.0 .. 1.0, 0.2, probability used by a walksat step (see Note) 
+`max_flips`, nat, 1000, bound on the number of flipped variables
+`max_extra_flips`, nat, 10, number of extra flips performed after a model is found
+|=================================
+
+[NOTE]
+============================
+A walksat step selects an unsat clause and flips one of its variables
+with probability `rvar_probability`, that variable is chosen randomly
+with probability (1-rvar_probability), that variable is the one that
+results in minimal increase of the number of unsat clauses.
+============================
+
+*Example:*::
++mcsat_params , , , .3;+
+
+sets the `rvar_probability` to `0.3`.
+
+==== reset
+
+Resets the probabilities and number of samples.
+
+*Syntax*:: `reset ;`
+
+==== dumptable
+
+Displays tables representing the current state of the system.  This
+includes the sorts with their constants, the predicates, all known atoms
+with their current probabilities, clauses, and rules.
+
+*Syntax*:: `dumptable [TABLE] ;`
+
+TABLE may be one of `all`, `sort`, `predicate`, `atom`, `clause`, or
+`rule`.  The default is `all`.
+
+==== verbosity
+
+Sets the verbosity level, used to control how much is printed. Defaults to 1.
+
+*Syntax*:: `verbosity NUM ;`
+
+==== help
+
+Provides a brief summary of the commands.
+
+*Syntax*:: `help ;`
+
+==== quit
+
+Exits mcsat.
+
+*Syntax*:: `quit ;`
+
+=== MCSAT Example
+
+Here is a PCE session on a simple example taken from
+http://www.cs.ru.nl/~peterl/teaching/KeR/uncer24.ps.gz[].
+In this example, there is the sort of people `C`, and two people `A` and
+`B` of sort `C`, and three predicates.  The `Friends` predicate holds
+between two people, while the `Smoking` and `Cancer` predicates describe a
+single person.  In this example all predicates are indirect.  If any are
+made direct, say Smoking, and no other changes are made, the effect would
+be that nobody smokes, as the direct predicate is not stated for anybody.
+
+After the predicate declarations are the rules that state that smoking
+causes cancer (with some weight) and that friends influence each others'
+smoking habits.  In such a small example, with such small weights, doing
+the default number of samples will not converge to a very meaningful
+result, so before running `mcsat` we increase the `max_samples` parameter.
+We then dump the atom table to see the result of the sampling.  Note that
+the marginal probability of `Friends(A, B)` is less than 50%, while that
+for `Friends(A, A)` is exactly 50%.  The explanation for this is that the
+sampling picks an atom at random each time through, and assigns it either
+true or false, as long as it is consistent with the atoms already
+selected.  In some cases, 'Smoking(A)` and `Smoking(B)` will be selected
+with opposite values, after which it is less likely that they will satisfy
+being `Friends`.  On the other hand, this has no effect on `Friends(A,
+A)`, since the rule is always true in that case.  This can seem
+counter-intuitive, but remember that `P implies Q` is really `not P or Q`,
+and has nothing to do with cause and effect.  Thus you could read the
+first rule as either ``smoking causes cancer'' or ``no cancer causes no smoking''.
+
+It might also seem strange that someone can be friends with themselves, so
+we reset the system and add the rule that nobody is their own friend.
+This has little effect on the `Smoking` and `Cancer` results, as is
+expected.
+
+Though this is a simple example, it is worth experimenting with it to get a
+feel for the system.  Try setting different weights, or adding your own
+rules, more constants, or predicates.  Note that the normal way to experiment with
+examples such as this is to create a file, say `cancer`, containing these
+commands and run `mcsat -i cancer`.  The file is loaded, and the `-i`
+allows for further interaction.
+
+.......
+% mcsat
+mcsat: type 'help;' for help
+mcsat> sort C;
+mcsat> const A, B: C;
+mcsat> predicate Friends(C, C) indirect;
+mcsat> predicate Smoking(C) indirect;
+mcsat> predicate Cancer(C) indirect;
+mcsat> add [x] Smoking(x) => Cancer(x)  0.8;
+mcsat> add [x, y] Friends(x, y) implies (Smoking(x) iff Smoking(y))  1.1;
+mcsat> mcsat_params 10000;
+Setting MCSAT parameters:
+ max_samples was 100, now 10000
+
+mcsat> mcsat;
+Calling MCSAT with parameters (set using mcsat_params):
+ max_samples = 10000
+ sa_probability = 0.500000
+ samp_temperature = 0.910000
+ rvar_probability = 0.200000
+ max_flips = 1000
+ max_extra_flips = 10
+
+mcsat> dumptable atom;
+--------------------------------------------------------------------------------
+| i | tval | prob   | atom                                                     |
+--------------------------------------------------------------------------------
+| 0 | F    |  0.504 | Friends(A, A)
+| 1 | T    |  0.433 | Friends(A, B)
+| 2 | T    |  0.433 | Friends(B, A)
+| 3 | T    |  0.503 | Friends(B, B)
+| 4 | T    |  0.383 | Smoking(A)
+| 5 | T    |  0.380 | Smoking(B)
+| 6 | F    |  0.563 | Cancer(A)
+| 7 | T    |  0.570 | Cancer(B)
+--------------------------------------------------------------------------------
+mcsat> reset probabilities;
+Resetting probabilities of atoms to -1.0
+mcsat> add [x] ~Friends(x, x);
+mcsat> mcsat;
+Calling MCSAT with parameters (set using mcsat_params):
+ max_samples = 10000
+ sa_probability = 0.500000
+ samp_temperature = 0.910000
+ rvar_probability = 0.200000
+ max_flips = 1000
+ max_extra_flips = 10
+
+mcsat> dumptable atom;
+--------------------------------------------------------------------------------
+| i | tval | prob   | atom                                                     |
+--------------------------------------------------------------------------------
+| 0 | fx F | -0.000 | Friends(A, A)
+| 1 | T    |  0.430 | Friends(A, B)
+| 2 | T    |  0.427 | Friends(B, A)
+| 3 | fx F | -0.000 | Friends(B, B)
+| 4 | F    |  0.378 | Smoking(A)
+| 5 | F    |  0.372 | Smoking(B)
+| 6 | T    |  0.565 | Cancer(A)
+| 7 | T    |  0.562 | Cancer(B)
+--------------------------------------------------------------------------------
+mcsat> quit;
+%
+.......
+
+== XPCE
+
+XPCE uses XML-RPC to provide PCE services.  The server may be local or
+accessible over the web, and it supports multiple clients.  The data is
+passed in JSON format, making it easy to read and check for errors.
+
+=== Running XPCE
+
+----
+xpce PORT
+----
+
+This sets up an xpce server on the local host that listens to the given
+PORT (normally an unused port > 1024).
+
+=== XPCE Clients
+
+XPCE clients will connect to the `PORT` using the URL of the server, with
+`/RPC2` appended.  For example, `http://localhost:8080/RPC2` would be used
+by a client running on the same host, where the server was started with
+`PORT` `8080`.  The client may then invoke any of the methods listed
+below.
+
+=== XPCE Methods
+
+XPCE responds to a number of XML-RPC methods.  In general, the methods
+expect JSON input strings and returns JSON strings.  For the most part,
+the methods correspond to the commands of MCSAT.  The return is generally
+a JSON object (i.e., enclosed in '{}'), and if there is a warning or
+error, it is included in the object as `"warning":` or `"error":` followed by
+a descriptive string.  In the method descriptions below, if *Returns* is
+missing it defaults to `{}`, and if *Errors* or *Warnings* is missing then
+the command generates no messages directly, though indirectly a message
+may still be returned, e.g., for a malformed formula.
+
+==== `xpce.sort` - add a sort/supersort
+
+*Description:*:: If `"super"` is not provided, introduces new sort with the
+name `NAME`.  Otherwise introduces new sorts as needed, and creates the
+subsort relation.
+
+*Arguments*:: `{"name": NAME, "super": NAME}`
+- `"super"` is optional
+
+*Errors*::
+- `NAME is invalid`
+- `NAME is in use as a sort` - if `"super"` is not provided
+- `NAME is already a subsort of NAME`
+
+==== `xpce.predicate` - add a predicate
+
+*Description:*:: adds the NAME as a predicate, with signature given by the
+   list of sorts in NAMES.
+
+*Arguments*:: `{"predicate": NAME, "arguments": NAMES, "observable": BOOL}`
+
+*Errors*::
+- `NAME is invalid`
+- `NAME is in use as a predicate`
+
+
+==== `xpce.const` - add constants of a given sort
+
+*Description:*:: adds the NAMES as new constants of the given sort.
+
+*Arguments*:: `{"names": NAMES, "sort": NAME}`
+
+*Errors*::
+  - `NAME is invalid`
+  - `NAME is in use as a constant`
+
+
+==== `xpce.assert` - assert a fact
+
+*Description:*:: asserts the `FACT` to the internal database.  Note that
+   facts are of the form `p(c1,...,cn)`, where `p` is an observable
+   predicate, and the `ci` are all constants.  Use `xpce.add` with a high
+   weight for any other formulas.
+
+*Arguments*:: `{"fact": FACT}`
+
+
+==== `xpce.add` - add a weighted assertion or rule
+
+*Description:*:: asserts the `FORMULA` to the internal database with the
+   given weight.  The FORMULA may contain variables, which are
+   instantiated with constants of the corresponding sort.
+
+*Arguments*:: `{"formula": FORMULA, "weight": NUM, "source": NAME}`
+- `"weight"` is optional, defaults to `DBL_MAX`.
+- `"source"` is optional, no default
+
+
+==== `xpce.ask` - query for instances
+
+*Description:*:: Creates instances of the given formula, runs MCSAT
+   sampling, and collects the results, sorted according to probability
+   (highest to lowest).  Only returns results greater than or equal to the
+   threshold, and at most maxresults are returned - unless it is zero, in
+   which case all instances above the threshold are returned.
+
+*Arguments*:: `{"formula": FORMULA, "threshold": NUM, "maxresults": NUM}`
+ - `"threshold"` is optional between 0.0 and 1.0 - default 0.0
+ - `"maxresults"` is optional a nonnegative integer, default 0
+
+*Returns*:: a JSON array of the form
+-----
+    [{"subst": SUBST, "formula_instance": FORMULA, "probability": NUM}
+     ...
+    ]
+-----    
+
+==== `xpce.command` - run an MCSAT command
+
+*Description:*:: This is the simplest, and the only one that does not
+expect a JSON string. It simply takes any of the commands as described in
+<<MCSAT>> in the form of a string (including the terminating ';'), and
+returns a string.
+
+==== XPCE JSON Formula Syntax
+[[FormulaSyntax]]
+----
+FORMULA := ATOM
+         | {"not": FORMULA}
+         | {"and": [FORMULA, FORMULA]}
+         | {"or": [FORMULA, FORMULA]}
+         | {"implies": [FORMULA, FORMULA]}
+         | {"iff": [FORMULA, FORMULA]}
+	 | {"xor": [FORMULA, FORMULA]}
+
+ATOM := {"atom": {"predicate": NAME, "arguments": ARGUMENTS}}
+
+NAMES := [NAME++',']
+ARGUMENTS := [ARGUMENT++',']
+CONSTANTS := [CONSTANT++',']
+NUM := ['+'|'-'] simple floating point number
+NAME := chars except whitespace parens ':' ',' ';'
+ARGUMENT := CONSTANT | {"var":  NAME}
+CONSTANT := NAME
+----
+
+=== XPCE example
+
+The PCE sources include a simple C client in `src/xpce-client.c`, that is
+built automatically when PCE is built.  See the
+https://transpal.sri.com/Plone/framework/Components/pce-1[PAL WIKI] for an
+example of a Java client.
+
+== Contacts
+
+mailto:support@transpal.sri.com[]
+
+== Bibliography
+[bibliography]
+- [[[MarkovLogic]]] Matthew Richardson and Pedro Domingos.
+  'Markov Logic Networks'.  'Machine Learning'. 2006.
+- [[[MCSAT]]] Hoifung Poon and Pedro Domingos.
+  'Sound and Efficient Inference with Probabilistic and Deterministic
+  Dependencies'. Proceedings of the Twenty-First National Conference on
+  Artificial Intelligence (AAAI-06). 458--463. 2006. Boston, MA. AAAI
+  Press.
+- [[[LazyMCSAT]]] Parag Singla and Pedro Domingos.
+  'Memory-Efficient Inference in Relational Domains'.
+  'Proceedings of the Twenty-First National Conference on Artificial
+  Intelligence (AAAI-06). 488--493. 2006. Boston, MA. AAAI Press.
+- [[[Alchemy]]] Kok, S., Singla, P., Richardson, M., and Domingos, P.
+  `The Alchemy system for statistical relational AI`.
+  Technical report, Department of Computer Science and Engineering,
+  University of Washington (2005).
+  http://www.cs.washington.edu/ai/alchemy[].
+- [[[CALO]]] http://www.ai.sri.com/project/CALO.  A book describing the
+  CALO results is in progress.
+- [[[Learners]]] Thomas G. Dietterich and Xinlong Bao.
+  'Integrating Multiple Learning Components Through Markov Logic'.
+  'Proceedings of the Twenty-Third AAAI Conference on Artificial
+  Intelligence'. 2008.
