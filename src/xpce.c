@@ -27,7 +27,6 @@
 #include "parser.h"
 #include "cnf.h"
 #include "mcsat.h"
-#include "yacc.tab.h"
 #include "lazysamplesat.h"
 
 extern int yyparse ();
