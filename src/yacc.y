@@ -84,7 +84,7 @@ input_fmla_t *yy_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2) {
   fmla = (input_fmla_t *) safe_malloc(sizeof(input_fmla_t));
   ufmla = (input_ufmla_t *) safe_malloc(sizeof(input_ufmla_t));
   cfmla = (input_comp_fmla_t *) safe_malloc(sizeof(input_comp_fmla_t));
-  fmla->kind = op;
+  fmla->atomic = false;
   fmla->ufmla = ufmla;
   ufmla->cfmla = cfmla;
   cfmla->op = op;
@@ -99,7 +99,7 @@ input_fmla_t *yy_atom_to_fmla (input_atom_t *atom) {
 
   fmla = (input_fmla_t *) safe_malloc(sizeof(input_fmla_t));
   ufmla = (input_ufmla_t *) safe_malloc(sizeof(input_ufmla_t));
-  fmla->kind = ATOM;
+  fmla->atomic = true;
   fmla->ufmla = ufmla;
   ufmla->atom = atom;
   return fmla;
