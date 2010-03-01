@@ -3,8 +3,11 @@
 #define __PARSER_H
 
 #include "utils.h"
+#include "yacc.tab.h"
 
 enum input_kind_t {INFILE, INSTRING};
+
+typedef enum yytokentype yytoken_t;
 
 #define INIT_INPUT_STACK_SIZE 4
 
