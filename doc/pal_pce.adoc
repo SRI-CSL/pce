@@ -79,7 +79,7 @@ associated with a particular project.  PCE is then queried for formula
 patterns, new samples are run, and the formula instances are output, along
 with their marginal probabilities.
 
-The direct atoms, i.e., atoms with direct predicates are only true when
+The direct atoms, (i.e., atoms with direct predicates) are only true when
 they have been added as hard facts.  The closed world assumption applies,
 so unasserted direct atoms are treated as false.  Given the truth
 assignment to the hard facts, the MCSAT procedures construct an initial
@@ -251,8 +251,8 @@ Commands are case-insensitive, and terminated with a semicolon.
 
 ==== sort
 
-MCSAT uses sorts - sorts are pairwise disjoint or subsorts (see
-below) and introduced with the `sort` or `subsort` command.
+MCSAT uses sorts, which are simple forms of types.  Sorts are pairwise
+disjoint unless introduced by the subsort command (see below).
 
 *Syntax:*:: `sort NAME;`
 
@@ -713,7 +713,7 @@ subsort relation.
 
 ==== `xpce.command` - run an MCSAT command
 
-*Description:*:: This is the simplest, and the only one that does not
+*Description:*:: This is the simplest command, and the only one that does not
 expect a JSON string. It simply takes any of the commands as described in
 <<MCSAT>> in the form of a string (including the terminating ';'), and
 returns a string.
