@@ -233,7 +233,7 @@ rule_literal_t ***cnf_pos(input_fmla_t *fmla, var_entry_t **vars) {
   input_atom_t *atom;
   input_comp_fmla_t *cfmla;
 
-  if (fmla->kind == ATOM) {
+  if (fmla->atomic) {
     atom = fmla->ufmla->atom;
     return cnf_literal(atom, vars, false);
   } else {
@@ -274,7 +274,7 @@ rule_literal_t ***cnf_neg(input_fmla_t *fmla, var_entry_t **vars) {
   input_atom_t *atom;
   input_comp_fmla_t *cfmla;
   
-  if (fmla->kind == ATOM) {
+  if (fmla->atomic) {
     atom = fmla->ufmla->atom;
     return cnf_literal(atom, vars, true);
   } else {    
