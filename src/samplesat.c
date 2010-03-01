@@ -2655,36 +2655,36 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
    represented by bindings (initially all -1) can be consistently bound.
    Note that this modifies the bindings.
  */
-static bool query_match(samp_atom_t *atom, samp_atom_t *patom,
-			int32_t *bindings, samp_table_t *table) {
-  pred_table_t *pred_table = &(table->pred_table);
-  int32_t i;
-  int32_t vidx;
+// static bool query_match(samp_atom_t *atom, samp_atom_t *patom,
+// 			int32_t *bindings, samp_table_t *table) {
+//   pred_table_t *pred_table = &(table->pred_table);
+//   int32_t i;
+//   int32_t vidx;
 
-  if (atom->pred != patom->pred) {
-    return false;
-  }
-  i = 0;
-  for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
-    if (atom->args[i] != patom->args[i]) {
-      if (patom->args[i] >= 0) {
-	// It's a different constant - no match
-	return false;
-      } else {
-	// See if the variable is bound - the index is -(arg + 1)
-	vidx = -(patom->args[i] + 1);
-	if (bindings[vidx] >= 0) {
-	  if (bindings[vidx] != atom->args[i]) {
-	    return false;
-	  }
-	} else {
-	  bindings[vidx] = atom->args[i];
-	}
-      }
-    }
-  }
-  return true;
-}
+//   if (atom->pred != patom->pred) {
+//     return false;
+//   }
+//   i = 0;
+//   for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
+//     if (atom->args[i] != patom->args[i]) {
+//       if (patom->args[i] >= 0) {
+// 	// It's a different constant - no match
+// 	return false;
+//       } else {
+// 	// See if the variable is bound - the index is -(arg + 1)
+// 	vidx = -(patom->args[i] + 1);
+// 	if (bindings[vidx] >= 0) {
+// 	  if (bindings[vidx] != atom->args[i]) {
+// 	    return false;
+// 	  }
+// 	} else {
+// 	  bindings[vidx] = atom->args[i];
+// 	}
+//       }
+//     }
+//   }
+//   return true;
+// }
 
 static inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 
