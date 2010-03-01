@@ -544,7 +544,7 @@ void print_ask_results (input_formula_t *fmla, samp_table_t *table) {
   
   printf("\n%d results:\n", ask_buffer.size);
   for (i = 0; i < ask_buffer.size; i++) {
-    qinst = ask_buffer.data[i];
+    qinst = (samp_query_instance_t *) ask_buffer.data[i];
     qsubst = qinst->subst;
     printf("[");
     if (fmla->vars != NULL) {
@@ -555,7 +555,7 @@ void print_ask_results (input_formula_t *fmla, samp_table_t *table) {
       }
     }
     printf("]");
-    output("% 5.3f:", query_probability(ask_buffer.data[i], table));
+    output("% 5.3f:", query_probability((samp_query_instance_t *) ask_buffer.data[i], table));
     print_query_instance(qinst, table, 0, false);
     printf("\n");
     fflush(stdout);
