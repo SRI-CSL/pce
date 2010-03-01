@@ -38,7 +38,6 @@ void run_pce_command (xmlrpc_env * const env, const char * const serverUrl, char
 }
 
 int main(int const argc, const char ** const argv ATTR_UNUSED) {
-  int32_t i;
   xmlrpc_env env;
   const char * const serverUrl = "http://localhost:8080/RPC2";
 
