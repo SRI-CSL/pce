@@ -1,6 +1,7 @@
 #include <string.h>
 #include "memalloc.h"
 #include "utils.h"
+#include "input.h"
 #include "tables.h"
 
 void init_sort_table(sort_table_t *sort_table){
