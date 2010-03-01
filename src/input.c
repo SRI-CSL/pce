@@ -6,7 +6,6 @@
 #include "memalloc.h"
 #include "utils.h"
 #include "parser.h"
-#include "yacc.tab.h"
 #include "print.h"
 #include "input.h"
 #include "cnf.h"
@@ -207,7 +206,7 @@ void free_literals (input_literal_t **lit) {
 void free_fmla (input_fmla_t *fmla) {
   input_comp_fmla_t *cfmla;
   
-  if (fmla->kind == ATOM) {
+  if (fmla->atomic) {
     free_atom(fmla->ufmla->atom);
   } else {
     cfmla = fmla->ufmla->cfmla;
