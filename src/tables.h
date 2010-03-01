@@ -143,7 +143,7 @@ typedef union input_ufmla_s {
 } input_ufmla_t;
 
 typedef struct input_fmla_s {
-  int32_t kind;
+  bool atomic;
   input_ufmla_t *ufmla;
 } input_fmla_t;
 
