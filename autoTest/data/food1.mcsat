@@ -1,5 +1,9 @@
+# test
+
 sort Person;
 sort Food;
+
+# test
 
 const billy,sandra: Person;
 const beef,yogurt,iceCream: Food;
@@ -11,3 +15,6 @@ assert likes(sandra,iceCream);
 
 add [person] likes(person,beef) implies ~likes(person,yogurt) 2.0;
 add [person] likes(person,iceCream) implies likes(person,yogurt) 2.0;
+
+
+
