@@ -261,36 +261,34 @@ void yy_add_decl (input_clause_t *clause, char *wt, char *source) {
   }
 };
   
-void yy_ask_fdecl (input_formula_t *formula, char *thresholdstr, char *numresultstr) {
+void yy_ask_fdecl (input_formula_t *formula, char **threshold_numresult) {
   double threshold;
 
   input_command.kind = ASK;
   input_command.decl.ask_fdecl.formula = formula;
-  if (thresholdstr == NULL) {
+  if (threshold_numresult == NULL) {
     input_command.decl.ask_fdecl.threshold = 0;
+    input_command.decl.ask_fdecl.numresults = 0; // Zero means no limit
   } else {
-    threshold = atof(thresholdstr);
+    threshold = atof(threshold_numresult[0]);
     if (0.0 <= threshold && threshold <= 1.0) {
       input_command.decl.ask_fdecl.threshold = threshold;
     } else {
       free_formula(formula);
-      safe_free(numresultstr);
-      safe_free(thresholdstr);
+      safe_free(threshold_numresult);
       yyerror("ask: THRESHOLD must be between 0.0 and 1.0");
       return;
     }
-    safe_free(thresholdstr);
-    if (numresultstr == NULL) {
+    if (threshold_numresult[1] == NULL) {
       input_command.decl.ask_fdecl.numresults = 0; // Zero means no limit
-    } else if (yy_check_int(numresultstr)) {
-      input_command.decl.ask_fdecl.numresults = atoi(numresultstr);
+    } else if (yy_check_int(threshold_numresult[1])) {
+      input_command.decl.ask_fdecl.numresults = atoi(threshold_numresult[1]);
     } else {
       free_formula(formula);
-      safe_free(numresultstr);
-      safe_free(thresholdstr);
+      safe_free(threshold_numresult);
       yyerror("ask: NUMRESULTS must be an integer");
     }
-    safe_free(numresultstr);
+    safe_free(threshold_numresult);
   }
 };
   
@@ -338,7 +336,7 @@ void yy_ask_fdecl (input_formula_t *formula, char *thresholdstr, char *numresult
  * max_flips, max_extra_flips, and max_samples, in that order.  Missing
  * args get default values.
  */
-void yy_mcsat_decl (char **params) {
+void yy_mcsat_decl () {
   //yy_get_mcsat_params(params);
   input_command.kind = MCSAT;
 }
@@ -511,7 +509,7 @@ void yy_mcsat_params_decl (char **params) {
 }
 
 %type <str> arg NAME NUM STRING addwt oarg oname onum retractarg
-%type <strs> arguments variables oarguments
+%type <strs> arguments variables oarguments onum2
 %type <formula> formula
 %type <fmla> fmla
 %type <clause> clause
@@ -520,6 +518,8 @@ void yy_mcsat_params_decl (char **params) {
 %type <atom> atom
 %type <bval> witness
 %type <ival> cmd table resetarg
+
+%locations
 
 %start command
 
@@ -563,8 +563,8 @@ decl: SORT NAME {yy_sort_decl($2);}
     | ADD_CLAUSE clause addwt oname {yy_add_decl($2, $3, $4);}
 //    | ASK_CLAUSE clause NUM oarg oarg {yy_ask_decl($2, $3, $4, $5);}
     | ADD formula addwt oname {yy_add_fdecl($2, $3, $4);}
-    | ASK formula onum onum {yy_ask_fdecl($2, $3, $4);}
-    | MCSAT oarguments {yy_mcsat_decl($2);}
+    | ASK formula onum2 {yy_ask_fdecl($2, $3);}
+    | MCSAT {yy_mcsat_decl();}
     | MCSAT_PARAMS oarguments {yy_mcsat_params_decl($2);}
     | RESET resetarg {yy_reset($2);}
     | RETRACT retractarg {yy_retract($2);}
@@ -572,7 +572,7 @@ decl: SORT NAME {yy_sort_decl($2);}
     | LOAD STRING {yy_load($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
 // Need to reference @$ in order for locations to be generated
-    | HELP cmd {@$;yy_help($2);}
+    | HELP cmd {yy_help($2);}
     ;
 
 cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
@@ -629,7 +629,7 @@ literal: atom {$$ = yy_literal(0,$1);}
 atom: NAME '(' arguments ')' {$$ = yy_atom($1, $3);}
     ;
 
-oarguments: /*empty*/ {$$ = NULL;} | oargs {$$ = copy_yyargs();};
+oarguments: oargs {$$ = copy_yyargs();};
 
 oargs: oarg {pvector_push(&yyargs,$1);}
       | oargs ',' oarg {pvector_push(&yyargs,$3);}
@@ -654,6 +654,12 @@ arg: NAME | NUM; // returns string from yystrings
 addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
 
 oname: /* empty */ {$$=NULL;} | NAME;
+
+onum2: /* empty */ {$$=NULL;}
+     | NUM {pvector_push(&yyargs, $1); $$ = copy_yyargs();}
+     | NUM NUM {pvector_push(&yyargs, $1); pvector_push(&yyargs, $2);
+                $$ = copy_yyargs();}
+
 onum: /* empty */ {$$=NULL;} | NUM;
 
 %%

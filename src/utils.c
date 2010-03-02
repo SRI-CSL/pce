@@ -18,7 +18,7 @@ int32_t imin(int32_t i, int32_t j) {return i>j ? j : i;}
 
 char * str_copy(char *name){
   int32_t len = strlen(name);
-  char * new_name = safe_malloc(++len * sizeof(char));
+  char * new_name = (char *) safe_malloc(++len * sizeof(char));
   memcpy(new_name, name, len);
   return new_name;
 }
@@ -33,7 +33,7 @@ samp_atom_t *atom_copy(samp_atom_t *atom, int32_t arity){
 
 int32_t *intarray_copy(int32_t *signature, int32_t length){
   int32_t size = length * sizeof(int32_t);
-  int32_t *new_signature = safe_malloc(size);
+  int32_t *new_signature = (int32_t *) safe_malloc(size);
   memcpy(new_signature, signature, size);
   return new_signature;
 }

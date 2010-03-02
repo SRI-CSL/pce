@@ -26,7 +26,7 @@
 #include "input.h"
 #include "parser.h"
 #include "cnf.h"
-#include "mcsat.h"
+#include "xpce.h"
 #include "lazysamplesat.h"
 
 extern int yyparse ();
@@ -34,6 +34,8 @@ extern int yyparse ();
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static xmlrpc_server_abyss_t * serverToTerminateP;
+
+samp_table_t samp_table;
 
 // sort-decl := {"sort": NAME, "super": NAME} # "super" is optional,
 //                     # so this call can declare a sort or a subsort
@@ -142,7 +144,8 @@ xpce_result(xmlrpc_env * const envP,
 	    struct json_object *result) {
   struct json_object *ret;
   xmlrpc_value *xret;
-  char *err, *warn, *retstr;
+  char *err, *warn;
+  const char *retstr;
   
   ret = json_object_new_object();
   if (result != NULL) {
@@ -181,7 +184,7 @@ xpce_sort(xmlrpc_env * const envP,
     json_object_put(sortdecl);
     return xpce_result(envP, NULL);
   }
-  sort = json_object_get_string(sortobj);
+  sort = (char *) json_object_get_string(sortobj);
   superobj = json_object_object_get(sortdecl, "super");
   if (superobj == NULL) {
     pthread_mutex_lock(&mutex);
@@ -189,7 +192,7 @@ xpce_sort(xmlrpc_env * const envP,
     add_sort(&samp_table.sort_table, sort);
     pthread_mutex_unlock(&mutex);
   } else {
-    super = json_object_get_string(superobj);
+    super = (char *) json_object_get_string(superobj);
     pthread_mutex_lock(&mutex);
     add_subsort(&samp_table.sort_table, sort, super);
     pthread_mutex_unlock(&mutex);
@@ -224,16 +227,16 @@ xpce_predicate(xmlrpc_env * const envP,
     json_object_put(preddecl);
     return xpce_result(envP, NULL);
   }
-  pred = json_object_get_string(predobj);
+  pred = (char *) json_object_get_string(predobj);
   if (!json_object_is_type(argsobj, json_type_array)) {
     mcsat_err("Bad arguments, should be array of names\n");
     json_object_put(preddecl);
     return xpce_result(envP, NULL);
   }
-  sorts = safe_malloc((json_object_array_length(argsobj) + 1) * sizeof(char *));
+  sorts = (char **) safe_malloc((json_object_array_length(argsobj) + 1) * sizeof(char *));
   for (i = 0; i < json_object_array_length(argsobj); i++) {
     arg = json_object_array_get_idx(argsobj, i);
-    sorts[i] = json_object_get_string(arg);
+    sorts[i] = (char*) json_object_get_string(arg);
   }
   sorts[i] = NULL;
   observable = json_object_get_boolean(observableobj);
@@ -265,10 +268,10 @@ xpce_constdecl(xmlrpc_env * const envP,
     json_object_put(constdecl);
     return xpce_result(envP, NULL);
   }
-  sort = json_object_get_string(sortobj);
+  sort = (char *) json_object_get_string(sortobj);
   for (i = 0; i < json_object_array_length(namesobj); i++) {
     nameobj = json_object_array_get_idx(namesobj, i);
-    name = json_object_get_string(nameobj);
+    name = (char *) json_object_get_string(nameobj);
     pthread_mutex_lock(&mutex);
     add_constant(name, sort, &samp_table);
     pthread_mutex_unlock(&mutex);
@@ -278,7 +281,7 @@ xpce_constdecl(xmlrpc_env * const envP,
 }
 
 char * xpce_json_valid_name(struct json_object *obj) {
-  char *str;
+  const char *str;
   
   if (!json_object_is_type(obj, json_type_string)) {
     return NULL;
@@ -299,7 +302,7 @@ char ** xpce_json_constant_array(struct json_object *obj) {
     return NULL;
   }
 
-  arg = safe_malloc((json_object_array_length(obj)+1) * sizeof(char *));
+  arg = (char **) safe_malloc((json_object_array_length(obj)+1) * sizeof(char *));
   for (i = 0; i < json_object_array_length(obj); i++) {
     jarg = json_object_array_get_idx(obj, i);
     if ((arg[i] = xpce_json_valid_name(jarg)) == NULL) {
@@ -317,7 +320,7 @@ void push_new_var(char *var) {
   int32_t i;
   
   for (i = 0; i < formula_vars.size; i++) {
-    if (strcmp(var, formula_vars.data[i]) == 0) {
+    if (strcmp(var, (char *) formula_vars.data[i]) == 0) {
       return;
     }
   }
@@ -333,7 +336,7 @@ char **copy_formula_vars() {
     if (formula_vars.data[i] == NULL) {
       var[i] = "";
     } else {
-      var[i] = formula_vars.data[i];
+      var[i] = (char *) formula_vars.data[i];
     }
   }
   var[i] = NULL;
@@ -349,7 +352,7 @@ char ** xpce_json_constants_array(struct json_object *obj) {
     return NULL;
   }
 
-  arg = safe_malloc((json_object_array_length(obj)+1) * sizeof(char *));
+  arg = (char **) safe_malloc((json_object_array_length(obj)+1) * sizeof(char *));
   for (i = 0; i < json_object_array_length(obj); i++) {
     jarg = json_object_array_get_idx(obj, i);
     if (! json_object_is_type(jarg, json_type_string)) {
@@ -373,7 +376,7 @@ char ** xpce_json_arguments_array(struct json_object *obj) {
     return NULL;
   }
 
-  arg = safe_malloc((json_object_array_length(obj)+1) * sizeof(char *));
+  arg = (char **) safe_malloc((json_object_array_length(obj)+1) * sizeof(char *));
   for (i = 0; i < json_object_array_length(obj); i++) {
     jarg = json_object_array_get_idx(obj, i);
     if (json_object_is_type(jarg, json_type_string)) {
@@ -561,7 +564,7 @@ xpce_assert(xmlrpc_env * const envP,
       json_object_put(assertdecl);
       return xpce_result(envP, NULL);
     }
-    source = json_object_get_string(sourceobj);
+    source = (char *) json_object_get_string(sourceobj);
   }
   pthread_mutex_lock(&mutex);
   assert_atom(&samp_table, atom, source);
@@ -626,7 +629,7 @@ xpce_add(xmlrpc_env * const envP,
       json_object_put(adddecl);
       return xpce_result(envP, NULL);
     }
-    source = json_object_get_string(sourceobj);
+    source = (char *) json_object_get_string(sourceobj);
   }
   pthread_mutex_lock(&mutex);
   add_cnf(fmla, weight, source);
@@ -670,7 +673,7 @@ subst_into_json_atom(struct json_object *atom,
       // Check that we found the variable
       assert(vars[j] != NULL);
     } else {
-      cname = json_object_get_string(arg);
+      cname = (char *) json_object_get_string(arg);
       nconst = json_object_new_string(strdup(cname));
       json_object_array_add(nargs, nconst);
     }
@@ -816,7 +819,7 @@ xpce_ask(xmlrpc_env * const envP,
   // E.g., [{"subst": {"x": "Dan", "y": "Ron"}, "formula-instance": FORMULA, "probability": 0.7}, ...]
   answer = json_object_new_array();
   for (i = 0; i < ask_buffer.size; i++) {
-    qinst = ask_buffer.data[i];
+    qinst = (samp_query_instance_t *) ask_buffer.data[i];
     qsubst = qinst->subst;
     finfo = json_object_new_object();
     fsubst = json_object_new_object();
@@ -867,39 +870,39 @@ xpce_mcsat(xmlrpc_env * const envP,
 }
 
 
-static xmlrpc_value *
-xpce_dumptable(xmlrpc_env * const envP,
-	       xmlrpc_value * const paramArrayP,
-	       void * const serverInfo ATTR_UNUSED,
-	       void * const channelInfo ATTR_UNUSED) {
+// static xmlrpc_value *
+// xpce_dumptable(xmlrpc_env * const envP,
+// 	       xmlrpc_value * const paramArrayP,
+// 	       void * const serverInfo ATTR_UNUSED,
+// 	       void * const channelInfo ATTR_UNUSED) {
 
-  const char *table;
-  int32_t tbl;
-  /* Parse our argument array. */
-  xmlrpc_decompose_value(envP, paramArrayP, "(s)", &table);
-  if (envP->fault_occurred)
-    return NULL;
+//   const char *table;
+//   int32_t tbl;
+//   /* Parse our argument array. */
+//   xmlrpc_decompose_value(envP, paramArrayP, "(s)", &table);
+//   if (envP->fault_occurred)
+//     return NULL;
   
-  fprintf(stderr, "Got dumptable %s\n", table);
-  if (strcasecmp(table,"all") == 0) {
-    tbl = ALL;
-  } else if (strcasecmp(table,"sort") == 0) {
-    tbl = SORT;
-  } else if (strcasecmp(table,"predicate") == 0) {
-    tbl = PREDICATE;
-  } else if (strcasecmp(table,"atom") == 0) {
-    tbl = ATOM;
-  } else if (strcasecmp(table,"clause") == 0) {
-    tbl = CLAUSE;
-  } else if (strcasecmp(table,"rule") == 0) {
-    tbl = RULE;
-  } else {
-    return NULL;
-  }
-  // This just prints out at the server end - need to send the string
-  dumptable(tbl, &samp_table);
-  return xmlrpc_build_value(envP, "i", 0);
-}
+//   fprintf(stderr, "Got dumptable %s\n", table);
+//   if (strcasecmp(table,"all") == 0) {
+//     tbl = ALL;
+//   } else if (strcasecmp(table,"sort") == 0) {
+//     tbl = SORT;
+//   } else if (strcasecmp(table,"predicate") == 0) {
+//     tbl = PREDICATE;
+//   } else if (strcasecmp(table,"atom") == 0) {
+//     tbl = ATOM;
+//   } else if (strcasecmp(table,"clause") == 0) {
+//     tbl = CLAUSE;
+//   } else if (strcasecmp(table,"rule") == 0) {
+//     tbl = RULE;
+//   } else {
+//     return NULL;
+//   }
+//   // This just prints out at the server end - need to send the string
+//   dumptable(tbl, &samp_table);
+//   return xmlrpc_build_value(envP, "i", 0);
+// }
 
 static xmlrpc_value *
 xpce_quit(xmlrpc_env * const envP,
@@ -1043,7 +1046,11 @@ int main(int const argc, const char ** const argv) {
   serverparm.config_file_name = NULL;
   serverparm.registryP        = registryP;
   serverparm.port_number      = atoi(argv[1]);
+#ifdef _WIN32
+  serverparm.log_file_name    = "C:\\xmlpce_log";
+#else
   serverparm.log_file_name    = "/tmp/xmlpce_log";
+#endif
 
   // log_file_name is the last parameter set above
   xmlrpc_server_abyss_create(&env, &serverparm, XMLRPC_APSIZE(log_file_name), &serverP);

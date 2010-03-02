@@ -29,7 +29,7 @@ void run_pce_command (xmlrpc_env * const env, const char * const serverUrl, char
     fprintf(stderr, "Error: %s\n", env->fault_string);
   } else {
     xmlrpc_parse_value(env, resultP, "s", &result);
-    printf(result);    
+    printf("Result is %s\n", result);    
     xmlrpc_DECREF(resultP);
   }
 }

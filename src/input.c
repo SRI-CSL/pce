@@ -6,7 +6,6 @@
 #include "memalloc.h"
 #include "utils.h"
 #include "parser.h"
-#include "yacc.tab.h"
 #include "print.h"
 #include "input.h"
 #include "cnf.h"

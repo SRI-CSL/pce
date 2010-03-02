@@ -28,6 +28,10 @@
 #include "memalloc.h"
 #include "memsize.h"
 #include "pce.h"
+#ifdef _WIN32
+#include <io.h>
+#define fsync _commit
+#endif
 
 #define AGENT_NAME "pce"
 
@@ -147,7 +151,7 @@ static names_buffer_t learner_ids = {0, 0, NULL};
 static rule_vars_buffer_t rules_vars_buffer = {0, 0, NULL};
 static rule_vars_buffer_t rule_vars_buffer = {0, 0, NULL};
 
-//samp_table_t samp_table;
+samp_table_t samp_table;
 
 static void pce_error(const char *fmt, ...);
 static rule_literal_t ***icl_toCnf(ICLTerm *formula);
@@ -1723,12 +1727,12 @@ void icl_atoms_resize(int32_t nsize) {
       out_of_memory();
     }
     if (icl_atoms.size == 0) {
-      icl_atoms.Atom = safe_malloc(nsize * sizeof(ICLTerm *));
+      icl_atoms.Atom = (ICLTerm **) safe_malloc(nsize * sizeof(ICLTerm *));
       for (i = 0; i < nsize; i++) {
 	icl_atoms.Atom[i] = NULL;
       }
     } else {
-      icl_atoms.Atom = safe_realloc(icl_atoms.Atom, nsize * sizeof(ICLTerm *));
+      icl_atoms.Atom = (ICLTerm **) safe_realloc(icl_atoms.Atom, nsize * sizeof(ICLTerm *));
       for (i = icl_atoms.size; i < nsize; i++) {
 	icl_atoms.Atom[i] = NULL;
       }
@@ -1912,7 +1916,7 @@ char *pce_make_lname(ICLTerm *Username) {
 
   if (icl_IsStr(Username)) {
     // Prepend 'user:'
-    name = safe_malloc((strlen(icl_Str(Username)) + 6) * sizeof(char));
+    name = (char *) safe_malloc((strlen(icl_Str(Username)) + 6) * sizeof(char));
     strcpy(name, "user:");
     strcat(name, icl_Str(Username));
     return name;
@@ -1979,7 +1983,7 @@ char *calo_string_expansion(char *str) {
   for (i = 0; i < 12; i++) {
     if (strncmp(str, uri_abbr[i], strlen(uri_abbr[i])) == 0) {
       len = strlen(str) - strlen(uri_abbr[i]) + strlen(uri_expn[i]) + 1;
-      nstr = safe_malloc(len * sizeof(char));
+      nstr = (char *) safe_malloc(len * sizeof(char));
       strcpy(nstr,uri_expn[i]);
       strcat(nstr,&str[strlen(uri_abbr[i])]);
       return nstr;

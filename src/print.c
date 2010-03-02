@@ -40,14 +40,14 @@ void cprintf(int32_t level, const char *fmt, ...){
 }
 
 extern char *get_string_from_buffer (string_buffer_t *strbuf) {
-  char *new;
+  char *new_str;
   if (strbuf->size == 0) {
     return "";
   } else {
-    new = (char *) safe_malloc((strbuf->size+1) * sizeof(char));
-    strcpy(new, strbuf->string);
+    new_str = (char *) safe_malloc((strbuf->size+1) * sizeof(char));
+    strcpy(new_str, strbuf->string);
     strbuf->size = 0;
-    return new;
+    return new_str;
   }
 }
 

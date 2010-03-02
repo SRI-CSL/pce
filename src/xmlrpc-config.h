@@ -75,7 +75,11 @@
 #define HAVE_LIBWWW_SSL 0
 
 /* Used to mark an unused function parameter */
+#ifdef __GNUC__
 #define ATTR_UNUSED __attribute__((__unused__))
+#else
+#define ATTR_UNUSED
+#endif
 
 #define DIRECTORY_SEPARATOR "/"
 

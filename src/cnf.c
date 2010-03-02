@@ -4,7 +4,7 @@
 #include <float.h>
 #include "memalloc.h"
 #include "utils.h"
-#include "yacc.tab.h"
+#include "parser.h"
 #include "input.h"
 #include "print.h"
 #include "vectors.h"

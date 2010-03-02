@@ -11,6 +11,10 @@
 #include "tables.h"
 #include "input.h"
 #include "print.h"
+#include "mcsat.h"
+#ifdef _WIN32
+#include <io.h>
+#endif
 
 #define VERSION "0.1"
 
@@ -174,7 +178,9 @@ int main(int argc, char *argv[]) {
       load_mcsat_file(argv[i], &samp_table);
       file_loaded = true;
     } else {
-      err(1, "File %s\n", argv[i]);
+      //err(1, "File %s\n", argv[i]);
+      fprintf(stderr, "%s: File %s\n", program_name, argv[i]);
+      exit(1);
     }
   }
   if (interactive || !file_loaded) {

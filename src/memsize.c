@@ -102,6 +102,22 @@ double mem_size(void) {
 }
 
 
+#elif defined(_WIN32)
+
+/*
+ * WINDOWS IMPLEMENTATION
+ */
+
+#include <windows.h>
+#include <psapi.h>
+
+double mem_size(void) {
+  HANDLE hProcess = GetCurrentProcess();
+  PROCESS_MEMORY_COUNTERS pmc;
+  GetProcessMemoryInfo( hProcess, &pmc, sizeof(pmc));
+  return (double) pmc.WorkingSetSize;
+}
+
 #else
 
 /*

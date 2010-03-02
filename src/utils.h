@@ -10,6 +10,9 @@
 #include "symbol_tables.h"
 #include "integer_stack.h"
 
+#ifdef _WIN32
+#define strcasecmp(s1, s2) _stricmp(s1, s2)
+#endif
 
 /*
  * Missing comment: what does this do?

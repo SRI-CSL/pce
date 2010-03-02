@@ -46,7 +46,7 @@ extern bool input_stack_push_file(char *file) {
     printf("File %s could not be opened\n", file);
     return false;
   }
-  pinput = safe_malloc(sizeof(parse_input_t));
+  pinput = (parse_input_t *) safe_malloc(sizeof(parse_input_t));
   pinput->kind = INFILE;
   pinput->input.in_file.file = file;
   pinput->input.in_file.fps = input;
@@ -57,7 +57,7 @@ extern bool input_stack_push_file(char *file) {
 extern bool input_stack_push_string(char *str) {
   parse_input_t *pinput;
 
-  pinput = safe_malloc(sizeof(parse_input_t));
+  pinput = (parse_input_t *) safe_malloc(sizeof(parse_input_t));
   pinput->kind = INSTRING;
   pinput->input.in_string.string = str;
   pinput->input.in_string.index = 0;

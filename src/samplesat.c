@@ -16,6 +16,11 @@
 #include "lazysamplesat.h"
 #include "vectors.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <wincrypt.h>
+#endif
+
 #ifdef MINGW
 
 /*
@@ -1053,7 +1058,22 @@ static void print_list(samp_clause_t *link, samp_table_t *table) {
  * - returns a floating point number in the interval [0.0, 1.0)
  */
 double choose(){
-  return ((double) random()) /((double) RAND_MAX + 1.0);
+#ifdef _WIN32
+  // Get the cryptographic service provider
+  HCRYPTPROV hCryptProv;
+  CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, 0);
+
+  // Get the random number
+  union {
+    BYTE bs[sizeof(unsigned long int)];
+    unsigned long int li;
+  } rand_buf;
+  CryptGenRandom(hCryptProv, sizeof(rand_buf), (BYTE*) &rand_buf);
+
+  return ((double) rand_buf.li) / ((double) ULONG_MAX + 1.0);
+#else
+  return ((double) random()) / ((double) RAND_MAX + 1.0);
+#endif
 }
 
 

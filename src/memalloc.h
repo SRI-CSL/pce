@@ -13,6 +13,10 @@
 
 #include "pce_exit_codes.h"
 
+#ifndef __GNUC__
+#define __attribute__(x)
+#endif
+
 /*
  * Print an error message then call exit(MCSAT_EXIT_OUT_OF_MEMORY)
  */

@@ -1,8 +1,8 @@
 #include <string.h>
 #include "memalloc.h"
 #include "utils.h"
-#include "input.h"
 #include "tables.h"
+#include "input.h"
 
 void init_sort_table(sort_table_t *sort_table){
   int32_t size = INIT_SORT_TABLE_SIZE;
