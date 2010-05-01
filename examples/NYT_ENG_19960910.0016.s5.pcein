@@ -1,0 +1,43 @@
+#  With Favre throwing the best - looking pinpoint passes the side of
+#  Troy Aikman and with receiver Robert Brooks doing a great impression
+#  of Michael Irvin and with the Packers' defense playing like, well,
+#  like themselves, Green Bay routed Philadelphia, 39 to 13.
+
+sort NFLGame;
+sort NFLTeam;
+sort FinalScore;
+
+const GreenBay, Philadelphia: NFLTeam;
+const g: NFLGame;
+const 39, 13: FinalScore;
+
+predicate greater(FinalScore, FinalScore) indirect;
+predicate played(NFLTeam, NFLGame) indirect;
+predicate won(NFLTeam, NFLGame) indirect;
+predicate scored(NFLTeam, FinalScore) indirect;
+
+add [S] ~greater(S, S);
+add [S1, S2] greater(S1, S2) => ~greater(S2, S1);
+# Infinite weight
+add greater(39, 13);
+
+add [T1, T2] played(T1, g) and played(T2, g) => (won(T1, g) => ~won(T2, g)) 3.0;
+add [T1, T2] played(T1, g) and played(T2, g) => (~won(T1, g) => won(T2, g)) 3.0;
+
+add [T1, T2, S1, S2] played(T1, g) and scored(T1, S1) and played(T2, g) and scored(T2, S2) and greater(S1, S2) => won(T1, g) 3.0;
+add [T1, T2, S1, S2] played(T1, g) and scored(T1, S1) and played(T2, g) and scored(T2, S2) and greater(S2, S1) => won(T2, g) 3.0;
+
+add [T1, T2, S1, S2] scored(T1, S1) and scored(T1, S2) and scored(T2, S2) and (greater(S1, S2) or greater(S2, S1)) => ~scored(T1, S2) 3.0;
+add [T1, T2, S1, S2] scored(T1, S1) and scored(T2, S1) and scored(T2, S2) and (greater(S1, S2) or greater(S2, S1)) => ~scored(T2, S1) 3.0;
+add [T, S1, S2] scored(T, S1) and (greater(S1, S2) or greater(S2, S1)) => ~scored(T, S2) 3.0;
+
+# From Stanford
+add played(Philadelphia, g) 3.0;
+add played(GreenBay, g) 3.0;
+
+add scored(GreenBay, 39) 3.0;
+add scored(Philadelphia, 39) 3.0;
+add scored(Philadelphia, 13) 3.0;
+
+mcsat_params 20000, 0.01, 20.0, 0.01, 30;
+mcsat; dumptables atom;
