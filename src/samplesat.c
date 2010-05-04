@@ -32,6 +32,12 @@ static inline int random(void) {
 }
 
 #endif
+
+void all_rule_instances_rec(int32_t vidx,
+			    samp_rule_t *rule,
+			    samp_table_t *table,
+			    int32_t atom_index) ;
+
   
 static void add_atom_to_pred(pred_table_t *pred_table,
 			     int32_t predicate,
@@ -90,11 +96,13 @@ int32_t add_internal_atom(samp_table_t *table,
   atom_table_t *atom_table = &(table->atom_table);
   pred_table_t *pred_table = &(table->pred_table);
   clause_table_t *clause_table = &(table->clause_table);
+  rule_table_t *rule_table = &(table->rule_table); 
   int32_t i;
   int32_t predicate = atom->pred;
   int32_t arity = pred_arity(predicate, pred_table);
   samp_bvar_t current_atom_index;
   array_hmap_pair_t *atom_map;
+  samp_rule_t *rule ;
   atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
 				 arity+1, //+1 for pred
 				 (int32_t *) atom);
@@ -130,6 +138,11 @@ int32_t add_internal_atom(samp_table_t *table,
     clause_table->watched[pos_lit(current_atom_index)] = NULL;
     clause_table->watched[neg_lit(current_atom_index)] = NULL;
     //assert(valid_table(table));
+    pred_entry_t *entry = pred_entry(pred_table, predicate);
+    for (i = 0; i < entry->num_rules; i++){
+	rule = rule_table->samp_rules[i];	
+	all_rule_instances_rec(0, rule, table, current_atom_index);
+    }
     return current_atom_index;
   } else {
     return atom_map->val;
@@ -2028,6 +2041,7 @@ bool check_clause_instance(samp_table_t *table,
   samp_atom_t *rule_atom; 
   array_hmap_pair_t *atom_map;
   samp_truth_value_t *assignment;
+  bool found_atom_index = false;
   bool neg;
   // FIXME: Need to keep track of non-false atoms - if there is only one,
   // then activate it, if necessary, at the end.  Have to do two loops, the
@@ -2036,6 +2050,7 @@ bool check_clause_instance(samp_table_t *table,
   // and activate the inactive atom if there is one.
   assignment = table->atom_table.assignment[table->atom_table.current_assignment];
   num_non_false = 0;
+  
   for (i = 0; i < rule->num_lits; i++){//for each literal
     atom = rule->literals[i]->atom;
     neg  = rule->literals[i]->neg;
@@ -2057,17 +2072,22 @@ bool check_clause_instance(samp_table_t *table,
 				    arity + 1,
 				    (int32_t *) rule_atom);
     // check for witness predicate - fixed false if NULL atom_map
-    if (atom_map == NULL ||
-	(atom_map != atom_index &&
-	 (neg ? assigned_false(assignment[atom_map])
-	      : assigned_true(assignment[atom_map])))) {
-      if (num_non_false == 0) {
-	num_non_false += 1;
-      } else {
-	return false;
+    if (atom_map !=NULL && atom_map->val == atom_index){
+      found_atom_index = true;
+    } else {
+      if (atom_map == NULL ||
+	  (neg ? assigned_false(assignment[atom_map->val])
+	      : assigned_true(assignment[atom_map->val]))) {
+	if (num_non_false == 0) {
+	  num_non_false = 1;
+	} else {
+	  return false;
+	}
       }
     }
   }
+  if (atom_index != -1 && !found_atom_index)
+    return false;
   assert(num_non_false <= 1);
   // Now we do the flipping
   for (i = 0; i < rule->num_lits; i++){//for each literal

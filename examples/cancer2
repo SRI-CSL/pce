@@ -8,7 +8,7 @@ predicate Cancer(Person) indirect;
 # Smoking causes cancer.
 add [x] Smoking(x) => Cancer(x)  0.8;
 # If two people are friends, either both smoke or neither does.
-add [x, y] Friends(x, y) implies (Smoking(x) iff Smoking(y))  1.1;
+add [x, y] Friends(x, y) implies (Smoking(x) implies Smoking(y))  1.1;
 
 add Smoking(A);
 add Friends(A, B);

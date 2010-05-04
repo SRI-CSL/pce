@@ -86,13 +86,15 @@ if test "x$liboaa" == x; then
         oaalibdir=$liboaa/lib/x86-linux
       else if test $build == i386-apple-darwin9-3.0; then
         oaalibdir=$liboaa/lib/mac-os-x
+      else if test $build == i386-apple-darwin8.11.1; then
+        oaalibdir=$liboaa/lib/mac-os-x
       else if test $build == sparc-sun-solaris2.9; then
         oaalibdir=$liboaa/lib/sparc-solaris
       else if test $build == i686-pc-cygwin; then
         oaalibdir=$liboaa/lib/x86-linux
 	LIBS="$LIBS -lintl -liconv  -lglib-2.0"
       else AC_MSG_WARN([$build platform not supported])
-      fi fi fi fi fi
+      fi fi fi fi fi fi
       if test ! -f $oaalibdir/liboaa2.a; then
         AC_MSG_WARN([$aalibdir/liboaa2.a not found])
       fi
