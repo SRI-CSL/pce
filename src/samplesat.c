@@ -2028,7 +2028,7 @@ bool check_clause_instance(samp_table_t *table,
   samp_atom_t *rule_atom; 
   array_hmap_pair_t *atom_map;
   samp_truth_value_t *assignment;
-
+  bool neg;
   // FIXME: Need to keep track of non-false atoms - if there is only one,
   // then activate it, if necessary, at the end.  Have to do two loops, the
   // first simply keeps track of the number of non-false atoms - if there is
@@ -2038,6 +2038,7 @@ bool check_clause_instance(samp_table_t *table,
   num_non_false = 0;
   for (i = 0; i < rule->num_lits; i++){//for each literal
     atom = rule->literals[i]->atom;
+    neg  = rule->literals[i]->neg;
     predicate = atom->pred; 
     arity = pred_arity(predicate, pred_table);
     rule_atom_buffer_resize(arity);
@@ -2056,7 +2057,10 @@ bool check_clause_instance(samp_table_t *table,
 				    arity + 1,
 				    (int32_t *) rule_atom);
     // check for witness predicate - fixed false if NULL atom_map
-    if (atom_map == NULL || assigned_true(assignment[atom_index])) {
+    if (atom_map == NULL ||
+	(atom_map != atom_index &&
+	 (neg ? assigned_false(assignment[atom_map])
+	      : assigned_true(assignment[atom_map])))) {
       if (num_non_false == 0) {
 	num_non_false += 1;
       } else {
