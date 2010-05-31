@@ -118,6 +118,7 @@ void mcsat_err(const char *fmt, ...) {
     va_start(argp, fmt);
     vfprintf(stderr, fmt, argp);
     va_end(argp);
+    fprintf(stderr, "\n");
   }
 }
 
@@ -175,6 +176,16 @@ void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
   }
 }
 
+char *literal_string(samp_literal_t lit, samp_table_t *table) {
+  bool oldout = output_to_string;
+  char *result;
+  output_to_string = true;
+  print_literal(lit, table);
+  result = get_string_from_buffer(&output_buffer);
+  output_to_string = oldout;
+  return result;
+}
+
 // Returns a newly allocated string
 // char *atom_string(samp_atom_t *atom, samp_table_t *table) {
 //   pred_table_t *pred_table = &table->pred_table;
@@ -210,17 +221,27 @@ void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
   
 
 void print_atom(samp_atom_t *atom, samp_table_t *table) {
-  pred_table_t *pred_table = &(table->pred_table);
-  const_table_t *const_table = &(table->const_table);
-  uint32_t i;
+  pred_table_t *pred_table = &table->pred_table;
+  const_table_t *const_table = &table->const_table;
+  sort_table_t *sort_table = &table->sort_table;
+  sort_entry_t *entry;
+  int32_t *psig, i;
+
+  psig = pred_signature(atom->pred, pred_table);  
   output("%s", pred_name(atom->pred, pred_table));
   for (i = 0; i < pred_arity(atom->pred, pred_table); i++){
     i == 0 ? output("(") : output(", ");
-    if (atom->args[i] < 0) {
-      // A variable - print X followed by index
-      output("X%"PRId32"", -(atom->args[i]+1));
+    entry = &sort_table->entries[psig[i]];
+    if (entry->constants == NULL) {
+      // It's an integer
+      output("%"PRId32"", atom->args[i]);
     } else {
-      output("%s", const_name(atom->args[i], const_table));
+      if (atom->args[i] < 0) {
+	// A variable - print X followed by index
+	output("X%"PRId32"", -(atom->args[i]+1));
+      } else {
+	output("%s", const_name(atom->args[i], const_table));
+      }
     }
   }
   output(")");
@@ -251,13 +272,11 @@ void print_atoms(samp_table_t *table){
   int i;
   
   output("--------------------------------------------------------------------------------\n");
-  output("| %*s | tval | prob   | %-*s |\n", nwdth, "i", 57-nwdth, "atom");
+  output("| %*s | prob   | %-*s |\n", nwdth, "i", 65-nwdth, "atom");
   output("--------------------------------------------------------------------------------\n");
   for (i = 0; i < nvars; i++){
-    samp_truth_value_t tv = atom_table->assignment[atom_table->current_assignment][i];
-    output("| %-*u | %-4s | % 5.3f | ",
-	    nwdth, i, samp_truth_value_string(tv),
-	    atom_probability(i, table));
+    output("| %-*u | % 5.3f | ",
+	   nwdth, i, atom_probability(i, table));
     print_atom(atom_table->atom[i], table);
     output("\n");
   }
@@ -371,15 +390,20 @@ extern void dump_sort_table (samp_table_t *table) {
     sort_entry_t entry = sort_table->entries[i];
     output("| %-*s ", slen, entry.name);
     int32_t clen = slen;
-    for (j=0; j<entry.cardinality; j++){
-      char *nstr = const_table->entries[entry.constants[j]].name;
-      j == 0 ? output("| ") : output(", ");
-      clen += strlen(nstr) + 2;
-      if (clen > 72) {
-	clen = slen;
-	output("\n| %-*s | %s", slen, "", nstr);
-      } else {
-	output("%s", nstr);
+    if (entry.constants == NULL) {
+      // Have a subrange
+      output("| [%"PRId32" .. %"PRId32"]", entry.lower_bound, entry.upper_bound);
+    } else {
+      for (j=0; j<entry.cardinality; j++){
+	char *nstr = const_table->entries[entry.constants[j]].name;
+	j == 0 ? output("| ") : output(", ");
+	clen += strlen(nstr) + 2;
+	if (clen > 72) {
+	  clen = slen;
+	  output("\n| %-*s | %s", slen, "", nstr);
+	} else {
+	  output("%s", nstr);
+	}
       }
     }
     output("\n");
@@ -445,12 +469,54 @@ extern void dump_clause_table (samp_table_t *table) {
   print_clauses(table);
 }
 
+void print_rule_atom_arg (rule_atom_arg_t *arg, var_entry_t **vars, const_table_t *const_table) {
+  int32_t argidx = arg->value;
+  
+  switch (arg->kind) {
+  case variable:
+    output("%s", vars[argidx]->name);
+    break;
+  case constant:
+    output("%s", const_table->entries[argidx].name);
+    break;
+  case integer:
+    output("%"PRId32"", argidx);
+    break;
+  }
+}
+
+void print_rule_atom (rule_atom_t *ratom, bool neg, var_entry_t **vars,
+		      samp_table_t *table, int indent) {
+  pred_table_t *pred_table = &table->pred_table;
+  const_table_t *const_table = &table->const_table;
+  int32_t arity, k;
+
+  arity = atom_arity(ratom, pred_table);
+  if (ratom->builtinop != 0 && arity == 2) {
+    // Infix
+    if (neg) output("(");
+    print_rule_atom_arg(&ratom->args[0], vars, const_table);
+    output(" %s ", builtinop_string(ratom->builtinop));
+    print_rule_atom_arg(&ratom->args[1], vars, const_table);
+    if (neg) output(")");
+  } else {
+    // Prefix
+    if (ratom->builtinop == 0) {
+      output("%s", pred_name(ratom->pred, pred_table));
+    } else {
+      output("%s", builtinop_string(ratom->builtinop));
+    }
+    for (k = 0; k < arity; k++) {
+      k==0 ? output("(") : output(", ");
+      print_rule_atom_arg(&ratom->args[k], vars, const_table);
+    }
+    output(")");
+  }
+}
+
 void print_rule (samp_rule_t *rule, samp_table_t *table, int indent) {
-  pred_table_t *pred_table = &(table->pred_table);
-  const_table_t *const_table = &(table->const_table);
   rule_literal_t *lit;
-  samp_atom_t *atom;
-  int32_t j, k, argidx, pred_idx;
+  int32_t j;
 
   if (rule->num_vars > 0) {
     for(j = 0; j < rule->num_vars; j++) {
@@ -464,21 +530,7 @@ void print_rule (samp_rule_t *rule, samp_table_t *table, int indent) {
     j==0 ? output("   ") : output(" | ");
     lit = rule->literals[j];
     if (lit->neg) output("~");
-    atom = lit->atom;
-    pred_idx = atom->pred;
-    output("%s", pred_name(pred_idx, pred_table));
-    for(k = 0; k < pred_arity(pred_idx, pred_table); k++) {
-      k==0 ? output("(") : output(", ");
-      argidx = atom->args[k];
-      if(argidx < 0) {
-	// Must be a variable - look it up in the vars
-	output("%s", rule->vars[-(argidx + 1)]->name);
-      } else {
-	// Look it up in the const_table
-	output("%s", const_table->entries[argidx].name);
-      }
-    }
-    output(")");
+    print_rule_atom(lit->atom, lit->neg, rule->vars, table, indent);
   }
 }
 

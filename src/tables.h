@@ -106,14 +106,21 @@ typedef struct samp_clause_s {
 
 
 // An atom has a predicate symbol and an array of the corresponding arity.
-// Note that to get the arity, the pred_table must be available.
+// Note that to get the arity, the pred_table must be available unless the
+// predicate is builtin.
 typedef struct samp_atom_s {
   int32_t pred;
   int32_t args[0];
 } samp_atom_t;
 
+typedef struct input_sortdef_s {
+  int32_t lower_bound;
+  int32_t upper_bound;
+} input_sortdef_t;
+
 typedef struct input_atom_s {
   char *pred;
+  int32_t builtinop;
   char **args;
 } input_atom_t;
 
@@ -165,6 +172,8 @@ typedef struct sort_entry_s {
   int32_t cardinality; //number of elements in sort i
   char *name;//print name of the sort
   int32_t *constants; //array of constants in the given sort
+  int32_t lower_bound; // lower and upper bounds for integer sorts
+  int32_t upper_bound; //    (could be a union type)
   int32_t *subsorts; // array of subsort indices
   int32_t *supersorts; // array of supersort indices
 } sort_entry_t;
@@ -278,9 +287,30 @@ typedef struct clause_table_s {
 // and the literal list is a list of actual literals, in order to reference
 // the variables.
 
+typedef enum {constant, variable, integer} arg_kind_t;
+
+// In a rule, an argument may be:
+//  a constant (value is an index into the const_table)
+//  a variable (value is an index into the variable array of the associated rule)
+//  an integer (value is the integer)
+// When the rule is instantiated, a samp_atom_t is created, which only has constants
+// and integers - these are determined by the sorts.
+// We can't do this for rules, as this would not allow a distinction between
+// integers and variables.
+typedef struct rule_atom_arg_s {
+  arg_kind_t kind;
+  int32_t value;
+} rule_atom_arg_t;
+
+typedef struct rule_atom_s {
+  int32_t pred;
+  int32_t builtinop;
+  rule_atom_arg_t *args;
+} rule_atom_t;
+
 typedef struct rule_literal_s {
   bool neg;
-  samp_atom_t *atom;
+  rule_atom_t *atom;
 } rule_literal_t;
 
 typedef struct samp_rule_s {
@@ -375,6 +405,8 @@ extern void reset_sort_table(sort_table_t *sort_table);
 
 extern void add_sort(sort_table_t *sort_table, char *name);
 
+void add_sortdef(sort_table_t *sort_table, char *sort, input_sortdef_t *sortdef);
+
 extern void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort);
 
 extern int32_t add_pred(pred_table_t *pred_table, char *name, bool evidence,
@@ -459,4 +491,14 @@ extern int32_t add_const(char *name, char * sort_name, samp_table_t *table);
 
 extern char *const_name(int32_t const_index, const_table_t *const_table);
 
+// The builtin binary predicates
+
+extern char* builtinop_string (int32_t bop);
+
+extern int32_t builtin_arity (int32_t op);
+
+extern int32_t atom_arity(rule_atom_t *atom, pred_table_t *pred_table);
+
+extern bool call_builtin (int32_t bop, int32_t arity, int32_t *args);
+  
 #endif /* __TABLES_H */

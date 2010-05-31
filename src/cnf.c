@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <float.h>
+#include <ctype.h>
 #include "memalloc.h"
 #include "utils.h"
 #include "parser.h"
@@ -31,28 +32,45 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
   pred_table_t *pred_table = &samp_table.pred_table;
   sort_table_t *sort_table = &samp_table.sort_table;
   const_table_t *const_table = &samp_table.const_table;
-  int32_t i, j, num_args, pred_val, pred_idx, const_idx, *psig, vsig, subsig, vlen;
+  sort_entry_t *sort_entry;
+  int32_t i, j, num_args, pred_val, pred_idx, const_idx, *psig, vsig,
+    subsig, vlen, intval;
   char *pred, *cname;
-  samp_atom_t *atom;
+  rule_atom_arg_t *args;
+  rule_atom_t *atom;
   rule_literal_t *lit;
   
   pred = iatom->pred;
   // Get number of args
   for (num_args = 0; iatom->args[num_args] != NULL; num_args++) {}
   // check if we've seen the predicate before and complain if not.
-  pred_val = pred_index(pred, pred_table);
-  if (pred_val == -1) {
-    mcsat_err("Predicate %s not declared", pred);
-    return NULL;
+  if (iatom->builtinop == 0) {
+    pred_val = pred_index(pred, pred_table);
+    if (pred_val == -1) {
+      mcsat_err("Predicate %s not declared", pred);
+      return NULL;
+    }
+    pred_idx = pred_val_to_index(pred_val);
+    if (pred_arity(pred_idx, pred_table) != num_args) {
+      mcsat_err("Wrong number of args");
+      return NULL;
+    }
+    psig = pred_signature(pred_idx, pred_table);
+  } else {
+    // A builtinop
+    pred_idx = INT32_MAX;  // Make it unusable
+    if (builtin_arity(iatom->builtinop) != num_args) {
+      mcsat_err("Wrong number of args");
+      return NULL;
+    }
+    // We let the other atoms in the rule determine variable signatures
+    psig = NULL;
   }
-  pred_idx = pred_val_to_index(pred_val);
-  if (pred_arity(pred_idx, pred_table) != num_args) {
-    mcsat_err("Wrong number of args");
-    return NULL;
-  }
-  atom = (samp_atom_t *) safe_malloc((num_args + 1) * sizeof(samp_atom_t));
+  args = (rule_atom_arg_t *) safe_malloc(num_args * sizeof(rule_atom_arg_t));
+  atom = (rule_atom_t *) safe_malloc(sizeof(rule_atom_t));
+  atom->args = args;
   atom->pred = pred_idx;
-  psig = pred_signature(pred_idx, pred_table);
+  atom->builtinop = iatom->builtinop;
   vlen = vars_len(vars);
   for (i = 0; i < num_args; i++) {
     for (j = 0; j < vlen; j++) {
@@ -61,63 +79,89 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
       }
     }
     if (j < vlen) {
-      // Variables are negated indices into the var array, which will match
-      // the names_buffer.  Need to add one in order not to hit zero.
+      // We have a variable.  Variables are tagged in rule_atom_arg_t 
       // Check the signature, and adjust to the least common supersort
       vsig = vars[j]->sort_index;
-      if (vsig == -1) {
-	vars[j]->sort_index = psig[i];
-      } else {
-	subsig = greatest_common_subsort(vsig, psig[i], sort_table);
-	if (subsig != vsig) {
-	  if (subsig == -1) {
-	    mcsat_err("Variable %s used with incompatible sorts %s and %s",
-		      vars[j]->name, sort_table->entries[vsig].name,
-		      sort_table->entries[psig[i]].name);
-	    return NULL;
-	}
-	vars[j]->sort_index = subsig;
-	}
-      }
-      // Variables are negated indices into the var array, which will match
-      // the names_buffer.  Need to add one in order not to hit zero.
-      atom->args[i] = -(j + 1);
-    } else {
-      // Must be a constant
-      cname = iatom->args[i];
-      // See if constant is known
-      const_idx = stbl_find(&const_table->const_name_index, cname);
-      if (const_idx == -1) {
-	if (!strict_constants()) {
-	  // Add the constant - note that the sort is determined by the
-	  // predicate, and may be wrong if psig[i] has supersorts -
-	  // warn in such a case.
-	  add_const_internal(cname, psig[i], &samp_table);
-	  if (sort_table->entries[psig[i]].supersorts != NULL) {
-	    printf("Warning: constant %s assigned to subsort %s\n",
-		   cname, sort_table->entries[psig[i]].name);
-	  }
-	  const_idx = stbl_find(&const_table->const_name_index, cname);
+      if (psig != 0) {
+	if (vsig == -1) {
+	  vars[j]->sort_index = psig[i];
 	} else {
-	  mcsat_err("Constant %s not previously declared\n", cname);
+	  subsig = greatest_common_subsort(vsig, psig[i], sort_table);
+	  if (subsig != vsig) {
+	    if (subsig == -1) {
+	      mcsat_err("Variable %s used with incompatible sorts %s and %s",
+			vars[j]->name, sort_table->entries[vsig].name,
+			sort_table->entries[psig[i]].name);
+	      return NULL;
+	    }
+	    vars[j]->sort_index = subsig;
+	  }
+	}
+      }
+      atom->args[i].kind = variable;
+      atom->args[i].value = j;
+    } else {
+      // Must be a constant or integer
+      cname = iatom->args[i];
+      // May not have a signature, if it is a builtin (e.g., = or /=)
+      if (psig != NULL) {
+	sort_entry = &sort_table->entries[psig[i]];
+      }
+      char *p;
+      for (p = cname; isdigit(*p); p++);
+      if (*p == '\0') {
+	// Have an integer - check that it is correct
+	if (psig == NULL || sort_entry->constants == NULL) {
+	  // Maybe an integer
+	  intval = atoi(cname);
+	  atom->args[i].kind = integer;
+	  atom->args[i].value = atoi(cname);
+	} else {
+	  mcsat_err("Have integer where %s expected", sort_entry->name);
 	  return NULL;
 	}
       } else {
-	sort_entry_t *sort_entry = &samp_table.sort_table.entries[psig[i]];
-	bool foundit = false;
-	for (j = 0; j < sort_entry->cardinality; j++) {
-	  if (sort_entry->constants[j] == const_idx) {
-	    foundit = true;
-	    break;
+	// See if constant is known
+	const_idx = stbl_find(&const_table->const_name_index, cname);
+	if (const_idx == -1) {
+	  if (!strict_constants()) {
+	    // Add the constant - note that the sort is determined by the
+	    // predicate, and may be wrong if psig[i] has supersorts -
+	    // warn in such a case.
+	    add_const_internal(cname, psig[i], &samp_table);
+	    if (sort_table->entries[psig[i]].supersorts != NULL) {
+	      printf("Warning: constant %s assigned to subsort %s\n",
+		     cname, sort_table->entries[psig[i]].name);
+	    }
+	    const_idx = stbl_find(&const_table->const_name_index, cname);
+	  } else {
+	    mcsat_err("Constant %s not previously declared\n", cname);
+	    return NULL;
+	  }
+	} else {
+	  if (psig != NULL) {
+	    if (sort_entry->constants == NULL) {
+	      mcsat_err("Expected an integer of sort %s, but given %s",
+			sort_entry->name, cname);
+	      return NULL;
+	    }
+	    bool foundit = false;
+	    for (j = 0; j < sort_entry->cardinality; j++) {
+	      if (sort_entry->constants[j] == const_idx) {
+		foundit = true;
+		break;
+	      }
+	    }
+	    if (!foundit) {
+	      mcsat_err("Sort error: constant %s of sort %s\n does not match pred %s arg %"PRId32" sort %s\n",
+			cname, const_sort_name(const_idx,&samp_table), pred, i+1, sort_entry->name);
+	      return NULL;
+	    }
 	  }
 	}
-	if (!foundit) {
-	  mcsat_err("Sort error: constant %s of sort %s\n does not match pred %s arg %"PRId32" sort %s\n",
-		    cname, const_sort_name(const_idx,&samp_table), pred, i+1, sort_entry->name);
-	  return NULL;
-	}
+	atom->args[i].kind = constant;
+	atom->args[i].value = const_idx;
       }
-      atom->args[i] = const_idx;
     }
   }
   //print_atom(atom, &samp_table);
@@ -257,11 +301,11 @@ rule_literal_t ***cnf_pos(input_fmla_t *fmla, var_entry_t **vars) {
 			 cnf_union(cnf_neg(cfmla->arg1, vars),
 				   cnf_pos(cfmla->arg2, vars)));
     } else if (op == IFF) {
-      // CNF(A iff B) = CNF(A /\ B) X CNF(not(A) /\ not(B))
-      return cnf_product(cnf_union(cnf_pos(cfmla->arg1, vars),
-				   cnf_pos(cfmla->arg2, vars)),
-			 cnf_union(cnf_neg(cfmla->arg1, vars),
-				   cnf_neg(cfmla->arg2, vars)));
+      // CNF(A iff B) = CNF(A X not(B)) /\ CNF(not(A) X B)
+      return cnf_union(cnf_product(cnf_pos(cfmla->arg1, vars),
+				   cnf_neg(cfmla->arg2, vars)),
+		       cnf_product(cnf_neg(cfmla->arg1, vars),
+				   cnf_pos(cfmla->arg2, vars)));
     } else {
       mcsat_err("cnfpos error: op %"PRId32" unexpected\n", op);
       return NULL;
@@ -328,7 +372,7 @@ var_entry_t **copy_variables(var_entry_t **vars) {
 // Sets the variables in the clause, removing those not mentioned
 void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
   pred_table_t *pred_table = &samp_table.pred_table;
-  samp_atom_t *atom;
+  rule_atom_t *atom;
   var_entry_t **cvars;
   int32_t i, j, numvars, arity, vidx, delta, *mapping;
   bool usedvar, unusedvar;
@@ -344,12 +388,11 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
   // Now go through the literals, untagging the found variables
   for (i = 0; i < clause->num_lits; i++) {
     atom = clause->literals[i]->atom;
-    arity = pred_arity(atom->pred, pred_table);
+    arity = atom_arity(atom, pred_table);
     // Loop through the args of the atom
     for (j = 0; j < arity; j++) {
-      if (atom->args[j] < 0) {
-	// We have a variable - vidx is the index into vars
-	vidx = -(atom->args[j] + 1);
+      if (atom->args[j].kind == variable) {
+	vidx = atom->args[j].value;
 	if (cvars[vidx]->sort_index < 0) {
 	  cvars[vidx]->sort_index = -(cvars[vidx]->sort_index + 1);
 	}
@@ -385,13 +428,15 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
       safe_realloc(cvars, (numvars-delta) * sizeof(var_entry_t *));
       for (i = 0; i < clause->num_lits; i++) {
 	atom = clause->literals[i]->atom;
-	arity = pred_arity(atom->pred, pred_table);
+	arity = atom->builtinop == 0
+	  ? pred_arity(atom->pred, pred_table)
+	  : builtin_arity(atom->builtinop);
 	// Loop through the args of the atom
 	for (j = 0; j < arity; j++) {
-	  if (atom->args[j] < 0) {
+	  if (atom->args[j].kind == variable) {
 	    // We have a variable - vidx is the index into vars
-	    vidx = -(atom->args[j] + 1);
-	    atom->args[j] = -(mapping[vidx] + 1);
+	    vidx = atom->args[j].value;
+	    atom->args[j].value = mapping[vidx];
 	  }
 	}
       }
@@ -421,13 +466,14 @@ bool clause_vars_equal(int32_t nvars, var_entry_t **v1, var_entry_t **v2) {
   return true;
 }
 
-bool samp_atoms_equal(samp_atom_t *a1, samp_atom_t *a2) {
+bool rule_atoms_equal(rule_atom_t *a1, rule_atom_t *a2) {
   int32_t i, arity;
-  
-  if (a1->pred == a2->pred) {
-    arity = pred_arity(a1->pred, &samp_table.pred_table);
+
+  if (a1->builtinop == a2->builtinop && a1->pred == a2->pred) {
+    arity = atom_arity(a1, &samp_table.pred_table);
     for (i = 0; i < arity; i++) {
-      if (a1->args[i] != a2->args[i]) {
+      if ((a1->args[i].kind != a2->args[i].kind)
+	  || (a1->args[i].value != a2->args[i].value)) {
 	return false;
       }
     }
@@ -437,9 +483,14 @@ bool samp_atoms_equal(samp_atom_t *a1, samp_atom_t *a2) {
   }
 }
 
+bool lits_resolve(rule_literal_t *l1, rule_literal_t *l2) {
+  return (l1->neg != l2->neg)
+    && rule_atoms_equal(l1->atom, l2->atom);
+}
+
 bool lits_equal(rule_literal_t *l1, rule_literal_t *l2) {
   return (l1->neg == l2->neg)
-    && samp_atoms_equal(l1->atom, l2->atom);
+    && rule_atoms_equal(l1->atom, l2->atom);
 }
 
 bool clause_lits_equal(int32_t nlits, rule_literal_t **l1, rule_literal_t **l2) {
@@ -501,6 +552,7 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
 
   if (all_clauses_involve_indirects(lits) != -1) {
     mcsat_err("cnf error: add should include at least one indirect atom in each clause.\n");
+    return;
   }
   
   if (formula->vars == NULL) {
@@ -511,7 +563,9 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
       clause_buffer_resize(num_lits);
       for (j = 0; j < num_lits; j++) {
 	lit = lits[i][j];
-	atom_idx = add_internal_atom(&samp_table, lit->atom);
+	samp_atom_t *satom = rule_atom_to_samp_atom(lit->atom, pred_table);
+	atom_idx = add_internal_atom(&samp_table, satom, true);
+	free_samp_atom(satom);
 	clause_buffer.data[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
       }
       add_internal_clause(&samp_table, clause_buffer.data, num_lits, weight);
@@ -552,8 +606,10 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
 	rule_table->num_rules++;
 	all_rule_instances(current_rule, &samp_table);
 	for (j = 0; j < num_lits; j++) {
-	  int32_t pred = lits[i][j]->atom->pred;
-	  add_rule_to_pred(pred_table, pred, current_rule);
+	  if (lits[i][j]->atom->builtinop == 0) {
+	    int32_t pred = lits[i][j]->atom->pred;
+	    add_rule_to_pred(pred_table, pred, current_rule);
+	  }
 	}
       } else {
 	mcsat_warn("Rule was seen before, adding weights\n");

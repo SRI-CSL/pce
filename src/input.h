@@ -23,6 +23,7 @@ typedef struct input_pred_decl_s {
 
 typedef struct input_sort_decl_s {
   char *name;
+  input_sortdef_t *sortdef; // Holds intervals
 } input_sort_decl_t;
 
 typedef struct input_subsort_decl_s {

@@ -276,3 +276,15 @@ int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_t
   }
 }
       
+samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, pred_table_t *pred_table) {
+  int32_t i;
+  int32_t arity = ratom->builtinop == 0
+    ? pred_arity(ratom->pred, pred_table)
+    : builtin_arity(ratom->builtinop);
+  samp_atom_t *satom = (samp_atom_t *) safe_malloc((arity+1) * sizeof(int32_t));
+  satom->pred = ratom->pred;
+  for (i = 0; i < arity; i++) {
+    satom->args[i] = ratom->args[i].value;
+  }
+  return satom;
+}

@@ -167,7 +167,7 @@ int32_t choose_random_atom(samp_table_t *table){
   //assert(valid_table(table));
 
   array_hmap_pair_t *atom_map;
-  atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
+  atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
 				  arity + 1,
 				  (int32_t *) atom);
   //assert(valid_table(table));
@@ -178,7 +178,16 @@ int32_t choose_random_atom(samp_table_t *table){
       printf("\n");
       fflush(stdout);
     }
-    return activate_atom(table, atom);
+    activate_atom(table, atom);
+    atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
+				    arity + 1,
+				    (int32_t *) atom);
+    if (atom_map == NULL) {
+      printf("Something is wrong in choose_random_atom\n");
+      return 0;
+    } else {
+      return atom_map->val;
+    }
   } else {
     return atom_map->val;
   }
@@ -204,16 +213,17 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
     /*
      * Simulated annealing step
      */
-    printf("Doing simulated annealing step\n");
+    //printf("Doing simulated annealing step, num_unsat_clauses = %d\n",
+    //       clause_table->num_unsat_clauses);
     // choose a random atom
     //assert(valid_table(table));
     var = choose_random_atom(table);
     //var = choose_unfixed_variable(assignment, atom_table->num_vars,
     //			  atom_table->num_unfixed_vars);
     //assert(valid_table(table));
-    if (var == -1
-	|| fixed_tval(assignment[var])
-	) return;
+    if (var == -1 || fixed_tval(assignment[var]) ) {
+      return;
+    }
     cost_flip_unfixed_variable(table, &dcost, var);
     //assert(valid_table(table));
     if (dcost < 0){
@@ -230,7 +240,6 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
     /*
      * Walksat step
      */
-    printf("Doing walksat step\n");
     //choose an unsat clause
     clause_position = random_uint(clause_table->num_unsat_clauses);
     link = clause_table->unsat_clauses;

@@ -254,6 +254,7 @@ array_hmap_pair_t *array_size_hmap_get(array_hmap_t *hmap, int32_t size,
   while (d->key != ARRAY_HASH_EMPTY_KEY) {
     j ++;
     j &= mask;
+    d = hmap->data + j;
     if (jhash == d->hash && size == d->length && array_size_equal(size, d->key, k)) return d;
   }
 

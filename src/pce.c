@@ -949,7 +949,7 @@ void pce_install_rule(ICLTerm *Formula, double weight) {
       clause_buffer_resize(clauses[i]->num_lits);
       for (j = 0; j < clauses[i]->num_lits; j++) {
 	lit = clauses[i]->literals[j];
-	atom_idx = add_internal_atom(&samp_table, lit->atom);
+	atom_idx = add_internal_atom(&samp_table, lit->atom, true);
 	clause_buffer.data[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
       }
       add_internal_clause(&samp_table, clause_buffer.data,

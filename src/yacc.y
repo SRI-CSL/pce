@@ -45,12 +45,83 @@ char **copy_yyargs() {
   return arg;
 }  
 
-input_atom_t *yy_atom (char *pred, char **args) {
+bool yy_check_nat(char *str){
+  int32_t i;
+  for(i=0; str[i] != '\0'; i++){
+    if (! isdigit(str[i])) {
+      yyerror("Integer expected");
+      return false;
+    }
+  }
+  return true;
+}
+
+bool yy_check_int(char *str) {
+  if (str[0] == '+' || str[0] == '-') {
+    return yy_check_nat(&str[1]);
+  } else {
+    return yy_check_nat(str);
+  }
+}
+
+bool yy_check_float(char *str) {
+  bool have_digit = false;
+  bool have_dot = false;
+  int32_t i;
+  if (str[0] == '.' || str[0] == '+' || str[0] == '-' || isdigit(str[0])) {
+    if (str[0] == '.') {
+      have_dot = true;
+    } else if (isdigit(str[0])) {
+      have_digit = true;
+    }
+    for(i=1; str[i] != '\0'; i++){
+      if (isdigit(str[i])){
+	have_digit = true;
+      } else if (str[i] == '.') {
+	if (have_dot) {
+	  yyerror("Number has two decimal points");
+	  return false;
+	}
+	else
+	  have_dot = true;
+      } else {
+	yyerror("Invalid floating point number");
+	return false;
+      }
+    }
+  } else {
+    yyerror("Invalid floating point number");
+    return false;
+  }
+  return true;
+}
+
+input_sortdef_t *yy_sortdef(char *lbnd, char *ubnd) {
+  input_sortdef_t *sdef;
+
+  if (yy_check_int(lbnd)) {
+    if (yy_check_int(ubnd)) {
+      sdef = (input_sortdef_t *) safe_malloc(sizeof(input_sortdef_t));
+      sdef->lower_bound = atoi(lbnd);
+      sdef->upper_bound = atoi(ubnd);
+      return sdef;
+    } else {
+      yyerror("upper bound must be an integer");
+      return NULL;
+    }
+  } else {
+    yyerror("lower bound must be an integer");
+    return NULL;
+  }
+}
+
+input_atom_t *yy_atom (char *pred, char **args, int32_t builtinop) {
   input_atom_t *atom;
   
   atom = (input_atom_t *) safe_malloc(sizeof(input_atom_t));
   atom->pred = pred;
   atom->args = args;
+  atom->builtinop = builtinop;
   return atom;
 };
 
@@ -148,57 +219,14 @@ input_clause_t *yy_clause(char **vars, input_literal_t **lits) {
 int yylex (void);
 input_command_t input_command;
 
-bool yy_check_int(char *str){
-  int32_t i;
-  for(i=0; str[i] != '\0'; i++){
-    if (! isdigit(str[i])) {
-      yyerror("Integer expected");
-      return false;
-    }
-  }
-  return true;
-}
-
-bool yy_check_float(char *str) {
-  bool have_digit = false;
-  bool have_dot = false;
-  int32_t i;
-  if (str[0] == '.' || str[0] == '+' || str[0] == '-' || isdigit(str[0])) {
-    if (str[0] == '.') {
-      have_dot = true;
-    } else if (isdigit(str[0])) {
-      have_digit = true;
-    }
-    for(i=1; str[i] != '\0'; i++){
-      if (isdigit(str[i])){
-	have_digit = true;
-      } else if (str[i] == '.') {
-	if (have_dot) {
-	  yyerror("Number has two decimal points");
-	  return false;
-	}
-	else
-	  have_dot = true;
-      } else {
-	yyerror("Invalid floating point number");
-	return false;
-      }
-    }
-  } else {
-    yyerror("Invalid floating point number");
-    return false;
-  }
-  return true;
-}
-
   void yy_command(int kind, input_decl_t *decl) {
     input_command.kind = kind;
     //input_command.decl = decl;
   };
-
-  void yy_sort_decl (char *name) {
+  void yy_sort_decl (char *name, input_sortdef_t *sortdef) {
     input_command.kind = SORT;
     input_command.decl.sort_decl.name = name;
+    input_command.decl.sort_decl.sortdef = sortdef;
   };
   void yy_subsort_decl (char *subsort, char *supersort) {
     input_command.kind = SUBSORT;
@@ -281,7 +309,7 @@ void yy_ask_fdecl (input_formula_t *formula, char **threshold_numresult) {
     }
     if (threshold_numresult[1] == NULL) {
       input_command.decl.ask_fdecl.numresults = 0; // Zero means no limit
-    } else if (yy_check_int(threshold_numresult[1])) {
+    } else if (yy_check_nat(threshold_numresult[1])) {
       input_command.decl.ask_fdecl.numresults = atoi(threshold_numresult[1]);
     } else {
       free_formula(formula);
@@ -322,7 +350,7 @@ void yy_ask_fdecl (input_formula_t *formula, char **threshold_numresult) {
 //     safe_free(allstr);
 //     if (numsamp == NULL) {
 //       input_command.decl.ask_decl.num_samples = DEFAULT_MAX_SAMPLES;
-//     } else if (yy_check_int(numsamp)) {
+//     } else if (yy_check_nat(numsamp)) {
 //       input_command.decl.ask_decl.num_samples = atoi(numsamp);
 //     } else {
 //       free_clause(clause);
@@ -357,7 +385,7 @@ void yy_mcsat_params_decl (char **params) {
   input_command.decl.mcsat_params_decl.num_params = arglen;
   // max_samples
   if (arglen > 0 && strcmp(params[0], "") != 0) {
-    if (yy_check_int(params[0])) {
+    if (yy_check_nat(params[0])) {
       input_command.decl.mcsat_params_decl.max_samples = atoi(params[0]);
     }
   } else {
@@ -404,7 +432,7 @@ void yy_mcsat_params_decl (char **params) {
   }
   // max_flips
   if (arglen > 4 && strcmp(params[4], "") != 0) {
-    if (yy_check_int(params[4])) {
+    if (yy_check_nat(params[4])) {
       input_command.decl.mcsat_params_decl.max_flips = atoi(params[4]);
     }
   } else {
@@ -412,7 +440,7 @@ void yy_mcsat_params_decl (char **params) {
   }
   // max_extra_flips
   if (arglen > 5 && strcmp(params[5], "") != 0) {
-    if (yy_check_int(params[5])) {
+    if (yy_check_nat(params[5])) {
       input_command.decl.mcsat_params_decl.max_extra_flips = atoi(params[5]);
     }
   } else {
@@ -490,6 +518,18 @@ void yy_mcsat_params_decl (char **params) {
 %left XOR
 %left AND
 %nonassoc NOT
+%nonassoc EQ
+%nonassoc NEQ
+%nonassoc LE
+%nonassoc LT
+%nonassoc GE
+%nonassoc GT
+%nonassoc DDOT
+%token PLUS
+%token MINUS
+%token TIMES
+%token DIV
+%token REM
 %token NAME
 %token NUM
 %token STRING
@@ -499,6 +539,7 @@ void yy_mcsat_params_decl (char **params) {
   bool bval;
   char *str;
   char **strs;
+  input_sortdef_t *sortdef;
   input_fmla_t *fmla;
   input_formula_t *formula;
   input_clause_t *clause;
@@ -508,8 +549,9 @@ void yy_mcsat_params_decl (char **params) {
   int32_t ival;
 }
 
-%type <str> arg NAME NUM STRING addwt oarg oname onum retractarg
+%type <str> arg NAME NUM STRING addwt oarg oname retractarg
 %type <strs> arguments variables oarguments onum2
+%type <sortdef> sortdef interval
 %type <formula> formula
 %type <fmla> fmla
 %type <clause> clause
@@ -517,7 +559,7 @@ void yy_mcsat_params_decl (char **params) {
 %type <lits> literals
 %type <atom> atom
 %type <bval> witness
-%type <ival> cmd table resetarg
+%type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM
 
 %locations
 
@@ -553,7 +595,7 @@ command: decl enddecl {if (yyerrflg) {yyerrflg=false; YYABORT;} else {YYACCEPT;}
 
 enddecl: ';' | QUIT;
 
-decl: SORT NAME {yy_sort_decl($2);}
+decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | SUBSORT NAME NAME {yy_subsort_decl($2, $3);}
     | PREDICATE atom witness {yy_pred_decl($2, $3);}
     | CONST arguments ':' NAME {yy_const_decl($2, $4);}
@@ -585,6 +627,11 @@ cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | RESET {$$ = RESET;} | RETRACT {$$ = RETRACT;} | DUMPTABLE {$$ = DUMPTABLE;}
      | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
      ;
+
+sortdef: /* empty */ {$$ = NULL;}
+       | EQ interval {$$ = $2;} ;
+
+interval: '[' NUM DDOT NUM ']' {$$ = yy_sortdef($2, $4);} ;
 
 table: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
        | SORT {$$ = SORT;} | PREDICATE {$$ = PREDICATE;} | ATOM {$$ = ATOM;}
@@ -626,8 +673,18 @@ literal: atom {$$ = yy_literal(0,$1);}
        | NOT atom {$$ = yy_literal(1,$2);}
        ;
 
-atom: NAME '(' arguments ')' {$$ = yy_atom($1, $3);}
+atom: NAME '(' arguments ')' {$$ = yy_atom($1, $3, 0);}
+    | arg bop arg {pvector_push(&yyargs,$1);
+                   pvector_push(&yyargs,$3);
+                   $$ = yy_atom("", copy_yyargs(), $2);}
+    | preop '(' arguments ')' {$$ = yy_atom("", $3, $1);}
     ;
+
+bop: EQ {$$ = EQ;} | NEQ {$$ = NEQ;} | LT {$$ = LT;} | LE {$$ = LE;}
+   | GT {$$ = GT;} | GE {$$ = GE;} ;
+
+preop: PLUS {$$ = PLUS;} | MINUS {$$ = MINUS;} | TIMES {$$ = TIMES;}
+     | DIV {$$ = DIV;} | REM {$$ = REM;} ;
 
 oarguments: oargs {$$ = copy_yyargs();};
 
@@ -660,7 +717,7 @@ onum2: /* empty */ {$$=NULL;}
      | NUM NUM {pvector_push(&yyargs, $1); pvector_push(&yyargs, $2);
                 $$ = copy_yyargs();}
 
-onum: /* empty */ {$$=NULL;} | NUM;
+//onum: /* empty */ {$$=NULL;} | NUM;
 
 %%
 
@@ -719,10 +776,15 @@ int skip_white_space_and_comments (void) {
 }
 
 int yylex (void) {
-  int c;
+  int c, cc;
   int32_t i;
   char *nstr;
-  
+  static bool ddot_wait = false;
+
+  if (ddot_wait) {
+    ddot_wait = false;
+    return DDOT;
+  }
   c = skip_white_space_and_comments();
   yylloc.first_line = yylloc.last_line;
   yylloc.first_column = yylloc.last_column;
@@ -740,25 +802,48 @@ int yylex (void) {
       if (! have_digit && isdigit(c))
 	have_digit = 1;
       if (c == '.') {
-	if (have_dot)
+	if (have_dot) {
 	  yyerror("Number has two decimal points");
-	else
+	} else {
+	  // Do we have '..'?
+	  if ((cc = yygetc(parse_input)) == '.') {
+	    if (i == 0) {
+	      return DDOT;
+	    } else {
+	      ddot_wait = true;
+	      break;
+	    }
+	  } else {
+	    yyungetc(cc, parse_input);
+	  }
 	  have_dot = 1;
+	}
       };
       yystrbuf[i++] = c;
       c = yygetc(parse_input);
       ++yylloc.last_column;
     } while (c != EOF && (isdigit(c) || c == '.'));
     yystrbuf[i] = '\0';
-    yyungetc(c, parse_input);
-    --yylloc.last_column;
+    if (! ddot_wait) {
+      yyungetc(c, parse_input);
+      --yylloc.last_column;
+    }
     yylval.str = yystrbuf;
-    if (! have_digit)
-      yyerror("Malformed number - '.', '+', '-' must have following digits");
     nstr = (char *) safe_malloc((strlen(yylval.str)+1) * sizeof(char));
     strcpy(nstr, yylval.str);
     yylval.str = nstr;
-    return NUM;
+    if (! have_digit) {
+      if (strlen(yylval.str) == 1) {
+	switch (yylval.str[0]) {
+	case '+': return PLUS;
+	case '-': return MINUS;
+	}
+      }
+      safe_free(nstr);
+      yyerror("Syntax error: '.', '+', '-' must be followed by parens or digits");
+    } else {
+      return NUM;
+    }
   }
   if (isalpha(c)) {
     do {
@@ -843,20 +928,49 @@ int yylex (void) {
     yylval.str = nstr;
     return NAME;
   }
-  if (c == '=') {
+  // not isalpha(c)
+  if (c ==  '=') {
     c = yygetc(parse_input);
     if (c == '>') {
       return IMPLIES;
     } else {
       yyungetc(c, parse_input);
+      return EQ;
+    }
+  }
+  if (c == '<') {
+    if ((cc = yygetc(parse_input)) == '=') {
+      return LE;
+    } else {
+      yyungetc(cc, parse_input);
+      return LT;
+    }
+  }
+  if (c == '>') {
+    if ((cc = yygetc(parse_input)) == '=') {
+      return GE;
+    } else {
+      yyungetc(cc, parse_input);
+      return GT;
+    }
+  }
+  if (c == '/') {
+    if ((cc = yygetc(parse_input)) == '=') {
+      return NEQ;
+    } else {
+      yyungetc(cc, parse_input);
       --yylloc.last_column;
       nstr = (char *) safe_malloc(2 * sizeof(char));
-      nstr[0] = '=';
-      nstr[1] = '\0';
-      strcpy(nstr, yylval.str);
+      strcpy(nstr, "/");
       yylval.str = nstr;
-      return NAME;
+      return DIV;
     }
+  }
+  if (c == '*') {
+    return TIMES;
+  }
+  if (c == '%') {
+    return REM;
   }
   if (c == '\"') {
     // At the moment, escapes not recognized

@@ -30,7 +30,7 @@ extern void atom_buffer_resize(int32_t arity);
 
 extern int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
 
-extern int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom);
+extern int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p);
 
 extern int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source);
 
@@ -93,7 +93,9 @@ extern void update_pmodel(samp_table_t *table);
 extern void empty_clause_lists(samp_table_t *table);
 
 extern void init_clause_lists(clause_table_t *clause_table);
-  
+
+extern void create_new_const_atoms(int32_t cidx, samp_table_t *table);
+
 extern void create_new_const_rule_instances(int32_t constidx,
 					    samp_table_t *table,
 					    int32_t atom_index);

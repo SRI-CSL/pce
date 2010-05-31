@@ -178,7 +178,9 @@ void free_atom(input_atom_t *atom) {
   int32_t i;
 
   i = 0;
-  safe_free(atom->pred);
+  if (atom->builtinop == 0) {
+    safe_free(atom->pred);
+  }
   while (atom->args[i] != NULL) {
     safe_free(atom->args[i]);
     i++;
@@ -252,8 +254,13 @@ void free_samp_atom(samp_atom_t *atom) {
   safe_free(atom);
 }
 
+void free_rule_atom(rule_atom_t *atom) {
+  safe_free(atom->args);
+  safe_free(atom);
+}
+
 void free_rule_literal(rule_literal_t *lit) {
-  free_samp_atom(lit->atom);
+  free_rule_atom(lit->atom);
   safe_free(lit);
 }
 
@@ -296,7 +303,7 @@ void show_help(int32_t topic) {
     output("\n\
 Type help followed by a command for details, e.g., 'help mcsat_params;'\n\n\
 Input grammar:\n\
- sort NAME ';'\n\
+ sort NAME [ '=' '[' INT '..' INT ']' ] ';'\n\
  subsort NAME NAME ';'\n\
  predicate ATOM [direct|indirect] ';'\n\
  const NAME++',' ':' NAME ';'\n\
@@ -325,7 +332,7 @@ predicates default to 'direct' (i.e., witness/observable)\n\
   }
   case SORT: {
     output("\n\
-sort NAME;\n\
+sort NAME [ = '[' INT .. INT ']' ];\n\
   declares NAME as a new sort\n\
 ");
     break;
@@ -528,6 +535,7 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
       int32_t cidx = const_index(cnst, const_table);
       // We don't invoke this in add_const, as this is eager.
       // Last arg says this is not lazy.
+      create_new_const_atoms(cidx, table);
       create_new_const_rule_instances(cidx, table, 0);
       create_new_const_query_instances(cidx, table, 0);
     }
@@ -617,6 +625,9 @@ extern bool read_eval(samp_table_t *table) {
       input_sort_decl_t decl = input_command.decl.sort_decl;
       cprintf(2, "Adding sort %s\n", decl.name);
       add_sort(sort_table, decl.name);
+      if (decl.sortdef != NULL) {
+	add_sortdef(sort_table, decl.name, decl.sortdef);
+      }
       break;
     }
     case SUBSORT: {

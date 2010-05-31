@@ -1,6 +1,8 @@
 #include <string.h>
 #include "memalloc.h"
 #include "utils.h"
+#include "parser.h"
+#include "print.h"
 #include "tables.h"
 #include "input.h"
 
@@ -53,6 +55,23 @@ void add_sort(sort_table_t *sort_table, char *name) {
     sort_table->num_sorts++;
     stbl_add(&(sort_table->sort_name_index), name, n);
   }
+}
+
+void add_sortdef(sort_table_t *sort_table, char *sort,
+		 input_sortdef_t *sortdef) {
+  int32_t sidx, lbnd, ubnd;
+  sort_entry_t *sentry;
+
+  sidx = stbl_find(&sort_table->sort_name_index, sort);
+  sentry = &sort_table->entries[sidx];
+  // Free up the constants array - it's not needed here
+  safe_free(sentry->constants);
+  sentry->constants = NULL;
+  lbnd = sortdef->lower_bound;
+  ubnd = sortdef->upper_bound;
+  sentry->lower_bound = lbnd;
+  sentry->upper_bound = ubnd;
+  sentry->cardinality = ubnd - lbnd + 1;
 }
 
 int32_t sort_name_index(char *name,
@@ -127,7 +146,7 @@ void add_subsort_consts_to_supersort(int32_t subidx, int32_t supidx,
       }
     }
     if (! foundit) {
-      // Note that this alao adds to the supersorts of supentry
+      // Note that this also adds to the supersorts of supentry
       add_const_to_sort(subentry.constants[i], supidx, sort_table);
     }
   }
@@ -1070,4 +1089,134 @@ bool valid_table(samp_table_t *table){
     return false;
   }
   return true;
+}
+
+bool eq (int32_t i, int32_t j) {
+  return i == j;
+}
+
+bool neq (int32_t i, int32_t j) {
+  return i != j;
+}
+
+bool lt (int32_t i, int32_t j) {
+  return i < j;
+}
+
+bool le (int32_t i, int32_t j) {
+  return i <= j;
+}
+
+bool gt (int32_t i, int32_t j) {
+  return i > j;
+}
+
+bool ge (int32_t i, int32_t j) {
+  return i >= j;
+}
+
+bool plusp (int32_t i, int32_t j, int32_t k) {
+  if ((i > 0 && j > 0 && j > INT32_MAX - i)
+      || (i < 0 && j < 0 && j < INT32_MIN - i)) {
+    // Overflow
+    return false;
+  } else {
+    return i + j == k;
+  }
+}
+
+bool minusp (int32_t i, int32_t j, int32_t k) {
+  return plusp(i, -j, k);
+}
+
+bool timesp (int32_t i, int32_t j, int32_t k) {
+  if ((i > 0 && j > 0 && (i > INT32_MAX / j || j > INT32_MAX / i))
+      || (i < 0 && j < 0 && (-i > INT32_MAX / -j || -j > INT32_MAX / -i))) {
+    // Overflow
+    return false;
+  } else {
+    return i * j == k;
+  }
+}
+
+bool divp (int32_t i, int32_t j, int32_t k) {
+  return j != 0 && i / j == k;
+}
+
+bool remp (int32_t i, int32_t j, int32_t k) {
+  return j != 0 && i % j == k;
+}
+
+bool (*builtin2[]) (int32_t x, int32_t y) = {eq, neq, lt, le, gt, ge};
+
+bool (*builtin3[]) (int32_t x, int32_t y, int32_t z) = {plusp, minusp, timesp, divp, remp};
+
+extern int32_t builtin_arity (int32_t op) {
+  switch (op) {
+  case EQ:
+  case NEQ:
+  case LT:
+  case LE:
+  case GT:
+  case GE:
+    return 2;
+  case PLUS:
+  case MINUS:
+  case TIMES:
+  case DIV:
+  case REM:
+    return 3;
+  default:
+    mcsat_err("Bad operator"); return 0;
+  }
+}
+
+extern bool call_builtin (int32_t op, int32_t arity, int32_t *args) {
+  switch (arity) {
+  case 2:
+    switch (op) {
+    case EQ: return (builtin2[0])(args[0], args[1]);
+    case NEQ: return (builtin2[1])(args[0], args[1]);
+    case LT: return (builtin2[2])(args[0], args[1]);
+    case LE: return (builtin2[3])(args[0], args[1]);
+    case GT: return (builtin2[4])(args[0], args[1]);
+    case GE: return (builtin2[5])(args[0], args[1]);
+    default: mcsat_err("Bad binary operator"); return true;
+    }
+  case 3:
+    switch (op) {
+    case PLUS: return (builtin3[0])(args[0], args[1], args[2]);
+    case MINUS: return (builtin3[1])(args[0], args[1], args[2]);
+    case TIMES: return (builtin3[2])(args[0], args[1], args[2]);
+    case DIV: return (builtin3[3])(args[0], args[1], args[2]);
+    case REM: return (builtin3[4])(args[0], args[1], args[2]);
+    default: mcsat_err("Bad operator"); return true;
+    }
+  default:
+    mcsat_err("Wrong number of args to builtin");
+    return true;
+  }
+}
+
+extern char* builtinop_string (int32_t op) {
+  switch (op) {
+  case EQ: return "=";
+  case NEQ: return "/=";
+  case LT: return "<";
+  case LE: return "<=";
+  case GT: return ">";
+  case GE: return ">=";
+  case PLUS: return "+";
+  case MINUS: return "-";
+  case TIMES: return "*";
+  case DIV: return "/";
+  case REM: return "%";
+  default: mcsat_err("Bad operator"); return "???";
+  }
+}
+
+extern int32_t atom_arity(rule_atom_t *atom, pred_table_t *pred_table) {
+  return atom->builtinop == 0
+    ? pred_arity(atom->pred, pred_table)
+    : builtin_arity(atom->builtinop);
 }
