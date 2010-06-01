@@ -321,12 +321,26 @@ Input grammar:\n\
  help [all | sort | subsort | predicate | const | atom | assert |\n\
        add | add_clause | ask | mcsat | mcsat_params | reset | retract |\n\
        dumptable | load | verbosity | help] ';' \n\n\
-where:\n CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n\
- LITERAL := ['~'] ATOM\n ATOM := NAME '(' ARG++',' ')'\n\
+where:\n\
+ FORMULA := ['[' NAME++',' ']'] FMLA\n\
+ FMLA := ATOM\n\
+       | FMLA 'iff' FMLA\n\
+       | FMLA ('implies'|'=>') FMLA\n\
+       | FMLA 'or' FMLA\n\
+       | FMLA 'xor' FMLA\n\
+       | FMLA 'and' FMLA\n\
+       | (not'|'~') FMLA\n\
+       | '(' FMLA ')'\n\
+ CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n\
+ LITERAL := ['~'] ATOM\n\
+ ATOM := NAME '(' ARG++',' ')'\n\
+       | ARG BOP ARG\n\
  ARG := NAME | NUM\n\
+ BOP := '=' | '/=' | '<' | '<=' | '>' | '>='\n\
  NAME := chars except whitespace parens ':' ',' ';'\n\
  NUM := ['+'|'-'] simple floating point number\n\
 predicates default to 'direct' (i.e., witness/observable)\n\
++(x,y,z) is true when x + y = z, similarly for -, *, /, %\n\
 ");
     break;
   }
