@@ -2127,9 +2127,9 @@ int32_t substit_rule(samp_rule_t *rule,
       atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
 				      arity+1, //+1 for pred
 				      (int32_t *) new_atom);
-      printf("substit_rule: Adding internal atom ");
-      print_atom_now(new_atom, table);
-      printf("\n");
+      // printf("substit_rule: Adding internal atom ");
+      // print_atom_now(new_atom, table);
+      // printf("\n");
       int32_t added_atom = add_internal_atom(table, new_atom, false);
       if (added_atom == -1){
 	// This shouldn't happen, but if it does, we need to free up space
