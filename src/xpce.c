@@ -441,6 +441,8 @@ json_atom_to_input_atom(struct json_object *jatom) {
   atom = (input_atom_t *) safe_malloc(sizeof(input_atom_t));
   atom->pred = pred;
   atom->args = args;
+  // FIXME
+  atom->builtinop = 0;
   return atom;
 }
 
