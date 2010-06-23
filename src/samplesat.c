@@ -15,6 +15,7 @@
 #include "samplesat.h"
 #include "lazysamplesat.h"
 #include "vectors.h"
+#include "SFMT.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1036,11 +1037,11 @@ void cost_flip_unfixed_variable(samp_table_t *table,
   samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment]; 
 
   if (assigned_true(assignment[var])){
-    lit = neg_lit(var);
-    nlit = pos_lit(var);
-  } else {
-    lit = pos_lit(var);
     nlit = neg_lit(var);
+    lit = pos_lit(var);
+  } else {
+    nlit = pos_lit(var);
+    lit = neg_lit(var);
   }
   samp_clause_t *link  = table->clause_table.watched[lit];
   while (link != NULL){
@@ -1057,7 +1058,7 @@ void cost_flip_unfixed_variable(samp_table_t *table,
   link = table->clause_table.unsat_clauses;
   while (link != NULL){
     i = 0;
-    while (i < link->numlits && link->disjunct[i] != lit){
+    while (i < link->numlits && link->disjunct[i] != nlit){
       i++;
     }
     if (i < link->numlits){
@@ -1106,7 +1107,8 @@ double choose(){
 
   return ((double) rand_buf.li) / ((double) ULONG_MAX + 1.0);
 #else
-  return ((double) random()) / ((double) RAND_MAX + 1.0);
+  //return ((double) random()) / ((double) RAND_MAX + 1.0);
+  return ((double) gen_rand64()) / ((double) UINT64_MAX + 1.0);
 #endif
 }
 
@@ -1720,11 +1722,16 @@ int32_t sample_sat_body(samp_table_t *table, double sa_probability,
 				  atom_table->num_unfixed_vars);
     if (var == -1) return 0;
     cost_flip_unfixed_variable(table, &dcost, var);
-    if (dcost < 0){
+    //printf("Simulated annealing: num_unsat = %d, var = %d, dcost = %d\n",
+    // clause_table->num_unsat_clauses, var, dcost);
+    //print_assignment(table);
+    if (dcost <= 0){
+      //printf("Flipping for dcost\n");
       conflict = flip_unfixed_variable(table, var);
     } else {
       choice = choose();
       if (choice < exp(-dcost/samp_temperature)) {
+	//printf("Flipping for temp\n");
 	conflict = flip_unfixed_variable(table, var);
       }
     }
@@ -1733,6 +1740,7 @@ int32_t sample_sat_body(samp_table_t *table, double sa_probability,
      * Walksat step
      */
     //choose an unsat clause
+    //printf("Walksat\n");
     clause_position = random_uint(clause_table->num_unsat_clauses);
     link = clause_table->unsat_clauses;
     while (clause_position != 0){
@@ -1766,6 +1774,7 @@ static void print_model(samp_table_t *table) {
 }
 
 void update_query_pmodel(samp_table_t *table) {
+  atom_table_t *atom_table;
   query_instance_table_t *qinst_table;
   samp_query_instance_t *qinst;
   samp_truth_value_t *assignment;
@@ -1773,14 +1782,29 @@ void update_query_pmodel(samp_table_t *table) {
   bool fval;
 
   qinst_table = &table->query_instance_table;
+  atom_table = &table->atom_table;
   assignment
-    = table->atom_table.assignment[table->atom_table.current_assignment];
+    = atom_table->assignment[atom_table->current_assignment];
   num_queries = qinst_table->num_queries;
   apmodel = table->atom_table.pmodel;
   
   for (i = 0; i < num_queries; i++) {
     // Each query instance is an array of array of literals
     qinst = qinst_table->query_inst[i];
+    // Debugging information
+    // First loop through the conjuncts
+    // for (j = 0; qinst->lit[j] != NULL; j++) {
+    //   // Now the disjuncts
+    //   for (k = 0; qinst->lit[j][k] != -1; k++) {
+    // 	// Print lit and assignment
+    // 	if (is_neg(qinst->lit[j][k])) output("~");
+    // 	print_atom(atom_table->atom[var_of(qinst->lit[j][k])], table);
+    // 	assigned_true_lit(assignment, qinst->lit[j][k]) ? output(": T ") : output(": F ");
+    //   }
+    // }
+    // printf("\n");
+    // fflush(stdout);
+    
     fval = false;
     // First loop through the conjuncts
     for (j = 0; qinst->lit[j] != NULL; j++) {
@@ -1835,6 +1859,8 @@ int32_t first_sample_sat(samp_table_t *table, double sa_probability,
 			 uint32_t max_flips){
   int32_t conflict;
   conflict = init_sample_sat(table);
+  //printf("After init_sample_sat:\n");
+  //print_assignment(table);
   if (conflict == -1) return -1;
   uint32_t num_flips = max_flips;
   while (table->clause_table.num_unsat_clauses > 0 &&
@@ -1879,6 +1905,8 @@ void sample_sat(samp_table_t *table, double sa_probability,
   int32_t conflict;
   //assert(valid_table(table));
   conflict = reset_sample_sat(table);
+  //printf("After reset_sample_sat:\n");
+  //print_assignment(table);
   //assert(valid_table(table));
   uint32_t num_flips = max_flips;
   if (conflict != -1) {
@@ -1887,6 +1915,8 @@ void sample_sat(samp_table_t *table, double sa_probability,
       //assert(valid_table(table));
       num_flips--;
     }
+    //printf("After flipping:\n");
+    //print_assignment(table);    
     if (max_extra_flips < num_flips){
       num_flips = max_extra_flips;
     }
@@ -1960,6 +1990,7 @@ void mc_sat(samp_table_t *table, uint32_t max_samples,
     cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
     sample_sat(table, sa_probability, samp_temperature,
 	       rvar_probability, max_flips, max_extra_flips);
+    //print_assignment(table);
     //    print_state(table, i+1);
     //assert(valid_table(table));
   }
@@ -2237,35 +2268,37 @@ bool check_clause_instance(samp_table_t *table,
   for (i = 0; i < rule->num_lits; i++){//for each literal
     if (i != atom_index){//if literal is not the one being activated
       atom = rule->literals[i]->atom;
-      predicate = atom->pred; 
-      arity = pred_arity(predicate, pred_table);
-      rule_atom_buffer_resize(arity);
-      rule_inst_atom = (samp_atom_t *) rule_atom_buffer.data;
-      rule_inst_atom->pred = predicate; 
-      for (j = 0; j < arity; j++){//copy each instantiated argument
-	if (atom->args[j].kind == variable){
-	  rule_inst_atom->args[j]
-	    = substit_buffer.entries[atom->args[j].value].const_index;
-	} else {
-	  rule_inst_atom->args[j] = atom->args[j].value;
+      if (atom->builtinop == 0) {
+	predicate = atom->pred; 
+	arity = pred_arity(predicate, pred_table);
+	rule_atom_buffer_resize(arity);
+	rule_inst_atom = (samp_atom_t *) rule_atom_buffer.data;
+	rule_inst_atom->pred = predicate; 
+	for (j = 0; j < arity; j++){//copy each instantiated argument
+	  if (atom->args[j].kind == variable){
+	    rule_inst_atom->args[j]
+	      = substit_buffer.entries[atom->args[j].value].const_index;
+	  } else {
+	    rule_inst_atom->args[j] = atom->args[j].value;
+	  }
 	}
-      }
-      //find the index of the atom
-      atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
-				      arity + 1,
-				      (int32_t *) rule_inst_atom);
-      // check for witness predicate - fixed false if NULL atom_map
-      if (atom_map == NULL) {
-	activate_atom(table, rule_inst_atom);
-	return false;//atom is inactive
-      }
-      if (rule->literals[i]->neg &&
-	  assignment[atom_map->val] == v_fixed_false){
-	return false;//literal is fixed true
-      }
-      if (!rule->literals[i]->neg &&
-	  assignment[atom_map->val] == v_fixed_true){
-	return false;//literal is fixed true
+	//find the index of the atom
+	atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
+					arity + 1,
+					(int32_t *) rule_inst_atom);
+	// check for witness predicate - fixed false if NULL atom_map
+	if (atom_map == NULL) {
+	  activate_atom(table, rule_inst_atom);
+	  return false;//atom is inactive
+	}
+	if (rule->literals[i]->neg &&
+	    assignment[atom_map->val] == v_fixed_false){
+	  return false;//literal is fixed true
+	}
+	if (!rule->literals[i]->neg &&
+	    assignment[atom_map->val] == v_fixed_true){
+	  return false;//literal is fixed true
+	}
       }
     }
   }
