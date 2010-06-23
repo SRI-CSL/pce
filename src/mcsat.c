@@ -12,6 +12,7 @@
 #include "input.h"
 #include "print.h"
 #include "mcsat.h"
+#include "SFMT.h"
 #ifdef _WIN32
 #include <io.h>
 #endif
@@ -105,15 +106,17 @@ static void decode_options(int argc, char **argv) {
       show_help = 1;
       break;
     case 's':
-    case SEED_OPTION:
+    case SEED_OPTION: {
       for(i=0; optarg[i] != '\0'; i++){
 	if (! isdigit(optarg[i])) {
 	  mcsat_err("Error: seed must be an integer\n");
 	  exit(1);
 	}
       }
-      srand(atoi(optarg));
+      // srand(atoi(optarg));
+      init_gen_rand(atoi(optarg));
       break;
+    }
     case LAZY_OPTION:
       if ((strcasecmp(optarg, "true") == 0) || (strcasecmp(optarg, "t") == 0) || (strcmp(optarg, "1") == 0)) {
 	set_lazy_mcsat(true);
@@ -169,6 +172,7 @@ int main(int argc, char *argv[]) {
   bool file_loaded;
 
   program_name = argv[0];
+  init_gen_rand(12345); // May be reset in options
   decode_options(argc, argv);
   init_samp_table(&samp_table);
   file_loaded = false;
