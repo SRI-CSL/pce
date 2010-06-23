@@ -374,6 +374,21 @@ void print_state(samp_table_t *table, uint32_t round){
     output(".");
   }
 }
+
+void print_assignment(samp_table_t *table){
+  atom_table_t *atom_table = &(table->atom_table);
+  samp_truth_value_t *assignment =
+    atom_table->assignment[atom_table->current_assignment];
+  int32_t i;
+  
+  for (i = 0; i < atom_table->num_vars; i++) {
+    print_atom(atom_table->atom[i], table);
+    assigned_true(assignment[i]) ? output(": T ") : output(": F ");
+  }
+  printf("\n");
+  fflush(stdout);
+}
+
   
 extern void dump_sort_table (samp_table_t *table) {
   sort_table_t *sort_table = &(table->sort_table);
