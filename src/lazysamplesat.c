@@ -44,7 +44,7 @@ int32_t pred_cardinality(pred_tbl_t *pred_tbl,
 int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table) {
   int32_t i;
   int32_t card = 0;
-  for (i = 0; i < pred_tbl->num_preds; i++){
+  for (i = 1; i < pred_tbl->num_preds; i++){
     card += pred_cardinality(pred_tbl, sort_table, i);
   }
   return card;
@@ -172,8 +172,8 @@ int32_t choose_random_atom(samp_table_t *table){
 				  (int32_t *) atom);
   //assert(valid_table(table));
   if (atom_map == NULL){//need to activate atom
-    if (get_verbosity_level() > 1) {
-      printf("Activating atom ");
+    if (get_verbosity_level() >= 0) {
+      printf("Activating atom (at round %d) ", atom_table->num_samples);
       print_atom(atom, table);
       printf("\n");
       fflush(stdout);
