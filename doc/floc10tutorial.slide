@@ -1,0 +1,168 @@
+author: S. Owre, N. Shankar
+title: \textbf{Probabilistic Reasoning with PCE}
+date: 
+preamble: \usepackage{tabularx}
+\setbeamercolor{title}{fg=white!80!blue}
+\setbeamercovered{transparent}
+\logo{\includegraphics[height=0.5cm]{images/sri_blue_logo.jpg}}
+ \input{smacros}
+
+\comment{Abstract: Markov Logic Networks are a framework for
+probabilistic inference introduced by Richardson and Domingos.  It
+formalizes a graphical relational model in terms of a first-order
+logic with probabilities.  These models can be used to compute the
+most probable explanation (MPE) or to compute conditional and marginal
+probabilities.  SRI's Probabilistic Consistency Engine (PCE) is an
+implementation of the Poon and Domingos MC-SAT method of inference
+which is based on a Markov Chain Monte Carlo (MCMC) analysis.  We
+demonstrate the capabilities of PCE through some simple examples.  We
+also outline the mathematical background behind this approach to
+probabilistic inference.  }
+
+islide: What is PCE?
+
+PCE stands for Probabilistic Consistency Engine
+
+It is used for probabilistic inference with Markov Logic Networks (MLNs).
+
+PCE can infer the marginal probabilities of formulas based on facts
+and rules.
+
+Facts and rules are presented in an order-sorted first-order logic.
+
+Inference is carried out using sampling-based methods in order to achieve
+scale.
+
+PCE is general enough to capture other graph-based formalisms for
+probabilistic reasoning.
+
+islide: Overview
+
+islide: Small PCE Example
+
+islide: Probability Basics (From Neapolitan)
+
+Given a sample space $\Omega$ of the form $\{e_1,\ldots, e_n\}$.
+
+An event $E$ is a subset of $\Omega$\@.
+
+A probability function $P$ assigns a value in $[0, 1]$ to events such that
+\begin{enumerate}
+\item $P(\{e_1\}) +\ldots + P(\{e_n\}) = 1$, and
+\item $P(E) = \Sigma_{e\in E} P(\{e\})$.
+\end{enumerate}
+
+Example: For a fair 6-sided dice, the probability $P(i)$ for $1\leq i\leq 6$ is $\frac{1/6}$.
+
+islide: Bayesian Inference
+For two events $E$ and $F$, $P(E | F)$ is the probability of $E$ given $F$, which is
+$P(E\cap F)/P(F)$\@.
+
+Events $E$ and $F$ are independent if $P(E | F) = P(E)$ when $P(E) \neq 0$ and $P(F) \neq 0$\@.
+
+$E$ and $F$ are conditionally independent under $G$, if $P(E | F\cap G) = P(E | G)$, when
+$P(E | G)$ and $P(F | G)$ are non-zero.
+
+islide: Bayes Theorem: $P(E | F) P(F) = P(E\cap F) = P(F | E) P(E)$\@.
+
+islide: Logic and Probability (Wikipedia)
+
+Medical diagnosis offers a simple example of Bayesian reasoning.
+
+We have a test for a disease returns a positive or negative results. 
+
+If the patient has the disease, the test is positive  with probability .99.
+
+If the patient does not have the disease, the test is positive with probability .05.
+
+A patient has the disease with probability .001.
+
+What is the probability that a patient with a positive test has the disease?
+
+$P(D | pos) = P(pos | D)  P(D)/P(pos) =
+.99 \times .001/ (.99\times .001 + .05 \times .999) = 99/5094$
+
+islide: Bayes Nets
+Bayes nets are an instance of graphical models
+for large-scale Bayesian inference.
+
+A graphical model is one where the nodes represent
+random variables and the absence of edges corresponds
+to conditional independence. 
+
+Bayes nets are directed, whereas Markov Random Fields are
+undirected.
+
+In a Bayes Net, each node has a probability distribution
+conditional on the valuation of the parent nodes.
+
+A Bayes Net can be used to compute joint probability distributions
+$P(x_1, \ldots, x_n)$ which can be computed by taking each individual
+variable $X_i$, its parents $\pi_i$ and the valuation of its parents
+$X_{\{pi_i} = x_{\pi_i}$ as
+$\Pi_i P(X_i = x_i | X_{\pi_i} = x_{\pi_i})$\@.
+
+It can also be used for conditional inference to computed the probability
+that $\ol{X} = \ol{x}$ given $\ol{Y} = \ol{y}$.  
+
+islide: Gibbs Sampling
+Since Bayesian inference on a large network is hard,
+sampling based approaches are used to find stationary
+probabilities over a Markov Chain.
+
+Gibbs sampling is one way to construct a Markov chain
+and a sample sequence.
+
+The stationary probability corresponds to the joint distribution.
+
+Suppose we have to construct a distribution over two variables
+$X$ and $Y$. 
+
+We start with a seed $y_0$.
+
+We then pick an $x_0$ by sampling according to $P(X = x | Y = y_0)$.
+
+We then pick a $y_1$ according to $P(Y = y | X = x_0)$.
+
+This is repeated to build a sequence $\pair{\pair{x_0, y_0},\ldots}$.
+
+For $n$ random variables, each step picks an assignment for one variable
+$X_i$ according to 
+$P(X_i = x'_i | \bigwedge_{j\neq i} X_j = x_j)$.  
+
+islide: Markov Logic Networks: MPE
+
+If we want to compute the most likely $y$ such that $Y = y$
+given $X = x$, where we have some constraints $C_i$ each with
+weight $w_i$\@.  
+
+This is obtained by maximizing $P(Y=y | X=x)$
+which is proportional to exponentiation of $\Sigma_i w_i C_i(x, y)$,
+the sum of the weights of the satisfiable formulas.
+
+We can use weighted MAXSAT to compute the MPE.
+
+<Example> 
+
+islide: Markov Logics: Marginal Probabilities
+Now, given some constraint $C$,  we want to compute
+$P(C | X = x)$ over a Markov Logic Network.
+
+<Example>
+
+islide: What is PCE? 
+
+islide: PCE Inference: MCSat
+
+islide: PCE Input Language
+
+islide: PCE Applications: Boy Tuesday
+
+islide: PCE Applications: NFL
+
+Relation to Other Models
+
+Conclusions
+
+
+
