@@ -421,19 +421,21 @@ Probably not needed.\n\
     //case VAR:
   case ASK: {
     output("\n\
-ask FORMULA [NUMBER_OF_SAMPLES [THRESHOLD]];\n\
+ask FORMULA [THRESHOLD [NUMRESULTS];\n\
   Queries for the probability of instances of the given formula.\n\
-Does sampling over the given NUMBER_OF_SAMPLES (default %d), and prints\n\
-the instance with the highest probability if THRESHOLD is not provided.\n\
-If THRESHOLD is provided, all instances whose probabilities are >= THRESHOLD\n\
-are printed, in order.\n\
+Does sampling over the number of samples (set by MCSAT_PARAMS), and prints\n\
+only instances of probability >= THRESHOLD (default 0.0), up to NUMRESULTS\n\
+ (default all), in probability order.\n\
 For example:\n\
   ask [x] father(Bob, x) and mother(Alice, x)\n\
-    may produce 'father(Bob, Carl) and mother(Alice, Carl): .253\n\
-  ask [x] father(Bob, x) and mother(Alice, x) 200 .2\n\
-    may produce 'father(Bob, Carl) and mother(Alice, Carl): .253\n\
-                 father(Bob, Cathy) and mother(Alice, Cathy): .215'\n\
-", DEFAULT_MAX_SAMPLES);
+    may produce\n\
+      [x <- Carl] 0.253: father(Bob, Carl) and mother(Alice, Carl)\n\
+      [x <- Darla] 0.117: father(Bob, Darla) and mother(Alice, Darla)\n\
+      [x <- Earl] 0.019: father(Bob, Earl) and mother(Alice, Earl)\n\
+  ask [x] father(Bob, x) and mother(Alice, x) .2 2\n\
+    may produce
+      [x <- Carl] 0.253: father(Bob, Carl) and mother(Alice, Carl)\n\
+");
     break;
   }
 
