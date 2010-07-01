@@ -433,7 +433,7 @@ For example:\n\
       [x <- Darla] 0.117: father(Bob, Darla) and mother(Alice, Darla)\n\
       [x <- Earl] 0.019: father(Bob, Earl) and mother(Alice, Earl)\n\
   ask [x] father(Bob, x) and mother(Alice, x) .2 2\n\
-    may produce
+    may produce\n\
       [x <- Carl] 0.253: father(Bob, Carl) and mother(Alice, Carl)\n\
 ");
     break;
