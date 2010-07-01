@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -176,8 +177,11 @@ void atom_buffer_resize(int32_t arity) {
 
 
 int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
-  const_table_t *const_table = &(table->const_table);
-  pred_table_t *pred_table = &(table->pred_table);
+  const_table_t *const_table = &table->const_table;
+  pred_table_t *pred_table = &table->pred_table;
+  sort_table_t *sort_table = &table->sort_table;
+  sort_entry_t entry;  
+  
   char * in_predicate = current_atom->pred;
   int32_t pred_id = pred_index(in_predicate, pred_table);
   if (pred_id == -1){
@@ -186,16 +190,36 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
   }
   int32_t predicate = pred_val_to_index(pred_id);
   int32_t i;
+  int32_t *psig, intval;
   int32_t arity = pred_arity(predicate, pred_table);
 
   atom_buffer_resize(arity);
   samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
   atom->pred = predicate;
+  psig = pred_signature(predicate, pred_table);
   for (i = 0; i < arity; i++){
-    atom->args[i] = const_index(current_atom->args[i], const_table);
-    if (atom->args[i] == -1){
-      mcsat_err("\nConstant %s is not declared.", current_atom->args[i]);
-      return -1;
+    entry = sort_table->entries[psig[i]];
+    if (entry.constants == NULL) {
+      // Should be an integer
+      char *p;
+      for (p = current_atom->args[i]; isdigit(*p); p++);
+      if (*p == '\0') {
+	intval = atoi(current_atom->args[i]);
+	if (intval < entry.lower_bound || intval > entry.upper_bound) {
+	  mcsat_err("\nInteger %s is out of bounds.", current_atom->args[i]);
+	  return -1;
+	}
+	atom->args[i] = intval;
+      } else {
+	mcsat_err("\nInvalid integer %s.", current_atom->args[i]);
+	return -1;
+      }
+    } else {
+      atom->args[i] = const_index(current_atom->args[i], const_table);
+      if (atom->args[i] == -1){
+	mcsat_err("\nConstant %s is not declared.", current_atom->args[i]);
+	return -1;
+      }
     }
   }
   int32_t result = add_internal_atom(table, atom, true);
@@ -254,6 +278,7 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom,
     mcsat_err("assert: May not assert atoms with indirect predicate %s\n", in_predicate);
     return -1;
   }
+  
   int32_t atom_index = add_atom(table, current_atom);
   if (atom_index == -1){
     return -1;
@@ -2070,7 +2095,32 @@ void create_new_const_atoms(int32_t cidx, samp_table_t *table) {
     }
   }
 }
-  
+
+bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs,
+		    samp_table_t *table) {
+  pred_table_t *pred_table = &table->pred_table;
+  int32_t j, arity, *nargs, argidx;
+  bool builtin_result;
+
+  assert(lit->atom->builtinop != 0);
+  arity = atom_arity(lit->atom, pred_table);
+  nargs = (int32_t *) safe_malloc(arity * sizeof(int32_t));
+  for(j=0; j<arity; j++) {
+    argidx = lit->atom->args[j].value;
+    if (lit->atom->args[j].kind == variable) {
+      nargs[j] = substs[argidx].const_index;
+    } else {
+      nargs[j] = argidx;
+    }
+  }
+  builtin_result = call_builtin(lit->atom->builtinop, arity, nargs);
+  safe_free(nargs);
+  if (builtin_result) {
+    return lit->neg ? false : true;
+  } else {
+    return lit->neg ? true : false;
+  }
+}  
 
 // Given a rule, a -1 terminated array of constants corresponding to the
 // variables of the rule, and a samp_table, returns the substituted clause.
@@ -2084,9 +2134,10 @@ int32_t substit_rule(samp_rule_t *rule,
   atom_table_t *atom_table = &table->atom_table;
   pred_table_t *pred_table = &table->pred_table;
   sort_entry_t *sort_entry;
-  int32_t vsort, csort, csubst, *nargs;
+  int32_t vsort, csort, csubst;
   array_hmap_pair_t *atom_map;
-  int32_t i, j, litidx, argidx;
+  int32_t i, j, litidx;
+  
   for(i=0; i<rule->num_vars; i++){
     csubst = substs[i].const_index;
     if (csubst == INT32_MIN) {
@@ -2111,7 +2162,7 @@ int32_t substit_rule(samp_rule_t *rule,
       }
     }
   }
-  if(substs[i].const_index != INT32_MIN) {
+  if (substs != NULL && substs[i].const_index != INT32_MIN) {
     mcsat_err("substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
 	      i, rule->num_vars);
     return -1;
@@ -2125,25 +2176,8 @@ int32_t substit_rule(samp_rule_t *rule,
     int32_t arity = atom_arity(lit->atom, pred_table);
     if (lit->atom->builtinop != 0) {
       // Have a builtin - just test.  If false, keep going, else done with this rule
-      nargs = (int32_t *) safe_malloc(arity * sizeof(int32_t));
-      for(j=0; j<arity; j++) {
-	argidx = lit->atom->args[j].value;
-	if (lit->atom->args[j].kind == variable) {
-	  nargs[j] = substs[argidx].const_index;
-	} else {
-	  nargs[j] = argidx;
-	}
-      }
-      if (call_builtin(lit->atom->builtinop, arity, nargs)) {
-	safe_free(nargs);
-	if (! lit->neg) {
+      if (builtin_inst_p(lit, substs, table)) {
 	  return -1;
-	}
-      } else {
-	safe_free(nargs);
-	if (lit->neg) {
-	  return -1;
-	}
       }
     } else {
       // Not a builtin
@@ -2489,22 +2523,34 @@ int32_t substit_query(samp_query_t *query,
   sort_table_t *sort_table = &table->sort_table;
   pred_table_t *pred_table = &table->pred_table;
   atom_table_t *atom_table = &table->atom_table;
+  sort_entry_t *sort_entry;
   samp_atom_t *new_atom;
-  int32_t i, j, k, vsort, csort, arity, argidx, added_atom;
+  int32_t i, j, k, vsort, csort, csubst, arity, argidx, added_atom, numlits, litnum;
   rule_literal_t ***lit;
   samp_literal_t **litinst;
   
   for(i = 0; i < query->num_vars; i++) {
-    if (substs[i].const_index == INT32_MIN) {
+    csubst = substs[i].const_index;
+    if (csubst == INT32_MIN) {
       mcsat_err("substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
 		i, query->num_vars);
       return -1;
     }
     vsort = query->vars[i]->sort_index;
-    csort = const_sort_index(substs[i].const_index, const_table);
-    if (! subsort_p(csort, vsort, sort_table)) {
-      mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
-      return -1;
+    sort_entry = &sort_table->entries[vsort];
+    if (sort_entry->constants == NULL) {
+      // It's an integer; check that its value is within the sort
+      if (! (sort_entry->lower_bound <= csubst &&
+	     csubst <= sort_entry->upper_bound)) {
+	mcsat_err("substit: integer is out of bounds %"PRId32"\n", i);
+	return -1;
+      }
+    } else {
+      csort = const_sort_index(substs[i].const_index, const_table);
+      if (! subsort_p(csort, vsort, sort_table)) {
+	mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
+	return -1;
+      }
     }
   }
   if (substs != NULL && substs[i].const_index != INT32_MIN) {
@@ -2512,47 +2558,64 @@ int32_t substit_query(samp_query_t *query,
 	      i, query->num_vars);
       return -1;
   }
-  // Everything is OK, do the sustitution
+  // Everything is OK, do the substitution
   lit = query->literals;
   litinst = (samp_literal_t **)
     safe_malloc((query->num_clauses + 1) * sizeof(samp_literal_t *));
   for (i = 0; i < query->num_clauses; i++) {
-    for (j = 0; lit[i][j] != NULL; j++) {}
-    litinst[i] = (samp_literal_t *)
-      safe_malloc((j + 1) * sizeof(samp_literal_t));
+    numlits = 0;
     for (j = 0; lit[i][j] != NULL; j++) {
-      arity = pred_arity(lit[i][j]->atom->pred, pred_table);
-      new_atom = rule_atom_to_samp_atom(lit[i][j]->atom, pred_table);
-      for (k = 0; k < arity; k++) {
-	argidx = new_atom->args[k];
-	if (argidx < 0) {
-	  // Have a var, index to var (and hence, const) array is -(argidx + 1)
-	  new_atom->args[k] = substs[-(argidx + 1)].const_index;
-	}
-      }
-      if (lazy_mcsat()) {
-	array_hmap_pair_t *atom_map;
-	atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
-					arity+1, //+1 for pred
-					(int32_t *) new_atom);
-	if (atom_map != NULL) {
-	  added_atom = atom_map->val;
-	} else {
-	  added_atom = -1;
+      if (lit[i][j]->atom->builtinop != 0) {
+	// Have a builtin - just test.  If false, keep going, else done
+	// with this query clause
+	if (builtin_inst_p(lit[i][j], substs, table)) {
+	  numlits = 0;
+	  break;
 	}
       } else {
-	added_atom = add_internal_atom(table, new_atom, false);
+	numlits++;
       }
-      if (added_atom == -1){
-	// This shouldn't happen, but if it does, we need to free up space
-	free_samp_atom(new_atom);
-	mcsat_err("substit: Bad atom\n");
-	return -1;
-      }
-      free_samp_atom(new_atom);
-      litinst[i][j] = lit[i][j]->neg ? neg_lit(added_atom) : pos_lit(added_atom);
     }
-    litinst[i][j] = -1; // end-marker - NULL doesn't work
+    if (numlits > 0) { // Can ignore clauses for which numlits == 0
+      litinst[i] = (samp_literal_t *)
+	safe_malloc((numlits + 1) * sizeof(samp_literal_t));
+      litnum = 0;
+      for (j = 0; lit[i][j] != NULL; j++) {
+	if (lit[i][j]->atom->builtinop == 0) {
+	  arity = pred_arity(lit[i][j]->atom->pred, pred_table);
+	  new_atom = rule_atom_to_samp_atom(lit[i][j]->atom, pred_table);
+	  for (k = 0; k < arity; k++) {
+	    argidx = new_atom->args[k];
+	    if (lit[i][j]->atom->args[k].kind == variable) {
+	      // Have a var, index to var (and hence, const) array is -(argidx + 1)
+	      new_atom->args[k] = substs[argidx].const_index;
+	    }
+	  }
+	  if (lazy_mcsat()) {
+	    array_hmap_pair_t *atom_map;
+	    atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
+					    arity+1, //+1 for pred
+					    (int32_t *) new_atom);
+	    if (atom_map != NULL) {
+	      added_atom = atom_map->val;
+	    } else {
+	      added_atom = -1;
+	    }
+	  } else {
+	    added_atom = add_internal_atom(table, new_atom, false);
+	  }
+	  if (added_atom == -1){
+	    // This shouldn't happen, but if it does, we need to free up space
+	    free_samp_atom(new_atom);
+	    mcsat_err("substit: Bad atom\n");
+	    return -1;
+	  }
+	  free_samp_atom(new_atom);
+	  litinst[i][litnum++] = lit[i][j]->neg ? neg_lit(added_atom) : pos_lit(added_atom);
+	}
+      }
+      litinst[i][litnum++] = -1; // end-marker - NULL doesn't work
+    }
   }
   litinst[i] = NULL;
   return add_subst_query_instance(litinst, substs, query, table);
@@ -2624,7 +2687,12 @@ void all_query_instances_rec(int32_t vidx, samp_query_t *query,
     vsort = query->vars[vidx]->sort_index;
     entry = sort_table->entries[vsort];
     for(i=0; i<entry.cardinality; i++){
-      substit_buffer.entries[vidx].const_index = entry.constants[i];
+      if (entry.constants == NULL) {
+	// Have a subrange
+	substit_buffer.entries[vidx].const_index = entry.lower_bound + i;
+      } else {
+	substit_buffer.entries[vidx].const_index = entry.constants[i];
+      }
       if (vidx == query->num_vars - 1) {
 	substit_buffer.entries[vidx+1].const_index = INT32_MIN;
 	if (!lazy_mcsat() || check_query_instance(query, table)) {
