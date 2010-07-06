@@ -1,31 +1,31 @@
 //:listdef-labeled.style: horizontal
-= PCE User Guide
+= PROBABILITY CONSISTENCY ENGINE
 :author: Sam Owre
 :authors: Sam Owre, Natarajan Shankar, Bruno Dutertre, and Shahin Saadati
 :email: owre@csl.sri.com
 :revdate: July 2009
 :revnumber: 1.0
 
-== Introduction
-
 The Probability Consistency Engine (PCE) is a system for performing
-probabilistic inference in <<MarkovLogic,Markov Logic>> using
+probabilistic inference.  A typical use for PCE is to take the rules and
+assertions provided by various learners and classifiers, as well as facts
+and a priori knowledge, and to compute marginal probabilities for
+properties of interest.  Given a set of weighted rules and facts, it
+performs sampling to determine marginal probabilities.  It can be run
+online, thus accumulating new facts and rules in real time.  PCE is
+useful in situations where rules and assertions are inherently
+probabilistic, for example in biology or computational linguistics, or
+where expert systems have traditionally been applied.
+
+== Overview
+[[pce-description]]
+
+PCE performs probabilistic inference in <<MarkovLogic,Markov Logic>> using
 Markov Chain Monte Carlo (MCMC) methods.  PCE uses the <<MCSAT,MCSat>> and
 <<LazyMCSAT,Lazy MCSat>> algorithms and was originally developed as part
 of the <<CALO,CALO>> project, where it was used to provide marginal
 probabilities for the weighted assertions and rules provided by diverse
 machine learners and classifiers.
-
-The PCE system currently has three different APIs.  A future version will
-also support PCE as a library, allowing more direct control of the system.
-The most basic API is the standalone `MCSAT`, which runs as an interactive
-application taking commands from the user or files and providing feedback
-directly.  The version used for CALO, referred to below as `OAAPCE`, is an
-Open Agent Architecture <<OAA,OAA>> agent, and assumes there are some
-specific CALO agents available.  As OAA is a bit heavyweight with
-nonstandard datatypes, a new version was created, called `XPCE`.  It is
-based on XML-RPC and uses JSON for the data encoding.  We describe MCSAT
-and XPCE below, and describe OAAPCE in <<OAAPCE,Appendix A>>.
 
 == PCE Description
 [[pce-description]]

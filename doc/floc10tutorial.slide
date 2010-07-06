@@ -1,11 +1,14 @@
+% -*- Mode: TeX -*-
 author: S. Owre, N. Shankar
 title: \textbf{Probabilistic Reasoning with PCE}
 date: 
 preamble: \usepackage{tabularx}
+\def\comment#1{}
+\newcommand{\ol}[1]{\overline{#1}}
+\newcommand{\pair}[1]{\langle #1 \rangle}
 \setbeamercolor{title}{fg=white!80!blue}
 \setbeamercovered{transparent}
-\logo{\includegraphics[height=0.5cm]{images/sri_blue_logo.jpg}}
- \input{smacros}
+\logo{\includegraphics[height=0.5cm]{sri_blue_logo}}
 
 \comment{Abstract: Markov Logic Networks are a framework for
 probabilistic inference introduced by Richardson and Domingos.  It
@@ -38,7 +41,77 @@ probabilistic reasoning.
 
 islide: Overview
 
-islide: Small PCE Example
+Small Example
+
+Probability Basics (From Neapolitan)
+
+Bayesian Inference
+
+Bayes Theorem: $P(E | F) P(F) = P(E\cap F) = P(F | E) P(E)$\@.
+
+Logic and Probability (Wikipedia)
+
+Bayes Nets
+
+Gibbs Sampling
+
+Markov Logic Networks: MPE
+
+Markov Logics: Marginal Probabilities
+
+What is PCE? 
+
+PCE Inference: MCSat
+
+PCE Input Language
+
+PCE Applications: Boy Tuesday
+
+PCE Applications: NFL
+
+Relation to Other Models
+
+Conclusions
+
+aslide: Small PCE Example - Specification
+sort Person;
+const A, B, C: Person;
+predicate Friends(Person, Person) indirect;
+predicate Smoking(Person) indirect;
+predicate Cancer(Person) indirect;
+
+# Smoking causes cancer.
+add [x] Smoking(x) => Cancer(x)  0.1;
+# If two people are friends, either both smoke or neither does.
+add [x, y] Friends(x, y) implies (Smoking(x) implies Smoking(y))  1.1;
+
+add Smoking(A);
+add Friends(A, B);
+
+mcsat_params 1000000;
+mcsat;
+dumptable atom;
+
+aslide: Small PCE Example - Results
+------------------------------------------------------------
+|  i | prob   | atom                                        |
+------------------------------------------------------------
+| 0  |  0.500 | Friends(A, A)
+| 1  |  1.000 | Friends(A, B)
+| 2  |  0.400 | Friends(A, C)
+| 3  |  0.501 | Friends(B, A)
+| 4  |  0.501 | Friends(B, B)
+| 5  |  0.434 | Friends(B, C)
+| 6  |  0.500 | Friends(C, A)
+| 7  |  0.472 | Friends(C, B)
+| 8  |  0.501 | Friends(C, C)
+| 9  |  1.000 | Smoking(A)
+| 10 |  0.752 | Smoking(B)
+| 11 |  0.616 | Smoking(C)
+| 12 |  0.525 | Cancer(A)
+| 13 |  0.519 | Cancer(B)
+| 14 |  0.516 | Cancer(C)
+------------------------------------------------------------
 
 islide: Probability Basics (From Neapolitan)
 
@@ -52,7 +125,7 @@ A probability function $P$ assigns a value in $[0, 1]$ to events such that
 \item $P(E) = \Sigma_{e\in E} P(\{e\})$.
 \end{enumerate}
 
-Example: For a fair 6-sided dice, the probability $P(i)$ for $1\leq i\leq 6$ is $\frac{1/6}$.
+Example: For a fair 6-sided dice, the probability $P(i)$ for $1\leq i\leq 6$ is $\frac{1}{6}$.
 
 islide: Bayesian Inference
 For two events $E$ and $F$, $P(E | F)$ is the probability of $E$ given $F$, which is
@@ -63,19 +136,35 @@ Events $E$ and $F$ are independent if $P(E | F) = P(E)$ when $P(E) \neq 0$ and $
 $E$ and $F$ are conditionally independent under $G$, if $P(E | F\cap G) = P(E | G)$, when
 $P(E | G)$ and $P(F | G)$ are non-zero.
 
-islide: Bayes Theorem: $P(E | F) P(F) = P(E\cap F) = P(F | E) P(E)$\@.
+slide: Bayes Theorem (Wikipedia)
+
+Bayes' theorem relates the conditional and marginal probabilities of
+events A and B, where B has a non-vanishing probability:
+\begin{center}
+    $P(A|B) = {\displaystyle \frac{P(B | A)\, P(A)}{P(B)}}$.
+\end{center}
+
+Each term in Bayes' theorem has a conventional name:
+\begin{itemize}
+\item $P(A)$ is the prior or marginal probability of $A$.
+\item $P(A|B)$ is the conditional or posterior probability of $A$, given $B$.
+\item $P(B|A)$ is the conditional probability of $B$ given $A$. It is also
+called the likelihood.
+\item $P(B)$ is the prior or marginal probability of $B$; acts as a
+normalizing constant.
+\end{itemize}
 
 islide: Logic and Probability (Wikipedia)
 
 Medical diagnosis offers a simple example of Bayesian reasoning.
 
-We have a test for a disease returns a positive or negative results. 
+We have a test for a disease that returns positive or negative results. 
 
-If the patient has the disease, the test is positive  with probability .99.
+If the patient has the disease, the test is positive  with probability $.99$.
 
-If the patient does not have the disease, the test is positive with probability .05.
+If the patient does not have the disease, the test is positive with probability $.05$.
 
-A patient has the disease with probability .001.
+A patient has the disease with probability $.001$.
 
 What is the probability that a patient with a positive test has the disease?
 
@@ -90,8 +179,8 @@ A graphical model is one where the nodes represent
 random variables and the absence of edges corresponds
 to conditional independence. 
 
-Bayes nets are directed, whereas Markov Random Fields are
-undirected.
+Bayes nets are directed, whereas Markov Logic Networks (a.k.a. Markov
+Random Fields) are undirected.
 
 In a Bayes Net, each node has a probability distribution
 conditional on the valuation of the parent nodes.
@@ -99,40 +188,79 @@ conditional on the valuation of the parent nodes.
 A Bayes Net can be used to compute joint probability distributions
 $P(x_1, \ldots, x_n)$ which can be computed by taking each individual
 variable $X_i$, its parents $\pi_i$ and the valuation of its parents
-$X_{\{pi_i} = x_{\pi_i}$ as
+$X_{\pi_i} = x_{\pi_i}$ as
 $\Pi_i P(X_i = x_i | X_{\pi_i} = x_{\pi_i})$\@.
 
-It can also be used for conditional inference to computed the probability
-that $\ol{X} = \ol{x}$ given $\ol{Y} = \ol{y}$.  
+It can also be used for conditional inference to compute the probability
+that $\ol{X} = \ol{x}$ given $\ol{Y} = \ol{y}$.
+
+islide: Markov Chain Monte Carlo (MCMC)
+
+Markov chain Monte Carlo (MCMC) methods are a class of algorithms for
+sampling from probability distributions
+
+They are based on constructing a Markov chain that has the desired distribution as
+its equilibrium distribution.
+
+The state of the chain after a large number of steps is then used as a
+sample from the desired distribution.
+
+The quality of the sample improves as a function of the number of steps.
+
+The most common application of these algorithms is numerically calculating
+multi-dimensional integrals.
+
+islide: Random Walk Algorithms
+
+A na\"{i}ve implementation of a random walk will make small step, with no
+tendency to proceed in any direction.  Easy to implement, but can take a
+long time to cover the space.
+
+Metropolis-Hastings Generates a random walk using a proposal density and a
+method for rejecting proposed moves.
+
+Gibbs sampling requires that all the conditional distributions of the
+target distribution can be sampled exactly.  When this holds, no 'tuning'
+is needed.
+
+Slice sampling alternates sampling in the vertical direction with
+sampling from the horizontal `slice' defined by the current vertical
+position.
+
+Multiple-try Metropolis is a variation of the Metropolis-Hastings
+algorithm that allows multiple trials at each point.
+
+Many variations: Successive over-relaxation, Hybrid
+Monte Carlo, Langevin MCMC, Reversible jump ...
 
 islide: Gibbs Sampling
-Since Bayesian inference on a large network is hard,
-sampling based approaches are used to find stationary
+Bayesian inference on a large network is hard,
+sampling approaches are used to find stationary
 probabilities over a Markov Chain.
 
 Gibbs sampling is one way to construct a Markov chain
 and a sample sequence.
 
-The stationary probability corresponds to the joint distribution.
+Stationary probability corresponds to the joint distribution.
 
 Suppose we have to construct a distribution over two variables
 $X$ and $Y$. 
 
-We start with a seed $y_0$.
+Start with a seed $y_0$.
 
-We then pick an $x_0$ by sampling according to $P(X = x | Y = y_0)$.
+Then pick $x_0$ by sampling according to $P(X = x | Y = y_0)$.
 
-We then pick a $y_1$ according to $P(Y = y | X = x_0)$.
+Then pick $y_1$ according to $P(Y = y | X = x_0)$.
 
 This is repeated to build a sequence $\pair{\pair{x_0, y_0},\ldots}$.
 
 For $n$ random variables, each step picks an assignment for one variable
 $X_i$ according to 
-$P(X_i = x'_i | \bigwedge_{j\neq i} X_j = x_j)$.  
+$P(X_i = x'_i | \bigwedge_{j<i} X_j = x'_j \wedge \bigwedge_{j>i} X_j = x_j)$.  
 
 islide: Markov Logic Networks: MPE
 
-If we want to compute the most likely $y$ such that $Y = y$
+We want to compute the most likely $y$ such that $Y = y$
 given $X = x$, where we have some constraints $C_i$ each with
 weight $w_i$\@.  
 
@@ -140,9 +268,9 @@ This is obtained by maximizing $P(Y=y | X=x)$
 which is proportional to exponentiation of $\Sigma_i w_i C_i(x, y)$,
 the sum of the weights of the satisfiable formulas.
 
-We can use weighted MAXSAT to compute the MPE.
+Weighted MAXSAT can compute the MPE.
 
-<Example> 
+<Example>
 
 islide: Markov Logics: Marginal Probabilities
 Now, given some constraint $C$,  we want to compute
@@ -150,19 +278,152 @@ $P(C | X = x)$ over a Markov Logic Network.
 
 <Example>
 
-islide: What is PCE? 
+islide: What is PCE?
 
-islide: PCE Inference: MCSat
+PCE is based on Markov Logic, and uses the MCSat and Lazy MCSat methods to
+compute marginal probabilities.
+
+MCSat and Lazy MCSat are variants of Markov Chain Monte Carlo (MCMC)
+sampling.
+
+slide: PCE Inference: MCSat
 
 islide: PCE Input Language
 
-islide: PCE Applications: Boy Tuesday
+PCE runs interactively, in batch mode, or as an XML-RPC server.
 
-islide: PCE Applications: NFL
+It is online, new sorts, constants, assertions, and rules can be added at
+any time.
 
-Relation to Other Models
+slide: PCE Commands
+Basic commands are:
+\begin{alltt}\smaller{\begin{itemize}
+\item sort NAME [ '=' '[' INT '..' INT ']' ] ';'
+\item subsort NAME NAME ';'
+\item predicate ATOM [direct|indirect] ';'
+\item const NAME++',' ':' NAME ';'
+\item assert ATOM ';'
+\item add FORMULA [WEIGHT [SOURCE]] ';'
+\item add_clause CLAUSE [NUM [NAME]] ';'
+\item ask FORMULA [THRESHOLD [NUMRESULTS]] ';'
+\item mcsat ';'
+\item mcsat_params [NUM]**',' ';'
+\item reset [all | probabilities] ';'
+\item dumptable [all | sort | predicate | atom | clause | rule] ';'
+\item load STRING ';'
+\item help ';'
+\item quit ';'
+\end{itemize}}
+\end{alltt}
 
-Conclusions
+
+slide: PCE Applications: Boy Born on Tuesday
+
+slide: PCE Applications: Machine Reading NFL 
+
+\begin{quote}
+With Favre throwing the best-looking pinpoint passes this side of Troy
+Aikman and with receiver Robert Brooks doing a great impression of Michael
+Irvin and with the Packers' defense playing like, well, like themselves,
+Green Bay routed Philadelphia, 39 to 13.
+\end{quote}
+
+Task is to determine who won and who lost, and what was the final score.
+
+
+aslide: PCE Applications: NFL Stanford Analysis
+
+\smaller{
+EntityMention [type=NFLTeam, objectId=EntityMention6, value="Packers"]
+EntityMention [type=NFLTeam, objectId=EntityMention7, value="Green Bay"]
+EntityMention [type=NFLTeam, objectId=EntityMention8, value="Philadelphia"]
+EntityMention [type=FinalScore, objectId=EntityMention9, value="39"]
+EntityMention [type=FinalScore, objectId=EntityMention10, value="13"]
+
+RelationMention [type=teamScoringAll,
+  EntityMention [type=FinalScore, objectId=EntityMention9, value="39"]
+  EntityMention [type=NFLTeam, objectId=EntityMention6, value="Packers"]
+]
+RelationMention [type=teamScoringAll,
+  EntityMention [type=FinalScore, objectId=EntityMention9, value="39"]
+  EntityMention [type=NFLTeam, objectId=EntityMention8, value="Philadelphia"]
+]
+RelationMention [type=teamScoringAll,
+  EntityMention [type=FinalScore, objectId=EntityMention10, value="13"]
+  EntityMention [type=NFLTeam, objectId=EntityMention8, value="Philadelphia"]
+]
+}
+
+aslide: PCE Applications: NFL Specification
+
+sort objectId;
+sort NFLTeam;
+sort FinalScore = [0..100];
+
+predicate MentionNFLTeam(objectId, NFLTeam);
+predicate MentionFinalScore(objectId, FinalScore);
+predicate MentionTeamScoringAll(objectId, objectId);
+
+predicate played(NFLTeam, NFLTeam) indirect;
+predicate scored(NFLTeam, FinalScore) indirect;
+predicate won(NFLTeam) indirect;
+
+aslide: PCE Applications: NFL PCE Specification
+
+# Rules relating mentions to reality
+add [tm1, tm2, T1, T2] MentionNFLTeam(tm1, T1)
+                   and MentionNFLTeam(tm2, T2) and T1 /= T2
+    => played(T1, T2) 2.0;
+
+add [sm, tm, S, T] MentionTeamScoringAll(sm, tm)
+         and MentionFinalScore(sm, S)
+	 and MentionNFLTeam(tm, T)
+    => scored(T, S) 1.0;
+
+add [T] ~played(T, T);
+add [T1, T2] played(T1, T2) implies played(T2, T1);
+add [T1, T2] played(T1, T2) and won(T1) implies ~won(T2);
+
+add [T1, T2, S1, S2]
+played(T1, T2) and scored(T1, S1) and scored(T2, S2)
+  and (S1 > S2) implies won(T1);
+
+add [T1, T2, S1, S2]
+played(T1, T2) and scored(T1, S1) and scored(T2, S2)
+  and ~(S2 > S1) implies ~won(T2) ;
+
+add [T, S1, S2] scored(T, S1) and (S1 > S2)
+ implies ~scored(T, S2);
+
+# add [T1, T2, T3, S1, S2] scored(T1, S1) and scored(T2, S1) and scored(T3, S2)
+#    and S1 /= S2 => sameteam(T1, T2) 3.0;
+
+# Scraped from Stanford output
+
+const EntityMention6: objectId;
+const EntityMention7: objectId;
+const EntityMention8: objectId;
+const EntityMention9: objectId;
+const EntityMention10: objectId;
+const Packers: NFLTeam;
+const GreenBay: NFLTeam;
+const Philadelphia: NFLTeam;
+assert MentionNFLTeam(EntityMention6, Packers);
+assert MentionNFLTeam(EntityMention7, GreenBay);
+assert MentionNFLTeam(EntityMention8, Philadelphia);
+assert MentionFinalScore(EntityMention9, 39);
+assert MentionFinalScore(EntityMention10, 13);
+
+assert MentionTeamScoringAll(EntityMention9, EntityMention6);
+assert MentionTeamScoringAll(EntityMention9, EntityMention8);
+assert MentionTeamScoringAll(EntityMention10, EntityMention8);
+
+mcsat_params 1000;
+ask [T1, T2] won(T1) and ~won(T2);
+
+slide: Relation to Other Models
+
+slide: Conclusions
 
 
 
