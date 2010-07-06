@@ -1928,29 +1928,34 @@ void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 		uint32_t max_flips, uint32_t max_extra_flips) {
   int32_t conflict;
+  uint32_t max_tries = 10;
   //assert(valid_table(table));
   conflict = reset_sample_sat(table);
   //printf("After reset_sample_sat:\n");
   //print_assignment(table);
   //assert(valid_table(table));
+  uint32_t num_tries = max_tries;
   uint32_t num_flips = max_flips;
-  if (conflict != -1) {
-    while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0 && conflict == 0) {
-      conflict = sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
+  while(table->clause_table.num_unsat_clauses > 0 && num_tries > 0 && conflict ==0){
+      
+      while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0 && conflict == 0) {
+	conflict = sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
+	//assert(valid_table(table));
+	num_flips--;
+      }
+      //printf("After flipping:\n");
+      //print_assignment(table);    
+      if (max_extra_flips < num_flips){
+	num_flips = max_extra_flips;
+      }
+      while (num_flips > 0 && conflict == 0){
+	conflict = sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
       //assert(valid_table(table));
-      num_flips--;
+	num_flips--;
+      }
+      num_tries--;
     }
-    //printf("After flipping:\n");
-    //print_assignment(table);    
-    if (max_extra_flips < num_flips){
-      num_flips = max_extra_flips;
-    }
-    while (num_flips > 0 && conflict == 0){
-      conflict = sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
-      //assert(valid_table(table));
-      num_flips--;
-    }
-  }
+
     
   if (conflict != -1 && table->clause_table.num_unsat_clauses == 0){
     update_pmodel(table);
@@ -1962,7 +1967,7 @@ void sample_sat(samp_table_t *table, double sa_probability,
     if (conflict == -1){
       cprintf(2, "Hit a conflict.\n");
     } else {
-      cprintf(2, "Failed to find a model. Consider increasing max_flips - see mcsat help.\n");
+      cprintf(2, "Failed to find a model. Consider increasing max_flips and max_tries - see mcsat help.\n");
     }
 
     // Flip current_assignment (restore the saved assignment)
