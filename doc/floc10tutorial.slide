@@ -293,13 +293,14 @@ The MCSAT inference averages the probabilities over a sequence of random models
 generated using SampleSAT.  
 
 islide: PCE Inference: MCSAT
-MCSAT generates a sequence of random models over all the ground atoms. 
+MCSAT computes marginal probabilities of atoms and query instances over
+by generating a sequence of random models over all the ground atoms. 
 
 In the initialization step, we first apply a closed world assumption to the
 direct atoms (atoms with direct predicates): atoms that are not asserted
 as facts are assumed false.
 
-The ground atoms are then assigned a truth value (using SampleSAT)
+The ground atoms are then assigned a truth value (using WalkSAT)
 that satisfies all the hard constraints (rules with weight MAXWEIGHT).
 
 This yields an initial model $M_0$.
@@ -309,7 +310,26 @@ groundings satisfied in $M_i$; discarding some of these rule groundings based on
 the weight; and using SampleSAT to build a model satisfying the remaining ones.
 
 We only retain the satisfaction counts for each atom/query formula instance,
-and not the models themselves.  
+and not the models themselves.
+
+islide: WalkSAT and SampleSAT
+WalkSAT starts with a random truth assignment.
+
+It repeatedly (max\_flips times) picks a random unsatisfied clause and flips
+the truth assignment for a literal in this clause.
+
+Otherwise, it tries to start with a different random truth assignment.
+
+With MaxWalkSAT the clauses have weights and we would like to find the assignment
+that maximizes the weight. 
+
+The literal to be flipped is either randomly (with probability $p$)
+chosen from the unsatisfied clause, or we pick the flip that has the greatest
+cost differential.
+
+SampleSAT mixes simulated annealing steps where a single randomly chosen
+atom is flipped, with MaxWalkSAT steps (where a literal in a randomly chosen
+unsatisfied clause is flipped).
 
 islide: PCE Input Language
 
