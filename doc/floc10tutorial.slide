@@ -26,7 +26,8 @@ islide: What is PCE?
 
 PCE stands for Probabilistic Consistency Engine
 
-It is used for probabilistic inference with Markov Logic Networks (MLNs).
+It is used for probabilistic inference with Markov Logic Networks (MLNs),
+and builds on the work of Pedro Domingos.
 
 PCE can infer the marginal probabilities of formulas based on facts
 and rules.
@@ -311,7 +312,7 @@ the weight; and using SampleSAT to build a model satisfying the remaining ones.
 We only retain the satisfaction counts for each atom/query formula instance,
 and not the models themselves.
 
-islide: WalkSAT and SampleSAT
+islide: WalkSAT, MaxWalkSAT, and SampleSAT
 WalkSAT starts with a random truth assignment.
 
 It repeatedly (max\_flips times) picks a random unsatisfied clause and flips
@@ -319,7 +320,7 @@ the truth assignment for a literal in this clause.
 
 Otherwise, it tries to start with a different random truth assignment.
 
-With MaxWalkSAT the clauses have weights and we would like to find the assignment
+MaxWalkSAT the clauses have weights and we would like to find the assignment
 that maximizes the weight. 
 
 The literal to be flipped is either randomly (with probability $p$)
@@ -330,7 +331,7 @@ SampleSAT mixes simulated annealing steps where a single randomly chosen
 atom is flipped, with MaxWalkSAT steps (where a literal in a randomly chosen
 unsatisfied clause is flipped).
 
-slide: WalkSAT Algorithm (Domingo)
+slide: WalkSAT Algorithm (Selman et al. 1996)
 
 \begin{tabbing}
 Wa\=lkSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips}, \textit{p})\\
@@ -348,14 +349,61 @@ Wa\=lkSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips}, \textit{p})\
 \> \textbf{return} failure\\
 \end{tabbing}
 
+slide: MaxWalkSAT Algorithm (Kautz et al. 1997)
+
+\begin{tabbing}
+Ma\=xWalkSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips},
+\textit{p}, \textcolor{red}{\textit{thres}})\\
+\>\textbf{fo}\=\textbf{r} \textit{i} $\leftarrow$ 1 \textbf{to} \textit{max-tries} \textbf{do}\\
+\>\>  \textit{solution} = random truth assignment\\
+\>\>  \textbf{fo}\=\textbf{r} \textit{j} $\leftarrow$ 1 \textbf{to} \textit{max-flips} \textbf{do}\\
+\>\>\>    \textbf{if}\= \ \textcolor{red}{$\Sigma$ weight(sat. \textit{clauses}) $>$ \textit{thres}} \textbf{then}\\
+\>\>\>\>      \textbf{return} \textit{solution}\\
+\>\>\>    \textit{c} $\leftarrow$ random unsatisfied clause\\
+\>\>\>    \textbf{with probability} \textit{p}\\
+\>\>\>\>      flip a random variable in \textit{c}\\
+\>\>\>    \textbf{else}\\
+\>\>\>\>      fli\=p variable in \textit{c} that maximizes\\
+\>\>\>\>\>        \textcolor{red}{$\Sigma$ weight(sat. \textit{clauses})}\\
+\> \textbf{return} failure, \textcolor{red}{best \textit{solution} found}\\
+\end{tabbing}
+
+slide: SampleSAT (Wei et al. 2004)
+\begin{tabbing}
+Sa\=mpleSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips},
+\textit{p}, \textit{thres}, \textcolor{red}{\textit{sa-p}, \textit{sa-temp}})\\
+\>\textbf{fo}\=\textbf{r} \textit{i} $\leftarrow$ 1 \textbf{to} \textit{max-tries} \textbf{do}\\
+\>\>  \textit{solution} = random truth assignment\\
+\>\>  \textbf{fo}\=\textbf{r} \textit{j} $\leftarrow$ 1 \textbf{to} \textit{max-flips} \textbf{do}\\
+\>\>\>    \textcolor{red}{\textbf{wi}}\=\textcolor{red}{\textbf{th probability} \textit{sa-p}}\\
+\>\>\>\>    \textbf{if}\= \ $\Sigma$ weight(sat. \textit{clauses}) $>$ \textit{thres} \textbf{then}\\
+\>\>\>\>\>      \textbf{return} \textit{solution}\\
+\>\>\>\>    \textit{c} $\leftarrow$ random unsatisfied clause\\
+\>\>\>\>    \textbf{with probability} \textit{p}\\
+\>\>\>\>\>      flip a random variable in \textit{c}\\
+\>\>\>\>    \textbf{else}\\
+\>\>\>\>\>      fli\=p variable in \textit{c} that maximizes\\
+\>\>\>\>\>\>        $\Sigma$ weight(sat. \textit{clauses})\\
+\>\>\>   \textcolor{red}{\textbf{else}}\\
+\>\>\>\> \textcolor{red}{perform simulated annealing step with \textit{sa-temp}}\\
+\> \textbf{return} failure, best \textit{solution} found\\
+\end{tabbing}
+
+
 islide: PCE Input Language
 
-PCE runs interactively, in batch mode, or as an XML-RPC server.
+PCE is written in C, and runs interactively, in batch mode, or as an
+XML-RPC server.
 
-It is online, new sorts, constants, assertions, and rules can be added at
-any time.
+It is online, new sorts, subsorts, constants, assertions, and rules can be
+added at any time.
 
-slide: PCE Commands
+The interactive version accepts simple declarations.
+
+The XML-RPC server can work with several clients across different
+platforms, and accepts JSON objects.
+
+slide: PCE Interactive Commands
 Basic commands are:
 \begin{alltt}\smaller{\begin{itemize}
 \item sort NAME [ '=' '[' INT '..' INT ']' ] ';'
@@ -507,14 +555,67 @@ assert MentionTeamScoringAll(EntityMention9, EntityMention6);
 assert MentionTeamScoringAll(EntityMention9, EntityMention8);
 assert MentionTeamScoringAll(EntityMention10, EntityMention8);
 
-ask [T1, T2] won(T1) and ~won(T2);
+ask [T1, T2] won(T1) and ~won(T2) .1;
 }
 
 slide: PCE Application: NFL Result
+\begin{alltt}\smaller\smaller{% mcsat ../examples/football
+Loading ../examples/football
+Input from file ../examples/football
+Setting MCSAT parameters:
+ max_samples was 100, now 1000
 
+6 results:
+[T1 <- GreenBay, T2 <- Philadelphia] 0.385:
+     (won(GreenBay)) & (~won(Philadelphia))
+[T1 <- GreenBay, T2 <- Packers] 0.358:
+     (won(GreenBay)) & (~won(Packers))
+[T1 <- Packers, T2 <- Philadelphia] 0.348:
+     (won(Packers)) & (~won(Philadelphia))
+[T1 <- Packers, T2 <- GreenBay] 0.319:
+     (won(Packers)) & (~won(GreenBay))
+[T1 <- Philadelphia, T2 <- Packers] 0.291:
+     (won(Philadelphia)) & (~won(Packers))
+[T1 <- Philadelphia, T2 <- GreenBay] 0.289:
+     (won(Philadelphia)) & (~won(GreenBay))
+QUIT reached, exiting read_eval_print_loop
+}\end{alltt}
 
+Took over 2 minutes on a 64-bit intel
+
+slide: PCE Application: NFL Lazy Result
+
+\begin{alltt}\smaller\smaller{% mcsat ../examples/football --lazy=true
+Loading ../examples/football
+Input from file ../examples/football
+Setting MCSAT parameters:
+ max_samples was 100, now 1000
+
+6 results:
+[T1 <- GreenBay, T2 <- Philadelphia] 0.280:
+     (won(GreenBay)) & (~won(Philadelphia))
+[T1 <- GreenBay, T2 <- Packers] 0.273:
+     (won(GreenBay)) & (~won(Packers))
+[T1 <- Packers, T2 <- Philadelphia] 0.258:
+     (won(Packers)) & (~won(Philadelphia))
+[T1 <- Philadelphia, T2 <- Packers] 0.252:
+     (won(Philadelphia)) & (~won(Packers))
+[T1 <- Philadelphia, T2 <- GreenBay] 0.251:
+     (won(Philadelphia)) & (~won(GreenBay))
+[T1 <- Packers, T2 <- GreenBay] 0.250:
+     (won(Packers)) & (~won(GreenBay))
+QUIT reached, exiting read_eval_print_loop
+}\end{alltt}
+
+Probabilities are somewhat different, but time is $<$ a second.
 
 slide: Relation to Other Models
+
+
+
+Bayes Networks
+
+
 
 islide: Related Work
 
