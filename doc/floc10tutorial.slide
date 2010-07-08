@@ -61,13 +61,13 @@ Markov Logics: Marginal Probabilities
 
 What is PCE? 
 
-PCE Inference: MCSat
+PCE Inference: MCSAT
 
 PCE Input Language
 
-PCE Applications: Boy Tuesday
+PCE Example: Boy Born on Tuesday
 
-PCE Applications: NFL
+PCE Application: Machine Reading
 
 Relation to Other Models
 
@@ -185,11 +185,10 @@ Random Fields) are undirected.
 In a Bayes Net, each node has a probability distribution
 conditional on the valuation of the parent nodes.
 
-A Bayes Net can be used to compute joint probability distributions
-$P(x_1, \ldots, x_n)$ which can be computed by taking each individual
-variable $X_i$, its parents $\pi_i$ and the valuation of its parents
-$X_{\pi_i} = x_{\pi_i}$ as
-$\Pi_i P(X_i = x_i | X_{\pi_i} = x_{\pi_i})$\@.
+A Bayes Net can be used to compute joint probability distributions $P(x_1,
+\ldots, x_n)$ by taking each individual variable $X_i$, its parents
+$\pi_i$ and the valuation of its parents $X_{\pi_i} = x_{\pi_i}$ as $\Pi_i
+P(X_i = x_i | X_{\pi_i} = x_{\pi_i})$\@.
 
 It can also be used for conditional inference to compute the probability
 that $\ol{X} = \ol{x}$ given $\ol{Y} = \ol{y}$.
@@ -212,7 +211,7 @@ multi-dimensional integrals.
 
 islide: Random Walk Algorithms
 
-A na\"{i}ve implementation of a random walk will make small step, with no
+A na\"{i}ve implementation of a random walk will make small steps, with no
 tendency to proceed in any direction.  Easy to implement, but can take a
 long time to cover the space.
 
@@ -280,10 +279,10 @@ $P(C | X = x)$ over a Markov Logic Network.
 
 islide: What is PCE?
 
-PCE is based on Markov Logic, and uses the MCSat and Lazy MCSat methods to
+PCE is based on Markov Logic, and uses the MCSAT and Lazy MCSAT methods to
 compute marginal probabilities.
 
-MCSat and Lazy MCSat are variants of Markov Chain Monte Carlo (MCMC)
+MCSAT and Lazy MCSAT are variants of Markov Chain Monte Carlo (MCMC)
 sampling.
 
 The input language consists of sorts, constants,
@@ -301,7 +300,7 @@ direct atoms (atoms with direct predicates): atoms that are not asserted
 as facts are assumed false.
 
 The ground atoms are then assigned a truth value (using WalkSAT)
-that satisfies all the hard constraints (rules with weight MAXWEIGHT).
+that satisfies all the hard constraints (rules with MAX weight).
 
 This yields an initial model $M_0$.
 
@@ -330,6 +329,24 @@ cost differential.
 SampleSAT mixes simulated annealing steps where a single randomly chosen
 atom is flipped, with MaxWalkSAT steps (where a literal in a randomly chosen
 unsatisfied clause is flipped).
+
+slide: WalkSAT Algorithm (Domingo)
+
+\begin{tabbing}
+Wa\=lkSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips}, \textit{p})\\
+\>\textbf{fo}\=\textbf{r} \textit{i} $\leftarrow$ 1 \textbf{to} \textit{max-tries} \textbf{do}\\
+\>\>  \textit{solution} = random truth assignment\\
+\>\>  \textbf{fo}\=\textbf{r} \textit{j} $\leftarrow$ 1 \textbf{to} \textit{max-flips} \textbf{do}\\
+\>\>\>    \textbf{if}\= \ all \textit{clauses} satisfied \textbf{then}\\
+\>\>\>\>      \textbf{return} \textit{solution}\\
+\>\>\>    \textit{c} $\leftarrow$ random unsatisfied clause\\
+\>\>\>    \textbf{with probability} \textit{p}\\
+\>\>\>\>      flip a random variable in \textit{c}\\
+\>\>\>    \textbf{else}\\
+\>\>\>\>      fli\=p variable in \textit{c} that maximizes\\
+\>\>\>\>\>        number of satisfied \textit{clauses}\\
+\> \textbf{return} failure\\
+\end{tabbing}
 
 islide: PCE Input Language
 
@@ -360,9 +377,39 @@ Basic commands are:
 \end{alltt}
 
 
-slide: PCE Applications: Boy Born on Tuesday
+aslide: PCE Example: Boy Born on Tuesday
 
-slide: PCE Applications: Machine Reading NFL 
+sort Day;
+sort Child;
+const Mo, Tu, We, Th, Fr, Sa, Su: Day;
+const A, B: Child;
+predicate boy(Child) indirect;
+predicate born_on(Child, Day) indirect;
+
+# Every child must be born on one and only one day
+add [c] born_on(c, Mo) or born_on(c, Tu) or born_on(c, We)
+     or born_on(c, Th) or born_on(c, Fr) or born_on(c, Sa)
+     or born_on(c, Su);
+add [c, d1, d2] (born_on(c, d1) and born_on(c, d2)) implies d1 = d2;
+add (born_on(A, Tu) and boy(A)) or (born_on(B, Tu) and boy(B));
+
+mcsat_params 100000,,.00001;
+ask (boy(A) and boy(B));
+
+islide: PCE Application: Machine Reading
+
+PCE is currently being used in a machine-reading project managed by SRI
+
+FAUST (Flexible Acquisition and Understanding System for Text)
+
+Large project involving SRI, Stanford, PARC, UMass, UIUC, and UWashington
+
+PCE will act as a ``harness'', accepting weighted assertions and rules
+from various classifiers and learners
+
+slide: PCE Application: NFL Articles
+
+An early use case for FAUST is a corpus of NFL newspaper articles
 
 \begin{quote}
 With Favre throwing the best-looking pinpoint passes this side of Troy
@@ -371,12 +418,13 @@ Irvin and with the Packers' defense playing like, well, like themselves,
 Green Bay routed Philadelphia, 39 to 13.
 \end{quote}
 
-Task is to determine who won and who lost, and what was the final score.
+Task is to determine who won and who lost, and what was the final score
 
+slide: PCE Application: NFL Stanford NLP
 
-aslide: PCE Applications: NFL Stanford Analysis
+The Stanford NLP tools generate the following:
 
-\smaller{
+\begin{alltt}\smaller\smaller{
 EntityMention [type=NFLTeam, objectId=EntityMention6, value="Packers"]
 EntityMention [type=NFLTeam, objectId=EntityMention7, value="Green Bay"]
 EntityMention [type=NFLTeam, objectId=EntityMention8, value="Philadelphia"]
@@ -395,33 +443,34 @@ RelationMention [type=teamScoringAll,
   EntityMention [type=FinalScore, objectId=EntityMention10, value="13"]
   EntityMention [type=NFLTeam, objectId=EntityMention8, value="Philadelphia"]
 ]
-}
+}\end{alltt}
 
-aslide: PCE Applications: NFL Specification
+aslide: PCE Application: NFL Sorts and Predicates in PCE
 
 sort objectId;
 sort NFLTeam;
 sort FinalScore = [0..100];
 
-predicate MentionNFLTeam(objectId, NFLTeam);
-predicate MentionFinalScore(objectId, FinalScore);
-predicate MentionTeamScoringAll(objectId, objectId);
+predicate MentionNFLTeam(objectId, NFLTeam) direct;
+predicate MentionFinalScore(objectId, FinalScore) direct;
+predicate MentionTeamScoringAll(objectId, objectId) direct;
 
 predicate played(NFLTeam, NFLTeam) indirect;
 predicate scored(NFLTeam, FinalScore) indirect;
 predicate won(NFLTeam) indirect;
 
-aslide: PCE Applications: NFL PCE Specification
+aslide: PCE Application: NFL ``Mentions'' Rules in PCE
 
-# Rules relating mentions to reality
 add [tm1, tm2, T1, T2] MentionNFLTeam(tm1, T1)
                    and MentionNFLTeam(tm2, T2) and T1 /= T2
     => played(T1, T2) 2.0;
 
 add [sm, tm, S, T] MentionTeamScoringAll(sm, tm)
          and MentionFinalScore(sm, S)
-	 and MentionNFLTeam(tm, T)
+         and MentionNFLTeam(tm, T)
     => scored(T, S) 1.0;
+
+aslide: PCE Application: NFL Game Rules in PCE
 
 add [T] ~played(T, T);
 add [T1, T2] played(T1, T2) implies played(T2, T1);
@@ -438,11 +487,8 @@ played(T1, T2) and scored(T1, S1) and scored(T2, S2)
 add [T, S1, S2] scored(T, S1) and (S1 > S2)
  implies ~scored(T, S2);
 
-# add [T1, T2, T3, S1, S2] scored(T1, S1) and scored(T2, S1) and scored(T3, S2)
-#    and S1 /= S2 => sameteam(T1, T2) 3.0;
-
-# Scraped from Stanford output
-
+aslide: PCE Application: NFL Facts (from Stanford Output)
+\smaller{
 const EntityMention6: objectId;
 const EntityMention7: objectId;
 const EntityMention8: objectId;
@@ -461,12 +507,34 @@ assert MentionTeamScoringAll(EntityMention9, EntityMention6);
 assert MentionTeamScoringAll(EntityMention9, EntityMention8);
 assert MentionTeamScoringAll(EntityMention10, EntityMention8);
 
-mcsat_params 1000;
 ask [T1, T2] won(T1) and ~won(T2);
+}
+
+slide: PCE Application: NFL Result
+
+
 
 slide: Relation to Other Models
 
+islide: Related Work
+
+Alchemy (P. Domingos, Univ. of Washington)
+
+Markov TheBeast (S. Riedel)
+
+islide: Future Work
+
+Add conditionals
+
+Add functional properties, e.g., bijective, etc.
+
+Allow restricted formulas for direct predicates
+
+Allow probabilities to be given for weights
+
+Modularize, allowing composition of different samplings
+
+Allow non-Boolean Random Variables
+
 slide: Conclusions
-
-
 
