@@ -8,6 +8,7 @@ preamble: \usepackage{tabularx}
 \newcommand{\pair}[1]{\langle #1 \rangle}
 \setbeamercolor{title}{fg=white!80!blue}
 \setbeamercovered{transparent}
+\setbeamertemplate{bibliography item}[triangle]
 \logo{\includegraphics[height=0.5cm]{sri_blue_logo}}
 
 \comment{Abstract: Markov Logic Networks are a framework for
@@ -26,8 +27,8 @@ islide: What is PCE?
 
 PCE stands for Probabilistic Consistency Engine
 
-It is used for probabilistic inference with Markov Logic Networks (MLNs),
-and builds on the work of Pedro Domingos.
+It is used for probabilistic inference with Markov Logic as a formal
+framework
 
 PCE can infer the marginal probabilities of formulas based on facts
 and rules.
@@ -35,65 +36,60 @@ and rules.
 Facts and rules are presented in an order-sorted first-order logic.
 
 Inference is carried out using sampling-based methods in order to achieve
-scale.
+scale
 
 PCE is general enough to capture other graph-based formalisms for
-probabilistic reasoning.
+probabilistic reasoning
 
 islide: Overview
 
 Small Example
 
-Probability Basics (From Neapolitan)
+Probability Basics
 
-Bayesian Inference
+Graphical Models
 
-Bayes Theorem: $P(E | F) P(F) = P(E\cap F) = P(F | E) P(E)$\@.
+PCE Background
 
-Logic and Probability (Wikipedia)
-
-Bayes Nets
-
-Gibbs Sampling
-
-Markov Logic Networks: MPE
-
-Markov Logics: Marginal Probabilities
-
-What is PCE? 
-
-PCE Inference: MCSAT
-
-PCE Input Language
+PCE MCSAT Algorithm
 
 PCE Example: Boy Born on Tuesday
 
 PCE Application: Machine Reading
 
-Relation to Other Models
-
 Conclusions
 
-aslide: Small PCE Example - Specification
+slide: Small Example - Markov Logic Network
+
+\begin{itemize}
+\item Smoking causes cancer
+\item Friends influence smoking behavior
+\end{itemize}
+
+\includegraphics[width=\textwidth]{cancer}
+
+slide: Small Example - PCE Specification
+\begin{alltt}\smaller{
 sort Person;
 const A, B, C: Person;
-predicate Friends(Person, Person) indirect;
-predicate Smoking(Person) indirect;
-predicate Cancer(Person) indirect;
+predicate Friends(Person, Person) hidden;
+predicate Smokes(Person) hidden;
+predicate Cancer(Person) hidden;
 
 # Smoking causes cancer.
-add [x] Smoking(x) => Cancer(x)  0.1;
+add [x] Smokes(x) => Cancer(x)  0.1;
 # If two people are friends, either both smoke or neither does.
-add [x, y] Friends(x, y) implies (Smoking(x) implies Smoking(y))  1.1;
+add [x, y] Friends(x, y) implies (Smokes(x) implies Smokes(y))  1.1;
 
-add Smoking(A);
+add Smokes(A);
 add Friends(A, B);
 
-mcsat_params 1000000;
-mcsat;
-dumptable atom;
+mcsat_params 100000, .5, 5, .05, 100, 5;
+mcsat; dumptable atom;
+}\end{alltt}
 
-aslide: Small PCE Example - Results
+slide: Small PCE Example - Results
+\begin{alltt}\smaller{
 ------------------------------------------------------------
 |  i | prob   | atom                                        |
 ------------------------------------------------------------
@@ -106,13 +102,14 @@ aslide: Small PCE Example - Results
 | 6  |  0.500 | Friends(C, A)
 | 7  |  0.472 | Friends(C, B)
 | 8  |  0.501 | Friends(C, C)
-| 9  |  1.000 | Smoking(A)
-| 10 |  0.752 | Smoking(B)
-| 11 |  0.616 | Smoking(C)
+| 9  |  1.000 | Smokes(A)
+| 10 |  0.752 | Smokes(B)
+| 11 |  0.616 | Smokes(C)
 | 12 |  0.525 | Cancer(A)
 | 13 |  0.519 | Cancer(B)
 | 14 |  0.516 | Cancer(C)
 ------------------------------------------------------------
+}\end{alltt}
 
 islide: Probability Basics (From Neapolitan)
 
@@ -126,16 +123,9 @@ A probability function $P$ assigns a value in $[0, 1]$ to events such that
 \item $P(E) = \Sigma_{e\in E} P(\{e\})$.
 \end{enumerate}
 
-Example: For a fair 6-sided dice, the probability $P(i)$ for $1\leq i\leq 6$ is $\frac{1}{6}$.
-
-islide: Bayesian Inference
-For two events $E$ and $F$, $P(E | F)$ is the probability of $E$ given $F$, which is
-$P(E\cap F)/P(F)$\@.
-
-Events $E$ and $F$ are independent if $P(E | F) = P(E)$ when $P(E) \neq 0$ and $P(F) \neq 0$\@.
-
-$E$ and $F$ are conditionally independent under $G$, if $P(E | F\cap G) = P(E | G)$, when
-$P(E | G)$ and $P(F | G)$ are non-zero.
+Example: For a fair 6-sided dice, the probability $P(i)$ for $1\leq i\leq
+6$ is $\frac{1}{6}$, and the probability of an even number is
+$\frac{1}{6} + \frac{1}{6} + \frac{1}{6} = \frac{1}{2}$
 
 slide: Bayes Theorem (Wikipedia)
 
@@ -170,166 +160,127 @@ A patient has the disease with probability $.001$.
 What is the probability that a patient with a positive test has the disease?
 
 $P(D | pos) = P(pos | D)  P(D)/P(pos) =
-.99 \times .001/ (.99\times .001 + .05 \times .999) = 99/5094$
+.99 \times .001/ (.99\times .001 + .05 \times .999) = 99/5094 = .0194$
 
-islide: Bayes Nets
-Bayes nets are an instance of graphical models
-for large-scale Bayesian inference.
+slide: Medical Diagnosis in PCE
 
-A graphical model is one where the nodes represent
-random variables and the absence of edges corresponds
-to conditional independence. 
+\begin{alltt}\smaller{
+sort Patient;
+const a: Patient;
+predicate testedPositive(Patient) hidden;
+predicate diseased(Patient) hidden;
+add testedPositive(a) or ~diseased(a) 4.6; # 99%
+add ~testedPositive(a) or ~diseased(a) .01; # 1%
+add testedPositive(a) or diseased(a) .05;   # 5%
+add ~testedPositive(a) or diseased(a) 3.0; # 95%
+add ~diseased(a) 6.9; # 50%
+add diseased(a) .001; # .1%
 
-Bayes nets are directed, whereas Markov Logic Networks (a.k.a. Markov
-Random Fields) are undirected.
+add testedPositive(a);
+mcsat_params 1000000, 0.5, 20.0, 0.5, 30;
+ask diseased(a);
 
-In a Bayes Net, each node has a probability distribution
-conditional on the valuation of the parent nodes.
+\textit{Result:}
+[] 0.020: (diseased(a))
+}\end{alltt}
 
-A Bayes Net can be used to compute joint probability distributions $P(x_1,
-\ldots, x_n)$ by taking each individual variable $X_i$, its parents
-$\pi_i$ and the valuation of its parents $X_{\pi_i} = x_{\pi_i}$ as $\Pi_i
-P(X_i = x_i | X_{\pi_i} = x_{\pi_i})$\@.
+islide: Graphical Models
+
+The general idea is that you have some joint probability distribution
+over random variables $X = \{X_1,\ldots, X_n\}$
+
+From the joint distribution, you would like to compute marginal
+probabilities $P(X_i = x_i)$ and conditional probabilities $P(Z = z | Y =
+y)$, where $Z$ and $Y$ are disjoint subsets of $X$
+
+\emph{Graphical models} represent the joint distribution $P(X = x)$ as a
+product $1/Z \Pi_k F_k(X_k = x_k)$, where $k$ is a subset of indices,
+$X_k$ is the corresponding subset of variables, $x_k$ the corresponding
+values, $F_k$ is a potential, and $Z$ is a normalization constant
+
+\emph{Bayesian networks} and \emph{Markov Logic Networks} are both
+instances of graphical models
+
+In a Bayesian network, the joint probabilities at a node are relative to
+the parent nodes, whereas a Markov logic network is undirected
+
+islide: Bayesian Networks
+
+Potential functions in a Bayesian Network can be converted to feature
+function using a log-linear model as $P(X = x) = 1/Z e^{(\Sigma_i w_i
+f_i(x))}$.
+
+A Bayesian Network can be used to compute joint probability distributions
+$P(x_1, \ldots, x_n)$ by taking each individual variable $X_i$, its
+parents $\pi_i$ and the valuation of its parents $X_{\pi_i} = x_{\pi_i}$
+as $\Pi_i P(X_i = x_i | X_{\pi_i} = x_{\pi_i})$\@.
 
 It can also be used for conditional inference to compute the probability
 that $\ol{X} = \ol{x}$ given $\ol{Y} = \ol{y}$.
 
-islide: Markov Chain Monte Carlo (MCMC)
+islide: Markov Logic Networks
 
-Markov chain Monte Carlo (MCMC) methods are a class of algorithms for
-sampling from probability distributions
+Markov Logic Networks were developed by Pedro Domingos et al.
 
-They are based on constructing a Markov chain that has the desired distribution as
-its equilibrium distribution.
+More details may be found in Pedro's recently published book, available
+online at \url{http://dx.doi.org/10.2200/S00206ED1V01Y200907AIM007}
 
-The state of the chain after a large number of steps is then used as a
-sample from the desired distribution.
+In a Markov Logic Network, all random variables are Boolean and all
+feature functions are Boolean formulas
 
-The quality of the sample improves as a function of the number of steps.
+To compute conditional probabilities $P(Z = z | Y = y)$ over a graphical
+model, one typically uses Markov Chain Monte Carlo (MCMC) sampling
+algorithms to marginalize over the variables in $X - (Y \cup Z)$
 
-The most common application of these algorithms is numerically calculating
-multi-dimensional integrals.
+A Markov chain is a state machine with probabilities attached to the
+transitions between states -- sum of probabilities of outgoing transitions
+from each state must add up to $1$
 
-islide: Random Walk Algorithms
+\emph{MCSAT} is used as the MCMC sampling method for Markov logic networks
 
-A na\"{i}ve implementation of a random walk will make small steps, with no
-tendency to proceed in any direction.  Easy to implement, but can take a
-long time to cover the space.
+islide: PCE Background
 
-Metropolis-Hastings Generates a random walk using a proposal density and a
-method for rejecting proposed moves.
+PCE is based on Markov Logic, and uses MCSAT to compute marginal
+probabilities
 
-Gibbs sampling requires that all the conditional distributions of the
-target distribution can be sampled exactly.  When this holds, no 'tuning'
-is needed.
+The input language consists of sorts, subsorts, constants, observable
+predicates and hidden predicates, facts, and weighted rules
 
-Slice sampling alternates sampling in the vertical direction with
-sampling from the horizontal `slice' defined by the current vertical
-position.
+The MCSAT inference averages the probabilities over a sequence of random
+models generated using SampleSAT
 
-Multiple-try Metropolis is a variation of the Metropolis-Hastings
-algorithm that allows multiple trials at each point.
+It draws heavily on the work of Pedro Domingos et al. and the Alchemy
+system
 
-Many variations: Successive over-relaxation, Hybrid
-Monte Carlo, Langevin MCMC, Reversible jump ...
+The main differences are that PCE has subsorts, and is online and can run
+interactively or as an XML-RPC server
 
-islide: Gibbs Sampling
-Bayesian inference on a large network is hard,
-sampling approaches are used to find stationary
-probabilities over a Markov Chain.
+On the other hand, Alchemy is more mature and includes machine learning
+components and several other features
 
-Gibbs sampling is one way to construct a Markov chain
-and a sample sequence.
+slide: MCSAT (Poon \& Domingos 2006)
 
-Stationary probability corresponds to the joint distribution.
+\begin{itemize}
+\item MCSAT generates a sequence of models $x^{(0)}, \ldots, x^{(i)}, \ldots$
+\item Hard clauses are facts (and negations, by closed-world assumption)
+and clauses with maximal weight
+\item \textit{M} is a set of satisfied clauses
+\end{itemize}
 
-Suppose we have to construct a distribution over two variables
-$X$ and $Y$. 
-
-Start with a seed $y_0$.
-
-Then pick $x_0$ by sampling according to $P(X = x | Y = y_0)$.
-
-Then pick $y_1$ according to $P(Y = y | X = x_0)$.
-
-This is repeated to build a sequence $\pair{\pair{x_0, y_0},\ldots}$.
-
-For $n$ random variables, each step picks an assignment for one variable
-$X_i$ according to 
-$P(X_i = x'_i | \bigwedge_{j<i} X_j = x'_j \wedge \bigwedge_{j>i} X_j = x_j)$.  
-
-islide: Markov Logic Networks: MPE
-
-We want to compute the most likely $y$ such that $Y = y$
-given $X = x$, where we have some constraints $C_i$ each with
-weight $w_i$\@.  
-
-This is obtained by maximizing $P(Y=y | X=x)$
-which is proportional to exponentiation of $\Sigma_i w_i C_i(x, y)$,
-the sum of the weights of the satisfiable formulas.
-
-Weighted MAXSAT can compute the MPE.
-
-<Example>
-
-islide: Markov Logics: Marginal Probabilities
-Now, given some constraint $C$,  we want to compute
-$P(C | X = x)$ over a Markov Logic Network.
-
-<Example>
-
-islide: What is PCE?
-
-PCE is based on Markov Logic, and uses the MCSAT and Lazy MCSAT methods to
-compute marginal probabilities.
-
-MCSAT and Lazy MCSAT are variants of Markov Chain Monte Carlo (MCMC)
-sampling.
-
-The input language consists of sorts, constants,
-direct predicates and indirect predicates, facts, and weighted rules.
-
-The MCSAT inference averages the probabilities over a sequence of random models
-generated using SampleSAT.  
-
-islide: PCE Inference: MCSAT
-MCSAT computes marginal probabilities of atoms and query instances over
-by generating a sequence of random models over all the ground atoms. 
-
-In the initialization step, we first apply a closed world assumption to the
-direct atoms (atoms with direct predicates): atoms that are not asserted
-as facts are assumed false.
-
-The ground atoms are then assigned a truth value (using WalkSAT)
-that satisfies all the hard constraints (rules with MAX weight).
-
-This yields an initial model $M_0$.
-
-Each subsequent $M_{i+1}$ is generated from $M_i$ by selecting the rule
-groundings satisfied in $M_i$; discarding some of these rule groundings based on
-the weight; and using SampleSAT to build a model satisfying the remaining ones.
-
-We only retain the satisfaction counts for each atom/query formula instance,
-and not the models themselves.
-
-islide: WalkSAT, MaxWalkSAT, and SampleSAT
-WalkSAT starts with a random truth assignment.
-
-It repeatedly (max\_flips times) picks a random unsatisfied clause and flips
-the truth assignment for a literal in this clause.
-
-Otherwise, it tries to start with a different random truth assignment.
-
-MaxWalkSAT the clauses have weights and we would like to find the assignment
-that maximizes the weight. 
-
-The literal to be flipped is either randomly (with probability $p$)
-chosen from the unsatisfied clause, or we pick the flip that has the greatest
-cost differential.
-
-SampleSAT mixes simulated annealing steps where a single randomly chosen
-atom is flipped, with MaxWalkSAT steps (where a literal in a randomly chosen
-unsatisfied clause is flipped).
+\begin{tabbing}
+MC\=SAT(\textit{clauses}, \textit{weights}, \textit{num-samples})\\
+\> $x^{(0)}$ $\leftarrow$ Satisfy(hard \textit{clauses}) \hspace*{5ex} (\textcolor{red}{WalkSAT})\\
+\>\textbf{fo}\=\textbf{r} \textit{i} $\leftarrow$ 1 \textbf{to} \textit{num-samples} \textbf{do}\\
+\>\>  \textit{M} = $\emptyset$\\
+\>\>  \textbf{fo}\=\textbf{r all} $c_k$ $\in$ \textit{clauses} satisfied by
+$x^{(i-1)}$ \textbf{do}\\
+\>\>\>    \textbf{wi}\=\textbf{th probability} $1 - e^{-w_k}$ add $c_k$ to
+$M$\\
+\>\> \textbf{end for}\\
+\>\> Sample $x^{(i)} \sim U_{SAT(M)}$ (\=Random model for set $M$)\\
+\>\>\> (\textcolor{red}{SampleSAT})\\
+\> \textbf{end for}
+\end{tabbing}
 
 slide: WalkSAT Algorithm (Selman et al. 1996)
 
@@ -349,90 +300,42 @@ Wa\=lkSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips}, \textit{p})\
 \> \textbf{return} failure\\
 \end{tabbing}
 
-slide: MaxWalkSAT Algorithm (Kautz et al. 1997)
-
-\begin{tabbing}
-Ma\=xWalkSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips},
-\textit{p}, \textcolor{red}{\textit{thres}})\\
-\>\textbf{fo}\=\textbf{r} \textit{i} $\leftarrow$ 1 \textbf{to} \textit{max-tries} \textbf{do}\\
-\>\>  \textit{solution} = random truth assignment\\
-\>\>  \textbf{fo}\=\textbf{r} \textit{j} $\leftarrow$ 1 \textbf{to} \textit{max-flips} \textbf{do}\\
-\>\>\>    \textbf{if}\= \ \textcolor{red}{$\Sigma$ weight(sat. \textit{clauses}) $>$ \textit{thres}} \textbf{then}\\
-\>\>\>\>      \textbf{return} \textit{solution}\\
-\>\>\>    \textit{c} $\leftarrow$ random unsatisfied clause\\
-\>\>\>    \textbf{with probability} \textit{p}\\
-\>\>\>\>      flip a random variable in \textit{c}\\
-\>\>\>    \textbf{else}\\
-\>\>\>\>      fli\=p variable in \textit{c} that maximizes\\
-\>\>\>\>\>        \textcolor{red}{$\Sigma$ weight(sat. \textit{clauses})}\\
-\> \textbf{return} failure, \textcolor{red}{best \textit{solution} found}\\
-\end{tabbing}
-
 slide: SampleSAT (Wei et al. 2004)
 \begin{tabbing}
 Sa\=mpleSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips},
-\textit{p}, \textit{thres}, \textcolor{red}{\textit{sa-p}, \textit{sa-temp}})\\
+\textit{p}, \textcolor{red}{\textit{sa-p}, \textit{sa-temp}})\\
 \>\textbf{fo}\=\textbf{r} \textit{i} $\leftarrow$ 1 \textbf{to} \textit{max-tries} \textbf{do}\\
 \>\>  \textit{solution} = random truth assignment\\
 \>\>  \textbf{fo}\=\textbf{r} \textit{j} $\leftarrow$ 1 \textbf{to} \textit{max-flips} \textbf{do}\\
-\>\>\>    \textcolor{red}{\textbf{wi}}\=\textcolor{red}{\textbf{th probability} \textit{sa-p}}\\
-\>\>\>\>    \textbf{if}\= \ $\Sigma$ weight(sat. \textit{clauses}) $>$ \textit{thres} \textbf{then}\\
+\>\>\>    \textcolor{red}{\textbf{wi}}\=\textcolor{red}{\textbf{th
+probability} $1 - \textit{sa-p}$}\\
+\>\>\>\>    \textbf{if}\= \ all \textit{clauses} satisfied \textbf{then}\\
 \>\>\>\>\>      \textbf{return} \textit{solution}\\
 \>\>\>\>    \textit{c} $\leftarrow$ random unsatisfied clause\\
 \>\>\>\>    \textbf{with probability} \textit{p}\\
 \>\>\>\>\>      flip a random variable in \textit{c}\\
 \>\>\>\>    \textbf{else}\\
 \>\>\>\>\>      fli\=p variable in \textit{c} that maximizes\\
-\>\>\>\>\>\>        $\Sigma$ weight(sat. \textit{clauses})\\
+\>\>\>\>\>\>        number of satisfied \textit{clauses}\\
 \>\>\>   \textcolor{red}{\textbf{else}}\\
 \>\>\>\> \textcolor{red}{perform simulated annealing step with \textit{sa-temp}}\\
 \> \textbf{return} failure, best \textit{solution} found\\
 \end{tabbing}
 
+slide: PCE Example: Boy Born on Tuesday
 
-islide: PCE Input Language
-
-PCE is written in C, and runs interactively, in batch mode, or as an
-XML-RPC server.
-
-It is online, new sorts, subsorts, constants, assertions, and rules can be
-added at any time.
-
-The interactive version accepts simple declarations.
-
-The XML-RPC server can work with several clients across different
-platforms, and accepts JSON objects.
-
-slide: PCE Interactive Commands
-Basic commands are:
-\begin{alltt}\smaller{\begin{itemize}
-\item sort NAME [ '=' '[' INT '..' INT ']' ] ';'
-\item subsort NAME NAME ';'
-\item predicate ATOM [direct|indirect] ';'
-\item const NAME++',' ':' NAME ';'
-\item assert ATOM ';'
-\item add FORMULA [WEIGHT [SOURCE]] ';'
-\item add_clause CLAUSE [NUM [NAME]] ';'
-\item ask FORMULA [THRESHOLD [NUMRESULTS]] ';'
-\item mcsat ';'
-\item mcsat_params [NUM]**',' ';'
-\item reset [all | probabilities] ';'
-\item dumptable [all | sort | predicate | atom | clause | rule] ';'
-\item load STRING ';'
-\item help ';'
-\item quit ';'
-\end{itemize}}
-\end{alltt}
-
-
-aslide: PCE Example: Boy Born on Tuesday
-
+\begin{quote}\smaller{
+An acquaintance tells you she has two children, one is a boy born on
+tuesday.  What is the probability she has two boys?
+}\end{quote}
+\pause
+\begin{alltt}\smaller\smaller{
 sort Day;
 sort Child;
 const Mo, Tu, We, Th, Fr, Sa, Su: Day;
 const A, B: Child;
-predicate boy(Child) indirect;
-predicate born_on(Child, Day) indirect;
+predicate boy(Child) hidden;
+predicate born_on(Child, Day) hidden;
 
 # Every child must be born on one and only one day
 add [c] born_on(c, Mo) or born_on(c, Tu) or born_on(c, We)
@@ -441,8 +344,74 @@ add [c] born_on(c, Mo) or born_on(c, Tu) or born_on(c, We)
 add [c, d1, d2] (born_on(c, d1) and born_on(c, d2)) implies d1 = d2;
 add (born_on(A, Tu) and boy(A)) or (born_on(B, Tu) and boy(B));
 
-mcsat_params 100000,,.00001;
+mcsat_params 100000, .5, 5, .05, 100, 5;
 ask (boy(A) and boy(B));
+
+\textit{Result:}
+[] 0.477: (boy(A)) & (boy(B))
+}\end{alltt}
+
+slide: Which bowl is the cookie from?
+
+\begin{quote}\smaller{
+Two bowls: A and B, A has 10 chocolate and 30 plain cookies, B has 20 of
+each.  A bowl is picked at random, followed by a cookie picked at random,
+which is plain.  Which bowl is the cookie from?
+}\end{quote}
+\pause
+\begin{alltt}\smaller\smaller{
+sort Bowl;
+const A, B: Bowl;
+sort Color;
+const plain, choc: Color;
+predicate bowl(Bowl) hidden;
+predicate cookie(Color) hidden;
+add ~bowl(A)  or ~bowl(B);
+add ~cookie(plain) or ~cookie(choc);
+add bowl(A) or bowl(B);
+add bowl(A) .693;
+add bowl(B) .693;
+add bowl(A) => cookie(plain) 1.386; # 75%
+add bowl(A) => cookie(choc)   .288; # 25%
+add bowl(B) => cookie(plain)  .693; # 50%
+add bowl(B) => cookie(choc)   .693; # 50%
+add cookie(plain);
+mcsat_params 200000, .5, 5, .05, 100, 5;
+mcsat; dumptable atom;
+
+\textit{Result:}
+| 0 |  0.607 | bowl(A)
+| 1 |  0.393 | bowl(B)
+}\end{alltt}
+
+slide: Monty Hall Problem
+
+\begin{quote}\smaller{
+Three doors, behind one of which is a car.  Contestant chooses door A, and
+is shown another door, which is empty.  She is then offered the
+opportunity to switch.  Should she?
+}\end{quote}
+\pause
+\begin{alltt}\smaller{
+sort Door;
+const a, b, c: Door;
+sort Switch;
+const switch: Switch;
+predicate car(Door) hidden;
+predicate win(Switch) hidden;
+add car(a) or car(b) or car(c);
+add ~car(a) or ~car(b);
+add ~car(b) or ~car(c);
+add ~car(c) or ~car(a);
+add car(a) implies ~win(switch);
+add car(b) implies win(switch);
+add car(c) implies win(switch);
+mcsat_params 200000, .5, 5, .05, 100, 5;
+ask win(switch);
+
+\textit{Result:}
+[] 0.628: (win(switch))
+}\end{alltt}
 
 islide: PCE Application: Machine Reading
 
@@ -466,176 +435,94 @@ Irvin and with the Packers' defense playing like, well, like themselves,
 Green Bay routed Philadelphia, 39 to 13.
 \end{quote}
 
-Task is to determine who won and who lost, and what was the final score
+Task is to determine which teams played, who won and who lost, and what
+was the final score
 
-slide: PCE Application: NFL Stanford NLP
+islide: Related Work on MLNs
 
-The Stanford NLP tools generate the following:
+Alchemy: Markov logic networks in C++ (P. Domingos, Univ. of Washington)
 
-\begin{alltt}\smaller\smaller{
-EntityMention [type=NFLTeam, objectId=EntityMention6, value="Packers"]
-EntityMention [type=NFLTeam, objectId=EntityMention7, value="Green Bay"]
-EntityMention [type=NFLTeam, objectId=EntityMention8, value="Philadelphia"]
-EntityMention [type=FinalScore, objectId=EntityMention9, value="39"]
-EntityMention [type=FinalScore, objectId=EntityMention10, value="13"]
+Markov TheBeast: Markov logic networks in Java (S. Riedel)
 
-RelationMention [type=teamScoringAll,
-  EntityMention [type=FinalScore, objectId=EntityMention9, value="39"]
-  EntityMention [type=NFLTeam, objectId=EntityMention6, value="Packers"]
-]
-RelationMention [type=teamScoringAll,
-  EntityMention [type=FinalScore, objectId=EntityMention9, value="39"]
-  EntityMention [type=NFLTeam, objectId=EntityMention8, value="Philadelphia"]
-]
-RelationMention [type=teamScoringAll,
-  EntityMention [type=FinalScore, objectId=EntityMention10, value="13"]
-  EntityMention [type=NFLTeam, objectId=EntityMention8, value="Philadelphia"]
-]
-}\end{alltt}
+ProbCog: Probabilistic Cognition for Cognitive Technical Systems\\
+Markov logic networks in Python and Java (Dominik Jain)
 
-aslide: PCE Application: NFL Sorts and Predicates in PCE
+PyMLNs: inference and learning tools for MLNs in Python (Dominik Jain)
 
-sort objectId;
-sort NFLTeam;
-sort FinalScore = [0..100];
-
-predicate MentionNFLTeam(objectId, NFLTeam) direct;
-predicate MentionFinalScore(objectId, FinalScore) direct;
-predicate MentionTeamScoringAll(objectId, objectId) direct;
-
-predicate played(NFLTeam, NFLTeam) indirect;
-predicate scored(NFLTeam, FinalScore) indirect;
-predicate won(NFLTeam) indirect;
-
-aslide: PCE Application: NFL ``Mentions'' Rules in PCE
-
-add [tm1, tm2, T1, T2] MentionNFLTeam(tm1, T1)
-                   and MentionNFLTeam(tm2, T2) and T1 /= T2
-    => played(T1, T2) 2.0;
-
-add [sm, tm, S, T] MentionTeamScoringAll(sm, tm)
-         and MentionFinalScore(sm, S)
-         and MentionNFLTeam(tm, T)
-    => scored(T, S) 1.0;
-
-aslide: PCE Application: NFL Game Rules in PCE
-
-add [T] ~played(T, T);
-add [T1, T2] played(T1, T2) implies played(T2, T1);
-add [T1, T2] played(T1, T2) and won(T1) implies ~won(T2);
-
-add [T1, T2, S1, S2]
-played(T1, T2) and scored(T1, S1) and scored(T2, S2)
-  and (S1 > S2) implies won(T1);
-
-add [T1, T2, S1, S2]
-played(T1, T2) and scored(T1, S1) and scored(T2, S2)
-  and ~(S2 > S1) implies ~won(T2) ;
-
-add [T, S1, S2] scored(T, S1) and (S1 > S2)
- implies ~scored(T, S2);
-
-aslide: PCE Application: NFL Facts (from Stanford Output)
-\smaller{
-const EntityMention6: objectId;
-const EntityMention7: objectId;
-const EntityMention8: objectId;
-const EntityMention9: objectId;
-const EntityMention10: objectId;
-const Packers: NFLTeam;
-const GreenBay: NFLTeam;
-const Philadelphia: NFLTeam;
-assert MentionNFLTeam(EntityMention6, Packers);
-assert MentionNFLTeam(EntityMention7, GreenBay);
-assert MentionNFLTeam(EntityMention8, Philadelphia);
-assert MentionFinalScore(EntityMention9, 39);
-assert MentionFinalScore(EntityMention10, 13);
-
-assert MentionTeamScoringAll(EntityMention9, EntityMention6);
-assert MentionTeamScoringAll(EntityMention9, EntityMention8);
-assert MentionTeamScoringAll(EntityMention10, EntityMention8);
-
-ask [T1, T2] won(T1) and ~won(T2) .1;
-}
-
-slide: PCE Application: NFL Result
-\begin{alltt}\smaller\smaller{% mcsat ../examples/football
-Loading ../examples/football
-Input from file ../examples/football
-Setting MCSAT parameters:
- max_samples was 100, now 1000
-
-6 results:
-[T1 <- GreenBay, T2 <- Philadelphia] 0.385:
-     (won(GreenBay)) & (~won(Philadelphia))
-[T1 <- GreenBay, T2 <- Packers] 0.358:
-     (won(GreenBay)) & (~won(Packers))
-[T1 <- Packers, T2 <- Philadelphia] 0.348:
-     (won(Packers)) & (~won(Philadelphia))
-[T1 <- Packers, T2 <- GreenBay] 0.319:
-     (won(Packers)) & (~won(GreenBay))
-[T1 <- Philadelphia, T2 <- Packers] 0.291:
-     (won(Philadelphia)) & (~won(Packers))
-[T1 <- Philadelphia, T2 <- GreenBay] 0.289:
-     (won(Philadelphia)) & (~won(GreenBay))
-QUIT reached, exiting read_eval_print_loop
-}\end{alltt}
-
-Took over 2 minutes on a 64-bit intel
-
-slide: PCE Application: NFL Lazy Result
-
-\begin{alltt}\smaller\smaller{% mcsat ../examples/football --lazy=true
-Loading ../examples/football
-Input from file ../examples/football
-Setting MCSAT parameters:
- max_samples was 100, now 1000
-
-6 results:
-[T1 <- GreenBay, T2 <- Philadelphia] 0.280:
-     (won(GreenBay)) & (~won(Philadelphia))
-[T1 <- GreenBay, T2 <- Packers] 0.273:
-     (won(GreenBay)) & (~won(Packers))
-[T1 <- Packers, T2 <- Philadelphia] 0.258:
-     (won(Packers)) & (~won(Philadelphia))
-[T1 <- Philadelphia, T2 <- Packers] 0.252:
-     (won(Philadelphia)) & (~won(Packers))
-[T1 <- Philadelphia, T2 <- GreenBay] 0.251:
-     (won(Philadelphia)) & (~won(GreenBay))
-[T1 <- Packers, T2 <- GreenBay] 0.250:
-     (won(Packers)) & (~won(GreenBay))
-QUIT reached, exiting read_eval_print_loop
-}\end{alltt}
-
-Probabilities are somewhat different, but time is $<$ a second.
-
-slide: Relation to Other Models
-
-
-
-Bayes Networks
-
-
-
-islide: Related Work
-
-Alchemy (P. Domingos, Univ. of Washington)
-
-Markov TheBeast (S. Riedel)
+Incerto: A Probabilistic Reasoner for the Semantic Web based on Markov Logic
+(Pedro Oliveira)
 
 islide: Future Work
 
-Add conditionals
+Lazy MCSAT is an algorithm developed by Domingos that only creates
+instances as needed
 
-Add functional properties, e.g., bijective, etc.
+Make use of conditionals to make the conditional probability calculation
+more convenient
 
-Allow restricted formulas for direct predicates
+Allow relational constraints, for example, that a predicate is functional
 
-Allow probabilities to be given for weights
+Extend rules to work with fully observable predicates
 
-Modularize, allowing composition of different samplings
+Allow probabilities to be given in place of weights - both are useful
 
-Allow non-Boolean Random Variables
+Non-Boolean Random Variables
 
-slide: Conclusions
+Weight and rule learning from training data
 
+slide: Bibliography
+
+\smaller\smaller{
+\begin{thebibliography}{1}
+
+\bibitem{MarkovLogicNetworks:2006}
+Matthew Richardson and Pedro Domingos.
+\newblock Markov logic networks.
+\newblock {\em Mach. Learn.}, 62(1-2):107--136, 2006.
+
+\bibitem{WalkSAT:1995}
+Bart Selman, Henry Kautz, and Bram Cohen.
+\newblock Local search strategies for satisfiability testing.
+\newblock In {\em DIMACS Ser. in Discr. Math. and Theor. Comp. Sci.},
+pages 521--532, 1995.
+
+\bibitem{SampleSAT:2004}
+Wei Wei, Jordan Erenrich, and Bart Selman.
+\newblock Towards efficient sampling: exploiting random walk strategies.
+\newblock In {\em AAAI'04}, pages 670--676. AAAI Press, 2004.
+
+\bibitem{MC-SAT:2006}
+Hoifung Poon and Pedro Domingos.
+\newblock Sound and efficient inference with probabilistic and deterministic
+  dependencies.
+\newblock In {\em AAAI'06}, pages 458--463. AAAI Press, 2006.
+
+\bibitem{LazySAT:2006}
+Parag Singla and Pedro Domingos.
+\newblock Memory-efficient inference in relational domains.
+\newblock In {\em AAAI'06}, pages 488--493. AAAI Press, 2006.
+
+\bibitem{LazyMCSAT:2008}
+Hoifung Poon, Pedro Domingos, and Marc Sumner.
+\newblock A general method for reducing the complexity of relational inference
+  and its application to MCMC.
+\newblock In {\em AAAI'08}, pages 1075--1080. AAAI Press, 2008.
+
+\end{thebibliography}
+}
+
+islide: Conclusions
+
+Probabilistic inferencing has always been important for domains with
+uncertainty: planning, robotics, natural language processing, etc.
+
+It is becoming important even for formal methods, as a part of certifying
+reliability.
+
+PCE is a robust and scalable tool for probabilistic inference
+
+We invite you to try it out and give us feedback
+
+PCE is open source, and will be available soon as a component of the
+Personal Assistant that Learns (PAL) Framework at \url{http://pal.sri.com}\\
+\vspace*{10mm}\smaller{Bruno Dutertre was involved in early design and implementation}
