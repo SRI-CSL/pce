@@ -40,6 +40,7 @@ extern void print_clause(samp_clause_t *clause, samp_table_t *table);
 extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,
 				 int32_t indent, bool include_prob);
 extern void print_assignment(samp_table_t *table);
+extern void print_atom_now(samp_atom_t *atom, samp_table_t *table);
 extern char *literal_string(samp_literal_t lit, samp_table_t *table);
 extern double atom_probability(int32_t atom_index, samp_table_t *table);
 extern double query_probability(samp_query_instance_t *qinst,
