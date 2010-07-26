@@ -222,6 +222,11 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
       }
     }
   }
+  if (get_verbosity_level() > 1) {
+    printf("add_atom: Adding internal atom ");
+    print_atom_now(atom, table);
+    printf("\n");
+  }
   int32_t result = add_internal_atom(table, atom, true);
   return result;
 }
@@ -2037,6 +2042,11 @@ void new_const_atoms_at(int32_t idx, int32_t newcidx, int32_t arity, int32_t *ps
   int32_t i;
   
   if (idx == arity) {
+    if (get_verbosity_level() > 1) {
+      printf("new_const_atoms_at: Adding internal atom ");
+      print_atom_now(atom, table);
+      printf("\n");
+    }
     add_internal_atom(table, atom, false);
   } else if (idx == newcidx) {
     // skip over the new constant - it's already set in atom args.
@@ -2197,9 +2207,11 @@ int32_t substit_rule(samp_rule_t *rule,
       atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
 				      arity+1, //+1 for pred
 				      (int32_t *) new_atom);
-      // printf("substit_rule: Adding internal atom ");
-      // print_atom_now(new_atom, table);
-      // printf("\n");
+      if (get_verbosity_level() > 1) {
+	printf("substit_rule: Adding internal atom ");
+	print_atom_now(new_atom, table);
+	printf("\n");
+      }
       int32_t added_atom = add_internal_atom(table, new_atom, false);
       if (added_atom == -1){
 	// This shouldn't happen, but if it does, we need to free up space
@@ -2355,7 +2367,9 @@ void all_rule_instances_rec(int32_t vidx,
     // Simply do the substitution, or go to the next var
     if (vidx == rule->num_vars - 1) {
       substit_buffer.entries[vidx+1].const_index = INT32_MIN;
-      substit_rule(rule, substit_buffer.entries, table);
+      if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
+	substit_rule(rule, substit_buffer.entries, table);
+      }
     } else {
       all_rule_instances_rec(vidx+1, rule, table, atom_index);
     }
@@ -2394,6 +2408,11 @@ void all_pred_instances_rec(int32_t vidx, int32_t *psig, int32_t arity,
   int32_t i;
 
   if (vidx == arity) {
+    if (get_verbosity_level() > 1) {
+      printf("all_pred_instances_rec: Adding internal atom ");
+      print_atom_now(atom, table);
+      printf("\n");
+    }
     add_internal_atom(table, atom, false);
   } else {
     entry = sort_table->entries[psig[vidx]];
@@ -2442,6 +2461,10 @@ void all_rule_instances(int32_t rule_index, samp_table_t *table) {
 // Note that substit_buffer.entries has been set up already
 void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 				int32_t atom_index) {
+  int32_t i;
+  for(i=0; i<substit_buffer.size; i++){
+    substit_buffer.entries[i].fixed = false;
+  }
   all_rule_instances_rec(0, rule, table, atom_index);
 }
 
@@ -2607,6 +2630,11 @@ int32_t substit_query(samp_query_t *query,
 	      added_atom = -1;
 	    }
 	  } else {
+	    if (get_verbosity_level() > 1) {
+	      printf("substit_query: Adding internal atom ");
+	      print_atom_now(new_atom, table);
+	      printf("\n");
+	    }
 	    added_atom = add_internal_atom(table, new_atom, false);
 	  }
 	  if (added_atom == -1){
@@ -2659,12 +2687,12 @@ bool check_query_instance(samp_query_t *query, samp_table_t *table) {
       // check for witness predicate - fixed false if NULL atom_map
       if (atom_map == NULL) return false;//atom is inactive
       if (query->literals[i][j]->neg &&
-	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
+	  (samp_truth_value_t) atom_table->assignment[atom_table->current_assignment][atom_map->val]
 	  == v_fixed_false){
 	return false;//literal is fixed true
       }
       if (!query->literals[i][j]->neg &&
-	  (samp_truth_value_t) atom_table->assignment[atom_map->val]
+	  (samp_truth_value_t) atom_table->assignment[atom_table->current_assignment][atom_map->val]
 	  == v_fixed_true){
 	return false;//literal is fixed true
       }
@@ -2683,7 +2711,9 @@ void all_query_instances_rec(int32_t vidx, samp_query_t *query,
     // Simply do the substitution, or go to the next var
     if (vidx == query->num_vars - 1) {
       substit_buffer.entries[vidx+1].const_index = INT32_MIN;
-      substit_query(query, substit_buffer.entries, table);
+	if (!lazy_mcsat() || check_query_instance(query, table)) {
+	  substit_query(query, substit_buffer.entries, table);
+	}
     } else {
       all_query_instances_rec(vidx+1, query, table, atom_index);
     }
@@ -2731,6 +2761,11 @@ int32_t samp_query_to_query_instance(samp_query_t *query, samp_table_t *table) {
       new_atom = rule_atom_to_samp_atom(lit[i][j]->atom, pred_table);
       for (k = 0; k < arity; k++) {
 	argidx = new_atom->args[k];
+      }
+      if (get_verbosity_level() > 1) {
+	printf("samp_query_to_query_instance: Adding internal atom ");
+	print_atom_now(new_atom, table);
+	printf("\n");
       }
       added_atom = add_internal_atom(table, new_atom, false);
       if (added_atom == -1){
@@ -2944,6 +2979,11 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom){
   int32_t atom_index;
 
   //assert(valid_table(table));
+  if (get_verbosity_level() > 1) {
+    printf("activate_atom: Adding internal atom ");
+    print_atom_now(atom, table);
+    printf("\n");
+  }
   atom_index = add_internal_atom(table, atom, false);
   //assert(valid_table(table));
   assert(table->atom_table.num_vars == atom_index + 1);
