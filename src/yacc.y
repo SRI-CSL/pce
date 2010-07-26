@@ -857,9 +857,11 @@ int yylex (void) {
     yylval.str = yystrbuf;
     if (strcasecmp(yylval.str, "PREDICATE") == 0)
       return PREDICATE;
-    else if (strcasecmp(yylval.str, "DIRECT") == 0)
+    else if (strcasecmp(yylval.str, "OBSERVABLE") == 0
+	     || strcasecmp(yylval.str, "DIRECT") == 0)
       return DIRECT;
-    else if (strcasecmp(yylval.str, "INDIRECT") == 0)
+    else if (strcasecmp(yylval.str, "HIDDEN") == 0
+	     || strcasecmp(yylval.str, "INDIRECT") == 0)
       return INDIRECT;
     else if (strcasecmp(yylval.str, "SORT") == 0)
       return SORT;
