@@ -160,12 +160,13 @@ int32_t choose_random_atom(samp_table_t *table){
     constant = anum % card; //card can't be zero
     anum = anum/card;
     if (sort_table->entries[signature[i]].constants == NULL) {
+      // Must be an integer
       atom->args[i] = constant;
     } else {
       atom->args[i] = sort_table->entries[signature[i]].constants[constant];
+      // Quick typecheck
+      assert(const_sort_index(atom->args[i],const_table) == signature[i]);
     }
-    // Quick typecheck
-    assert(const_sort_index(atom->args[i],const_table) == signature[i]);
   }
   
   //assert(valid_table(table));
