@@ -1,0 +1,111 @@
+% -*- Mode: TeX -*-
+author: S. Owre
+title: \textbf{PCE Architecture}
+date: August 12, 2010
+preamble:
+\setbeamercolor{title}{fg=white!80!blue}
+\setbeamercovered{transparent}
+\logo{\includegraphics[height=0.5cm]{sri_blue_logo}}
+
+islide: PCE Architecture
+
+PCE does probabilistic inferencing based on Markov Logic Networks
+
+Input consists of sorts, constants, observable and hidden predicates,
+facts, weighted rules, and queries
+
+Output consists of marginal probabilities of atoms and query instances
+
+PCE can be invoked as an interactive tool: \texttt{mcsat}
+
+Or as an XML-RPC server: \texttt{xpce}
+
+These are written in C and run on Windows, Mac, and Linux
+
+Both run the same algorithms internally, only the input and output forms
+are different
+
+slide: \texttt{mcsat}
+
+\texttt{mcsat} takes simple commands:
+
+\begin{alltt}\smaller{
+sort Person;
+const A, B, C: Person;
+predicate Friends(Person, Person) hidden;
+predicate Smoking(Person) hidden;
+predicate Cancer(Person) hidden;
+
+add [x] Smoking(x) => Cancer(x)  0.8; # Smoking causes cancer.
+# Friends are likely to share smoking habits
+add [x, y] Friends(x, y) => (Smoking(x) iff Smoking(y))  .3;
+
+add Smoking(A);
+add Friends(A, B);
+
+mcsat_params 1000000;
+mcsat;
+dumptable atom;
+}\end{alltt}
+
+slide: \texttt{xpce}
+
+\includegraphics[width=\linewidth]{xpce-figure}
+
+islide: \texttt{xpce}
+
+\texttt{xpce} is an XML-RPC server
+
+Clients can be in any language that supports XML-RPC and JSON
+
+Clients invoke \emph{methods}, and the server returns \emph{responses}
+
+The \emph{xpce} server maintains a single persistent, common state
+
+For the most part, the method names are simply the \texttt{mcsat} commands
+prepended with \texttt{xpce.}, e.g. \texttt{xpce.sort},
+\texttt{xpce.predicate}, \texttt{xpce.const}, \texttt{xpce.assert},
+\texttt{xpce.add}, \texttt{xpce.ask}, \texttt{xpce.mcsat}
+
+In addition, the \texttt{xpce.command} method can be used to input a string
+of the form expected by \texttt{mcsat}
+
+islide: \texttt{xpce} and JSON
+
+\texttt{xpce} input and output is generally encoded in JSON
+
+Example: \texttt{predicate Smoking(Person) hidden;}\\
+is encoded as (using the \texttt{xpce.predicate} method):\\
+\begin{alltt}
+ \{"predicate": "Smoking",
+  "arguments": ["Person"],
+  "observable": false\}
+\end{alltt}
+
+slide: Java clients
+
+A number of Java classes are available to facilitate creation of clients:
+
+\begin{alltt}\smaller{
+ Sort Person = new Sort("Person");
+ addSort(Person);
+ addConstant(Person,"A");
+ PredicateDecl Friend =
+   new PredicateDecl(false, "Friend", Person, Person);
+ addPredicate(Friends);
+ Formula query = Formula.create("Cancer(\$P)");
+ ArrayList<FormulaAndProbability> answers =
+   client.ask(query, 0.01, 10);
+}\end{alltt}
+
+islide: Links
+
+The basic PCE documentation is in the Faust repository under
+\url{sw/PCE/pal_pce.pdf}.
+
+There is no documentation for the Java PCE client software - the sources
+are in the Faust repository under \url{sw/PCE/xpce_client}
+
+Building PCE requires XMLRPC-C (\url{http://xmlrpc-c.sourceforge.net/} and
+JSON-C (\url{http://oss.metaparadigm.com/json-c/}).
+
