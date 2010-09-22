@@ -513,10 +513,11 @@ bool clauses_equal(samp_rule_t *c1, samp_rule_t *c2) {
 }
 
 // Checks clauses to see that they all involve at least one indirect atom
+// or exactly one positive direct atom (head normal form)
 // Returns -1 if so, otherwise the index to the clause that fails
-int32_t all_clauses_involve_indirects(rule_literal_t ***lits) {
+void all_clauses_involve_indirects_or_hnf(rule_literal_t ***lits) {
   int32_t i, j;
-  bool found;
+  bool found, pos;
 
   for (i = 0; lits[i] != NULL; i++) {
     found = false;
@@ -527,22 +528,37 @@ int32_t all_clauses_involve_indirects(rule_literal_t ***lits) {
       }
     }
     if (!found) {
-      return i;
+      // All preds are direct - check that there is exactly one positive
+      pos = false;
+      for (j = 0; lits[i][j] != NULL; j++) {
+	if (! lits[i][j]->neg) {
+	  if (pos) {
+	    // Have more than one pos, complain
+	    mcsat_err("cnf error: clause contains only observable predicates, with more than one positive:");
+	    
+	  } else {
+	    pos = true;
+	  }
+	}
+      }
+      if (!pos) {
+	mcsat_err("cnf error: clause contains only observable predicates, with none positive:");
+      }
     }
   }
-  return -1;
 }
       
 
 // Generates the CNF form of a formula, and updates the clause table (if no
 // variables) or the rule table.
 
-void add_cnf(input_formula_t *formula, double weight, char *source) {
+void add_cnf(input_formula_t *formula, double weight, char *source, bool add_weights) {
   rule_table_t *rule_table = &samp_table.rule_table;
   pred_table_t *pred_table = &samp_table.pred_table;
   int32_t i, j, current_rule, num_lits, num_vars, atom_idx;
   rule_literal_t ***lits, *lit;
   samp_rule_t *clause, *found;
+  bool found_indirect;
 
   // Returns the literals, and sets the sort of the variables
   lits = cnf_pos(formula->fmla, formula->vars);
@@ -550,10 +566,10 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
     return;
   }
 
-  if (all_clauses_involve_indirects(lits) != -1) {
-    mcsat_err("cnf error: add should include at least one indirect atom in each clause.\n");
-    return;
-  }
+  // First check if clauses all either involve indirect preds, or are in head normal form
+  // We check here in order to abort the add_cnf before adding some clauses
+  // If there is an error, this function will not return
+  all_clauses_involve_indirects_or_hnf(lits);
   
   if (formula->vars == NULL) {
     // No variables, just assert the clauses
@@ -561,14 +577,18 @@ void add_cnf(input_formula_t *formula, double weight, char *source) {
     for (i = 0; lits[i] != NULL; i++) {
       for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++) {}
       clause_buffer_resize(num_lits);
+      found_indirect = false;
       for (j = 0; j < num_lits; j++) {
 	lit = lits[i][j];
+	if (lit->atom->pred > 0) {
+	  found_indirect = true;
+	}
 	samp_atom_t *satom = rule_atom_to_samp_atom(lit->atom, pred_table);
 	atom_idx = add_internal_atom(&samp_table, satom, true);
 	free_samp_atom(satom);
 	clause_buffer.data[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
       }
-      add_internal_clause(&samp_table, clause_buffer.data, num_lits, weight);
+      add_internal_clause(&samp_table, clause_buffer.data, num_lits, weight, found_indirect, add_weights);
     }
   } else {
     for (num_vars = 0; formula->vars[num_vars] != NULL; num_vars++) {}
