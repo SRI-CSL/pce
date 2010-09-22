@@ -549,6 +549,24 @@ void print_rule (samp_rule_t *rule, samp_table_t *table, int indent) {
   }
 }
 
+void print_rule_clause (rule_literal_t **lit, var_entry_t **vars,
+			samp_table_t *table) {
+  int32_t j;
+
+  if (vars != NULL) {
+    for(j = 0; vars[j] != NULL; j++) {
+      j==0 ? output(" (") : output(", ");
+      output("%s", vars[j]->name);
+    }
+    output(")");
+  }
+  for(j=0; lit[j] != NULL; j++) {
+    j==0 ? output("   ") : output(" | ");
+    if (lit[j]->neg) output("~");
+    print_rule_atom(lit[j]->atom, lit[j]->neg, vars, table, 0);
+  }
+}
+
 extern void dump_rule_table (samp_table_t *samp_table) {
   rule_table_t *rule_table = &(samp_table->rule_table);
   uint32_t nrules = rule_table->num_rules;
@@ -628,15 +646,22 @@ extern void dump_query_instance_table (samp_table_t *samp_table) {
 
 double atom_probability(int32_t atom_index, samp_table_t *table) {
   atom_table_t *atom_table = &table->atom_table;
+  pred_table_t *pred_table = &table->pred_table;
+  samp_atom_t *atom;
   double diff;
 
-  diff = (double)
-    (atom_table->num_samples - atom_table->sampling_nums[atom_index]);
-  if (diff > 0) {
-    return (double) (atom_table->pmodel[atom_index]/diff);
+  atom = atom_table->atom[atom_index];
+  if (atom->pred >= 0) { // an indirect predicate
+    diff = (double)
+      (atom_table->num_samples - atom_table->sampling_nums[atom_index]);
+    if (diff > 0) {
+      return (double) (atom_table->pmodel[atom_index]/diff);
+    } else {
+      // No samples - we know nothing
+      return .5;
+    }
   } else {
-    // No samples - we know nothing
-    return .5;
+    return atom_table->assignment[0][atom_index] == v_fixed_true ? 1.0 : 0.0;
   }
 }
 
