@@ -107,13 +107,13 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p){
   atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
 				 arity+1, //+1 for pred
 				 (int32_t *) atom);
-  if (atom_map == NULL){
+  if (atom_map == NULL) {
     //assert(valid_table(table));
     atom_table_resize(atom_table, clause_table);
     current_atom_index = atom_table->num_vars++;
     samp_atom_t * current_atom = (samp_atom_t *) safe_malloc((arity+1) * sizeof(int32_t));
     current_atom->pred = predicate;
-    for (i = 0; i < arity; i++){
+    for (i = 0; i < arity; i++) {
       current_atom->args[i] = atom->args[i];
     }
     atom_table->atom[current_atom_index] = current_atom;
@@ -306,43 +306,82 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom,
 int32_t add_internal_clause(samp_table_t *table,
 			    int32_t *clause,
 			    int32_t length,
-			    double weight){
-  uint32_t i;
+			    double weight,
+			    bool indirect,
+			    bool add_weights) {
+  atom_table_t *atom_table = &table->atom_table;
+  uint32_t i, posidx;
   clause_table_t *clause_table;
   samp_clause_t **samp_clauses;
+  samp_literal_t lit;
   array_hmap_pair_t *clause_map;
+  bool negs_all_true;
 
   clause_table = &table->clause_table;
-  int_array_sort(clause, length);
-  clause_map = array_size_hmap_find(&(clause_table->clause_hash), length, (int32_t *) clause);
-  if (clause_map == NULL){
-    clause_table_resize(clause_table);
-    if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < length){
-      out_of_memory();
-    }
-    int32_t index = clause_table->num_clauses++;
-    samp_clause_t *entry = (samp_clause_t *) safe_malloc(sizeof(samp_clause_t) + length * sizeof(int32_t));
-    samp_clauses = clause_table->samp_clauses;
-    samp_clauses[index] = entry;
-    entry->numlits = length;
-    entry->weight = weight;
-    entry->link = NULL;
-    for (i=0; i < length; i++){
-      entry->disjunct[i] = clause[i];
-    }
-    clause_map = array_size_hmap_get(&clause_table->clause_hash, length, (int32_t *) entry->disjunct);
-    clause_map->val = index;
-    // printf("\nAdded clause %"PRId32"\n", index);
-    return index;
-  } else {//add the weight to the existing clause
-    samp_clauses = clause_table->samp_clauses;
-    if (DBL_MAX - weight >= samp_clauses[clause_map->val]->weight){
-      samp_clauses[clause_map->val]->weight += weight;
+  if (indirect) {
+    int_array_sort(clause, length);
+    clause_map = array_size_hmap_find(&(clause_table->clause_hash), length, (int32_t *) clause);
+    if (clause_map == NULL){
+      clause_table_resize(clause_table);
+      if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < length){
+	out_of_memory();
+      }
+      int32_t index = clause_table->num_clauses++;
+      samp_clause_t *entry = (samp_clause_t *)
+	safe_malloc(sizeof(samp_clause_t) + length * sizeof(int32_t));
+      samp_clauses = clause_table->samp_clauses;
+      samp_clauses[index] = entry;
+      entry->numlits = length;
+      entry->weight = weight;
+      entry->link = NULL;
+      for (i=0; i < length; i++){
+	entry->disjunct[i] = clause[i];
+      }
+      clause_map = array_size_hmap_get(&clause_table->clause_hash, length, (int32_t *) entry->disjunct);
+      clause_map->val = index;
+      // printf("\nAdded clause %"PRId32"\n", index);
+      return index;
     } else {
-      samp_clauses[clause_map->val]->weight = DBL_MAX;
-    }  //do we need a similar check for negative weights? 
-    
-    return clause_map->val;
+      if (add_weights) {
+	//Add the weight to the existing clause
+	samp_clauses = clause_table->samp_clauses;
+	if (DBL_MAX - weight >= samp_clauses[clause_map->val]->weight){
+	  samp_clauses[clause_map->val]->weight += weight;
+	} else {
+	  samp_clauses[clause_map->val]->weight = DBL_MAX;
+	}  //do we need a similar check for negative weights?
+      }
+      return clause_map->val;
+    }
+  } else {
+    // Clause only involves direct predicates - just set positive literal to true
+    samp_truth_value_t *assignment =
+      atom_table->assignment[atom_table->current_assignment];
+    negs_all_true = true;
+    posidx = -1;
+    for (i = 0; i < length; i++) {
+      lit = clause[i];
+      if (is_neg(lit)) {
+	// Check that atom is true
+	if (!assigned_true(assignment[var_of(lit)])) {
+	  negs_all_true = false;
+	  break;
+	}
+      } else {
+	if (assigned_true(assignment[var_of(lit)])) {
+	  // Already true - exit
+	  break;
+	} else {
+	  posidx = i;
+	}
+      }
+    }
+    if (negs_all_true && posidx != -1) {
+      // Set assignment to fixed_true
+      atom_table->assignment[0][var_of(clause[posidx])] = v_fixed_true;
+      atom_table->assignment[1][var_of(clause[posidx])] = v_fixed_true;
+    }
+    return -1;
   }
 }
 
@@ -398,8 +437,10 @@ void add_source_to_clause(char *source, int32_t clause_index, double weight,
 
 int32_t add_clause(samp_table_t *table,
 		   input_literal_t **in_clause,
-		   double weight, char *source){
+		   double weight, char *source, bool add_weights){
+  atom_table_t *atom_table = &table->atom_table;
   int32_t i, atom, length, clause_index;
+  bool found_indirect;
   
   length = 0;
   while (in_clause[length] != NULL){
@@ -408,7 +449,8 @@ int32_t add_clause(samp_table_t *table,
 
   clause_buffer_resize(length);
 
-  for (i=0; i < length; i++){
+  found_indirect = false;
+  for (i=0; i < length; i++) {
     atom = add_atom(table, in_clause[i]->atom);
     
     if (atom == -1){
@@ -420,9 +462,15 @@ int32_t add_clause(samp_table_t *table,
     } else {
       clause_buffer.data[i] = pos_lit(atom);
     }
+    if (atom_table->atom[atom]->pred > 0) {
+      found_indirect = true;
+    }
   }
-  clause_index = add_internal_clause(table, clause_buffer.data, length, weight);
-  add_source_to_clause(source, clause_index, weight, table);
+  clause_index = add_internal_clause(table, clause_buffer.data, length, weight,
+				     found_indirect, add_weights);
+  if (clause_index != -1) {
+    add_source_to_clause(source, clause_index, weight, table);
+  }
   return clause_index;
 }
 
@@ -2143,7 +2191,7 @@ bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs,
 // Returns -1 if there is a problem.
 int32_t substit_rule(samp_rule_t *rule,
 		     substit_entry_t *substs,
-		     samp_table_t *table){
+		     samp_table_t *table) {
   const_table_t *const_table = &table->const_table;
   sort_table_t *sort_table = &table->sort_table;
   atom_table_t *atom_table = &table->atom_table;
@@ -2152,6 +2200,7 @@ int32_t substit_rule(samp_rule_t *rule,
   int32_t vsort, csort, csubst;
   array_hmap_pair_t *atom_map;
   int32_t i, j, litidx;
+  bool found_indirect;
   
   for(i=0; i<rule->num_vars; i++){
     csubst = substs[i].const_index;
@@ -2186,6 +2235,7 @@ int32_t substit_rule(samp_rule_t *rule,
   // We just use the clause_buffer - first make sure it's big enough
   clause_buffer_resize(rule->num_lits);
   litidx = 0;
+  found_indirect = false;
   for(i=0; i<rule->num_lits; i++) {
     rule_literal_t *lit = rule->literals[i];
     int32_t arity = atom_arity(lit->atom, pred_table);
@@ -2219,6 +2269,9 @@ int32_t substit_rule(samp_rule_t *rule,
 	mcsat_err("substit: Bad atom\n");
 	return -1;
       }
+      if (new_atom->pred > 0) {
+	found_indirect = true;
+      }
       //if (atom_map != NULL) {
       // already had the atom - free it
       safe_free(new_atom);
@@ -2226,7 +2279,7 @@ int32_t substit_rule(samp_rule_t *rule,
       clause_buffer.data[litidx++] = lit->neg ? neg_lit(added_atom) : pos_lit(added_atom);
     }
   }
-  return add_internal_clause(table, clause_buffer.data, litidx, rule->weight);
+  return add_internal_clause(table, clause_buffer.data, litidx, rule->weight, found_indirect, false);
 }
 
 
