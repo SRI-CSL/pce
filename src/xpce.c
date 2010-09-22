@@ -634,7 +634,7 @@ xpce_add(xmlrpc_env * const envP,
     source = (char *) json_object_get_string(sourceobj);
   }
   pthread_mutex_lock(&mutex);
-  add_cnf(fmla, weight, source);
+  add_cnf(fmla, weight, source, true);
   pthread_mutex_unlock(&mutex);
   
   free_formula(fmla);
