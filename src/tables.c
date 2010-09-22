@@ -272,7 +272,7 @@ void add_const_to_sort(int32_t const_index,
   bool foundit;
   sort_entry_t *entry, *supentry;
   
-  entry = &sort_table->entries[sort_index];  
+  entry = &sort_table->entries[sort_index];
   if (entry->size == entry->cardinality){
     if (MAXSIZE(sizeof(int32_t), 0) - entry->size < entry->size/2){
       out_of_memory();
