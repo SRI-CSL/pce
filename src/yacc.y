@@ -272,7 +272,7 @@ input_command_t input_command;
     if (strcmp(wt, "DBL_MAX") == 0) {
       input_command.decl.add_fdecl.weight = DBL_MAX;
     } else {
-      input_command.decl.add_fdecl.weight = atof(wt);
+      input_command.decl.add_fdecl.weight = strtod(wt, NULL);
       safe_free(wt);
     }
   };
