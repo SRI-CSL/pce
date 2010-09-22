@@ -109,7 +109,7 @@ typedef struct samp_clause_s {
 // Note that to get the arity, the pred_table must be available unless the
 // predicate is builtin.
 typedef struct samp_atom_s {
-  int32_t pred;
+  int32_t pred; // <= 0: direct pred; > 0: indirect pred
   int32_t args[0];
 } samp_atom_t;
 
@@ -224,7 +224,7 @@ typedef struct pred_tbl_s {
 
 typedef struct pred_table_s  {
   pred_tbl_t evpred_tbl; //signature map for evidence predicates
-  pred_tbl_t pred_tbl;//signature map for normal predicates
+  pred_tbl_t pred_tbl;//signature map for non-evidence predicates
   stbl_t pred_name_index;//symbol table for all predicates
 } pred_table_t;
 
