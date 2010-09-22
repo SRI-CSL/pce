@@ -1,5 +1,6 @@
 /* Functions for creating input structures */
 
+#include <ctype.h>
 #include <inttypes.h>
 #include <float.h>
 #include <string.h>
@@ -19,10 +20,10 @@ extern int yydebug;
 // MCSAT parameters
 #define DEFAULT_MAX_SAMPLES 100
 #define DEFAULT_SA_PROBABILITY .5
-#define DEFAULT_SAMP_TEMPERATURE 0.91
-#define DEFAULT_RVAR_PROBABILITY .2
-#define DEFAULT_MAX_FLIPS 1000
-#define DEFAULT_MAX_EXTRA_FLIPS 10
+#define DEFAULT_SAMP_TEMPERATURE 5.0
+#define DEFAULT_RVAR_PROBABILITY .05
+#define DEFAULT_MAX_FLIPS 100
+#define DEFAULT_MAX_EXTRA_FLIPS 5
 
 static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 static double sa_probability = DEFAULT_SA_PROBABILITY;
@@ -534,8 +535,11 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
   sort_table_t *sort_table = &table->sort_table;
   const_table_t *const_table = &table->const_table;
   var_table_t *var_table = &table->var_table;
-  
-  if (sort_name_index(sort, sort_table) == -1) {
+  int32_t sort_index, i, icnst;
+  sort_entry_t *sort_entry;
+
+  sort_index = sort_name_index(sort, sort_table);
+  if (sort_index == -1) {
     if (!strict_constants())
       add_sort(sort_table, sort);
     else {
@@ -543,20 +547,39 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
       return -1;
     }
   }
-  // Need to see if name in var_table
-  if (var_index(cnst, var_table) == -1) {
-    cprintf(2, "Adding const %s\n", cnst);
-    // add_const returns -1 for error, 1 for already exists, 0 for new
-    if (add_const(cnst, sort, table) == 0) {
-      int32_t cidx = const_index(cnst, const_table);
-      // We don't invoke this in add_const, as this is eager.
-      // Last arg says this is not lazy.
-      create_new_const_atoms(cidx, table);
-      create_new_const_rule_instances(cidx, table, 0);
-      create_new_const_query_instances(cidx, table, 0);
+  sort_entry = &sort_table->entries[sort_index];
+  if (sort_entry->constants == NULL) {
+    // Check that the const is an integer in range
+    for (i = (cnst[0] == '+' || cnst[0] == '-') ? 1 : 0; cnst[i] != '\0'; i++) {
+      if (! isdigit(cnst[i])) {
+	mcsat_err("Sort %s only allows integers in [%"PRId32"..%"PRId32"]\n",
+		  sort, sort_entry->lower_bound, sort_entry->upper_bound);
+      }
+    }
+    icnst = atoi(cnst);
+    if (icnst >= sort_entry->lower_bound && icnst <= sort_entry->upper_bound) {
+      mcsat_warn("Constant declaration ignored: %s is already in [%"PRId32"..%"PRId32"]\n",
+		 cnst, sort_entry->lower_bound, sort_entry->upper_bound);
+    } else {
+      mcsat_err("Illegal constant %s: sort %s only allows integers in [%"PRId32"..%"PRId32"]\n",
+		cnst, sort, sort_entry->lower_bound, sort_entry->upper_bound);
     }
   } else {
-    mcsat_err("%s is a variable, cannot be redeclared a constant\n", cnst);
+    // Need to see if name in var_table
+    if (var_index(cnst, var_table) == -1) {
+      cprintf(2, "Adding const %s\n", cnst);
+      // add_const returns -1 for error, 1 for already exists, 0 for new
+      if (add_const(cnst, sort, table) == 0) {
+	int32_t cidx = const_index(cnst, const_table);
+	// We don't invoke this in add_const, as this is eager.
+	// Last arg says this is not lazy.
+	create_new_const_atoms(cidx, table);
+	create_new_const_rule_instances(cidx, table, 0);
+	create_new_const_query_instances(cidx, table, 0);
+      }
+    } else {
+      mcsat_err("%s is a variable, cannot be redeclared a constant\n", cnst);
+    }
   }
   return 0;
 }
@@ -695,7 +718,7 @@ extern bool read_eval(samp_table_t *table) {
     case ADD: {
       input_add_fdecl_t decl = input_command.decl.add_fdecl;
       cprintf(2, "Clausifying and adding formula\n");
-      add_cnf(decl.formula, decl.weight, decl.source);
+      add_cnf(decl.formula, decl.weight, decl.source, true);
       break;
     }
     case ADD_CLAUSE: {
@@ -704,8 +727,7 @@ extern bool read_eval(samp_table_t *table) {
 	// No variables - adding a clause
 	cprintf(2, "Adding clause\n");
 	add_clause(table,
-		   decl.clause->literals,
-		   decl.weight, decl.source);
+		   decl.clause->literals, decl.weight, decl.source, true);
       }
       else {
 	// Have variables - adding a rule
