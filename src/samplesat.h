@@ -38,12 +38,14 @@ extern void all_pred_instances(char *pred, samp_table_t *table);
 
 extern int32_t add_clause(samp_table_t *table,
 			  input_literal_t **in_clause,
-			  double weight, char *source);
+			  double weight, char *source, bool add_weights);
 
 extern int32_t add_internal_clause(samp_table_t *table,
 				   int32_t *clause,
 				   int32_t length,
-				   double weight);
+				   double weight,
+				   bool indirect,
+				   bool add_weights);
 
 extern int32_t add_rule(input_clause_t *in_rule,
 			double weight,
