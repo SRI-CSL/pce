@@ -1201,7 +1201,7 @@ extern bool call_builtin (int32_t op, int32_t arity, int32_t *args) {
 extern char* builtinop_string (int32_t op) {
   switch (op) {
   case EQ: return "=";
-  case NEQ: return "/=";
+  case NEQ: return "~=";
   case LT: return "<";
   case LE: return "<=";
   case GT: return ">";
