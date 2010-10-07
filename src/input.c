@@ -323,25 +323,43 @@ Input grammar:\n\
        add | add_clause | ask | mcsat | mcsat_params | reset | retract |\n\
        dumptable | load | verbosity | help] ';' \n\n\
 where:\n\
- FORMULA := ['[' NAME++',' ']'] FMLA\n\
+predicates default to 'observable' (i.e., direct/witness)\n\n\
+ FORMULA := FMLA\n\
+          | '[' VAR+',' ']' FMLA\n\
  FMLA := ATOM\n\
        | FMLA 'iff' FMLA\n\
        | FMLA ('implies'|'=>') FMLA\n\
        | FMLA 'or' FMLA\n\
        | FMLA 'xor' FMLA\n\
        | FMLA 'and' FMLA\n\
-       | (not'|'~') FMLA\n\
+       | ('not'|'~') FMLA\n\
        | '(' FMLA ')'\n\
- CLAUSE := ['(' NAME++',' ')'] LITERAL++'|'\n\
- LITERAL := ['~'] ATOM\n\
- ATOM := NAME '(' ARG++',' ')'\n\
+ CLAUSE := LITERAL+'|'\n\
+         | '(' VAR+',' ')' LITERAL+'|'\n\
+ LITERAL := ATOM\n\
+          | ('not'|'~') ATOM\n\
+ ATOM := PREDICATE '(' ARGUMENT+',' ')'\n\
        | ARG BOP ARG\n\
- ARG := NAME | NUM\n\
- BOP := '=' | '/=' | '<' | '<=' | '>' | '>='\n\
- NAME := chars except whitespace parens ':' ',' ';'\n\
- NUM := ['+'|'-'] simple floating point number\n\
-predicates default to 'direct' (i.e., witness/observable)\n\
-+(x,y,z) is true when x + y = z, similarly for -, *, /, %\n\
+       | PREOP '(' ARGUMENT+',' ')'\n\
+ ARGUMENT := NAME | NUM\n\
+ VAR := NAME\n\
+ PREDICATE := NAME\n\
+ BOP := '=' | NEQ | '<' | '<=' | '>' | '>='\n\
+ NEQ := '/=' | '~='\n\
+ PREOP := '+' | '-' | '*' | '/' | '%'\n\
+        +(x,y,z) means x + y = z, similarly for -, *, /, %\n\
+        see standard C operators for definitions.\n\
+ STRING := Anything between double quotes, e.g., \"a\"\n\
+           or between single quotes, e.g., 'a'\n\
+ NAME := ALPHA (^ DELIM | CNTRL | COMMENT )*\n\
+ NUM := ( DIGIT | '.' | '+' | '-' ) ( DIGIT | '.' )*\n\
+        must contain at least one digit, at most one '.'\n\
+ INT := ['+'|'-'] DIGIT+\n\
+ ALPHA := 'a' | ... | 'z' | 'A' | ... | 'Z'\n\
+ DIGIT := '0' | ... | '9'\n\
+ DELIM := ' ' | '(' | ')' | '[' | ']' | '|' | ',' | ';' | ':'\n\
+ CNTRL := non-printing (control) characters\n\
+ COMMENT := '#' to end of line\n\n\
 ");
     break;
   }
