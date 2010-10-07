@@ -1015,7 +1015,15 @@ int yylex (void) {
   /* return end-of-file  */
   if (c == EOF) return QUIT;
   /* return single chars */
-  if (c == '~') return NOT;
+  if (c == '~') {
+    if ((cc = yygetc(parse_input)) == '=') {
+      return NEQ;
+    } else {
+      yyungetc(cc, parse_input);
+      --yylloc.last_column;
+      return NOT;
+    }
+  }
   if (isspace(c) || c == ',' ||  c == ';' || c == '(' || c == ')' || c == '[' || c == ']'
       || c == ':' || c == '\0' || c == EOF) {
     return c;
