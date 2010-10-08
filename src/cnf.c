@@ -514,7 +514,7 @@ bool clauses_equal(samp_rule_t *c1, samp_rule_t *c2) {
 
 // Checks clauses to see that they all involve at least one indirect atom
 // or exactly one positive direct atom (head normal form)
-// Returns -1 if so, otherwise the index to the clause that fails
+// Will not rerutn if there is an error.
 void all_clauses_involve_indirects_or_hnf(rule_literal_t ***lits) {
   int32_t i, j;
   bool found, pos;
