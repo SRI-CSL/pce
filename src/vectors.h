@@ -109,7 +109,7 @@ extern void extend_pvector(pvector_t *v);
 
 extern void resize_pvector(pvector_t *v, uint32_t n);
 
-static inline void pvector_push(pvector_t *v, void *p) {
+static void pvector_push(pvector_t *v, void *p) {
   uint32_t i;
 
   i = v->size;
