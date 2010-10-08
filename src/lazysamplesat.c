@@ -121,7 +121,6 @@ int32_t choose_random_atom(samp_table_t *table){
   pred_tbl_t *pred_tbl = &table->pred_table.pred_tbl; // Indirect preds
   atom_table_t *atom_table = &table->atom_table;
   sort_table_t *sort_table = &table->sort_table;
-  const_table_t *const_table = &table->const_table;
   pred_entry_t *pred_entry;
 
   // Get the number of possible indirect atoms
