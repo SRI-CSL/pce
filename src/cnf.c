@@ -32,7 +32,7 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
   pred_table_t *pred_table = &samp_table.pred_table;
   sort_table_t *sort_table = &samp_table.sort_table;
   const_table_t *const_table = &samp_table.const_table;
-  sort_entry_t *sort_entry;
+  sort_entry_t *sort_entry = NULL;
   int32_t i, j, num_args, pred_val, pred_idx, const_idx, *psig, vsig,
     subsig, vlen, intval;
   char *pred, *cname;
