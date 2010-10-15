@@ -28,6 +28,7 @@
 #include "cnf.h"
 #include "xpce.h"
 #include "lazysamplesat.h"
+#include "SFMT.h"
 
 extern int yyparse ();
 
@@ -36,6 +37,8 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static xmlrpc_server_abyss_t * serverToTerminateP;
 
 samp_table_t samp_table;
+
+uint32_t xpce_seed = 12345;
 
 // sort-decl := {"sort": NAME, "super": NAME} # "super" is optional,
 //                     # so this call can declare a sort or a subsort
@@ -872,6 +875,47 @@ xpce_mcsat(xmlrpc_env * const envP,
 }
 
 
+static xmlrpc_value *
+xpce_reset(xmlrpc_env * const envP,
+	   xmlrpc_value * const paramArrayP,
+	   void * const serverInfo ATTR_UNUSED,
+	   void * const channelInfo ATTR_UNUSED) {
+  struct json_object *resetdecl, *resetobj;
+
+  // Reset takes a single argument
+  printf("In xpce.reset\n");
+  resetdecl = xpce_parse_decl(envP, paramArrayP);
+  // should have form {"what": NAME}:
+  //    may be empty, NAME is 'all' or 'probabilities'
+  if (envP->fault_occurred) {
+    mcsat_err("Bad argument: expected {\"what\": NAME}\n");
+    json_object_put(resetdecl);
+    return xpce_result(envP, NULL);
+  }
+  resetobj = json_object_object_get(resetdecl, "what");
+  if (resetobj == NULL ||
+      strcasecmp(json_object_get_string(resetobj), "all") == 0) {
+    // Resets the sample tables
+    reset_sort_table(&samp_table.sort_table);
+    // Need to do more here - like free up space.
+    init_samp_table(&samp_table);
+    init_gen_rand(xpce_seed);
+  } else if (strcasecmp(json_object_get_string(resetobj), "probabilities") == 0) {
+    // Simply resets the probabilities of the atom table to -1.0
+    output("Resetting probabilities of atoms to -1.0\n");
+    int32_t i;
+    samp_table.atom_table.num_samples = 0;
+    for (i=0; i<samp_table.atom_table.num_vars; i++) {
+      samp_table.atom_table.pmodel[i] = -1;
+    }
+  } else {
+    mcsat_err("Bad argument: expected {\"what\": NAME}\n");
+  }
+  json_object_put(resetdecl);
+  return xpce_result(envP, NULL);
+}
+
+
 // static xmlrpc_value *
 // xpce_dumptable(xmlrpc_env * const envP,
 // 	       xmlrpc_value * const paramArrayP,
@@ -971,6 +1015,7 @@ int main(int const argc, const char ** const argv) {
 
   // Force output, mcsat_err, and mcsat_warn to save to buffer (see print.c)
   output_to_string = true; 
+  init_gen_rand(xpce_seed);
   init_samp_table(&samp_table);
   input_stack_push_file("");
   yylloc.first_line = 1;
@@ -996,8 +1041,8 @@ int main(int const argc, const char ** const argv) {
     = {"xpce.mcsat", &xpce_mcsat};
 //   struct xmlrpc_method_info3 const methodInfoMcsatParams
 //     = {"xpce.mcsat_params", &xpce_mcsat_params};
-//   struct xmlrpc_method_info3 const methodInfoReset
-//     = {"xpce.reset", &xpce_reset};
+  struct xmlrpc_method_info3 const methodInfoReset
+    = {"xpce.reset", &xpce_reset};
 //   struct xmlrpc_method_info3 const methodInfoRetract
 //     = {"xpce.retract", &xpce_retract};
 //   struct xmlrpc_method_info3 const methodInfoDumptable
@@ -1036,7 +1081,7 @@ int main(int const argc, const char ** const argv) {
   xmlrpc_registry_add_method3(&env, registryP, &methodInfoAsk);
   xmlrpc_registry_add_method3(&env, registryP, &methodInfoMcsat);
 //   xmlrpc_registry_add_method3(&env, registryP, &methodInfoMcsatParams);
-//   xmlrpc_registry_add_method3(&env, registryP, &methodInfoReset);
+  xmlrpc_registry_add_method3(&env, registryP, &methodInfoReset);
 //   xmlrpc_registry_add_method3(&env, registryP, &methodInfoRetract);
 //   xmlrpc_registry_add_method3(&env, registryP, &methodInfoDumptable);
   xmlrpc_registry_add_method3(&env, registryP, &methodInfoQuit);
