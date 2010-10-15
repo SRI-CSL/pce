@@ -306,7 +306,7 @@ Type help followed by a command for details, e.g., 'help mcsat_params;'\n\n\
 Input grammar:\n\
  sort NAME [ '=' '[' INT '..' INT ']' ] ';'\n\
  subsort NAME NAME ';'\n\
- predicate ATOM [direct|indirect] ';'\n\
+ predicate ATOM ['observable' | 'hidden'] ';'\n\
  const NAME++',' ':' NAME ';'\n\
  assert ATOM ';'\n\
  add FORMULA [WEIGHT [SOURCE]] ';'\n\
@@ -314,9 +314,9 @@ Input grammar:\n\
  ask FORMULA [THRESHOLD [NUMRESULTS]] ';'\n\
  mcsat ';'\n\
  mcsat_params [NUM]**',' ';'\n\
- reset [all | probabilities] ';'\n\
+ reset ['all' | 'probabilities'] ';'\n\
  retract NAME ';'\n\
- dumptable [all | sort | predicate | atom | clause | rule] ';'\n\
+ dumptable ['all' | 'sort' | 'predicate' | 'atom' | 'clause' | 'rule'] ';'\n\
  load STRING ';'\n\
  verbosity NUM ';'\n help ';'\n quit ';'\n\
  help [all | sort | subsort | predicate | const | atom | assert |\n\
