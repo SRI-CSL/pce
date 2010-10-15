@@ -164,7 +164,7 @@ int32_t choose_random_atom(samp_table_t *table){
     } else {
       atom->args[i] = sort_table->entries[signature[i]].constants[constant];
       // Quick typecheck
-      assert(const_sort_index(atom->args[i],const_table) == signature[i]);
+      assert(const_sort_index(atom->args[i], &table->const_table) == signature[i]);
     }
   }
   
