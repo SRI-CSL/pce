@@ -646,7 +646,6 @@ extern void dump_query_instance_table (samp_table_t *samp_table) {
 
 double atom_probability(int32_t atom_index, samp_table_t *table) {
   atom_table_t *atom_table = &table->atom_table;
-  pred_table_t *pred_table = &table->pred_table;
   samp_atom_t *atom;
   double diff;
 
