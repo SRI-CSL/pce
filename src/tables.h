@@ -354,6 +354,7 @@ typedef struct samp_query_instance_s {
   int32_t sampling_num; // The num_samples when this instance was created
   int32_t pmodel; // The nimber of samples for which this instance was true
   int32_t *subst; // Holds the mapping from vars to consts
+  bool *constp; // Whether given var is a constant or integer
   samp_literal_t **lit; // The instance - a conjunction of disjunctions of lits
 } samp_query_instance_t;
 
