@@ -615,8 +615,12 @@ void print_ask_results (input_formula_t *fmla, samp_table_t *table) {
     if (fmla->vars != NULL) {
       for (j = 0; fmla->vars[j] != NULL; j++) {
 	if (j != 0) printf(", ");
-	cname = const_name(qsubst[j], &table->const_table);
-	printf("%s <- %s", fmla->vars[j]->name, cname);
+	if (qinst->constp[j]) {
+	  cname = const_name(qsubst[j], &table->const_table);
+	  printf("%s <- %s", fmla->vars[j]->name, cname);
+	} else {
+	  printf("%s <- %"PRId32"", fmla->vars[j]->name, qsubst[j]);
+	}
       }
     }
     printf("]");
