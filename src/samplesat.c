@@ -1170,6 +1170,7 @@ static void print_list(samp_clause_t *link, samp_table_t *table) {
  * Random number generator:
  * - returns a floating point number in the interval [0.0, 1.0)
  */
+
 double choose(){
 #ifdef _WIN32
   // Get the cryptographic service provider
@@ -1186,7 +1187,8 @@ double choose(){
   return ((double) rand_buf.li) / ((double) ULONG_MAX + 1.0);
 #else
   //return ((double) random()) / ((double) RAND_MAX + 1.0);
-  return ((double) gen_rand64()) / ((double) UINT64_MAX + 1.0);
+  //return ((double) gen_rand64()) / ((double) UINT64_MAX + 1.0);
+  return genrand_real2();
 #endif
 }
 
@@ -1201,11 +1203,9 @@ double choose(){
 void kill_clause_list(samp_clause_t **link_ptr, samp_clause_t *link,
 		      clause_table_t *clause_table) {
   samp_clause_t *next;
-  double abs_weight;
 
   while (link != NULL) {
-    abs_weight = fabs(link->weight);
-    if (abs_weight < DBL_MAX && choose() < exp(- abs_weight)) {
+    if (link->weight != DBL_MAX && link->weight != DBL_MIN && choose() < exp(- fabs(link->weight))) {
       // move it to the dead_clauses list
       next = link->link;
       link->link = clause_table->dead_clauses;
@@ -2557,13 +2557,13 @@ void create_new_const_rule_instances(int32_t constidx, samp_table_t *table,
 
 int32_t add_subst_query_instance(samp_literal_t **litinst, substit_entry_t *substs,
 				 samp_query_t *query, samp_table_t *table) {
-  query_instance_table_t *query_instance_table;
-  query_table_t *query_table;
+  query_instance_table_t *query_instance_table = &table->query_instance_table;
+  query_table_t *query_table = &table->query_table;
+  sort_table_t *sort_table = &table->sort_table;
   samp_query_instance_t *qinst;
-  int32_t i, qindex;
+  sort_entry_t *sort_entry;
+  int32_t i, qindex, vsort;
   
-  query_table = &table->query_table;
-  query_instance_table = &table->query_instance_table;
   for (i = 0; i < query_instance_table->num_queries; i++) {
     if (eql_query_instance_lits(litinst,
 				query_instance_table->query_inst[i]->lit)) {
@@ -2589,8 +2589,12 @@ int32_t add_subst_query_instance(samp_literal_t **litinst, substit_entry_t *subs
     qinst->pmodel = 0;
     // Copy the substs - used to return the OAA formula instances
     qinst->subst = (int32_t *) safe_malloc(query->num_vars * sizeof(int32_t));
+    qinst->constp = (bool *) safe_malloc(query->num_vars * sizeof(bool));
     for (i = 0; i < query->num_vars; i++) {
       qinst->subst[i] = substs[i].const_index;
+      vsort = query->vars[i]->sort_index;
+      sort_entry = &sort_table->entries[vsort];
+      qinst->constp[i] = (sort_entry->constants != NULL);
     }
     qinst->lit = litinst;
   }
