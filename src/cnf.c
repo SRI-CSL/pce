@@ -254,8 +254,8 @@ static rule_literal_t ***cnf_union(rule_literal_t ***c1,
   if (c1 == NULL || c2 == NULL) {
     return NULL;
   }
-  for (cnflen1 = 0; c1[cnflen1] != 0; cnflen1++) {}
-  for (cnflen2 = 0; c1[cnflen2] != 0; cnflen2++) {}
+  for (cnflen1 = 0; c1[cnflen1] != NULL; cnflen1++);
+  for (cnflen2 = 0; c2[cnflen2] != NULL; cnflen2++);
   unioncnf = (rule_literal_t ***)
     safe_malloc((cnflen1 + cnflen2 + 1) * sizeof(rule_literal_t **));
   for (i = 0; c1[i] != NULL; i++) {
@@ -425,7 +425,8 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
 	  mapping[i] = i - delta;
 	}
       }
-      safe_realloc(cvars, (numvars-delta) * sizeof(var_entry_t *));
+      // This leads to valgrind errors - don't know why
+      //safe_realloc(cvars, (numvars-delta) * sizeof(var_entry_t *));
       for (i = 0; i < clause->num_lits; i++) {
 	atom = clause->literals[i]->atom;
 	arity = atom->builtinop == 0
