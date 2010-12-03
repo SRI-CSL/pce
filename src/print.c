@@ -653,8 +653,19 @@ extern void dump_query_instance_table (samp_table_t *samp_table) {
 }
 
 extern void summarize_sort_table (samp_table_t *table) {
+  sort_table_t *sort_table = &(table->sort_table);
+  sort_entry_t *entry;
+  int32_t i, total;
+  
   output("Sort table has %"PRId32" entries\n",
-	 table->sort_table.num_sorts);
+	 sort_table->num_sorts);
+  total = 0;
+  for (i = 0; i < sort_table->num_sorts; i++) {
+    entry = &sort_table->entries[i];
+    total += entry->cardinality;
+    output("    %s: %"PRId32"\n", entry->name, entry->cardinality);
+  }
+  output("  Total: %"PRId32"\n", total);
 }
 
 extern void summarize_pred_table (samp_table_t *table) {
