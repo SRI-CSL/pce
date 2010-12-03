@@ -406,8 +406,16 @@ extern void dump_sort_table (samp_table_t *table) {
     output("| %-*s ", slen, entry.name);
     int32_t clen = slen;
     if (entry.constants == NULL) {
-      // Have a subrange
-      output("| [%"PRId32" .. %"PRId32"]", entry.lower_bound, entry.upper_bound);
+      if (entry.ints == NULL) {
+	// Have a subrange
+	output("| [%"PRId32" .. %"PRId32"]", entry.lower_bound, entry.upper_bound);
+      } else {
+	output("| INTEGER: {");
+	for (j=0; j<entry.cardinality; j++) {
+	  if (j != 0) output(", ");
+	  output("%"PRId32"", entry.ints[j]);
+	}
+      }
     } else {
       for (j=0; j<entry.cardinality; j++){
 	char *nstr = const_table->entries[entry.constants[j]].name;
@@ -643,6 +651,36 @@ extern void dump_query_instance_table (samp_table_t *samp_table) {
   }
   output("-------------------------------------------------------------------------------\n");
 }
+
+extern void summarize_sort_table (samp_table_t *table) {
+  output("Sort table has %"PRId32" entries\n",
+	 table->sort_table.num_sorts);
+}
+
+extern void summarize_pred_table (samp_table_t *table) {
+  uint32_t obsnum, hidnum;
+
+  obsnum = table->pred_table.evpred_tbl.num_preds;
+  hidnum = table->pred_table.pred_tbl.num_preds;
+  output("Predicate table has %"PRId32" total entries;\n", obsnum+hidnum);
+  output("  %"PRId32" observable and %"PRId32" hidden\n", obsnum, hidnum);
+}
+
+extern void summarize_atom_table (samp_table_t *table) {
+  output("Atom table has %"PRId32" entries\n",
+	 table->atom_table.num_vars);
+}
+
+extern void summarize_clause_table (samp_table_t *table) {
+  output("Clause table has %"PRId32" entries\n",
+	 table->clause_table.num_clauses);
+}
+
+extern void summarize_rule_table (samp_table_t *table) {
+  output("Rule table has %"PRId32" entries\n",
+	 table->rule_table.num_rules);
+}
+
 
 double atom_probability(int32_t atom_index, samp_table_t *table) {
   atom_table_t *atom_table = &table->atom_table;

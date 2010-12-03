@@ -201,10 +201,10 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom){
     entry = sort_table->entries[psig[i]];
     if (entry.constants == NULL) {
       // Should be an integer
-      char *p;
-      for (p = current_atom->args[i]; isdigit(*p); p++);
+      char *p = current_atom->args[i];
+      for (p = (p[0] == '+' || p[0] == '-') ? &p[1] : p; isdigit(*p); p++);
       if (*p == '\0') {
-	intval = atoi(current_atom->args[i]);
+	intval = str2int(current_atom->args[i]);
 	if (intval < entry.lower_bound || intval > entry.upper_bound) {
 	  mcsat_err("\nInteger %s is out of bounds.", current_atom->args[i]);
 	  return -1;
@@ -2090,7 +2090,7 @@ void new_const_atoms_at(int32_t idx, int32_t newcidx, int32_t arity, int32_t *ps
   int32_t i;
   
   if (idx == arity) {
-    if (get_verbosity_level() > 1) {
+    if (get_verbosity_level() > 2) {
       printf("new_const_atoms_at: Adding internal atom ");
       print_atom_now(atom, table);
       printf("\n");
@@ -2103,9 +2103,16 @@ void new_const_atoms_at(int32_t idx, int32_t newcidx, int32_t arity, int32_t *ps
     entry = sort_table->entries[psig[idx]];
     if (entry.constants == NULL) {
       // An integer
-      for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
-	atom->args[idx] = i;
-	new_const_atoms_at(idx+1, newcidx, arity, psig, atom, table);
+      if (entry.ints == NULL) {
+	for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
+	  atom->args[idx] = i;
+	  new_const_atoms_at(idx+1, newcidx, arity, psig, atom, table);
+	}
+      } else {
+	for (i = 0; i < entry.cardinality; i++) {
+	  atom->args[idx] = entry.ints[i];
+	  new_const_atoms_at(idx+1, newcidx, arity, psig, atom, table);
+	}
       }
     } else {
       for (i = 0; i < entry.cardinality; i++) {
@@ -2118,17 +2125,14 @@ void new_const_atoms_at(int32_t idx, int32_t newcidx, int32_t arity, int32_t *ps
 
 
 // When new constants are introduced, may need to add new atoms
-void create_new_const_atoms(int32_t cidx, samp_table_t *table) {
-  const_table_t *const_table = &table->const_table;
+void create_new_const_atoms(int32_t cidx, int32_t csort,
+			    samp_table_t *table) {
   sort_table_t *sort_table = &table->sort_table;
   pred_table_t *pred_table = &table->pred_table;
-  const_entry_t centry;
   pred_entry_t *pentry;
-  int32_t csort, i, j, pval, arity;
+  int32_t i, j, pval, arity;
   samp_atom_t *atom;
   
-  centry = const_table->entries[cidx];
-  csort = centry.sort_index;
   for (i = 0; i < pred_table->evpred_tbl.num_preds; i++) {
     pentry = &pred_table->evpred_tbl.entries[i];
     pval = 2 * i;
@@ -2194,11 +2198,11 @@ int32_t substit_rule(samp_rule_t *rule,
 		     samp_table_t *table) {
   const_table_t *const_table = &table->const_table;
   sort_table_t *sort_table = &table->sort_table;
-  atom_table_t *atom_table = &table->atom_table;
+  // atom_table_t *atom_table = &table->atom_table;
   pred_table_t *pred_table = &table->pred_table;
   sort_entry_t *sort_entry;
   int32_t vsort, csort, csubst;
-  array_hmap_pair_t *atom_map;
+  // array_hmap_pair_t *atom_map;
   int32_t i, j, litidx;
   bool found_indirect;
   
@@ -2254,10 +2258,10 @@ int32_t substit_rule(samp_rule_t *rule,
 	  new_atom->args[j] = substs[argidx].const_index;
 	}
       }
-      atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
-				      arity+1, //+1 for pred
-				      (int32_t *) new_atom);
-      if (get_verbosity_level() > 1) {
+      // atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
+      // 				      arity+1, //+1 for pred
+      // 				      (int32_t *) new_atom);
+      if (get_verbosity_level() > 2) {
 	printf("substit_rule: Adding internal atom ");
 	print_atom_now(new_atom, table);
 	printf("\n");
@@ -2433,8 +2437,12 @@ void all_rule_instances_rec(int32_t vidx,
     int32_t i;
     for(i=0; i<entry.cardinality; i++){
       if (entry.constants == NULL) {
-	// Have a subrange
-	substit_buffer.entries[vidx].const_index = entry.lower_bound + i;
+	if (entry.ints == NULL) {
+	  // Have a subrange
+	  substit_buffer.entries[vidx].const_index = entry.lower_bound + i;
+	} else {
+	  substit_buffer.entries[vidx].const_index = entry.ints[i];
+	}
       } else {
 	substit_buffer.entries[vidx].const_index = entry.constants[i];
       }
@@ -2471,9 +2479,16 @@ void all_pred_instances_rec(int32_t vidx, int32_t *psig, int32_t arity,
     entry = sort_table->entries[psig[vidx]];
     if (entry.constants == NULL) {
       // Have an integer
-      for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
-	atom->args[vidx] = i;
-	all_pred_instances_rec(vidx+1, psig, arity, atom, table);
+      if (entry.ints == NULL) {
+	for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
+	  atom->args[vidx] = i;
+	  all_pred_instances_rec(vidx+1, psig, arity, atom, table);
+	}
+      } else {
+	for (i = 0; i < entry.cardinality; i++) {
+	  atom->args[vidx] = entry.ints[i];
+	  all_pred_instances_rec(vidx+1, psig, arity, atom, table);
+	}
       }
     } else {
       for (i = 0; i < entry.cardinality; i++) {
@@ -2523,14 +2538,13 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 
 // Called by MCSAT when a new constant is added.
 // Generates all new instances of rules involving this constant.
-void create_new_const_rule_instances(int32_t constidx, samp_table_t *table,
+void create_new_const_rule_instances(int32_t constidx, int32_t csort,
+				     samp_table_t *table,
 				     int32_t atom_index) {
-  const_table_t *const_table = &(table->const_table);
   //sort_table_t *sort_table = &(table->sort_table);
   rule_table_t *rule_table = &(table->rule_table);
-  const_entry_t centry = const_table->entries[constidx];
-  int32_t csort = centry.sort_index;
   int32_t i, j, k;
+  
   for(i=0; i<rule_table->num_rules; i++){
     samp_rule_t *rule = rule_table->samp_rules[i];
     for (j=0; j<rule->num_vars; j++) {
@@ -2780,8 +2794,12 @@ void all_query_instances_rec(int32_t vidx, samp_query_t *query,
     entry = sort_table->entries[vsort];
     for(i=0; i<entry.cardinality; i++){
       if (entry.constants == NULL) {
-	// Have a subrange
-	substit_buffer.entries[vidx].const_index = entry.lower_bound + i;
+	if (entry.ints == NULL) {
+	  // Have a subrange
+	  substit_buffer.entries[vidx].const_index = entry.lower_bound + i;
+	} else {
+	  substit_buffer.entries[vidx].const_index = entry.ints[i];
+	}
       } else {
 	substit_buffer.entries[vidx].const_index = entry.constants[i];
       }
@@ -2865,16 +2883,12 @@ void fixed_const_query_instances(samp_query_t *query,
   all_query_instances_rec(0, query, table, atom_index);
 }
 
-void create_new_const_query_instances(int32_t constidx, samp_table_t *table,
-				      int32_t atom_index) {
-  const_table_t *const_table = &(table->const_table);
+void create_new_const_query_instances(int32_t constidx, int32_t csort,
+				      samp_table_t *table, int32_t atom_index) {
   query_table_t *query_table = &(table->query_table);
   samp_query_t *query;
-  const_entry_t centry;
-  int32_t i, j, k, csort;
+  int32_t i, j, k;
 
-  centry = const_table->entries[constidx];
-  csort = centry.sort_index;
   for(i=0; i<query_table->num_queries; i++){
     query = query_table->query[i];
     for (j=0; j<query->num_vars; j++) {

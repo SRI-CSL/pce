@@ -108,12 +108,13 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 	sort_entry = &sort_table->entries[psig[i]];
       }
       char *p;
-      for (p = cname; isdigit(*p); p++);
+      for (p = (cname[0] == '+' || cname[0] == '-') ? &cname[1] : cname;
+	   isdigit(*p); p++);
       if (*p == '\0') {
 	// Have an integer - check that it is correct
 	if (psig == NULL || sort_entry->constants == NULL) {
 	  // Maybe an integer
-	  intval = atoi(cname);
+	  intval = str2int(cname);
 	  atom->args[i].kind = integer;
 	  atom->args[i].value = atoi(cname);
 	} else {

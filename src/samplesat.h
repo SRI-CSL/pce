@@ -96,13 +96,16 @@ extern void empty_clause_lists(samp_table_t *table);
 
 extern void init_clause_lists(clause_table_t *clause_table);
 
-extern void create_new_const_atoms(int32_t cidx, samp_table_t *table);
+extern void create_new_const_atoms(int32_t cidx, int32_t csort,
+				   samp_table_t *table);
 
 extern void create_new_const_rule_instances(int32_t constidx,
+					    int32_t csort,
 					    samp_table_t *table,
 					    int32_t atom_index);
 
 extern void create_new_const_query_instances(int32_t constidx,
+					     int32_t csort,
 					     samp_table_t *table,
 					     int32_t atom_index);
 

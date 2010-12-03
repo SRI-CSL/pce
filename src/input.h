@@ -227,4 +227,7 @@ extern input_fmla_t *yy_fmla(int32_t op, input_fmla_t *arg1, input_fmla_t *arg2)
 extern input_fmla_t *yy_atom_to_fmla (input_atom_t *atom);
 extern input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
 
+extern int32_t str2int(char *cnst);
+extern void add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table);
+
 #endif /* __INPUT_H */     

@@ -20,12 +20,33 @@ extern void free_parse_data();
 static bool yyerrflg = false;
 
 // These are buffers for holding things until they are malloc'ed
-static char yystrbuf[1000];
+#define INIT_YYSTRBUF_SIZE 200
+uint32_t yystrbuf_size = INIT_YYSTRBUF_SIZE;
+char *yystrbuf = NULL;
 static pvector_t yyargs;
 static pvector_t yylits;
 parse_input_t *parse_input;
 
 void yyerror (char *str);
+
+void yystrbuf_add(char c, uint32_t i) {
+  uint32_t n;
+  
+  if (yystrbuf == NULL) {
+    yystrbuf = (char *) safe_malloc(yystrbuf_size * sizeof(char));
+  } else {
+    if (i+1 >= yystrbuf_size) {
+      n = yystrbuf_size + 1;
+      n += n >> 1;
+      if (n >= UINT32_MAX) {
+	out_of_memory();
+      }
+      yystrbuf_size = n;
+      yystrbuf = (char *) safe_realloc(yystrbuf, n * sizeof(char));
+    }
+  }
+  yystrbuf[i] = c;
+}
 
 char **copy_yyargs() {
   char **arg;
@@ -99,11 +120,12 @@ bool yy_check_float(char *str) {
 input_sortdef_t *yy_sortdef(char *lbnd, char *ubnd) {
   input_sortdef_t *sdef;
 
-  if (yy_check_int(lbnd)) {
-    if (yy_check_int(ubnd)) {
+  if (strcmp(lbnd, "MIN") == 0 || yy_check_int(lbnd)) {
+    if (strcmp(ubnd, "MAX") == 0 || yy_check_int(ubnd)) {
       sdef = (input_sortdef_t *) safe_malloc(sizeof(input_sortdef_t));
-      sdef->lower_bound = atoi(lbnd);
-      sdef->upper_bound = atoi(ubnd);
+      
+      sdef->lower_bound = (strcmp(lbnd, "MIN") == 0) ? INT32_MIN : atoi(lbnd);
+      sdef->upper_bound = (strcmp(ubnd, "MAX") == 0) ? INT32_MAX : atoi(ubnd);
       return sdef;
     } else {
       yyerror("upper bound must be an integer");
@@ -241,7 +263,7 @@ input_command_t input_command;
   void yy_const_decl (char **name, char *sort) {
     int32_t i = 0;
     
-    input_command.kind = CONST;
+    input_command.kind = CONSTD;
     while (name[i] != NULL) {i++;}
     input_command.decl.const_decl.num_names = i;
     input_command.decl.const_decl.name = name;
@@ -257,7 +279,7 @@ input_command_t input_command;
     input_command.decl.var_decl.sort = sort;
   };
   void yy_atom_decl (input_atom_t *atom) {
-    input_command.kind = ATOM;
+    input_command.kind = ATOMD;
     input_command.decl.atom_decl.atom = atom;
   };
   void yy_assert_decl (input_atom_t *atom, char *source) {
@@ -495,9 +517,9 @@ void yy_mcsat_params_decl (char **params) {
 %token RULE
 %token SORT
 %token SUBSORT
-%token CONST
+%token CONSTD
 %token VAR
-%token ATOM
+%token ATOMD
 %token ASSERT
 %token ADD
 %token ASK
@@ -508,6 +530,7 @@ void yy_mcsat_params_decl (char **params) {
 %token RESET
 %token RETRACT
 %token DUMPTABLE
+%token SUMMARY
 %token LOAD
 %token VERBOSITY
 %token HELP
@@ -525,6 +548,7 @@ void yy_mcsat_params_decl (char **params) {
 %nonassoc GE
 %nonassoc GT
 %nonassoc DDOT
+%token INTEGER
 %token PLUS
 %token MINUS
 %token TIMES
@@ -551,7 +575,7 @@ void yy_mcsat_params_decl (char **params) {
 
 %type <str> arg NAME NUM STRING addwt oarg oname retractarg
 %type <strs> arguments variables oarguments onum2
-%type <sortdef> sortdef interval
+%type <sortdef> sortdef sortval interval
 %type <formula> formula
 %type <fmla> fmla
 %type <clause> clause
@@ -598,9 +622,9 @@ enddecl: ';' | QUIT;
 decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | SUBSORT NAME NAME {yy_subsort_decl($2, $3);}
     | PREDICATE atom witness {yy_pred_decl($2, $3);}
-    | CONST arguments ':' NAME {yy_const_decl($2, $4);}
+    | CONSTD arguments ':' NAME {yy_const_decl($2, $4);}
     | VAR arguments ':' NAME {yy_var_decl($2, $4);}
-    | ATOM atom {yy_atom_decl($2);}
+    | ATOMD atom {yy_atom_decl($2);}
     | ASSERT atom oname {yy_assert_decl($2, $3);}
     | ADD_CLAUSE clause addwt oname {yy_add_decl($2, $3, $4);}
 //    | ASK_CLAUSE clause NUM oarg oarg {yy_ask_decl($2, $3, $4, $5);}
@@ -619,7 +643,7 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
 
 cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | SORT {$$ = SORT;} | SUBSORT {$$ = SUBSORT;} | PREDICATE {$$ = PREDICATE;}
-     | CONST {$$ = CONST;} | VAR {$$ = VAR;} | ATOM {$$ = ATOM;}
+     | CONSTD {$$ = CONSTD;} | VAR {$$ = VAR;} | ATOMD {$$ = ATOMD;}
      | ASSERT {$$ = ASSERT;} | ADD {$$ = ADD;} | ADD_CLAUSE {$$ = ADD_CLAUSE;}
      | ASK {$$ = ASK;}
      //| ASK_CLAUSE {$$ = ASK_CLAUSE;}
@@ -629,13 +653,15 @@ cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      ;
 
 sortdef: /* empty */ {$$ = NULL;}
-       | EQ interval {$$ = $2;} ;
+       | EQ sortval {$$ = $2;} ;
+
+sortval: interval {$$ = $1;} | INTEGER {$$ = yy_sortdef("MIN","MAX");};
 
 interval: '[' NUM DDOT NUM ']' {$$ = yy_sortdef($2, $4);} ;
 
 table: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
-       | SORT {$$ = SORT;} | PREDICATE {$$ = PREDICATE;} | ATOM {$$ = ATOM;}
-       | CLAUSE {$$ = CLAUSE;} | RULE {$$ = RULE;}
+       | SORT {$$ = SORT;} | PREDICATE {$$ = PREDICATE;} | ATOMD {$$ = ATOMD;}
+       | CLAUSE {$$ = CLAUSE;} | RULE {$$ = RULE;} | SUMMARY {$$ = SUMMARY;}
        ;
 
 witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;}
@@ -819,7 +845,7 @@ int yylex (void) {
 	  have_dot = 1;
 	}
       };
-      yystrbuf[i++] = c;
+      yystrbuf_add(c, i++);
       c = yygetc(parse_input);
       ++yylloc.last_column;
     } while (c != EOF && (isdigit(c) || c == '.'));
@@ -847,7 +873,7 @@ int yylex (void) {
   }
   if (isalpha(c)) {
     do {
-      yystrbuf[i++] = c;
+      yystrbuf_add(c, i++);
       c = yygetc(parse_input);
       ++yylloc.last_column;      
     } while (c != EOF && isidentchar(c));
@@ -868,11 +894,11 @@ int yylex (void) {
     else if (strcasecmp(yylval.str, "SUBSORT") == 0)
       return SUBSORT;
     else if (strcasecmp(yylval.str, "CONST") == 0)
-      return CONST;
+      return CONSTD;
     else if (strcasecmp(yylval.str, "VAR") == 0)
       return VAR;
     else if (strcasecmp(yylval.str, "ATOM") == 0)
-      return ATOM;
+      return ATOMD;
     else if (strcasecmp(yylval.str, "ASSERT") == 0)
       return ASSERT;
     else if (strcasecmp(yylval.str, "ADD") == 0)
@@ -898,6 +924,10 @@ int yylex (void) {
       return CLAUSE;
     else if (strcasecmp(yylval.str, "RULE") == 0)
       return RULE;
+    else if (strcasecmp(yylval.str, "INTEGER") == 0)
+      return INTEGER;
+    else if (strcasecmp(yylval.str, "SUMMARY") == 0)
+      return SUMMARY;
     else if (strcasecmp(yylval.str, "LOAD") == 0)
       return LOAD;
     else if (strcasecmp(yylval.str, "VERBOSITY") == 0)
@@ -982,7 +1012,7 @@ int yylex (void) {
       if (c == '\"' || c == EOF) {
         break;
       } else {
-        yystrbuf[i++] = c;
+        yystrbuf_add(c, i++);
       }
     } while (true);
     yystrbuf[i] = '\0';
@@ -993,13 +1023,14 @@ int yylex (void) {
   }
   if (c == '\'') {
     // At the moment, escapes not recognized
+    printf("foo");
     do {
       c = yygetc(parse_input);
       ++yylloc.last_column;      
       if (c == '\'' || c == EOF) {
         break;
       } else {
-        yystrbuf[i++] = c;
+        yystrbuf_add(c, i++);
       }
     } while (true);
     if (c == EOF) {
@@ -1030,7 +1061,7 @@ int yylex (void) {
   }
   /* If we get here, simply collect until space, comma, paren, bracket, semicolon, \0, EOF
      and return a NAME */
-  yystrbuf[i++] = c;
+  yystrbuf_add(c, i++);
   do {
     c = yygetc(parse_input);
     ++yylloc.last_column;      
@@ -1038,7 +1069,7 @@ int yylex (void) {
 	|| c == ':' || c == '\0' || c == EOF) {
       break;
     } else {
-      yystrbuf[i++] = c;
+      yystrbuf_add(c, i++);
     }
   } while (true);
   yyungetc(c, parse_input);
@@ -1154,7 +1185,7 @@ void free_parse_data () {
     free_subsort_decl_data();
     break;
   }
-  case CONST: {
+  case CONSTD: {
     free_const_decl_data();
     break;
   }
@@ -1162,7 +1193,7 @@ void free_parse_data () {
     free_var_decl_data();
     break;
   }
-  case ATOM: {
+  case ATOMD: {
     free_atom_decl_data();
     break;
   }

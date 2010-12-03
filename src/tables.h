@@ -172,6 +172,7 @@ typedef struct sort_entry_s {
   int32_t cardinality; //number of elements in sort i
   char *name;//print name of the sort
   int32_t *constants; //array of constants in the given sort
+  int32_t *ints; // array of integers for sparse integer sorts
   int32_t lower_bound; // lower and upper bounds for integer sorts
   int32_t upper_bound; //    (could be a union type)
   int32_t *subsorts; // array of subsort indices

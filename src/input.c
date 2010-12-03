@@ -304,7 +304,7 @@ void show_help(int32_t topic) {
     output("\n\
 Type help followed by a command for details, e.g., 'help mcsat_params;'\n\n\
 Input grammar:\n\
- sort NAME [ '=' '[' INT '..' INT ']' ] ';'\n\
+ sort NAME [sortspec] ';'\n\
  subsort NAME NAME ';'\n\
  predicate ATOM ['observable' | 'hidden'] ';'\n\
  const NAME++',' ':' NAME ';'\n\
@@ -316,13 +316,15 @@ Input grammar:\n\
  mcsat_params [NUM]**',' ';'\n\
  reset ['all' | 'probabilities'] ';'\n\
  retract NAME ';'\n\
- dumptable ['all' | 'sort' | 'predicate' | 'atom' | 'clause' | 'rule'] ';'\n\
+ dumptable ['all' | 'sort' | 'predicate' | 'atom' | 'clause' | 'rule' | 'summary'] ';'\n\
  load STRING ';'\n\
  verbosity NUM ';'\n help ';'\n quit ';'\n\
  help [all | sort | subsort | predicate | const | atom | assert |\n\
        add | add_clause | ask | mcsat | mcsat_params | reset | retract |\n\
        dumptable | load | verbosity | help] ';' \n\n\
 where:\n\
+ sortspec :=  '=' '[' INT '..' INT ']'\n\
+           |  '=' INTEGER\n\
 predicates default to 'observable' (i.e., direct/witness)\n\n\
  FORMULA := FMLA\n\
           | '[' VAR+',' ']' FMLA\n\
@@ -391,7 +393,7 @@ indirect predicates do not.\n\
 ");
     break;
   }
-  case CONST: {
+  case CONSTD: {
     output("\n\
 const NAME1, NAME2, ... : SORT;\n\
   Declares constants to be of the given sort.\n\
@@ -429,7 +431,7 @@ For example:\n\
 ");
     break;
   }
-  case ATOM: {
+  case ATOMD: {
     output("\n\
 atom ATOM;\n\
   Simply adds an atom to the atom table, without any associated weight or truth value.\n\
@@ -548,12 +550,71 @@ extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t
   return 0;
 }
 
+extern int32_t str2int(char *cnst) {
+  int32_t i;
+  long int lcnst;
+
+  for (i = (cnst[0] == '+' || cnst[0] == '-') ? 1 : 0; cnst[i] != '\0'; i++) {
+    if (! isdigit(cnst[i])) {
+      mcsat_err("%s is not a valid integer\n", cnst);
+    }
+  }
+  lcnst = strtol(cnst, NULL, 10);
+  if (lcnst > INT32_MAX) {
+    mcsat_err("Integer %s is too big, above %"PRId32"", cnst, INT32_MAX);
+  }
+  if (lcnst < INT32_MIN) {
+    mcsat_err("Integer %s is too small, below %"PRId32"", cnst, INT32_MIN);
+  }
+  return (int32_t) lcnst;
+}
+  
+
+extern void add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table) {
+  sort_entry_t *supentry;
+  int32_t i, j;
+  bool foundit;
+
+  assert(entry->constants == NULL && entry->ints != NULL);
+  for (i = 0; i < entry->cardinality; i++) {
+    if (entry->ints[i] == icnst) {
+      mcsat_warn("Constant declaration ignored: %"PRId32" is already in %s\n", icnst, entry->name);
+      return;
+    }
+  }
+  if (entry->size == entry->cardinality) {
+    if (MAXSIZE(sizeof(long int), 0) - entry->size < entry->size/2) {
+      out_of_memory();
+    }
+    entry->size += entry->size/2;
+    entry->ints = (int32_t *)
+      safe_realloc(entry->ints, entry->size * sizeof(int32_t));
+  }
+  entry->ints[entry->cardinality++] = icnst;
+  // Added it to this sort, now do its supersorts
+  if (entry->supersorts != NULL) {
+    for (i = 0; entry->supersorts[i] != -1; i++) {
+      supentry = &sort_table->entries[entry->supersorts[i]];
+      foundit = false;
+      for (j = 0; j < supentry->cardinality; j++) {
+	if (supentry->ints[j] == icnst) {
+	  foundit = true;
+	  break;
+	}
+      }
+      if (!foundit) {
+	add_int_const(icnst, supentry, sort_table);
+      }
+    }
+  }
+}
+
 
 extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
   sort_table_t *sort_table = &table->sort_table;
   const_table_t *const_table = &table->const_table;
   var_table_t *var_table = &table->var_table;
-  int32_t sort_index, i, icnst;
+  int32_t sort_index, icnst;
   sort_entry_t *sort_entry;
 
   sort_index = sort_name_index(sort, sort_table);
@@ -568,19 +629,21 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
   sort_entry = &sort_table->entries[sort_index];
   if (sort_entry->constants == NULL) {
     // Check that the const is an integer in range
-    for (i = (cnst[0] == '+' || cnst[0] == '-') ? 1 : 0; cnst[i] != '\0'; i++) {
-      if (! isdigit(cnst[i])) {
-	mcsat_err("Sort %s only allows integers in [%"PRId32"..%"PRId32"]\n",
-		  sort, sort_entry->lower_bound, sort_entry->upper_bound);
+    icnst = str2int(cnst);
+    if (sort_entry->ints == NULL) {
+      if (icnst >= sort_entry->lower_bound && icnst <= sort_entry->upper_bound) {
+	mcsat_warn("Constant declaration ignored: %s is already in [%"PRId32"..%"PRId32"]\n",
+		   cnst, sort_entry->lower_bound, sort_entry->upper_bound);
+      } else {
+	mcsat_err("Illegal constant %s: sort %s only allows integers in [%"PRId32"..%"PRId32"]\n",
+		  cnst, sort, sort_entry->lower_bound, sort_entry->upper_bound);
       }
-    }
-    icnst = atoi(cnst);
-    if (icnst >= sort_entry->lower_bound && icnst <= sort_entry->upper_bound) {
-      mcsat_warn("Constant declaration ignored: %s is already in [%"PRId32"..%"PRId32"]\n",
-		 cnst, sort_entry->lower_bound, sort_entry->upper_bound);
     } else {
-      mcsat_err("Illegal constant %s: sort %s only allows integers in [%"PRId32"..%"PRId32"]\n",
-		cnst, sort, sort_entry->lower_bound, sort_entry->upper_bound);
+      // Sparse integers
+      add_int_const(icnst, sort_entry, sort_table);
+      create_new_const_atoms(icnst, sort_index, table);
+      create_new_const_rule_instances(icnst, sort_index, table, 0);
+      create_new_const_query_instances(icnst, sort_index, table, 0);
     }
   } else {
     // Need to see if name in var_table
@@ -590,10 +653,9 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
       if (add_const(cnst, sort, table) == 0) {
 	int32_t cidx = const_index(cnst, const_table);
 	// We don't invoke this in add_const, as this is eager.
-	// Last arg says this is not lazy.
-	create_new_const_atoms(cidx, table);
-	create_new_const_rule_instances(cidx, table, 0);
-	create_new_const_query_instances(cidx, table, 0);
+	create_new_const_atoms(cidx, sort_index, table);
+	create_new_const_rule_instances(cidx, sort_index, table, 0);
+	create_new_const_query_instances(cidx, sort_index, table, 0);
       }
     } else {
       mcsat_err("%s is a variable, cannot be redeclared a constant\n", cnst);
@@ -652,7 +714,7 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
     dump_pred_table(table);
     break;
   }
-  case ATOM: {
+  case ATOMD: {
     dump_atom_table(table);
     break;
   }
@@ -662,6 +724,16 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
   }
   case RULE: {
     dump_rule_table(table);
+    break;
+  }
+  case SUMMARY: {
+    summarize_sort_table(table);
+    summarize_pred_table(table);
+    //summarize_const_table(const_table, sort_table);
+    //summarize_var_table(var_table, sort_table);
+    summarize_atom_table(table);
+    summarize_clause_table(table);
+    summarize_rule_table(table);
     break;
   }
   }
@@ -679,6 +751,7 @@ extern bool read_eval(samp_table_t *table) {
     case PREDICATE: {
       input_pred_decl_t decl;
       decl = input_command.decl.pred_decl;
+      cprintf(2, "Adding predicate %s\n", decl.atom->pred);
       add_predicate(decl.atom->pred, decl.atom->args, decl.witness, table);
       break;
     }
@@ -698,10 +771,11 @@ extern bool read_eval(samp_table_t *table) {
       add_subsort(sort_table, decl.subsort, decl.supersort);
       break;
     }
-    case CONST: {
+    case CONSTD: {
       int32_t i;
       input_const_decl_t decl = input_command.decl.const_decl;
       for (i = 0; i < decl.num_names; i++) {
+	cprintf(2, "Adding const %s\n", decl.name[i]);
 	add_constant(decl.name[i], decl.sort, table);
       }
       break;
@@ -724,7 +798,7 @@ extern bool read_eval(samp_table_t *table) {
       }
       break;
     }
-    case ATOM: {
+    case ATOMD: {
       // invoke add_atom
       input_atom_decl_t decl = input_command.decl.atom_decl;
       add_atom(table, decl.atom);
