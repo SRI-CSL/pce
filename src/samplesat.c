@@ -437,7 +437,7 @@ void add_source_to_clause(char *source, int32_t clause_index, double weight,
 
 int32_t add_clause(samp_table_t *table,
 		   input_literal_t **in_clause,
-		   double weight, char *source, bool add_weights){
+		   double weight, char *source, bool add_weights) {
   atom_table_t *atom_table = &table->atom_table;
   int32_t i, atom, length, clause_index;
   bool found_indirect;
