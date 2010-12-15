@@ -517,37 +517,41 @@ bool clauses_equal(samp_rule_t *c1, samp_rule_t *c2) {
 // Checks clauses to see that they all involve at least one indirect atom
 // or exactly one positive direct atom (head normal form)
 // Will not return if there is an error.
-void all_clauses_involve_indirects_or_hnf(rule_literal_t ***lits) {
+bool all_clauses_involve_indirects_or_hnf(rule_literal_t ***lits,
+					  double weight) {
   int32_t i, j;
-  bool found, pos;
+  bool pos;
 
   for (i = 0; lits[i] != NULL; i++) {
-    found = false;
     for (j = 0; lits[i][j] != NULL; j++) {
       if (!pred_epred(lits[i][j]->atom->pred)) {
-	found = true;
-	break;
+	// Found a hidden (indirect) predicate
+	return true;
       }
     }
-    if (!found) {
-      // All preds are direct - check that there is exactly one positive
-      pos = false;
-      for (j = 0; lits[i][j] != NULL; j++) {
-	if (! lits[i][j]->neg) {
-	  if (pos) {
-	    // Have more than one pos, complain
-	    mcsat_err("cnf error: clause contains only observable predicates, with more than one positive:");
-	    
-	  } else {
-	    pos = true;
-	  }
+    // All preds are direct - check that the weight is DBL_MAX and there
+    // is exactly one positive
+    if (weight != DBL_MAX) {
+      mcsat_err("cnf error: clause contains only observable predicates, should not be given weight:");
+      return false;
+    }
+    pos = false;
+    for (j = 0; lits[i][j] != NULL; j++) {
+      if (! lits[i][j]->neg) {
+	if (pos) {
+	  // Have more than one pos, complain
+	  mcsat_err("cnf error: clause contains only observable predicates, with more than one positive:");
+	  return false;
 	}
+	pos = true;
       }
-      if (!pos) {
-	mcsat_err("cnf error: clause contains only observable predicates, with none positive:");
-      }
+    }
+    if (!pos) {
+      mcsat_err("cnf error: clause contains only observable predicates, with none positive:");
+      return false;
     }
   }
+  return true;
 }
       
 
@@ -571,7 +575,9 @@ void add_cnf(input_formula_t *formula, double weight, char *source, bool add_wei
   // First check if clauses all either involve indirect preds, or are in head normal form
   // We check here in order to abort the add_cnf before adding some clauses
   // If there is an error, this function will not return
-  all_clauses_involve_indirects_or_hnf(lits);
+  if (!all_clauses_involve_indirects_or_hnf(lits, weight)) {
+    return;
+  }
   
   if (formula->vars == NULL) {
     // No variables, just assert the clauses
