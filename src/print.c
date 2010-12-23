@@ -19,7 +19,7 @@ string_buffer_t output_buffer = {0, 0, NULL};
 string_buffer_t error_buffer = {0, 0, NULL};
 string_buffer_t warning_buffer = {0, 0, NULL};
 
-static int32_t verbosity_level = 1;
+static int32_t verbosity_level = 0;
 
 extern void set_verbosity_level(int32_t v) {
   verbosity_level = v;

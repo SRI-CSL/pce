@@ -43,6 +43,7 @@ extern int32_t add_clause(samp_table_t *table,
 extern int32_t add_internal_clause(samp_table_t *table,
 				   int32_t *clause,
 				   int32_t length,
+				   int32_t *fixed_preds,
 				   double weight,
 				   bool indirect,
 				   bool add_weights);

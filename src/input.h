@@ -53,6 +53,7 @@ typedef struct input_assert_decl_s {
 } input_assert_decl_t;
 
 typedef struct input_add_fdecl_s {
+  char **frozen;
   input_formula_t *formula;
   double weight;
   char *source;
@@ -182,6 +183,9 @@ extern input_atom_buffer_t input_atom_buffer;
 extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t *table);
 extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
 extern void dumptable(int32_t tbl, samp_table_t *table);
+
+extern void set_pce_rand_seed(uint32_t seed);
+extern void rand_reset();
 
 extern int32_t get_max_samples();
 extern double get_sa_probability();

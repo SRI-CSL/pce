@@ -38,8 +38,6 @@ static xmlrpc_server_abyss_t * serverToTerminateP;
 
 samp_table_t samp_table;
 
-uint32_t xpce_seed = 12345;
-
 // sort-decl := {"sort": NAME, "super": NAME} # "super" is optional,
 //                     # so this call can declare a sort or a subsort
 
@@ -346,6 +344,35 @@ char **copy_formula_vars() {
   return var;
 }
 
+static pvector_t fixed_preds;
+
+void push_new_fixed_pred(char *pred) {
+  int32_t i;
+  
+  for (i = 0; i < fixed_preds.size; i++) {
+    if (strcmp(pred, (char *) fixed_preds.data[i]) == 0) {
+      return;
+    }
+  }
+  pvector_push(&fixed_preds, strdup(pred));
+}
+
+char **copy_fixed_preds() {
+  char **var;
+  int32_t i;
+
+  var = (char **) safe_malloc((fixed_preds.size + 1) * sizeof(char *));
+  for (i = 0; i<fixed_preds.size; i++) {
+    if (fixed_preds.data[i] == NULL) {
+      var[i] = "";
+    } else {
+      var[i] = (char *) fixed_preds.data[i];
+    }
+  }
+  var[i] = NULL;
+  return var;
+}
+
 char ** xpce_json_constants_array(struct json_object *obj) {
   struct json_object *jarg;
   char **arg;
@@ -402,6 +429,32 @@ char ** xpce_json_arguments_array(struct json_object *obj) {
   }
   arg[i] = NULL;
   return arg;
+}
+
+char ** xpce_json_fixedpreds_array(struct json_object *obj) {
+  struct json_object *jpred;
+  char **pred;
+  int32_t i;
+  
+  if (!json_object_is_type(obj, json_type_array)) {
+    return NULL;
+  }
+
+  pred = (char **) safe_malloc((json_object_array_length(obj)+1) * sizeof(char *));
+  for (i = 0; i < json_object_array_length(obj); i++) {
+    jpred = json_object_array_get_idx(obj, i);
+    if (json_object_is_type(jpred, json_type_string)) {
+      if ((pred[i] = xpce_json_valid_name(jpred)) == NULL) {
+	safe_free(pred);
+	return NULL;
+      }
+    } else {
+      safe_free(pred);
+      return NULL;
+    }
+  }
+  pred[i] = NULL;
+  return pred;
 }
 
 input_atom_t *
@@ -585,19 +638,24 @@ xpce_add(xmlrpc_env * const envP,
 	 xmlrpc_value * const paramArrayP,
 	 void * const serverInfo ATTR_UNUSED,
 	 void * const channelInfo ATTR_UNUSED) {
-  struct json_object *adddecl, *fmlaobj, *weightobj, *sourceobj;
+  struct json_object *adddecl, *fixedobj, *fmlaobj, *weightobj, *sourceobj;
   input_formula_t *fmla;
   double weight;
-  char *source;
+  char *source, **fixed;
 
   printf("In xpce.add\n");
   adddecl = xpce_parse_decl(envP, paramArrayP);
   if (!json_object_is_type(adddecl, json_type_object)) {
-    mcsat_err("Bad argument: expected {\"formula\": FORMULA, \"weight\": NUM, \"source\": NAME}\n");
+    mcsat_err("Bad argument: expected {\"fixed\": NAMES, \"formula\": FORMULA, \"weight\": NUM, \"source\": NAME}\n");
     json_object_put(adddecl);
     return xpce_result(envP, NULL);
   }
-  
+  fixedobj = json_object_object_get(adddecl, "fixed");
+  if (fixedobj == NULL) {
+    fixed = NULL;
+  } else {
+    fixed = xpce_json_fixedpreds_array(fixedobj);
+  }
   fmlaobj = json_object_object_get(adddecl, "formula");
   if (fmlaobj == NULL) {
     mcsat_err("Bad argument: expected {\"formula\": FORMULA}\n");
@@ -608,7 +666,6 @@ xpce_add(xmlrpc_env * const envP,
     json_object_put(adddecl);
     return xpce_result(envP, NULL);
   }
-
   weightobj = json_object_object_get(adddecl, "weight");
   // If weight is NULL, use DBL_MAX
   if (weightobj == NULL) {
@@ -637,7 +694,7 @@ xpce_add(xmlrpc_env * const envP,
     source = (char *) json_object_get_string(sourceobj);
   }
   pthread_mutex_lock(&mutex);
-  add_cnf(fmla, weight, source, true);
+  add_cnf(fixed, fmla, weight, source, true);
   pthread_mutex_unlock(&mutex);
   
   free_formula(fmla);
@@ -899,7 +956,7 @@ xpce_reset(xmlrpc_env * const envP,
     reset_sort_table(&samp_table.sort_table);
     // Need to do more here - like free up space.
     init_samp_table(&samp_table);
-    init_gen_rand(xpce_seed);
+    rand_reset();
   } else if (strcasecmp(json_object_get_string(resetobj), "probabilities") == 0) {
     // Simply resets the probabilities of the atom table to -1.0
     output("Resetting probabilities of atoms to -1.0\n");
@@ -1015,7 +1072,7 @@ int main(int const argc, const char ** const argv) {
 
   // Force output, mcsat_err, and mcsat_warn to save to buffer (see print.c)
   output_to_string = true; 
-  init_gen_rand(xpce_seed);
+  rand_reset();
   init_samp_table(&samp_table);
   input_stack_push_file("");
   yylloc.first_line = 1;

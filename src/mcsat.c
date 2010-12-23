@@ -114,7 +114,7 @@ static void decode_options(int argc, char **argv) {
 	}
       }
       // srand(atoi(optarg));
-      init_gen_rand(atoi(optarg));
+      set_pce_rand_seed(atoi(optarg));
       break;
     }
     case LAZY_OPTION:
@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
   bool file_loaded;
 
   program_name = argv[0];
-  init_gen_rand(12345); // May be reset in options
+  rand_reset(); // May be reset in options
   decode_options(argc, argv);
   init_samp_table(&samp_table);
   file_loaded = false;

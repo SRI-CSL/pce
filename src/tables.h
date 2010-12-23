@@ -101,7 +101,8 @@ typedef struct samp_clause_s {
   double weight;//weight of the clause: 0 for hard clause
   struct samp_clause_s *link; //link to next clause for a given watched literal
   int32_t numlits;
-  samp_literal_t disjunct[0];//array of literals 
+  bool *frozen; // array indicating whether associated literal is frozen
+  samp_literal_t disjunct[0];//array of literals
 } samp_clause_t;
 
 
@@ -317,8 +318,11 @@ typedef struct rule_literal_s {
 typedef struct samp_rule_s {
   int32_t num_lits; //number of literal entries
   int32_t num_vars; //number of variables
+  int32_t num_frozen; //number of frozen predicates
   var_entry_t **vars; //The variables
   rule_literal_t **literals; //array of pointers to rule_literals
+  int32_t *frozen_preds; //array of frozen predicates
+  int32_t *clause_indices; //array of indices into clause_table
   double weight;
 } samp_rule_t;
 

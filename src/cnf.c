@@ -558,13 +558,17 @@ bool all_clauses_involve_indirects_or_hnf(rule_literal_t ***lits,
 // Generates the CNF form of a formula, and updates the clause table (if no
 // variables) or the rule table.
 
-void add_cnf(input_formula_t *formula, double weight, char *source, bool add_weights) {
+void add_cnf(char **frozen, input_formula_t *formula,
+	     double weight, char *source, bool add_weights) {
   rule_table_t *rule_table = &samp_table.rule_table;
   pred_table_t *pred_table = &samp_table.pred_table;
-  int32_t i, j, current_rule, num_lits, num_vars, atom_idx;
+  int32_t i, j, num_frozen, fpred_val, fpred_idx, *frozen_preds,
+    current_rule, num_lits, num_vars, atom_idx;
   rule_literal_t ***lits, *lit;
   samp_rule_t *clause, *found;
   bool found_indirect;
+
+  num_frozen = 0;
 
   // Returns the literals, and sets the sort of the variables
   lits = cnf_pos(formula->fmla, formula->vars);
@@ -577,6 +581,30 @@ void add_cnf(input_formula_t *formula, double weight, char *source, bool add_wei
   // If there is an error, this function will not return
   if (!all_clauses_involve_indirects_or_hnf(lits, weight)) {
     return;
+  }
+
+  if (frozen != NULL) {
+    for (num_frozen = 0; frozen[num_frozen] != NULL; num_frozen++) {};
+    frozen_preds = (int32_t *) safe_malloc((num_frozen+1) * sizeof(int32_t));
+    j = 0;
+    for (i = 0; frozen[i] != NULL; i++) {
+      fpred_val = pred_index(frozen[i], pred_table);
+      if (fpred_val == -1) {
+	mcsat_warn("Predicate %s not declared; will be ignored", frozen[i]);
+      } else {
+	fpred_idx = pred_val_to_index(fpred_val);
+	if (pred_epred(fpred_idx)) {
+	  // A direct predicate - no sense in trying to fix it complain, but go on anyway
+	  mcsat_warn("Predicate %s is observable, hence already frozen", frozen[i]);
+	} else {
+	  frozen_preds[j++] = fpred_idx;
+	}
+      }
+    }
+    num_frozen = j;
+    frozen_preds[j] = -1;
+  } else {
+    frozen_preds = NULL;
   }
   
   if (formula->vars == NULL) {
@@ -596,7 +624,8 @@ void add_cnf(input_formula_t *formula, double weight, char *source, bool add_wei
 	free_samp_atom(satom);
 	clause_buffer.data[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
       }
-      add_internal_clause(&samp_table, clause_buffer.data, num_lits, weight, found_indirect, add_weights);
+      add_internal_clause(&samp_table, clause_buffer.data, num_lits, frozen_preds,
+			  weight, found_indirect, add_weights);
     }
   } else {
     for (num_vars = 0; formula->vars[num_vars] != NULL; num_vars++) {}
@@ -615,6 +644,8 @@ void add_cnf(input_formula_t *formula, double weight, char *source, bool add_wei
       for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++) {}
       clause->num_lits = num_lits;
       clause->literals = lits[i];
+      clause->num_frozen = num_frozen;
+      clause->frozen_preds = frozen_preds;
       //set_clause_variables(clause);
       clause->num_vars = num_vars;
       set_fmla_clause_variables(clause, formula->vars);
@@ -640,13 +671,16 @@ void add_cnf(input_formula_t *formula, double weight, char *source, bool add_wei
 	  }
 	}
       } else {
-	mcsat_warn("Rule was seen before, adding weights\n");
 	if (found->weight != DBL_MAX) {
+	  mcsat_warn("Rule was seen before, adding weights\n");
 	  if (weight == DBL_MAX) {
 	    found->weight = DBL_MAX;
 	  } else {
 	    found->weight += weight;
 	  }
+	  // Need to update the clause table
+	} else {
+	  mcsat_warn("Rule was seen before with MAX weight: unchanged\n");
 	}
       }
     }
