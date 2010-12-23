@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "parser.h"
 #include "print.h"
+#include "SFMT.h"
 #include "input.h"
 #include "cnf.h"
 #include "samplesat.h"
@@ -34,6 +35,17 @@ static int32_t max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
 
 static bool strict_consts = true;
 static bool lazy = false;
+
+uint32_t pce_rand_seed = 12345;
+
+void rand_reset() {
+  init_gen_rand(pce_rand_seed);
+}
+
+void set_pce_rand_seed(uint32_t seed) {
+  pce_rand_seed = seed;
+  rand_reset();
+}
 
 input_clause_buffer_t input_clause_buffer = {0, 0, NULL};
 input_literal_buffer_t input_literal_buffer = {0, 0, NULL};
@@ -492,7 +504,8 @@ Restart MCSAT with '--lazy=%s' for the %slazy version\n\
   case RESET: {
     output("\n\
 reset [all | probabilities];\n\
-  Resets the internal tables.\n\
+  All: resets the internal tables and the random number seed\n\
+  Probabilities: just resets the count used to generate probabilities\n\
 ");
     break;
   }
@@ -503,12 +516,31 @@ retract [all | source];\n\
 ");
     break;
   }
-  case DUMPTABLE:
-  case LOAD:
-  case VERBOSITY:
+  case DUMPTABLE: {
+    output("\n\
+dumptable [all | sort | predicate | atom | clause | rule | summary];\n\
+  dumps the corresponding table(s), or a summary of them\n\
+");
+    break;
+  }    
+  case LOAD: {
+    output("\n\
+load \"file\";\n\
+  loads the file (files may themselves load files)\n\
+");
+    break;
+  }
+  case VERBOSITY: {
+    output("\n\
+verbosity num;\n\
+  Sets the verbosity level, mostly useful for debugging\n\
+");
+    break;
+  } 
   case HELP:
     output("\n\
-No help available yet\n\
+help [command];\n\
+  Provides help for the specified command\n\
 ");
     break;
   }
@@ -814,7 +846,7 @@ extern bool read_eval(samp_table_t *table) {
     case ADD: {
       input_add_fdecl_t decl = input_command.decl.add_fdecl;
       cprintf(2, "Clausifying and adding formula\n");
-      add_cnf(decl.formula, decl.weight, decl.source, true);
+      add_cnf(decl.frozen, decl.formula, decl.weight, decl.source, true);
       break;
     }
     case ADD_CLAUSE: {
@@ -933,6 +965,7 @@ extern bool read_eval(samp_table_t *table) {
 	reset_sort_table(sort_table);
 	// Need to do more here - like free up space.
 	init_samp_table(table);
+	init_gen_rand(pce_rand_seed);
 	break;
       }
       case PROBABILITIES: {
