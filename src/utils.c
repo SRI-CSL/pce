@@ -124,7 +124,7 @@ bool assigned_fixed_false_lit(samp_truth_value_t *assignment,
 }
 
 
-/* Evaluates a clause to false (-1) or to the literal index evaluating to true.
+/** Evaluates a clause to false (-1) or to the literal index evaluating to true.
  */
 int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
   int32_t i;
@@ -135,7 +135,7 @@ int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
   return -1;
 }
 
-/* Evaluates a clause to -1 if all literals are false, and i if the
+/** Evaluates a clause to -1 if all literals are false, and i if the
    i'th literal is true, in the given assignment. 
 */
 int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
