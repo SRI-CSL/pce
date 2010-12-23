@@ -46,9 +46,6 @@ src_c := array_hash_map.c cnf.c gcd.c hash_functions.c input.c \
 ifneq ($(XMLRPC_SERVER_LIBS),)
 src_c := $(src_c) xpce.c test-xpce.c test-xpce2.c xpce-client.c
 endif
-ifneq ($(OAACFLAGS),)
-src_c := $(src_c) pce.c reduced_pce.c
-endif
 
 
 #
@@ -96,9 +93,6 @@ binaries := $(bindir)/mcsat$(EXEEXT)
 ifneq ($(XMLRPC_SERVER_LIBS),)
 binaries := $(binaries) $(bindir)/xpce$(EXEEXT) $(bindir)/test-xpce$(EXEEXT) \
             $(bindir)/test-xpce2$(EXEEXT) $(bindir)/xpce-client$(EXEEXT)
-endif
-ifneq ($(OAACFLAGS),)
-binaries := $(binaries) $(bindir)/pce$(EXEEXT) $(bindir)/reduced_pce$(EXEEXT)
 endif
 
 
@@ -227,7 +221,7 @@ lib: $(lib_targets)
 # Dependency files
 $(objdir)/%.d: %.c
 	@ echo Building dependency file $@
-	$(CC) -MM -MG $(CPPFLAGS) $(OAACFLAGS) $< > $@.tmp
+	$(CC) -MM -MG $(CPPFLAGS) $< > $@.tmp
 	@ $(SED) 's,\($*\).o[ :]*,$(objdir)/\1.o $@ : , g' < $@.tmp > $@
 	@ rm -f $@.tmp
 
@@ -244,14 +238,6 @@ yacc.tab.c yacc.tab.h: yacc.y
 # Object files
 $(objdir)/%.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
-$(objdir)/pce.o: pce.c
-	echo OAACFLAGS = $(OAACFLAGS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) -I/usr/include/glib-2.0 -c $< -o $@
-
-$(objdir)/reduced_pce.o: reduced_pce.c
-	echo OAACFLAGS = $(OAACFLAGS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) -I/usr/include/glib-2.0 -c $< -o $@
 
 # static Library
 $(libmcsat): $(obj)
@@ -349,16 +335,6 @@ $(bindir)/xpce-client$(EXEEXT): $(objdir)/xpce-client.o $(libmcsat)
 	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(LIBS) $(XMLRPC_CLIENT_LIBS)
 endif
 
-ifneq ($(OAALDFLAGS),)
-$(bindir)/%$(EXEEXT): $(objdir)/%.o $(libmcsat)
-	$(LNK) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lglib-2.0
-
-$(bindir)/pce$(EXEEXT): $(objdir)/pce.o $(libmcsat)
-#	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lintl -liconv  -lglib-2.0
-	$(LNK) $(CPPFLAGS) $(CFLAGS) $(OAACFLAGS) $(LDFLAGS) -o $@ $< $(libmcsat) $(OAALDFLAGS) $(LIBS) -lglib-2.0
-endif
-
-
 #
 # Gperf generated tables
 # - we need to give different names to the mcsat and smt lookup functions
@@ -420,8 +396,6 @@ now := $(shell date)
 	@ echo "  CPPFLAGS = $(CPPFLAGS)"
 	@ echo "  LIBS     = $(LIBS)"
 	@ echo "  LDFLAGS  = $(LDFLAGS)"
-	@ echo "  OAACFLAGS  = $(OAACFLAGS)"
-	@ echo "  OAALDFLAGS  = $(OAALDFLAGS)"
 	@ echo "  libmcsat  = $(libmcsat)"
 	@ echo "  LD       = $(LD)"
 	@ echo "  AR       = $(AR)"
