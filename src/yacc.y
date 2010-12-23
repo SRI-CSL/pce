@@ -287,8 +287,9 @@ input_command_t input_command;
     input_command.decl.assert_decl.atom = atom;
     input_command.decl.assert_decl.source = source;
   };
-  void yy_add_fdecl (input_formula_t *formula, char *wt, char *source) {
+  void yy_add_fdecl (char **frozen, input_formula_t *formula, char *wt, char *source) {
     input_command.kind = ADD;
+    input_command.decl.add_fdecl.frozen = frozen;
     input_command.decl.add_fdecl.formula = formula;
     input_command.decl.add_fdecl.source = source;
     if (strcmp(wt, "DBL_MAX") == 0) {
@@ -574,7 +575,7 @@ void yy_mcsat_params_decl (char **params) {
 }
 
 %type <str> arg NAME NUM STRING addwt oarg oname retractarg
-%type <strs> arguments variables oarguments onum2
+%type <strs> arguments names oarguments onum2 ofrozen
 %type <sortdef> sortdef sortval interval
 %type <formula> formula
 %type <fmla> fmla
@@ -628,7 +629,7 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | ASSERT atom oname {yy_assert_decl($2, $3);}
     | ADD_CLAUSE clause addwt oname {yy_add_decl($2, $3, $4);}
 //    | ASK_CLAUSE clause NUM oarg oarg {yy_ask_decl($2, $3, $4, $5);}
-    | ADD formula addwt oname {yy_add_fdecl($2, $3, $4);}
+    | ADD ofrozen formula addwt oname {yy_add_fdecl($2, $3, $4, $5);}
     | ASK formula onum2 {yy_ask_fdecl($2, $3);}
     | MCSAT {yy_mcsat_decl();}
     | MCSAT_PARAMS oarguments {yy_mcsat_params_decl($2);}
@@ -672,7 +673,7 @@ resetarg: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;} | PROBABILITIES {$$ = PROBAB
 retractarg: ALL {$$ = "ALL";} | NAME;
 
 formula: fmla {$$ = yy_formula(NULL, $1);}
-       | '[' variables ']' fmla {$$ = yy_formula($2, $4);}
+       | '[' names ']' fmla {$$ = yy_formula($2, $4);}
        ;
 
 fmla: atom {$$ = yy_atom_to_fmla($1);}
@@ -686,7 +687,7 @@ fmla: atom {$$ = yy_atom_to_fmla($1);}
     ;
 
 clause: literals {$$ = yy_clause(NULL, $1);};
-      | '(' variables ')'
+      | '(' names ')'
 	literals {$$ = yy_clause($2, $4);};
 
 literals: lits {$$ = copy_yylits();};
@@ -724,10 +725,10 @@ args: arg {pvector_push(&yyargs,$1);}
       | args ',' arg {pvector_push(&yyargs,$3);}
       ;
 
-variables: vars {$$ = copy_yyargs();};
+names: nms {$$ = copy_yyargs();};
    
-vars: NAME {pvector_push(&yyargs, $1);}
-      | vars ',' NAME {pvector_push(&yyargs, $3);}
+nms: NAME {pvector_push(&yyargs, $1);}
+      | nms ',' NAME {pvector_push(&yyargs, $3);}
       ;
 
 oarg: /*empty*/ {$$=NULL;} | arg;
@@ -737,6 +738,10 @@ arg: NAME | NUM; // returns string from yystrings
 addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
 
 oname: /* empty */ {$$=NULL;} | NAME;
+
+ofrozen: /*empty */ {$$=NULL;}
+      | '{' names '}' {$$ = $2;}
+      ;
 
 onum2: /* empty */ {$$=NULL;}
      | NUM {pvector_push(&yyargs, $1); $$ = copy_yyargs();}
@@ -748,8 +753,9 @@ onum2: /* empty */ {$$=NULL;}
 %%
 
 int isidentchar(int c) {
-  return !(isspace(c) || iscntrl(c) || c =='(' || c == ')' || c == '|'
-	   || c == '[' || c == ']' || c == ',' || c == ';' || c == ':');
+  return !(isspace(c) || iscntrl(c) || c =='(' || c == ')'
+	   || c == '|' || c == '[' || c == ']' || c == '{'
+	   || c == '}' || c == ',' || c == ';' || c == ':');
 }
 
 int yygetc(parse_input_t *input) {
@@ -1056,7 +1062,7 @@ int yylex (void) {
     }
   }
   if (isspace(c) || c == ',' ||  c == ';' || c == '(' || c == ')' || c == '[' || c == ']'
-      || c == ':' || c == '\0' || c == EOF) {
+      || c == '{' || c == '}' || c == ':' || c == '\0' || c == EOF) {
     return c;
   }
   /* If we get here, simply collect until space, comma, paren, bracket, semicolon, \0, EOF
