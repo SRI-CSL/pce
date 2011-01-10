@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
+#include <time.h>
 #include "memalloc.h"
 #include "prng.h"
 #include "int_array_sort.h"
@@ -20,19 +21,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include <wincrypt.h>
-#endif
-
-#ifdef MINGW
-
-/*
- * Need some version of random()
- * rand() exists on mingw but random() does not
- */
-static inline int random(void) {
-  return rand();
-}
-
+// #include <wincrypt.h>
 #endif
 
 static uint32_t genrand_uint(uint32_t n) {
@@ -1198,24 +1187,9 @@ static void print_list(samp_clause_t *link, samp_table_t *table) {
  */
 
 double choose(){
-#ifdef _WIN32
-  // Get the cryptographic service provider
-  HCRYPTPROV hCryptProv;
-  CryptAcquireContext(&hCryptProv, NULL, NULL, PROV_RSA_FULL, 0);
-
-  // Get the random number
-  union {
-    BYTE bs[sizeof(unsigned long int)];
-    unsigned long int li;
-  } rand_buf;
-  CryptGenRandom(hCryptProv, sizeof(rand_buf), (BYTE*) &rand_buf);
-
-  return ((double) rand_buf.li) / ((double) ULONG_MAX + 1.0);
-#else
   //return ((double) random()) / ((double) RAND_MAX + 1.0);
   //return ((double) gen_rand64()) / ((double) UINT64_MAX + 1.0);
   return genrand_real2();
-#endif
 }
 
 
@@ -1357,7 +1331,7 @@ int32_t negative_unit_propagate(samp_table_t *table){
   link = *link_ptr;
   while (link != NULL) {
     abs_weight = fabs(link->weight);
-    cprintf(3,"negative_unit_propagate: probability is % 5.3f\n",
+    cprintf(3,"negative_unit_propagate: probability is % .4e\n",
 	    exp(- abs_weight));
     if (abs_weight == DBL_MAX || choose() > exp(- abs_weight)) {
       /*
@@ -1831,7 +1805,7 @@ int32_t sample_sat_body(samp_table_t *table, double sa_probability,
   int32_t conflict = 0;
 
   choice = choose();
-  cprintf(1,"sample_sat_body: num_unsat = %d, choice = % 5.3f, sa_probability = % 5.3f\n",
+  cprintf(1,"sample_sat_body: num_unsat = %d, choice = % .4e, sa_probability = % .4e\n",
 	  clause_table->num_unsat_clauses, choice, sa_probability);
   if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
     /*
@@ -2102,9 +2076,10 @@ void sample_sat(samp_table_t *table, double sa_probability,
 void mc_sat(samp_table_t *table, uint32_t max_samples,
 	    double sa_probability, double samp_temperature,
 	    double rvar_probability, uint32_t max_flips,
-	    uint32_t max_extra_flips){
+	    uint32_t max_extra_flips, uint32_t timeout){
   int32_t conflict;
   uint32_t i;
+  time_t fintime = 0;
 
   conflict = first_sample_sat(table, sa_probability, samp_temperature,
 			      rvar_probability, max_flips);
@@ -2118,6 +2093,9 @@ void mc_sat(samp_table_t *table, uint32_t max_samples,
   }
   //  print_state(table, 0);
   //assert(valid_table(table));
+  if (timeout != 0) {
+    fintime = time(NULL) + timeout;
+  }
   for (i = 0; i < max_samples; i++){
     cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
     sample_sat(table, sa_probability, samp_temperature,
@@ -2127,6 +2105,10 @@ void mc_sat(samp_table_t *table, uint32_t max_samples,
     //print_assignment(table);
     //    print_state(table, i+1);
     //assert(valid_table(table));
+    if (timeout != 0 && time(NULL) >= fintime) {
+      printf("Timeout after %"PRIu32" samples\n", i);
+      break;
+    }
   }
 
   //print_atoms(table);

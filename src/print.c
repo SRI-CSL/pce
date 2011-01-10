@@ -272,11 +272,14 @@ void print_atoms(samp_table_t *table){
   int i;
   
   output("--------------------------------------------------------------------------------\n");
-  output("| %*s | prob   | %-*s |\n", nwdth, "i", 65-nwdth, "atom");
+  output("| %*s | probability | %-*s |\n", nwdth, "i", 65-nwdth, "atom");
   output("--------------------------------------------------------------------------------\n");
   for (i = 0; i < nvars; i++){
-    output("| %-*u | % 5.3f | ",
-	   nwdth, i, atom_probability(i, table));
+    if (get_print_exp_p()) {
+      output("| %-*u | % .4e | ", nwdth, i, atom_probability(i, table));
+    } else {
+      output("| %-*u | % 11.4f | ", nwdth, i, atom_probability(i, table));
+    }
     print_atom(atom_table->atom[i], table);
     output("\n");
   }
@@ -646,7 +649,11 @@ extern void dump_query_instance_table (samp_table_t *samp_table) {
   for(i=0; i<nqueries; i++) {
     qinst = query_instance_table->query_inst[i];
     print_query_instance(qinst, samp_table, nwdth+17, true);
-    output(" : % 5.3f\n", query_probability(qinst, samp_table));
+    if (get_print_exp_p()) {
+      output(" : % .4e\n", query_probability(qinst, samp_table));
+    } else {
+      output(" : % 11.4f\n", query_probability(qinst, samp_table));
+    }
     output("\n");
   }
   output("-------------------------------------------------------------------------------\n");

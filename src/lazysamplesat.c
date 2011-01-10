@@ -357,9 +357,10 @@ void lazy_sample_sat(samp_table_t *table, double sa_probability,
 void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
 		 double sa_probability, double samp_temperature,
 		 double rvar_probability, uint32_t max_flips,
-		 uint32_t max_extra_flips){
+		 uint32_t max_extra_flips, uint32_t timeout){
   int32_t conflict;
   uint32_t i;
+  time_t fintime;
 
   conflict = first_lazy_sample_sat(table, sa_probability, samp_temperature,
 				   rvar_probability, max_flips);
@@ -370,12 +371,18 @@ void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
 
   //  print_state(table, 0);  
   //assert(valid_table(table));
+  if (timeout != 0) {
+    fintime = time(NULL) + timeout;
+  }
   for (i = 0; i < max_samples; i++){
     cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
     lazy_sample_sat(table, sa_probability, samp_temperature,
 		    rvar_probability, max_flips, max_extra_flips);
     //    print_state(table, i+1);
     //assert(valid_table(table));
+    if (timeout != 0 && time(NULL) >= fintime) {
+      break;
+    }
   }
 
   //print_atoms(table);

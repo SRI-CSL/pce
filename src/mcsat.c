@@ -47,6 +47,7 @@ static struct option long_options[] = {
   {"seed", required_argument, 0, SEED_OPTION},
   {"lazy", required_argument, 0, LAZY_OPTION},
   {"strict", required_argument, 0, STRICT_OPTION},
+  {"prexp", no_argument, 0, 'e'},
   {"verbosity", required_argument, 0, 'v'},
   {"version", no_argument, &show_version, 1},
   {0, 0, 0, 0}
@@ -73,13 +74,14 @@ Options:\n\
   -s,     --seed=NUM       use given random seed\n\
           --lazy=BOOL      whether to use lazy version (true)\n\
           --strict=BOOL    whether to require declarations for all constants (true)\n\
+  -e,     --prexp          whether to print using 'e' notation\n\
   -v,     --verbosity=NUM  sets the verbosity level\n\
   -V,     --version        prints the version number and exits\n\
 ", program_name, program_name);
   exit(0);
 }
 
-#define OPTION_STRING "ihs:Vv:"
+#define OPTION_STRING "ihs:eVv:"
 
 // static void set_subcommand_option (enum subcommand subcommand) {
 //   if (subcommand_option != subcommand) {
@@ -136,6 +138,9 @@ static void decode_options(int argc, char **argv) {
 	mcsat_err("Error: strict must be true, false, t, f, 0, or 1\n");
 	exit(1);
       }
+      break;
+    case 'e':
+      set_print_exp_p(true);
       break;
     case 'v':
       if (strlen(optarg) > 0) {

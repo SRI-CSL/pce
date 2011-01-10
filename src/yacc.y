@@ -398,11 +398,11 @@ void yy_mcsat_params_decl (char **params) {
   input_command.kind = MCSAT_PARAMS;
   // Determine num_params
   if (params != NULL) {
-    while (arglen <= 6 && (params[arglen] != NULL)) {
+    while (arglen <= 7 && (params[arglen] != NULL)) {
       arglen++;
     }
   }
-  if (arglen > 6) {
+  if (arglen > 7) {
     yyerror("mcsat_params: too many args");
   }
   input_command.decl.mcsat_params_decl.num_params = arglen;
@@ -468,6 +468,14 @@ void yy_mcsat_params_decl (char **params) {
     }
   } else {
     input_command.decl.mcsat_params_decl.max_extra_flips = -1;
+  }
+  // timeout
+  if (arglen > 6 && strcmp(params[6], "") != 0) {
+    if (yy_check_nat(params[6])) {
+      input_command.decl.mcsat_params_decl.timeout = atoi(params[6]);
+    }
+  } else {
+    input_command.decl.mcsat_params_decl.timeout = -1;
   }
   free_strings(params);
 };

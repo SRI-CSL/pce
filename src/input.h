@@ -95,6 +95,7 @@ typedef struct input_mcsat_params_decl_s {
   double rvar_probability;
   int32_t max_flips;
   int32_t max_extra_flips;
+  int32_t timeout;
 } input_mcsat_params_decl_t;
 
 typedef struct input_reset_decl_s {
@@ -184,6 +185,9 @@ extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t
 extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
 extern void dumptable(int32_t tbl, samp_table_t *table);
 
+extern void set_print_exp_p(bool flag);
+extern bool get_print_exp_p();
+
 extern void set_pce_rand_seed(uint32_t seed);
 extern void rand_reset();
 
@@ -193,6 +197,7 @@ extern double get_samp_temperature();
 extern double get_rvar_probability();
 extern int32_t get_max_flips();
 extern int32_t get_max_extra_flips();
+extern int32_t get_mcsat_timeout();
 
 extern void set_max_samples(int32_t m);
 extern void set_sa_probability(double d);
@@ -200,6 +205,7 @@ extern void set_samp_temperature(double d);
 extern void set_rvar_probability(double d);
 extern void set_max_flips(int32_t m);
 extern void set_max_extra_flips(int32_t m);
+extern void set_mcsat_timeout(int32_t m);
 
 extern bool strict_constants();
 extern void set_strict_constants(bool val);
