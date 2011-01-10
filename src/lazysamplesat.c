@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
+#include <time.h>
 #include "memalloc.h"
 #include "prng.h"
 #include "int_array_sort.h"
@@ -360,7 +361,7 @@ void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
 		 uint32_t max_extra_flips, uint32_t timeout){
   int32_t conflict;
   uint32_t i;
-  time_t fintime;
+  time_t fintime = 0;
 
   conflict = first_lazy_sample_sat(table, sa_probability, samp_temperature,
 				   rvar_probability, max_flips);
