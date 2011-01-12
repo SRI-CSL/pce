@@ -4,9 +4,11 @@
 #include <stdarg.h>
 #include <string.h>
 #include <pthread.h>
+
 #include "memalloc.h"
 #include "utils.h"
 #include "tables.h"
+#include "input.h"
 #include "print.h"
 
 #define INIT_STRING_BUFFER_SIZE 32

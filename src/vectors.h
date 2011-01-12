@@ -109,7 +109,7 @@ extern void extend_pvector(pvector_t *v);
 
 extern void resize_pvector(pvector_t *v, uint32_t n);
 
-static void pvector_push(pvector_t *v, void *p) {
+static inline void pvector_push(pvector_t *v, void *p) {
   uint32_t i;
 
   i = v->size;
@@ -129,10 +129,10 @@ static inline void pvector_shrink(pvector_t *v, uint32_t n) {
   v->size = n;
 }
 
+
 /*
  * Double vectors
  */
-
 extern void init_dvector(dvector_t *v, uint32_t n);
 
 extern void delete_dvector(dvector_t *v);
