@@ -23,6 +23,22 @@ demonstrate the capabilities of PCE through some simple examples.  We
 also outline the mathematical background behind this approach to
 probabilistic inference.  }
 
+islide: Probabilistic Inference
+An acquaintance tells you she has two children, one is a boy born on
+Tuesday.  What is the probability she has two boys?
+
+Two bowls: A and B, A has 10 chocolate and 30 plain cookies, B has 20 of
+each.  A bowl is picked at random, followed by a cookie picked at random,
+which is plain.  Which bowl is the cookie from?
+
+A jury is trying a case in which there are two suspects: one has a prior criminal record
+and the other doesn't.  Which suspect is more  likely to be guilty?
+
+A test for a disease has a false negative probability of $.01$, a
+false positive probability of $.05$, and a typical patient has the
+disease with probability $.001$\@.  What is the probability that a
+patient who has tested positive have the disease?
+
 islide: What is PCE?
 
 PCE stands for Probabilistic Consistency Engine
@@ -58,57 +74,68 @@ PCE Example: Boy Born on Tuesday
 PCE Application: Machine Reading
 
 Conclusions
+\comment{
+%%slide: Small Example - Markov Logic Network
 
-slide: Small Example - Markov Logic Network
+%% \begin{itemize}
+%% \item Smoking causes cancer
+%% \item Friends influence smoking behavior
+%% \end{itemize}
 
-\begin{itemize}
-\item Smoking causes cancer
-\item Friends influence smoking behavior
-\end{itemize}
-
-\includegraphics[width=\textwidth]{cancer}
-
+%% \includegraphics[width=\textwidth]{cancer}
+}
 slide: Small Example - PCE Specification
 \begin{alltt}\smaller{
 sort Person;
 const A, B, C: Person;
-predicate Friends(Person, Person) hidden;
-predicate Smokes(Person) hidden;
-predicate Cancer(Person) hidden;
+predicate Friends(Person, Person) indirect;
+predicate Smoking(Person) indirect;
+predicate Cancer(Person) indirect;
+
+#Friends of Friends are Friends
+add [x, y, z] Friends(x, y) and Friends(y, z) implies Friends(x, z) 0.7;
+
+#Friendless people smoke
 
 # Smoking causes cancer.
-add [x] Smokes(x) => Cancer(x)  0.1;
-# If two people are friends, either both smoke or neither does.
-add [x, y] Friends(x, y) implies (Smokes(x) implies Smokes(y))  1.1;
+add [x] Smoking(x) => Cancer(x)  1.5;
 
-add Smokes(A);
+# If two people are friends, either both smoke or neither does.
+add [x, y] Friends(x, y) implies (Smoking(x) implies Smoking(y))  1.1;
+
+#Friendship commutes
+add [x, y] Friends(x, y) implies Friends(y, x);
+
+add Smoking(A);
 add Friends(A, B);
+#add Friends(B, C);
 
 mcsat_params 100000, .5, 5, .05, 100, 5;
-mcsat; dumptable atom;
+mcsat;
+dumptable atom;
 }\end{alltt}
 
 slide: Small PCE Example - Results
 \begin{alltt}\smaller{
-------------------------------------------------------------
-|  i | prob   | atom                                        |
-------------------------------------------------------------
-| 0  |  0.500 | Friends(A, A)
+--------------------------------------------------------------------------------
+|  i | prob   | atom                                                            |
+--------------------------------------------------------------------------------
+| 0  |  0.708 | Friends(A, A)
 | 1  |  1.000 | Friends(A, B)
-| 2  |  0.400 | Friends(A, C)
-| 3  |  0.501 | Friends(B, A)
-| 4  |  0.501 | Friends(B, B)
-| 5  |  0.434 | Friends(B, C)
-| 6  |  0.500 | Friends(C, A)
-| 7  |  0.472 | Friends(C, B)
-| 8  |  0.501 | Friends(C, C)
-| 9  |  1.000 | Smokes(A)
-| 10 |  0.752 | Smokes(B)
-| 11 |  0.616 | Smokes(C)
-| 12 |  0.525 | Cancer(A)
-| 13 |  0.519 | Cancer(B)
-| 14 |  0.516 | Cancer(C)
-------------------------------------------------------------
+| 2  |  0.254 | Friends(A, C)
+| 3  |  1.000 | Friends(B, A)
+| 4  |  0.713 | Friends(B, B)
+| 5  |  0.256 | Friends(B, C)
+| 6  |  0.254 | Friends(C, A)
+| 7  |  0.256 | Friends(C, B)
+| 8  |  0.583 | Friends(C, C)
+| 9  |  1.000 | Smoking(A)
+| 10 |  0.698 | Smoking(B)
+| 11 |  0.506 | Smoking(C)
+| 12 |  0.817 | Cancer(A)
+| 13 |  0.730 | Cancer(B)
+| 14 |  0.675 | Cancer(C)
+--------------------------------------------------------------------------------
 }\end{alltt}
 
 islide: Probability Basics (From Neapolitan)
@@ -173,7 +200,7 @@ add testedPositive(a) or ~diseased(a) 4.6; # 99%
 add ~testedPositive(a) or ~diseased(a) .01; # 1%
 add testedPositive(a) or diseased(a) .05;   # 5%
 add ~testedPositive(a) or diseased(a) 3.0; # 95%
-add ~diseased(a) 6.9; # 50%
+add ~diseased(a) 6.9; # 99.9%
 add diseased(a) .001; # .1%
 
 add testedPositive(a);
@@ -194,9 +221,12 @@ probabilities $P(X_i = x_i)$ and conditional probabilities $P(Z = z | Y =
 y)$, where $Z$ and $Y$ are disjoint subsets of $X$
 
 \emph{Graphical models} represent the joint distribution $P(X = x)$ as a
-product $1/Z \Pi_k F_k(X_k = x_k)$, where $k$ is a subset of indices,
-$X_k$ is the corresponding subset of variables, $x_k$ the corresponding
-values, $F_k$ is a potential, and $Z$ is a normalization constant
+product $\frac{1}{Z} \Pi_k F_k(X_k = x_k)$, where $k$ is a subset of indices,
+$X_k$ is the corresponding sequence of variables, $x_k$ the corresponding
+sequence of values.
+
+$F_k$ is a potential function, and $Z$ is a normalization constant
+computed as $\Sigma_x P(x = x)$
 
 \emph{Bayesian networks} and \emph{Markov Logic Networks} are both
 instances of graphical models
@@ -207,7 +237,7 @@ the parent nodes, whereas a Markov logic network is undirected
 islide: Bayesian Networks
 
 Potential functions in a Bayesian Network can be converted to feature
-function using a log-linear model as $P(X = x) = 1/Z e^{(\Sigma_i w_i
+functions using a log-linear model as $P(X = x) = \frac{1}{Z} e^{(\Sigma_i w_i
 f_i(x))}$.
 
 A Bayesian Network can be used to compute joint probability distributions
@@ -215,8 +245,16 @@ $P(x_1, \ldots, x_n)$ by taking each individual variable $X_i$, its
 parents $\pi_i$ and the valuation of its parents $X_{\pi_i} = x_{\pi_i}$
 as $\Pi_i P(X_i = x_i | X_{\pi_i} = x_{\pi_i})$\@.
 
-It can also be used for conditional inference to compute the probability
-that $\ol{X} = \ol{x}$ given $\ol{Y} = \ol{y}$.
+For many inference problems, the random variables are partitioned as $X$ and $Y$. 
+
+Bayesian networks and other graphical models can be used to compute
+\begin{enumerate}
+\item Marginal probabilities: $p(X = x) = \Sigma_y p(X=x, Y = y)$
+
+\item Maximum a posteriori probability: $\mathit{argmax}_y p(X = x, Y = y)$
+
+\item Conditional probability: $p(X = x | Y = y) \Sigma_z p(X = x, Y = y, Z= z)/p(Y = y) $
+\end{enumerate}
 
 islide: Markov Logic Networks
 
@@ -228,9 +266,9 @@ online at \url{http://dx.doi.org/10.2200/S00206ED1V01Y200907AIM007}
 In a Markov Logic Network, all random variables are Boolean and all
 feature functions are Boolean formulas
 
-To compute conditional probabilities $P(Z = z | Y = y)$ over a graphical
+To compute conditional probabilities $P(X = x | Y = y)$ over a graphical
 model, one typically uses Markov Chain Monte Carlo (MCMC) sampling
-algorithms to marginalize over the variables in $X - (Y \cup Z)$
+algorithms to marginalize over the variables in $Z$\@.  
 
 A Markov chain is a state machine with probabilities attached to the
 transitions between states -- sum of probabilities of outgoing transitions
@@ -243,8 +281,8 @@ islide: PCE Background
 PCE is based on Markov Logic, and uses MCSAT to compute marginal
 probabilities
 
-The input language consists of sorts, subsorts, constants, observable
-predicates and hidden predicates, facts, and weighted rules
+The input language consists of sorts, subsorts, constants, observable/direct
+predicates and hidden/indirect predicates, facts, and weighted rules
 
 The MCSAT inference averages the probabilities over a sequence of random
 models generated using SampleSAT
@@ -369,8 +407,6 @@ predicate cookie(Color) hidden;
 add ~bowl(A)  or ~bowl(B);
 add ~cookie(plain) or ~cookie(choc);
 add bowl(A) or bowl(B);
-add bowl(A) .693;
-add bowl(B) .693;
 add bowl(A) => cookie(plain) 1.386; # 75%
 add bowl(A) => cookie(choc)   .288; # 25%
 add bowl(B) => cookie(plain)  .693; # 50%
@@ -382,37 +418,8 @@ mcsat; dumptable atom;
 \textit{Result:}
 | 0 |  0.607 | bowl(A)
 | 1 |  0.393 | bowl(B)
-}\end{alltt}
-
-slide: Monty Hall Problem
-
-\begin{quote}\smaller{
-Three doors, behind one of which is a car.  Contestant chooses door A, and
-is shown another door, which is empty.  She is then offered the
-opportunity to switch.  Should she?
-}\end{quote}
-\pause
-\begin{alltt}\smaller{
-sort Door;
-const a, b, c: Door;
-sort Switch;
-const switch: Switch;
-predicate car(Door) hidden;
-predicate win(Switch) hidden;
-add car(a) or car(b) or car(c);
-add ~car(a) or ~car(b);
-add ~car(b) or ~car(c);
-add ~car(c) or ~car(a);
-add car(a) implies ~win(switch);
-add car(b) implies win(switch);
-add car(c) implies win(switch);
-mcsat_params 200000, .5, 5, .05, 100, 5;
-ask win(switch);
-
-\textit{Result:}
-[] 0.628: (win(switch))
-}\end{alltt}
-
+}
+\end{alltt}
 islide: PCE Application: Machine Reading
 
 PCE is currently being used in a machine-reading project managed by SRI
@@ -421,7 +428,7 @@ FAUST (Flexible Acquisition and Understanding System for Text)
 
 Large project involving SRI, Stanford, PARC, UMass, UIUC, and UWashington
 
-PCE will act as a ``harness'', accepting weighted assertions and rules
+PCE  acts as a ``harness'', accepting weighted assertions and rules
 from various classifiers and learners
 
 slide: PCE Application: NFL Articles
@@ -526,3 +533,33 @@ We invite you to try it out and give us feedback
 PCE is open source, and will be available soon as a component of the
 Personal Assistant that Learns (PAL) Framework at \url{http://pal.sri.com}\\
 \vspace*{10mm}\smaller{Bruno Dutertre was involved in early design and implementation}
+
+
+\comment{
+slide: Monty Hall Problem
+\begin{quote}\smaller{
+Three doors, behind one of which is a car.  Contestant chooses door A, and
+is shown another door, which is empty.  She is then offered the
+opportunity to switch.  Should she?
+}\end{quote}
+\pause
+\begin{alltt}\smaller{
+sort Door;
+const a, b, c: Door;
+sort Switch;
+const switch: Switch;
+predicate car(Door) hidden;
+predicate win(Switch) hidden;
+add car(a) or car(b) or car(c);
+add ~car(a) or ~car(b);
+add ~car(b) or ~car(c);
+add ~car(c) or ~car(a);
+add car(a) implies ~win(switch);
+add car(b) implies win(switch);
+add car(c) implies win(switch);
+mcsat_params 200000, .5, 5, .05, 100, 5;
+ask win(switch);
+\textit{Result:}
+[] 0.628: (win(switch))
+}\end{alltt}
+}
