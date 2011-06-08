@@ -2577,14 +2577,14 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 void create_new_const_rule_instances(int32_t constidx, int32_t csort,
 				     samp_table_t *table,
 				     int32_t atom_index) {
-  //sort_table_t *sort_table = &(table->sort_table);
+  sort_table_t *sort_table = &(table->sort_table);
   rule_table_t *rule_table = &(table->rule_table);
   int32_t i, j, k;
   
   for(i=0; i<rule_table->num_rules; i++){
     samp_rule_t *rule = rule_table->samp_rules[i];
     for (j=0; j<rule->num_vars; j++) {
-      if (rule->vars[j]->sort_index == csort) {
+      if (subsort_p(csort, rule->vars[j]->sort_index, sort_table)) {
 	// Set the substit_buffer - no need to resize, as there are no new rules
 	substit_buffer.entries[j].const_index = constidx;
 	substit_buffer.entries[j].fixed = true;
