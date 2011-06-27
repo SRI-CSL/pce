@@ -302,9 +302,9 @@ void lazy_sample_sat(samp_table_t *table, double sa_probability,
       //assert(valid_table(table));
       num_flips--;
     }
-    if (max_extra_flips < num_flips){
-      num_flips = max_extra_flips;
-    }
+    //if (max_extra_flips < num_flips){
+    num_flips = genrand_uint(max_extra_flips);
+      //}
     while (num_flips > 0){
       lazy_sample_sat_body(table, sa_probability, samp_temperature,
 			   rvar_probability);
