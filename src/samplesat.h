@@ -157,5 +157,7 @@ bool eql_query_entries(rule_literal_t ***lits, samp_query_t *query, samp_table_t
 bool eql_query_instance_lits(samp_literal_t **lit1, samp_literal_t **lit2);
 
 void retract_source(char *source, samp_table_t *table);
+
+uint32_t genrand_uint(uint32_t n);
   
 #endif /* __SAMPLESAT_H */
