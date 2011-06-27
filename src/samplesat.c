@@ -24,7 +24,7 @@
 // #include <wincrypt.h>
 #endif
 
-static uint32_t genrand_uint(uint32_t n) {
+uint32_t genrand_uint(uint32_t n) {
   return (uint32_t) floor(genrand_real2() * n);
 }
 
@@ -1999,7 +1999,6 @@ void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 		uint32_t max_flips, uint32_t max_extra_flips) {
   int32_t conflict;
-  uint32_t max_tries = 10;
   //assert(valid_table(table));
   conflict = reset_sample_sat(table);
   if (get_verbosity_level() >= 1) {
@@ -2008,29 +2007,27 @@ void sample_sat(samp_table_t *table, double sa_probability,
     print_assignment(table);
   }
   //assert(valid_table(table));
-  uint32_t num_tries = max_tries;
   uint32_t num_flips = max_flips;
-  while(table->clause_table.num_unsat_clauses > 0 && num_tries > 0 && conflict ==0){
-    while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0 && conflict == 0) {
-      conflict = sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
-	//assert(valid_table(table));
-	num_flips--;
-      }
-      //printf("After flipping:\n");
-      //print_assignment(table);    
-      if (max_extra_flips < num_flips){
-	num_flips = max_extra_flips;
-      }
-      while (num_flips > 0 && conflict == 0){
-	conflict = sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
-      //assert(valid_table(table));
-	num_flips--;
-      }
-      num_tries--;
-    }
-
-    
+  while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0 && conflict == 0) {
+    conflict = sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
+    //assert(valid_table(table));
+    num_flips--;
+  }
+  //printf("After flipping:\n");
+  //print_assignment(table);    
+  //if (max_extra_flips < num_flips){
   if (conflict != -1 && table->clause_table.num_unsat_clauses == 0){
+    num_flips = genrand_uint(max_extra_flips);
+    //}
+    while (num_flips > 0 && conflict == 0){
+      conflict = sample_sat_body(table, 1, DBL_MAX, rvar_probability);
+      //assert(valid_table(table));
+      num_flips--;
+    }
+  } 
+  if (conflict != -1 && table->clause_table.num_unsat_clauses == 0){
+    //printf("Before update_pmodel\n");
+    //print_assignment(table);    
     update_pmodel(table);
   } else { 
     /*
