@@ -135,7 +135,7 @@ int32_t choose_random_atom(samp_table_t *table){
   while (true) {//determine the predicate
     assert (predicate <= pred_tbl->num_preds);
     pcard = pred_cardinality(pred_tbl, sort_table, predicate);
-    if (acard + pcard >= atom_num) {
+    if (acard + pcard > atom_num) {
       break;
     }
     acard += pcard;
