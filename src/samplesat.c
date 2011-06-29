@@ -2162,7 +2162,10 @@ void create_new_const_atoms(int32_t cidx, int32_t csort,
   pred_entry_t *pentry;
   int32_t i, j, pval, arity;
   samp_atom_t *atom;
-  
+
+  if (lazy_mcsat()) {
+    return;
+  }
   for (i = 0; i < pred_table->evpred_tbl.num_preds; i++) {
     pentry = &pred_table->evpred_tbl.entries[i];
     pval = 2 * i;
