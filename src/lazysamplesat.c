@@ -198,7 +198,7 @@ int32_t choose_random_atom(samp_table_t *table){
   }
 }
 
-void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
+int32_t lazy_sample_sat_body(samp_table_t *table, double sa_probability,
 			  double samp_temperature, double rvar_probability){
   //Assumed that table is in a valid state with a random assignment.
   //We first decide on simulated annealing vs. walksat.
@@ -210,6 +210,7 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
   int32_t var;
   uint32_t clause_position;
   samp_clause_t *link;
+  int32_t conflict = 0;
 
   assignment = atom_table->assignment[atom_table->current_assignment];
   //assert(valid_table(table));
@@ -231,13 +232,13 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
     }
     cost_flip_unfixed_variable(table, &dcost, var);
     //assert(valid_table(table));
-    if (dcost < 0){
+    if (dcost <= 0){
       flip_unfixed_variable(table, var);
       //assert(valid_table(table));
     } else {
       choice = choose();
       if (choice < exp(-dcost/samp_temperature)) {
-	flip_unfixed_variable(table, var);
+	conflict = flip_unfixed_variable(table, var);
 	//assert(valid_table(table));
       }
     }
@@ -255,9 +256,10 @@ void lazy_sample_sat_body(samp_table_t *table, double sa_probability,
     //assert(valid_table(table));
     //link points to chosen clause
     var = choose_clause_var(table, link, assignment, rvar_probability);
-    flip_unfixed_variable(table, var);
+    conflict = flip_unfixed_variable(table, var);
     //assert(valid_table(table));
   }
+  return conflict;
 }
 
 int32_t first_lazy_sample_sat(samp_table_t *table, double sa_probability,
@@ -290,27 +292,24 @@ int32_t first_lazy_sample_sat(samp_table_t *table, double sa_probability,
 void lazy_sample_sat(samp_table_t *table, double sa_probability,
 		     double samp_temperature, double rvar_probability,
 		     uint32_t max_flips, uint32_t max_extra_flips) {
+  clause_table_t *clause_table = &table->clause_table;
   int32_t conflict;
   //assert(valid_table(table));
   conflict = reset_sample_sat(table);
   //assert(valid_table(table));
   uint32_t num_flips = max_flips;
-  if (conflict != -1) {
-    while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0) {
-      lazy_sample_sat_body(table, sa_probability, samp_temperature,
-			   rvar_probability);
-      //assert(valid_table(table));
-      num_flips--;
+  while (num_flips > 0 && conflict == 0) {
+    if (clause_table->num_unsat_clauses == 0) {
+      if (max_extra_flips <= 0) {
+	break;
+      } else {
+	max_extra_flips--;
+      }
     }
-    //if (max_extra_flips < num_flips){
-    num_flips = genrand_uint(max_extra_flips);
-      //}
-    while (num_flips > 0){
-      lazy_sample_sat_body(table, sa_probability, samp_temperature,
-			   rvar_probability);
-      //assert(valid_table(table));
-      num_flips--;
-    }
+    conflict = lazy_sample_sat_body(table, sa_probability, samp_temperature,
+				    rvar_probability);
+    //assert(valid_table(table));
+    num_flips--;
   }
     
   if (conflict != -1 && table->clause_table.num_unsat_clauses == 0){

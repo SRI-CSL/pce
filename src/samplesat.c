@@ -1103,7 +1103,7 @@ int32_t flip_unfixed_variable(samp_table_t *table,
 			      int32_t var) {
   //  double dcost = 0;   //dcost seems unnecessary
   atom_table_t *atom_table = &table->atom_table;
-  samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment]; 
+  samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
   cprintf(2,"Flipping variable %"PRId32" to %s\n",
 	  var, assigned_true(assignment[var]) ? "false" : "true");
   if (assigned_true(assignment[var])){
@@ -1959,8 +1959,7 @@ int32_t first_sample_sat(samp_table_t *table, double sa_probability,
   }
   if (conflict == -1) return -1;
   uint32_t num_flips = max_flips;
-  while (table->clause_table.num_unsat_clauses > 0 &&
-	 num_flips > 0){
+  while (num_flips > 0){
     if (sample_sat_body(table, sa_probability, samp_temperature, rvar_probability) == -1)
       return -1;
     num_flips--;
@@ -1998,6 +1997,7 @@ void move_unsat_to_dead_clauses(clause_table_t *clause_table){
 void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability,
 		uint32_t max_flips, uint32_t max_extra_flips) {
+  clause_table_t *clause_table = &table->clause_table;
   int32_t conflict;
   //assert(valid_table(table));
   conflict = reset_sample_sat(table);
@@ -2008,7 +2008,14 @@ void sample_sat(samp_table_t *table, double sa_probability,
   }
   //assert(valid_table(table));
   uint32_t num_flips = max_flips;
-  while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0 && conflict == 0) {
+  while (num_flips > 0 && conflict == 0) {
+    if (clause_table->num_unsat_clauses == 0) {
+      if (max_extra_flips <= 0) {
+	break;
+      } else {
+	max_extra_flips--;
+      }
+    }
     conflict = sample_sat_body(table, sa_probability, samp_temperature, rvar_probability);
     //assert(valid_table(table));
     num_flips--;
