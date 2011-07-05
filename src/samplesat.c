@@ -2798,8 +2798,26 @@ bool check_query_instance(samp_query_t *query, samp_table_t *table) {
       atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
 				      arity + 1,
 				      (int32_t *) rule_inst_atom);
+      // if atom is inactive it needs to be activated
+      if (atom_map == NULL)
+      {
+		  if (get_verbosity_level() >= 0) {
+			printf("Activating atom (at the initialization of query) ");
+			print_atom(rule_inst_atom, table);
+			printf("\n");
+			fflush(stdout);
+		  }
+		  activate_atom(table, rule_inst_atom);
+	      // check for witness predicate - fixed false if NULL atom_map
+	      atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
+					      arity + 1,
+					      (int32_t *) rule_inst_atom);
+      }
+
+      assert(atom_map != NULL);
       // check for witness predicate - fixed false if NULL atom_map
-      if (atom_map == NULL) return false;//atom is inactive
+      //      if (atom_map == NULL) return false;//atom is inactive
+
       if (query->literals[i][j]->neg &&
 	  (samp_truth_value_t) atom_table->assignment[atom_table->current_assignment][atom_map->val]
 	  == v_fixed_false){
