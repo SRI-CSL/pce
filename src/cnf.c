@@ -663,13 +663,13 @@ void add_cnf(char **frozen, input_formula_t *formula,
 	current_rule = rule_table->num_rules;      
 	rule_table->samp_rules[current_rule] = clause;
 	rule_table->num_rules++;
-	all_rule_instances(current_rule, &samp_table);
 	for (j = 0; j < num_lits; j++) {
 	  if (lits[i][j]->atom->builtinop == 0) {
 	    int32_t pred = lits[i][j]->atom->pred;
 	    add_rule_to_pred(pred_table, pred, current_rule);
 	  }
 	}
+	all_rule_instances(current_rule, &samp_table);
       } else {
 	if (found->weight != DBL_MAX) {
 	  mcsat_warn("Rule was seen before, adding weights\n");
