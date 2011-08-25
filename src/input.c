@@ -13,6 +13,7 @@
 #include "cnf.h"
 #include "samplesat.h"
 #include "lazysamplesat.h"
+#include <time.h>
 
 extern int yyparse ();
 extern void free_parse_data();
@@ -914,7 +915,9 @@ extern bool read_eval(samp_table_t *table) {
       // 	break;
       //       }
     case MCSAT: {
-	
+      clock_t start, end;
+
+      start = clock();
       output("Calling %sMCSAT with parameters (set using mcsat_params):\n",
 	     lazy_mcsat() ? "LAZY_" : "");
       output(" max_samples = %"PRId32"\n", get_max_samples());
@@ -933,6 +936,8 @@ extern bool read_eval(samp_table_t *table) {
 	       get_samp_temperature(), get_rvar_probability(),
 	       get_max_flips(), get_max_extra_flips(), get_mcsat_timeout());
       }
+      end = clock();
+      output(" running took: %f seconds", (double)(end-start)/CLOCKS_PER_SEC);
       output("\n");
       break;
     }

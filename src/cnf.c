@@ -670,7 +670,7 @@ void add_cnf(char **frozen, input_formula_t *formula,
 	  }
 	}
 	all_rule_instances(current_rule, &samp_table);
-      } else {
+     } else {
 	if (found->weight != DBL_MAX) {
 	  mcsat_warn("Rule was seen before, adding weights\n");
 	  if (weight == DBL_MAX) {
