@@ -513,7 +513,7 @@ void print_rule_atom_arg (rule_atom_arg_t *arg, var_entry_t **vars, const_table_
   }
 }
 
-void print_rule_atom (rule_atom_t *ratom, bool neg, var_entry_t **vars,
+extern void print_rule_atom (rule_atom_t *ratom, bool neg, var_entry_t **vars,
 		      samp_table_t *table, int indent) {
   pred_table_t *pred_table = &table->pred_table;
   const_table_t *const_table = &table->const_table;
