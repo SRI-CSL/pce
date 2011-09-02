@@ -4,6 +4,7 @@
 #include "symbol_tables.h"
 #include "integer_stack.h"
 #include "utils.h"
+#include "vectors.h"
 
 /*
  * MCSAT MAIN DATA STRUCTURES
@@ -355,7 +356,8 @@ typedef struct query_table_s {
 } query_table_t;
 
 typedef struct samp_query_instance_s {
-  int32_t query_index; // Index to the query from which this was generated
+  //int32_t query_index; // Index to the query from which this was generated
+  ivector_t query_indices; // Indices to the queries from which this was generated
   int32_t sampling_num; // The num_samples when this instance was created
   int32_t pmodel; // The nimber of samples for which this instance was true
   int32_t *subst; // Holds the mapping from vars to consts
