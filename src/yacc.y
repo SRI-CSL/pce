@@ -11,6 +11,8 @@
 #include "parser.h"
 #include "vectors.h"
 #include "tables.h"
+#include "weight_learning.h"
+
 #define YYDEBUG 1
 #define YYERROR_VERBOSE 1
 #define YYINCLUDED_STDLIB_H 1
@@ -299,6 +301,19 @@ input_command_t input_command;
       safe_free(wt);
     }
   };
+  // for weight learning
+   void yy_learn_fdecl (char **frozen, input_formula_t *formula, char *prob, char *source) {
+    input_command.kind = LEARN;
+    input_command.decl.add_fdecl.frozen = frozen;
+    input_command.decl.add_fdecl.formula = formula;
+    input_command.decl.add_fdecl.source = source;
+    if (strcmp(prob, "NA") == 0) {
+      input_command.decl.add_fdecl.weight = NOT_AVAILABLE;
+    } else {
+      input_command.decl.add_fdecl.weight = strtod(prob, NULL);
+      safe_free(prob);
+    }
+  };
   
 void yy_add_decl (input_clause_t *clause, char *wt, char *source) {
   input_command.kind = ADD_CLAUSE;
@@ -382,6 +397,12 @@ void yy_ask_fdecl (input_formula_t *formula, char **threshold_numresult) {
 //     }
 //     safe_free(numsamp);
 // };
+
+// For weight learning 
+void yy_train_decl (char *file) {
+  input_command.kind = TRAIN;
+  input_command.decl.train_decl.file = file;
+}
   
 /* The params map to sa_probability, samp_temperature, rvar_probability,
  * max_flips, max_extra_flips, and max_samples, in that order.  Missing
@@ -544,6 +565,8 @@ void yy_mcsat_params_decl (char **params) {
 %token VERBOSITY
 %token HELP
 %token QUIT
+%token TRAIN
+%token LEARN
 %left IFF
 %right IMPLIES
 %left OR
@@ -582,7 +605,7 @@ void yy_mcsat_params_decl (char **params) {
   int32_t ival;
 }
 
-%type <str> arg NAME NUM STRING addwt oarg oname retractarg
+%type <str> arg NAME NUM STRING addwt oarg oname retractarg learnprob trainarg
 %type <strs> arguments names oarguments onum2 ofrozen
 %type <sortdef> sortdef sortval interval
 %type <formula> formula
@@ -616,6 +639,7 @@ void yy_mcsat_params_decl (char **params) {
    ASSERT p(c1, ..., cn);
    ADD clause [weight];
    ASK clause;
+   LEARN clause [probability];
 */
 
 /* Grammar */
@@ -639,6 +663,9 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
 //    | ASK_CLAUSE clause NUM oarg oarg {yy_ask_decl($2, $3, $4, $5);}
     | ADD ofrozen formula addwt oname {yy_add_fdecl($2, $3, $4, $5);}
     | ASK formula onum2 {yy_ask_fdecl($2, $3);}
+// Weight learning
+    | LEARN ofrozen formula learnprob oname {yy_learn_fdecl($2, $3, $4, $5);}
+    | TRAIN trainarg {yy_train_decl($2);}
     | MCSAT {yy_mcsat_decl();}
     | MCSAT_PARAMS oarguments {yy_mcsat_params_decl($2);}
     | RESET resetarg {yy_reset($2);}
@@ -659,7 +686,7 @@ cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | MCSAT {$$ = MCSAT;} | MCSAT_PARAMS {$$ = MCSAT_PARAMS}
      | RESET {$$ = RESET;} | RETRACT {$$ = RETRACT;} | DUMPTABLE {$$ = DUMPTABLE;}
      | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
-     ;
+     | LEARN {$$ = LEARN;} |  TRAIN {$$ = TRAIN;};
 
 sortdef: /* empty */ {$$ = NULL;}
        | EQ sortval {$$ = $2;} ;
@@ -745,6 +772,8 @@ arg: NAME | NUM; // returns string from yystrings
 
 addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
 
+learnprob: NUM | /* empty */ {$$ = "NA";};
+
 oname: /* empty */ {$$=NULL;} | NAME;
 
 ofrozen: /*empty */ {$$=NULL;}
@@ -757,6 +786,8 @@ onum2: /* empty */ {$$=NULL;}
                 $$ = copy_yyargs();}
 
 //onum: /* empty */ {$$=NULL;} | NUM;
+
+trainarg: /* empty */ {$$ = NULL;} | STRING;
 
 %%
 
@@ -923,6 +954,11 @@ int yylex (void) {
       return ADD_CLAUSE;
 //     else if (strcasecmp(yylval.str, "ASK_CLAUSE") == 0)
 //       return ASK_CLAUSE;
+// Weight learning
+     else if (strcasecmp(yylval.str, "LEARN") == 0)
+      return LEARN;
+    else if (strcasecmp(yylval.str, "TRAIN") == 0)
+      return TRAIN;
     else if (strcasecmp(yylval.str, "MCSAT") == 0)
       return MCSAT;
     else if (strcasecmp(yylval.str, "MCSAT_PARAMS") == 0)
@@ -1149,6 +1185,15 @@ void free_ask_decl_data() {
   free_clause(input_command.decl.ask_decl.clause);
 }
 
+// Weight learning
+void free_train_decl_data() {
+  safe_free(input_command.decl.train_decl.file);
+}
+
+void free_learn_decl_data() {
+  free_formula(input_command.decl.add_fdecl.formula);
+}
+
 void free_mcsat_decl_data() {
   // Nothing to do here
 }
@@ -1233,6 +1278,15 @@ void free_parse_data () {
 //   }
   case MCSAT: {
     free_mcsat_decl_data();
+    break;
+  }
+// Weight learning
+  case TRAIN: {
+    free_train_decl_data();
+    break;
+  }
+   case LEARN: {
+    free_learn_decl_data();
     break;
   }
   case MCSAT_PARAMS: {
