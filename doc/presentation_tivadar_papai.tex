@@ -1,0 +1,215 @@
+\documentclass{beamer}
+
+\usepackage{beamerthemesplit}
+%\usepackage{fancyvrb, relsize}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+
+
+\newcommand{\argmax}{\operatornamewithlimits{argmax}}
+\newcommand{\Prob}{\mbox{Pr}}
+%\newcommand{\And}{\wedge}
+\newcommand{\Or}{\vee}
+\newcommand{\Implies}{\supset}
+\newcommand{\Not}{\neg}
+\newcommand{\Proves}{\vdash}
+\newcommand{\Union}{\cup}
+
+
+
+\title{Using the Knowledge of a Domain Expert to 
+Train Markov Logic Networks}
+\author{Tivadar Papai \ advisor: Shalini Ghosh}
+\date{\today}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\section[Outline]{}
+\frame{\tableofcontents}
+
+\section{Markov Logic}
+\frame
+{
+  \frametitle{Markov Logic - I}
+
+  \begin{itemize}
+    \item A probabilistic first-order logic (FOL)
+    \item Knowledge Base (KB) is a set of weighted FOL formulas $W = \{\ldots(w_{i},F_{i})\ldots\}$
+    \item The probability of a truth assignment $x$ to the ground atoms:
+    \[
+      \Prob(X=x|w) = \frac{1}{Z(w)} \exp(\sum_i w_i n_i(x))
+    \]
+    where $w_i$ is the weight of $F_{i}$ (the $i$th formula in the KB) and
+    $n_i(X)$ is the number of true groundings of $F_{i}$ 
+  \end{itemize}
+}
+
+\frame
+{
+  \frametitle{Markov Logic - II}
+
+  \begin{itemize}
+    \item Weights do not have an intuitive meaning (cannot translate them directly into probabilities,
+          only in the simplest cases)
+    \item Weights are usually set to maximize the probability of the
+          training data
+  \end{itemize}
+}
+
+\frame
+{
+  \frametitle{Motivation}
+
+  \begin{itemize}
+    \item What if there is not sufficient training data available?
+    \item What if there is no training data at all, but we can rely on
+          the knowledge of domain experts?
+    \item A domain expert can tell how likely it is that a randomly chosen instantiation of a formula in the KB
+          holds
+    \item E.g., the domain expert can know the statistics what percentage of the 
+          population smokes, how likely it is that smoking causes lung cancer,
+          etc.
+    \item The domain expert has this information available in the 
+          form of subjective probabilities of FOL formulas
+  \end{itemize}
+}
+
+\section{Exponential Families of Probability Distributions}
+\frame
+{
+  \frametitle{Exponential Families of Probability Distributions - I}
+
+  \begin{itemize}
+    \item The probability distribution defined by an MLN can be written in
+          the form:
+        \begin{equation*}
+            \Prob(X=x|\theta)=\exp
+                   \left(\left<\theta,f(x)\right>-A(\theta)\right) 
+         \end{equation*}
+    \item $f_{i}(x) \equiv n_i(x)$, $\theta \equiv w$, $A=\log Z$  
+    \item An exponential family of probability distributions
+  \end{itemize}
+}
+
+\frame
+{
+  \frametitle{Exponential Families of Probability Distributions - II}
+
+  \begin{itemize}
+    \item $\theta$ - natural parameters
+    \item $\mu=\mathbb{E}_{\theta}[f(x)]=\sum_{x} f(x) Pr(X=x|\theta)$ - mean parameters
+    \item There is a many-to-one mapping from $\theta$ to $\mu$, let $m$ be this mapping ($m(\theta)=\mu$)
+    \item For every $\theta$ there is a $\mu=m(\theta)$, but it is not true that for every $\mu$ there is a $\theta$ 
+			which maps to it ($\mu$ is inconsistent in this case)
+    \item $\Prob(X=x|\theta)=\Prob(X=x|m(\theta))$, i.e., either $\theta$ or $\mu=m(\theta)$ can determine
+          the probability distribution
+  \end{itemize}
+}
+
+\section{Formalization}
+\frame
+{
+  \frametitle{Formalization - First Attempt}
+
+  \begin{itemize}
+    \item Let $\overline{\mu}_{i}= \frac{\mu_{i}}{g_{i}}$, where $g_{i}$ is the number of groundings of the $i$th formula
+          ($\overline{\mu}_{i}$ - a randomly chosen grounding of $F_{i}$ being true)
+    \item If $s$ is the subjective probability vector given by the expert we can try to find a $\theta$ 
+          for which $\mu=m(\theta)$ and $\overline{\mu}=s$ 
+    \item If $\mu$ is inconsistent, we cannot do this
+    \item E.g., $f_1 = P(x)$, $f_2 = P(x) \lor Q(x)$ then for $s_1=1.0$, $s_2=0.5$ 
+          there does not exist any $\theta$ s.t. $\overline{\mu}_{1}=s_1$ and 
+          $\overline{\mu}_{2}=s_2$
+    \item We need to soften the constraint
+    \item When training data is available we have to take that also into account
+  \end{itemize}
+}
+
+\frame
+{
+  \frametitle{Prior on $\mu$}
+
+  \begin{itemize}
+    \item In MLNs prior has only been put on $\theta$ so far (Gaussian prior with $0$ mean)
+    \item Truncated Gaussian ($\mu \in [0,1]$):
+	 \begin{equation*}
+	  \Pr(\mu) \propto 
+		  \exp \left(
+		   - \alpha (\overline{\mu} - s)^{T} (\overline{\mu} - s)
+		   \right)=
+		 \exp \left(- \alpha \sum_{i} (\overline{\mu}_{i}- s_{i})^{2} \right)
+	\end{equation*}
+	\end{itemize}
+}
+ 
+
+\frame{
+  \frametitle{Log-likelihood, Gradient}
+
+ \begin{itemize}
+	\item The log-likelihood:
+	\begin{equation*}\label{eq:log-likelihood}
+	  L=\log Pr(D|\mu) + \log \Pi(\mu) = \sum_{i=1}^{N} \log Pr(D_i|\mu) + \log \Pi(\mu)
+	\end{equation*}
+	 
+	 \item The gradient of $L$ w.r.t. $\theta$:   
+	\begin{eqnarray*}\label{eq:gradient}
+	  \frac{\partial L}{\partial \theta} &=\frac{\partial \log Pr(D|\theta)}{\partial \theta} + 
+			 \frac{\partial \log \Pi(\mu)}{\partial \mu}
+			 \frac{\partial \mu}{\partial \theta} \\
+			&= \sum_{i=1}^{N}\left( f(d_{i})-\mu \right) + 
+			 \Sigma_{\theta} \frac{\partial \log \Pi(\mu)}{\partial \mu}\\
+			&= \sum_{i=1}^{N}\left( f(d_{i})-\mu \right) + 
+			 \alpha' \Sigma_{\theta} \left(s -\overline{\mu} \right)
+	\end{eqnarray*}
+	where $\Sigma_{\theta}$ is the covariance matrix
+ \end{itemize}
+}
+
+\frame{
+  \frametitle{How to Find the Optimum?}
+
+ \begin{itemize}
+	\item The optimization problem is non-convex in general, however when we have sufficient amount of data then it is
+	\item Simple gradient ascent is slow, can stay in a non-global optimum, can suffer from ill-conditioning
+	\item L-BFGS directly cannot be used, because MC-SAT (slice sampling algorithm for MLNs) provides noisy 
+              results, it could also get stuck in local optima
+ \end{itemize}
+}
+
+\section{Demo}
+\frame{
+  \frametitle{Demo}
+}
+
+\section{Future Work}
+\frame{
+  \frametitle{Future Goals}
+
+ \begin{itemize}
+        \item Improve the existing implementation (all formulae must be given as clauses, 
+         gradient ascent's parameters should be part of the user's input, etc.)
+	\item Modify L-BFGS or find another library which could work with 
+           noisy MC-SAT results
+        \item Try out different priors
+	\item Give theoretical (probabilistic) guarantees for the usefulness of
+              subjective probabilities (assume expert knows
+	      the mean parameters of the features up to some error)
+	\item Apply in the medical and fault tolerance domains
+ \end{itemize}
+}
+
+\frame{
+	\frametitle{}
+	\begin{center}
+	\LARGE{Thank you for your attention!}
+	\end{center}
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% extra slides %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}
