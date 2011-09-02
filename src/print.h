@@ -47,6 +47,8 @@ extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *tab
 				 int32_t indent, bool include_prob);
 extern void print_rule_clause (rule_literal_t **lit, var_entry_t **vars,
 			       samp_table_t *table);
+extern void print_rule_atom (rule_atom_t *ratom, bool neg, var_entry_t **vars,
+			     samp_table_t *table, int indent);
 extern void print_assignment(samp_table_t *table);
 extern void print_atom_now(samp_atom_t *atom, samp_table_t *table);
 extern char *literal_string(samp_literal_t lit, samp_table_t *table);
