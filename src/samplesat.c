@@ -19,6 +19,9 @@
 #include "vectors.h"
 #include "SFMT.h"
 
+#include "weight_learning.h"
+#include "training_data.h"
+
 #ifdef _WIN32
 #include <windows.h>
 // #include <wincrypt.h>
@@ -1967,6 +1970,14 @@ void update_pmodel(samp_table_t *table) {
 
 	update_query_pmodel(table);
 
+	// for the covariance matrix
+	update_covariance_matrix_statistics(table);
+
+	if (get_dump_samples_path() != NULL)
+	{
+		append_assignment_to_file(get_dump_samples_path(), table);
+	}
+
 	if (get_verbosity_level() > 1) {
 		print_model(table);
 	}
@@ -2355,7 +2366,7 @@ int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs,
 		}
 	}
 	return add_internal_clause(table, clause_buffer.data, litidx,
-			rule->frozen_preds, rule->weight, found_indirect, false);
+			rule->frozen_preds, rule->weight, found_indirect, true);
 }
 
 static clause_buffer_t rule_atom_buffer = { 0, NULL };
@@ -2693,6 +2704,16 @@ int32_t add_subst_query_instance(samp_literal_t **litinst,
 	qindex = i;
 	if (i < query_instance_table->num_queries) {
 		// Already have this instance - just associate it with the query
+		qinst = query_instance_table->query_inst[i];
+		extend_ivector(&qinst->query_indices);
+		// find the index of the current query
+		for (i = 0; i < query_table->num_queries; i++) {
+			if (query_table->query[i] == query) {
+				break;
+			}
+		}
+		qinst->query_indices.data[qinst->query_indices.size] = i;
+		qinst->query_indices.size++;
 		safe_free(litinst);
 	} else {
 		query_instance_table_resize(query_instance_table);
@@ -2705,7 +2726,10 @@ int32_t add_subst_query_instance(samp_literal_t **litinst,
 				break;
 			}
 		}
-		qinst->query_index = i;
+		//qinst->query_index = i;
+		init_ivector(&qinst->query_indices, 1);
+		qinst->query_indices.data[0] = i;
+		qinst->query_indices.size++;
 		qinst->sampling_num = table->atom_table.num_samples;
 		qinst->pmodel = 0;
 		// Copy the substs - used to return the formula instances
