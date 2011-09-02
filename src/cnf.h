@@ -8,4 +8,6 @@ extern void add_cnf(char **frozen, input_formula_t *formula, double weight, char
 
 extern void ask_cnf(input_formula_t *formula, double threshold, int32_t numresults);
 
+extern void add_cnf_query(input_formula_t *formula);
+
 #endif /* __CNF_H */     
