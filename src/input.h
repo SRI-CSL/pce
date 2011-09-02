@@ -122,6 +122,10 @@ typedef struct input_verbosity_decl_s {
   int32_t level;
 } input_verbosity_decl_t;
 
+typedef struct input_train_decl_s {
+  char *file;
+} input_train_decl_t;
+
 typedef union input_decl_s {
   input_sort_decl_t sort_decl;
   input_subsort_decl_t subsort_decl;
@@ -139,6 +143,7 @@ typedef union input_decl_s {
   input_reset_decl_t reset_decl;
   input_retract_decl_t retract_decl;
   input_load_decl_t load_decl;
+  input_train_decl_t train_decl;
   input_verbosity_decl_t verbosity_decl;
   input_dumptable_decl_t dumptable_decl;
   input_help_decl_t help_decl;
@@ -211,6 +216,9 @@ extern bool strict_constants();
 extern void set_strict_constants(bool val);
 extern bool lazy_mcsat();
 extern void set_lazy_mcsat(bool val);
+
+extern char* get_dump_samples_path();
+extern void set_dump_samples_path(char *path);
   
 extern void input_clause_buffer_resize ();
 extern void input_literal_buffer_resize ();
@@ -239,5 +247,7 @@ extern input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
 
 extern int32_t str2int(char *cnst);
 extern void add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table);
+
+void set_training_data_file(char *path);
 
 #endif /* __INPUT_H */     
