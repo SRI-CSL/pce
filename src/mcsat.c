@@ -33,7 +33,8 @@ static int32_t interactive;
 enum {
   LAZY_OPTION = CHAR_MAX + 1,
   STRICT_OPTION,
-  SEED_OPTION
+  SEED_OPTION,
+  DUMP_SAMPLES_OPTION
 };
 
 // enum subcommand {
@@ -46,6 +47,7 @@ static struct option long_options[] = {
   {"interactive", no_argument, (int *)&interactive, 'i'},
   {"seed", required_argument, 0, SEED_OPTION},
   {"lazy", required_argument, 0, LAZY_OPTION},
+  {"dumpsamples", required_argument, 0, DUMP_SAMPLES_OPTION},
   {"strict", required_argument, 0, STRICT_OPTION},
   {"prexp", no_argument, 0, 'e'},
   {"verbosity", required_argument, 0, 'v'},
@@ -119,6 +121,9 @@ static void decode_options(int argc, char **argv) {
       set_pce_rand_seed(atoi(optarg));
       break;
     }
+    case DUMP_SAMPLES_OPTION:
+    	set_dump_samples_path(optarg);
+    	break;
     case LAZY_OPTION:
       if ((strcasecmp(optarg, "true") == 0) || (strcasecmp(optarg, "t") == 0) || (strcmp(optarg, "1") == 0)) {
 	set_lazy_mcsat(true);
