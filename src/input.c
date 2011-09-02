@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <float.h>
 #include <string.h>
+#include <time.h>
 #include "memalloc.h"
 #include "utils.h"
 #include "parser.h"
@@ -13,7 +14,8 @@
 #include "cnf.h"
 #include "samplesat.h"
 #include "lazysamplesat.h"
-#include <time.h>
+#include "weight_learning.h"
+#include "training_data.h"
 
 extern int yyparse ();
 extern void free_parse_data();
@@ -38,6 +40,7 @@ static int32_t mcsat_timeout = DEFAULT_MCSAT_TIMEOUT;
 
 static bool strict_consts = true;
 static bool lazy = false;
+static char *dump_samples_path = NULL;
 
 static bool print_exp_p = false;
 
@@ -124,6 +127,15 @@ void set_lazy_mcsat(bool val) {
   lazy = val;
 }
 
+extern char* get_dump_samples_path()
+{
+	return dump_samples_path;
+}
+
+extern void set_dump_samples_path(char *path)
+{
+	dump_samples_path = path;
+}
 
 void input_clause_buffer_resize (){
   if (input_clause_buffer.capacity == 0){
@@ -325,6 +337,7 @@ void free_samp_query_instance(samp_query_instance_t *qinst) {
   for (i = 0; qinst->lit[i] != NULL; i++) {
     safe_free(qinst->lit[i]);
   }
+  delete_ivector(&qinst->query_indices);
   safe_free(qinst->lit);
   safe_free(qinst);
 }
@@ -901,12 +914,48 @@ extern bool read_eval(samp_table_t *table) {
     case ASK: {
       input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
       cprintf(2, "ask: clausifying formula\n");
+
+      if (get_dump_samples_path() != NULL)
+	{
+	  output(" samples are not going to be dumped after the first ASK");
+	  set_dump_samples_path(NULL);
+	}
+
       ask_cnf(decl.formula, decl.threshold, decl.numresults);
       // Results are in ask_buffer - print them out
       print_ask_results(decl.formula, table);
       // Now clear out the query_instance table for the next query
       reset_query_instance_table(&table->query_instance_table);
       break;
+    }
+
+    case LEARN: {
+      input_add_fdecl_t decl = input_command.decl.add_fdecl;
+      add_weighted_formula(table, &decl);
+
+      //dump_clause_table(table);
+      //dump_rule_table(table);
+      break;
+    }
+    case TRAIN: {
+      input_train_decl_t decl = input_command.decl.train_decl;
+      training_data_t *training_data = NULL;
+
+      if (decl.file != NULL)
+	{
+	  printf("Loading training data from: %s\n", decl.file);
+	  training_data = parse_data_file(decl.file, table);
+	} else {
+	printf("No training data was provided\n");
+      }
+      if (LBFGS_MODE)
+	{
+	  weight_training_lbfgs(training_data, table);
+	} else {
+	gradient_ascent(training_data, table);
+      }
+      break;
+
     }
       //       case ASK_CLAUSE: {
       // 	input_ask_decl_t decl = input_command.decl.ask_decl;
@@ -927,6 +976,13 @@ extern bool read_eval(samp_table_t *table) {
       output(" max_flips = %"PRId32"\n", get_max_flips());
       output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
       output(" timeout = %"PRId32"\n", get_mcsat_timeout());
+
+      if (get_dump_samples_path() != NULL)
+	{
+	  output(" dumping samples to %s\n", get_dump_samples_path());
+	  init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
+	}
+      
       if (lazy_mcsat()) {
 	lazy_mc_sat(table, get_max_samples(), get_sa_probability(),
 		    get_samp_temperature(), get_rvar_probability(),
