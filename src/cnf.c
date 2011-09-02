@@ -11,6 +11,8 @@
 #include "vectors.h"
 #include "lazysamplesat.h"
 #include "cnf.h"
+#include "weight_learning.h"
+#include "tables.h"
 
 pvector_t ask_buffer = {0, 0, NULL};
 
@@ -698,6 +700,42 @@ static int cmp_pmodels(const void *p1, const void *p2) {
   n1 = (*q1)->pmodel;
   n2 = (*q2)->pmodel;
   return n1 < n2 ? 1 : n1 > n2 ? -1 : 0;
+}
+
+// Similar to cnf_ask, but the role of it is to add queries one by one
+// to allow sampling of them at the same time by a later call to mc_sat()
+
+void add_cnf_query(input_formula_t *formula) {
+	rule_literal_t ***lits;
+	samp_query_t *query;
+	int32_t i;
+
+	ask_buffer.size = 0;
+	// Returns the literals, and sets the sort of the variables
+	lits = cnf_pos(formula->fmla, formula->vars);
+	if (lits == NULL) {
+		return;
+	}
+	// Add all instances of the query to the query_instance_table
+	query = (samp_query_t *) safe_malloc(sizeof(samp_query_t));
+	for (i = 0; lits[i] != NULL; i++) {
+	}
+	query->num_clauses = i;
+	if (formula->vars == NULL) {
+		query->num_vars = 0;
+	} else {
+		for (i = 0; formula->vars[i] != NULL; i++) {
+		}
+		query->num_vars = i;
+	}
+	query->vars = copy_variables(formula->vars);
+	query->literals = lits;
+	// add query to query table
+	query_table_resize(&samp_table.query_table);
+	samp_table.query_table.query[samp_table.query_table.num_queries++] = query;
+	// Get the instances into the query_instance_table
+	all_query_instances(query, &samp_table);
+
 }
 
 
