@@ -29,11 +29,37 @@ static int32_t vars_len(var_entry_t **vars) {
   }
 }
 
+rule_atom_t *copy_rule_atom(rule_atom_t *atom, samp_table_t *table) {
+  pred_table_t *pred_table = &samp_table.pred_table;
+  rule_atom_t *catom;
+  int32_t i, arity;
+
+  arity = atom_arity(atom, pred_table);
+  catom = (rule_atom_t *) safe_malloc(sizeof(rule_atom_t));
+  catom->pred = atom->pred;
+  catom->builtinop = atom->builtinop;
+  catom->args = (rule_atom_arg_t *) safe_malloc(arity * sizeof(rule_atom_arg_t));
+  for(i=0; i < arity; i++) {
+    catom->args[i].kind = atom->args[i].kind;
+    catom->args[i].value = atom->args[i].value;
+  }
+  return catom;
+}
+
+rule_literal_t *copy_rule_literal(rule_literal_t *lit, samp_table_t *table) {
+  rule_literal_t *clit;
+  clit = (rule_literal_t *) safe_malloc(sizeof(rule_literal_t));
+  clit->neg = lit->neg;
+  clit->atom = copy_rule_atom(lit->atom, table);
+  return clit;
+}
+
 static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 					    var_entry_t **vars, bool neg) {
-  pred_table_t *pred_table = &samp_table.pred_table;
-  sort_table_t *sort_table = &samp_table.sort_table;
-  const_table_t *const_table = &samp_table.const_table;
+  samp_table_t *table = &samp_table;
+  pred_table_t *pred_table = &table->pred_table;
+  sort_table_t *sort_table = &table->sort_table;
+  const_table_t *const_table = &table->const_table;
   sort_entry_t *sort_entry = NULL;
   int32_t i, j, num_args, pred_val, pred_idx, const_idx, *psig, vsig,
     subsig, vlen, intval;
@@ -118,7 +144,14 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 	  // Maybe an integer
 	  intval = str2int(cname);
 	  atom->args[i].kind = integer;
-	  atom->args[i].value = atoi(cname);
+	  atom->args[i].value = intval;
+	  if (psig != NULL && sort_entry->ints == NULL) {
+	    if (add_int_const(intval, sort_entry, sort_table)) {
+	      create_new_const_atoms(intval, psig[i], table);
+	      create_new_const_rule_instances(intval, psig[i], table, 0);
+	      create_new_const_query_instances(intval, psig[i], table, 0);
+	    }
+	  }
 	} else {
 	  mcsat_err("Have integer where %s expected", sort_entry->name);
 	  return NULL;
@@ -224,10 +257,10 @@ static rule_literal_t ***cnf_product(rule_literal_t ***c1,
       conjunct = (rule_literal_t **)
 	safe_malloc((len1 + len2 + 1) * sizeof(rule_literal_t *));
       for (ii = 0; ii < len1; ii++) {
-	conjunct[ii] = c1[i][ii];
+	conjunct[ii] = copy_rule_literal(c1[i][ii], &samp_table);
       }
       for (jj = 0; jj < len2; jj++) {
-	conjunct[len1+jj] = c2[j][jj];
+	conjunct[len1+jj] = copy_rule_literal(c2[j][jj], &samp_table);
       }
       conjunct[len1+len2] = NULL;
       productcnf[idx++] = conjunct;
@@ -235,11 +268,11 @@ static rule_literal_t ***cnf_product(rule_literal_t ***c1,
   }
   productcnf[idx] = NULL;
   for (i = 0; c1[i] != NULL; i++) {
-    safe_free(c1[i]);
+    free_rule_literals(c1[i]);
   }
   safe_free(c1);
   for (j = 0; c2[j] != NULL; j++) {
-    safe_free(c2[j]);
+    free_rule_literals(c2[j]);
   }
   safe_free(c2);
   return productcnf;
