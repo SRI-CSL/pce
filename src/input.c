@@ -636,7 +636,7 @@ extern int32_t str2int(char *cnst) {
 }
   
 
-extern void add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table) {
+extern bool add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table) {
   sort_entry_t *supentry;
   int32_t i, j;
   bool foundit;
@@ -645,7 +645,7 @@ extern void add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort
   for (i = 0; i < entry->cardinality; i++) {
     if (entry->ints[i] == icnst) {
       mcsat_warn("Constant declaration ignored: %"PRId32" is already in %s\n", icnst, entry->name);
-      return;
+      return false;
     }
   }
   if (entry->size == entry->cardinality) {
@@ -673,6 +673,7 @@ extern void add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort
       }
     }
   }
+  return true;
 }
 
 
@@ -706,10 +707,11 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
       }
     } else {
       // Sparse integers
-      add_int_const(icnst, sort_entry, sort_table);
-      create_new_const_atoms(icnst, sort_index, table);
-      create_new_const_rule_instances(icnst, sort_index, table, 0);
-      create_new_const_query_instances(icnst, sort_index, table, 0);
+      if (add_int_const(icnst, sort_entry, sort_table)) {
+	create_new_const_atoms(icnst, sort_index, table);
+	create_new_const_rule_instances(icnst, sort_index, table, 0);
+	create_new_const_query_instances(icnst, sort_index, table, 0);
+      }
     }
   } else {
     // Need to see if name in var_table
