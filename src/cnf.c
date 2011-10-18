@@ -145,7 +145,7 @@ static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 	  intval = str2int(cname);
 	  atom->args[i].kind = integer;
 	  atom->args[i].value = intval;
-	  if (psig != NULL && sort_entry->ints == NULL) {
+	  if (psig != NULL && sort_entry->ints != NULL) {
 	    if (add_int_const(intval, sort_entry, sort_table)) {
 	      create_new_const_atoms(intval, psig[i], table);
 	      create_new_const_rule_instances(intval, psig[i], table, 0);
