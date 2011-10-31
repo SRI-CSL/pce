@@ -1108,8 +1108,6 @@ extern bool read_eval(samp_table_t *table) {
       break;
     };
   free_parse_data();
-  //yylloc.first_line += yylloc.last_line;
-  //yylloc.first_column += yyloc.last_column;
   return false;
 }
 	
