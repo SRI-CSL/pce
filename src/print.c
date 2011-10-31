@@ -420,6 +420,7 @@ extern void dump_sort_table (samp_table_t *table) {
 	  if (j != 0) output(", ");
 	  output("%"PRId32"", entry.ints[j]);
 	}
+	output("}");
       }
     } else {
       for (j=0; j<entry.cardinality; j++){
