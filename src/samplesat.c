@@ -211,7 +211,7 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 	}
 	atom->args[i] = intval;
 	if (psig != NULL && entry.ints != NULL) {
-	  if (add_int_const(intval, &entry, sort_table)) {
+	  if (add_int_const(intval, &sort_table->entries[psig[i]], sort_table)) {
 	    create_new_const_atoms(intval, psig[i], table);
 	    create_new_const_rule_instances(intval, psig[i], table, 0);
 	    create_new_const_query_instances(intval, psig[i], table, 0);
