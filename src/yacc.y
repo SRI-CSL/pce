@@ -16,6 +16,7 @@
 #define YYDEBUG 1
 #define YYERROR_VERBOSE 1
 #define YYINCLUDED_STDLIB_H 1
+#define YYLTYPE_IS_TRIVIAL 0
 
 extern void free_parse_data();
 
@@ -625,8 +626,6 @@ void yy_mcsat_params_decl (char **params) {
   yyargs.size = 0;
   yylits.size = 0;
   yyerrflg = false;
-  //yylloc.first_line = yylloc.last_line = 1;
-  //yylloc.first_column = yylloc.last_column = 0;
  }
 
 /* Add sorts, declarations (var, const have sorts)
@@ -824,11 +823,10 @@ int skip_white_space_and_comments (void) {
     do {
       c = yygetc(parse_input);
       if (c == '\n') {
+	++yylloc.last_line;
+	yylloc.last_column = 0;
 	if (yynerrs && (input_is_stdin(parse_input))) {
 	  return ';';
-	} else {
-	  ++yylloc.last_line;
-	  yylloc.last_column = 0;
 	}
       } else {
 	++yylloc.last_column;
@@ -837,7 +835,12 @@ int skip_white_space_and_comments (void) {
     if (c == '#') {
       do {
 	c = yygetc(parse_input);
-	++yylloc.last_column;
+	if (c == '\n') {
+	  ++yylloc.last_line;
+	  yylloc.last_column = 0;
+	} else {
+	  ++yylloc.last_column;
+	}
       } while (c != '\n' && c != EOF);
     } else {
       return c;
@@ -1058,7 +1061,7 @@ int yylex (void) {
     // At the moment, escapes not recognized
     do {
       c = yygetc(parse_input);
-      ++yylloc.last_column;      
+      ++yylloc.last_column;
       if (c == '\"' || c == EOF) {
         break;
       } else {
@@ -1076,7 +1079,7 @@ int yylex (void) {
     printf("foo");
     do {
       c = yygetc(parse_input);
-      ++yylloc.last_column;      
+      ++yylloc.last_column;
       if (c == '\'' || c == EOF) {
         break;
       } else {
@@ -1114,7 +1117,7 @@ int yylex (void) {
   yystrbuf_add(c, i++);
   do {
     c = yygetc(parse_input);
-    ++yylloc.last_column;      
+    ++yylloc.last_column;
     if (isspace(c) || c == ',' || c == ';' || c == '(' || c == ')' || c == '[' || c == ']'
 	|| c == ':' || c == '\0' || c == EOF) {
       break;
@@ -1322,11 +1325,11 @@ void free_parse_data () {
 
 void yyerror (char *str) {
   if (parse_input->kind == INFILE) {
-    printf("%s:%d:%d: %s\n", parse_input->input.in_file.file,
-	   yylloc.last_line, yylloc.last_column, str);
+    printf("%s:%d:%d: %s: %s\n", parse_input->input.in_file.file,
+	   yylloc.last_line, yylloc.last_column, str, yylval.str);
   } else {
-    printf("%s:%d:%d: %s\n", parse_input->input.in_string.string,
-	   yylloc.last_line, yylloc.last_column, str);
+    printf("%s:%d:%d: %s: %s\n", parse_input->input.in_string.string,
+	   yylloc.last_line, yylloc.last_column, str, yylval.str);
   }
   input_command.kind = 0;
   yyerrflg = true;
