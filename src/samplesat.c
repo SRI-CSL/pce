@@ -89,67 +89,67 @@ void add_rule_to_pred(pred_table_t *pred_table, int32_t predicate,
 clause_buffer_t atom_buffer = { 0, NULL };
 
 int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
-	atom_table_t *atom_table = &(table->atom_table);
-	pred_table_t *pred_table = &(table->pred_table);
-	clause_table_t *clause_table = &(table->clause_table);
-	rule_table_t *rule_table = &(table->rule_table);
-	int32_t i;
-	int32_t predicate = atom->pred;
-	int32_t arity = pred_arity(predicate, pred_table);
-	samp_bvar_t current_atom_index;
-	array_hmap_pair_t *atom_map;
-	samp_rule_t *rule;
-	atom_map = array_size_hmap_find(&(atom_table->atom_var_hash), arity + 1, //+1 for pred
-			(int32_t *) atom);
-	if (atom_map == NULL) {
-		if (get_verbosity_level() > 1) {
-			printf("add_internal_atom: Adding internal atom ");
-			print_atom_now(atom, table);
-			printf("\n");
-		}
+  atom_table_t *atom_table = &(table->atom_table);
+  pred_table_t *pred_table = &(table->pred_table);
+  clause_table_t *clause_table = &(table->clause_table);
+  rule_table_t *rule_table = &(table->rule_table);
+  int32_t i;
+  int32_t predicate = atom->pred;
+  int32_t arity = pred_arity(predicate, pred_table);
+  samp_bvar_t current_atom_index;
+  array_hmap_pair_t *atom_map;
+  samp_rule_t *rule;
+  atom_map = array_size_hmap_find(&(atom_table->atom_var_hash), arity + 1, //+1 for pred
+				  (int32_t *) atom);
+  if (atom_map == NULL) {
+    if (get_verbosity_level() > 1) {
+      printf("add_internal_atom: Adding internal atom ");
+      print_atom_now(atom, table);
+      printf("\n");
+    }
 
-		//assert(valid_table(table));
-		atom_table_resize(atom_table, clause_table);
-		current_atom_index = atom_table->num_vars++;
-		samp_atom_t * current_atom = (samp_atom_t *) safe_malloc(
-				(arity + 1) * sizeof(int32_t));
-		current_atom->pred = predicate;
-		for (i = 0; i < arity; i++) {
-			current_atom->args[i] = atom->args[i];
-		}
-		atom_table->atom[current_atom_index] = current_atom;
-		// Keep track of the number of samples when atom was introduced - these
-		// will be subtracted in computing probs
-		atom_table->sampling_nums[current_atom_index] = atom_table->num_samples;
+    //assert(valid_table(table));
+    atom_table_resize(atom_table, clause_table);
+    current_atom_index = atom_table->num_vars++;
+    samp_atom_t * current_atom = (samp_atom_t *)
+      safe_malloc((arity + 1) * sizeof(int32_t));
+    current_atom->pred = predicate;
+    for (i = 0; i < arity; i++) {
+      current_atom->args[i] = atom->args[i];
+    }
+    atom_table->atom[current_atom_index] = current_atom;
+    // Keep track of the number of samples when atom was introduced - these
+    // will be subtracted in computing probs
+    atom_table->sampling_nums[current_atom_index] = atom_table->num_samples;
 
-		atom_map = array_size_hmap_get(&(atom_table->atom_var_hash), arity + 1,
-				(int32_t *) current_atom);
-		atom_map->val = current_atom_index;
+    atom_map = array_size_hmap_get(&(atom_table->atom_var_hash), arity + 1,
+				   (int32_t *) current_atom);
+    atom_map->val = current_atom_index;
 
-		if (pred_epred(predicate)) { //closed world assumption
-			atom_table->assignment[0][current_atom_index] = v_fixed_false;
-			atom_table->assignment[1][current_atom_index] = v_fixed_false;
-		} else {//set pmodel to 0
-			atom_table->pmodel[current_atom_index] = 0; //atom_table->num_samples/2;
-			atom_table->assignment[0][current_atom_index] = v_false;
-			atom_table->assignment[1][current_atom_index] = v_false;
-			atom_table->num_unfixed_vars++;
-		}
-		add_atom_to_pred(pred_table, predicate, current_atom_index);
-		clause_table->watched[pos_lit(current_atom_index)] = NULL;
-		clause_table->watched[neg_lit(current_atom_index)] = NULL;
-		//assert(valid_table(table));
-		if (top_p) {
-			pred_entry_t *entry = pred_entry(pred_table, predicate);
-			for (i = 0; i < entry->num_rules; i++) {
-				rule = rule_table->samp_rules[i];
-				all_rule_instances_rec(0, rule, table, current_atom_index);
-			}
-		}
-		return current_atom_index;
-	} else {
-		return atom_map->val;
-	}
+    if (pred_epred(predicate)) { //closed world assumption
+      atom_table->assignment[0][current_atom_index] = v_fixed_false;
+      atom_table->assignment[1][current_atom_index] = v_fixed_false;
+    } else {//set pmodel to 0
+      atom_table->pmodel[current_atom_index] = 0; //atom_table->num_samples/2;
+      atom_table->assignment[0][current_atom_index] = v_false;
+      atom_table->assignment[1][current_atom_index] = v_false;
+      atom_table->num_unfixed_vars++;
+    }
+    add_atom_to_pred(pred_table, predicate, current_atom_index);
+    clause_table->watched[pos_lit(current_atom_index)] = NULL;
+    clause_table->watched[neg_lit(current_atom_index)] = NULL;
+    //assert(valid_table(table));
+    if (top_p) {
+      pred_entry_t *entry = pred_entry(pred_table, predicate);
+      for (i = 0; i < entry->num_rules; i++) {
+	rule = rule_table->samp_rules[i];
+	all_rule_instances_rec(0, rule, table, current_atom_index);
+      }
+    }
+    return current_atom_index;
+  } else {
+    return atom_map->val;
+  }
 }
 
 void atom_buffer_resize(int32_t arity) {
@@ -176,61 +176,66 @@ void atom_buffer_resize(int32_t arity) {
 }
 
 int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
-	const_table_t *const_table = &table->const_table;
-	pred_table_t *pred_table = &table->pred_table;
-	sort_table_t *sort_table = &table->sort_table;
-	sort_entry_t entry;
+  const_table_t *const_table = &table->const_table;
+  pred_table_t *pred_table = &table->pred_table;
+  sort_table_t *sort_table = &table->sort_table;
+  sort_entry_t entry;
 
-	char * in_predicate = current_atom->pred;
-	int32_t pred_id = pred_index(in_predicate, pred_table);
-	if (pred_id == -1) {
-		mcsat_err("\nPredicate %s is not declared", in_predicate);
-		return -1;
-	}
-	int32_t predicate = pred_val_to_index(pred_id);
-	int32_t i;
-	int32_t *psig, intval;
-	int32_t arity = pred_arity(predicate, pred_table);
+  char * in_predicate = current_atom->pred;
+  int32_t pred_id = pred_index(in_predicate, pred_table);
+  if (pred_id == -1) {
+    mcsat_err("\nPredicate %s is not declared", in_predicate);
+    return -1;
+  }
+  int32_t predicate = pred_val_to_index(pred_id);
+  int32_t i;
+  int32_t *psig, intval;
+  int32_t arity = pred_arity(predicate, pred_table);
 
-	atom_buffer_resize(arity);
-	samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
-	atom->pred = predicate;
-	psig = pred_signature(predicate, pred_table);
-	for (i = 0; i < arity; i++) {
-		entry = sort_table->entries[psig[i]];
-		if (entry.constants == NULL) {
-			// Should be an integer
-			char *p = current_atom->args[i];
-			for (p = (p[0] == '+' || p[0] == '-') ? &p[1] : p; isdigit(*p); p++)
-				;
-			if (*p == '\0') {
-				intval = str2int(current_atom->args[i]);
-				if (intval < entry.lower_bound || intval > entry.upper_bound) {
-					mcsat_err("\nInteger %s is out of bounds.",
-							current_atom->args[i]);
-					return -1;
-				}
-				atom->args[i] = intval;
-			} else {
-				mcsat_err("\nInvalid integer %s.", current_atom->args[i]);
-				return -1;
-			}
-		} else {
-			atom->args[i] = const_index(current_atom->args[i], const_table);
-			if (atom->args[i] == -1) {
-				mcsat_err("\nConstant %s is not declared.",
-						current_atom->args[i]);
-				return -1;
-			}
-		}
+  atom_buffer_resize(arity);
+  samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
+  atom->pred = predicate;
+  psig = pred_signature(predicate, pred_table);
+  for (i = 0; i < arity; i++) {
+    entry = sort_table->entries[psig[i]];
+    if (entry.constants == NULL) {
+      // Should be an integer
+      char *p = current_atom->args[i];
+      for (p = (p[0] == '+' || p[0] == '-') ? &p[1] : p; isdigit(*p); p++)
+	;
+      if (*p == '\0') {
+	intval = str2int(current_atom->args[i]);
+	if (intval < entry.lower_bound || intval > entry.upper_bound) {
+	  mcsat_err("\nInteger %s is out of bounds.", current_atom->args[i]);
+	  return -1;
 	}
-	if (get_verbosity_level() > 1) {
-		printf("add_atom: Adding internal atom ");
-		print_atom_now(atom, table);
-		printf("\n");
+	atom->args[i] = intval;
+	if (psig != NULL && entry.ints != NULL) {
+	  if (add_int_const(intval, &entry, sort_table)) {
+	    create_new_const_atoms(intval, psig[i], table);
+	    create_new_const_rule_instances(intval, psig[i], table, 0);
+	    create_new_const_query_instances(intval, psig[i], table, 0);
+	  }
 	}
-	int32_t result = add_internal_atom(table, atom, true);
-	return result;
+      } else {
+	mcsat_err("\nInvalid integer %s.", current_atom->args[i]);
+	return -1;
+      }
+    } else {
+      atom->args[i] = const_index(current_atom->args[i], const_table);
+      if (atom->args[i] == -1) {
+	mcsat_err("\nConstant %s is not declared.", current_atom->args[i]);
+	return -1;
+      }
+    }
+  }
+  if (get_verbosity_level() > 1) {
+    printf("add_atom: Adding internal atom ");
+    print_atom_now(atom, table);
+    printf("\n");
+  }
+  int32_t result = add_internal_atom(table, atom, true);
+  return result;
 }
 
 void add_source_to_assertion(char *source, int32_t atom_index,
@@ -272,34 +277,33 @@ void add_source_to_assertion(char *source, int32_t atom_index,
 	}
 }
 
-int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom,
-		char *source) {
-	pred_table_t *pred_table = &table->pred_table;
-	char *in_predicate = current_atom->pred;
-	int32_t pred_id = pred_index(in_predicate, pred_table);
+int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source) {
+  pred_table_t *pred_table = &table->pred_table;
+  char *in_predicate = current_atom->pred;
+  int32_t pred_id = pred_index(in_predicate, pred_table);
 
-	if (pred_id == -1) {
-		mcsat_err("assert: Predicate %s not found\n", in_predicate);
-		return -1;
-	}
-	pred_id = pred_val_to_index(pred_id);
-	if (pred_id >= 0) {
-		mcsat_err("assert: May not assert atoms with indirect predicate %s\n",
-				in_predicate);
-		return -1;
-	}
+  if (pred_id == -1) {
+    mcsat_err("assert: Predicate %s not found\n", in_predicate);
+    return -1;
+  }
+  pred_id = pred_val_to_index(pred_id);
+  if (pred_id >= 0) {
+    mcsat_err("assert: May not assert atoms with indirect predicate %s\n",
+	      in_predicate);
+    return -1;
+  }
 
-	int32_t atom_index = add_atom(table, current_atom);
-	if (atom_index == -1) {
-		return -1;
-	} else {
-		table->atom_table.assignment[0][atom_index] = v_fixed_true;
-		table->atom_table.assignment[1][atom_index] = v_fixed_true;
-		if (source != NULL) {
-			add_source_to_assertion(source, atom_index, table);
-		}
-		return atom_index;
-	}
+  int32_t atom_index = add_atom(table, current_atom);
+  if (atom_index == -1) {
+    return -1;
+  } else {
+    table->atom_table.assignment[0][atom_index] = v_fixed_true;
+    table->atom_table.assignment[1][atom_index] = v_fixed_true;
+    if (source != NULL) {
+      add_source_to_assertion(source, atom_index, table);
+    }
+    return atom_index;
+  }
 }
 
 bool member_frozen_preds(samp_literal_t lit, int32_t *frozen_preds,
