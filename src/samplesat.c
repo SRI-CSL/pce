@@ -102,7 +102,7 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
   atom_map = array_size_hmap_find(&(atom_table->atom_var_hash), arity + 1, //+1 for pred
 				  (int32_t *) atom);
   if (atom_map == NULL) {
-    if (get_verbosity_level() > 1) {
+    if (get_verbosity_level() >= 0) {
       printf("add_internal_atom: Adding internal atom ");
       print_atom_now(atom, table);
       printf("\n");
@@ -175,6 +175,8 @@ void atom_buffer_resize(int32_t arity) {
 	}
 }
 
+ivector_t new_intidx = {0, 0, NULL};
+
 int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
   const_table_t *const_table = &table->const_table;
   pred_table_t *pred_table = &table->pred_table;
@@ -189,13 +191,15 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
   }
   int32_t predicate = pred_val_to_index(pred_id);
   int32_t i;
-  int32_t *psig, intval;
+  int32_t *psig, intval, intsig;
   int32_t arity = pred_arity(predicate, pred_table);
 
   atom_buffer_resize(arity);
   samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
   atom->pred = predicate;
+  assert(atom->pred == predicate);
   psig = pred_signature(predicate, pred_table);
+  new_intidx.size = 0;
   for (i = 0; i < arity; i++) {
     entry = sort_table->entries[psig[i]];
     if (entry.constants == NULL) {
@@ -212,9 +216,8 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 	atom->args[i] = intval;
 	if (psig != NULL && entry.ints != NULL) {
 	  if (add_int_const(intval, &sort_table->entries[psig[i]], sort_table)) {
-	    create_new_const_atoms(intval, psig[i], table);
-	    create_new_const_rule_instances(intval, psig[i], table, 0);
-	    create_new_const_query_instances(intval, psig[i], table, 0);
+	    // Keep track of the newly added int constants
+	    ivector_push(&new_intidx, i);
 	  }
 	}
       } else {
@@ -229,12 +232,20 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
       }
     }
   }
-  if (get_verbosity_level() > 1) {
+  if (get_verbosity_level() >= 0) {
     printf("add_atom: Adding internal atom ");
     print_atom_now(atom, table);
     printf("\n");
   }
   int32_t result = add_internal_atom(table, atom, true);
+  // Now we need to deal with the newly introduced integer constants
+  for (i = 0; i < new_intidx.size; i++) {
+    intval = atom->args[new_intidx.data[i]];
+    intsig = psig[new_intidx.data[i]];
+    create_new_const_atoms(intval, intsig, table);
+    create_new_const_rule_instances(intval, intsig, table, 0);
+    create_new_const_query_instances(intval, intsig, table, 0);
+  }
   return result;
 }
 
@@ -2182,14 +2193,12 @@ void new_const_atoms_at(int32_t idx, int32_t newcidx, int32_t arity,
       if (entry.ints == NULL) {
 	for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
 	  atom->args[idx] = i;
-	  new_const_atoms_at(idx + 1, newcidx, arity, psig, atom,
-			     table);
+	  new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
 	}
       } else {
 	for (i = 0; i < entry.cardinality; i++) {
 	  atom->args[idx] = entry.ints[i];
-	  new_const_atoms_at(idx + 1, newcidx, arity, psig, atom,
-			     table);
+	  new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
 	}
       }
     } else {
