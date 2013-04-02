@@ -6,6 +6,9 @@
 #include <ctype.h>
 #include <err.h>
 #include <limits.h>
+#include <stdio.h>
+#include <errno.h>
+#include <math.h>
 #include <getopt.h>
 #include "samplesat.h"
 #include "tables.h"
@@ -34,7 +37,14 @@ enum {
   LAZY_OPTION = CHAR_MAX + 1,
   STRICT_OPTION,
   SEED_OPTION,
-  DUMP_SAMPLES_OPTION
+  DUMP_SAMPLES_OPTION,
+  MAX_SAMPLES_OPTION,
+  SA_PROBABILITY_OPTION,
+  SAMP_TEMPERATURE_OPTION,
+  RVAR_PROBABILITY_OPTION,
+  MAX_FLIPS_OPTION,
+  MAX_EXTRA_FLIPS_OPTION,
+  TIMEOUT_OPTION
 };
 
 // enum subcommand {
@@ -52,6 +62,13 @@ static struct option long_options[] = {
   {"prexp", no_argument, 0, 'e'},
   {"verbosity", required_argument, 0, 'v'},
   {"version", no_argument, &show_version, 1},
+  {"max_samples", required_argument, 0, MAX_SAMPLES_OPTION},
+  {"sa_probability", required_argument, 0, SA_PROBABILITY_OPTION},
+  {"samp_temperature", required_argument, 0, SAMP_TEMPERATURE_OPTION},
+  {"rvar_probability", required_argument, 0, RVAR_PROBABILITY_OPTION},
+  {"max_flips", required_argument, 0, MAX_FLIPS_OPTION},
+  {"max_extra_flips", required_argument, 0, MAX_EXTRA_FLIPS_OPTION},
+  {"timeout", required_argument, 0, TIMEOUT_OPTION},
   {0, 0, 0, 0}
 };
 
@@ -94,7 +111,9 @@ Options:\n\
 // }
 
 static void decode_options(int argc, char **argv) {
-  int32_t i, optchar, option_index;  
+  int32_t i, optchar, option_index;
+  char *endptr;
+  double val;
 
   option_index = 0;
   while ((optchar = getopt_long(argc, argv, OPTION_STRING, long_options, &option_index)) != -1) {
@@ -121,9 +140,85 @@ static void decode_options(int argc, char **argv) {
       set_pce_rand_seed(atoi(optarg));
       break;
     }
+    case MAX_SAMPLES_OPTION: {
+      for(i=0; optarg[i] != '\0'; i++) {
+	if (! isdigit(optarg[i])) {
+	  mcsat_err("Error: max_samples must be an integer\n");
+	  exit(1);
+	}
+      }
+      set_max_samples(atoi(optarg));
+      break;
+    }
+    case SA_PROBABILITY_OPTION: {
+      errno = 0;
+      val = strtod(optarg, &endptr);
+      if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
+	  || (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
+	  || val < 0.0 || val > 1.0) {
+	mcsat_err("Error: sa_probability must be a float between 0.0 and 1.0");
+	exit(1);
+	}
+      set_sa_probability(val);
+      break;
+    }
+    case SAMP_TEMPERATURE_OPTION: {
+      errno = 0;
+      val = strtod(optarg, &endptr);
+      if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
+	  || (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
+	  || val < 0.0) {
+	mcsat_err("Error: samp_temperature must be a float >= 0.0");
+	exit(1);
+	}
+      set_samp_temperature(val);
+      break;
+    }
+    case RVAR_PROBABILITY_OPTION: {
+      errno = 0;
+      val = strtod(optarg, &endptr);
+      if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
+	  || (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
+	  || val < 0.0 || val > 1.0) {
+	mcsat_err("Error: rvar_probability must be a float between 0.0 and 1.0");
+	exit(1);
+	}
+      set_rvar_probability(val);
+      break;
+    }
+    case MAX_FLIPS_OPTION: {
+      for(i=0; optarg[i] != '\0'; i++) {
+	if (! isdigit(optarg[i])) {
+	  mcsat_err("Error: max_flips must be an integer\n");
+	  exit(1);
+	}
+      }
+      set_max_flips(atoi(optarg));
+      break;
+    }
+    case MAX_EXTRA_FLIPS_OPTION: {
+      for(i=0; optarg[i] != '\0'; i++) {
+	if (! isdigit(optarg[i])) {
+	  mcsat_err("Error: max_extra_flips must be an integer\n");
+	  exit(1);
+	}
+      }
+      set_max_extra_flips(atoi(optarg));
+      break;
+    }
+    case TIMEOUT_OPTION: {
+      for(i=0; optarg[i] != '\0'; i++) {
+	if (! isdigit(optarg[i])) {
+	  mcsat_err("Error: timeout must be an integer\n");
+	  exit(1);
+	}
+      }
+      set_mcsat_timeout(atoi(optarg));
+      break;
+    }
     case DUMP_SAMPLES_OPTION:
-    	set_dump_samples_path(optarg);
-    	break;
+      set_dump_samples_path(optarg);
+      break;
     case LAZY_OPTION:
       if ((strcasecmp(optarg, "true") == 0) || (strcasecmp(optarg, "t") == 0) || (strcmp(optarg, "1") == 0)) {
 	set_lazy_mcsat(true);
