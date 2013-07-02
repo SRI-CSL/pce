@@ -96,6 +96,8 @@ typedef struct input_mcsat_params_decl_s {
   int32_t max_flips;
   int32_t max_extra_flips;
   int32_t timeout;
+  int32_t burn_in_steps;
+  int32_t samp_interval;
 } input_mcsat_params_decl_t;
 
 typedef struct input_reset_decl_s {

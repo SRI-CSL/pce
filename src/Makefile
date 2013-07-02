@@ -148,7 +148,7 @@ CFLAGS += -Wall -Winline -Wredundant-decls
 # 
 # for l-bfgs library
 #
-LIBS += -llbfgs
+LIBS += -L$(MCSAT_TOP_DIR)/lib -llbfgs
 
 
 #

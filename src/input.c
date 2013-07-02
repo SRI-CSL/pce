@@ -29,6 +29,8 @@ extern int yydebug;
 #define DEFAULT_MAX_FLIPS 100
 #define DEFAULT_MAX_EXTRA_FLIPS 5
 #define DEFAULT_MCSAT_TIMEOUT 0
+#define DEFAULT_BURN_IN_STEPS 100
+#define DEFAULT_SAMP_INTERVAL 1
 
 static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 static double sa_probability = DEFAULT_SA_PROBABILITY;
@@ -37,6 +39,8 @@ static double rvar_probability = DEFAULT_RVAR_PROBABILITY;
 static int32_t max_flips = DEFAULT_MAX_FLIPS;
 static int32_t max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
 static int32_t mcsat_timeout = DEFAULT_MCSAT_TIMEOUT;
+static int32_t burn_in_steps = DEFAULT_BURN_IN_STEPS;
+static int32_t samp_interval = DEFAULT_SAMP_INTERVAL;
 
 static bool strict_consts = true;
 static bool lazy = false;
@@ -88,6 +92,12 @@ int32_t get_max_extra_flips() {
 int32_t get_mcsat_timeout() {
   return mcsat_timeout;
 }
+int32_t get_burn_in_steps() {
+  return burn_in_steps;
+}
+int32_t get_samp_interval() {
+  return samp_interval;
+}
 
 void set_max_samples(int32_t m) {
   max_samples = m;
@@ -109,6 +119,12 @@ void set_max_extra_flips(int32_t m) {
 }
 void set_mcsat_timeout(int32_t m) {
   mcsat_timeout = m;
+}
+void set_burn_in_steps(int32_t m) {
+  burn_in_steps = m;
+}
+void set_samp_interval(int32_t m) {
+  samp_interval = m;
 }
 
 bool strict_constants() {
@@ -518,9 +534,11 @@ mcsat NUMs are optional, and represent, in order:\n\
   max_flips (int): Max number of variable flips to find a model\n\
   max_extra_flips (int): Max number of extra flips to try\n\
   timeout (int): Number of seconds to timeout - 0 means no timeout\n\
+  burn_in_steps (int): Number of burn-in steps for MCSAT\n\
+  samp_interval (int): Sampling interval, i.e., number of steps between samples\n\
  The sampling runs until either max_samples or the timeout, whichever comes first.\n\
 Example:\n\
-  mcsat_params ,.8,,1000;\n\
+  mcsat_params ,.8,,,1000;\n\
     Sets sa_probability to .8, max_flips to 1000, and keeps other parameter values.\n\
 ");
     break;
@@ -923,6 +941,7 @@ extern bool read_eval(samp_table_t *table) {
 	  set_dump_samples_path(NULL);
 	}
 
+      // mcsat runs in this subroutine
       ask_cnf(decl.formula, decl.threshold, decl.numresults);
       // Results are in ask_buffer - print them out
       print_ask_results(decl.formula, table);
@@ -978,6 +997,8 @@ extern bool read_eval(samp_table_t *table) {
       output(" max_flips = %"PRId32"\n", get_max_flips());
       output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
       output(" timeout = %"PRId32"\n", get_mcsat_timeout());
+      output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
+      output(" samp_interval = %"PRId32"\n", get_samp_interval());
 
       if (get_dump_samples_path() != NULL)
 	{
@@ -992,7 +1013,8 @@ extern bool read_eval(samp_table_t *table) {
       } else {
 	mc_sat(table, get_max_samples(), get_sa_probability(),
 	       get_samp_temperature(), get_rvar_probability(),
-	       get_max_flips(), get_max_extra_flips(), get_mcsat_timeout());
+	       get_max_flips(), get_max_extra_flips(), get_mcsat_timeout(),
+	       get_burn_in_steps(), get_samp_interval());
       }
       end = clock();
       output(" running took: %f seconds", (double)(end-start)/CLOCKS_PER_SEC);
@@ -1010,6 +1032,8 @@ extern bool read_eval(samp_table_t *table) {
 	output(" max_flips = %"PRId32"\n", get_max_flips());
 	output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
 	output(" timeout = %"PRId32"\n", get_mcsat_timeout());
+	output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
+	output(" samp_interval = %"PRId32"\n", get_samp_interval());
       } else {
 	output("Setting MCSAT parameters:\n");
 	if (decl.max_samples >= 0) {
@@ -1046,6 +1070,16 @@ extern bool read_eval(samp_table_t *table) {
 	  output(" timeout was %"PRId32", now %"PRId32"\n",
 		 get_mcsat_timeout(), decl.timeout);
 	  set_mcsat_timeout(decl.timeout);
+	}
+	if (decl.burn_in_steps >= 0) {
+	  output(" burn_in_steps was %"PRId32", now %"PRId32"\n",
+		 get_burn_in_steps(),decl.burn_in_steps);
+	  set_burn_in_steps(decl.burn_in_steps);
+	}
+	if (decl.samp_interval >= 0) {
+	  output(" samp_interval was %"PRId32", now %"PRId32"\n",
+	         get_samp_interval(),decl.samp_interval);
+	  set_samp_interval(decl.samp_interval);
 	}
       }
       output("\n");

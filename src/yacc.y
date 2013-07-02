@@ -420,11 +420,11 @@ void yy_mcsat_params_decl (char **params) {
   input_command.kind = MCSAT_PARAMS;
   // Determine num_params
   if (params != NULL) {
-    while (arglen <= 7 && (params[arglen] != NULL)) {
+    while (arglen <= 9 && (params[arglen] != NULL)) {
       arglen++;
     }
   }
-  if (arglen > 7) {
+  if (arglen > 9) {
     yyerror("mcsat_params: too many args");
   }
   input_command.decl.mcsat_params_decl.num_params = arglen;
@@ -499,10 +499,23 @@ void yy_mcsat_params_decl (char **params) {
   } else {
     input_command.decl.mcsat_params_decl.timeout = -1;
   }
+  if (arglen > 7 && strcmp(params[7], "") != 0) {
+    if (yy_check_nat(params[7])) {
+      input_command.decl.mcsat_params_decl.burn_in_steps = atoi(params[7]);
+    }
+  } else {
+    input_command.decl.mcsat_params_decl.burn_in_steps = -1;
+  }
+  if (arglen > 8 && strcmp(params[8], "") != 0) {
+    if (yy_check_nat(params[8])) {
+      input_command.decl.mcsat_params_decl.samp_interval = atoi(params[8]);
+    }
+  } else {
+    input_command.decl.mcsat_params_decl.samp_interval = -1;
+  }
   free_strings(params);
 };
   void yy_dumptables (int32_t table) {
-    input_command.kind = DUMPTABLE;
     input_command.decl.dumptable_decl.table = table;
   };
   void yy_reset (int32_t what) {

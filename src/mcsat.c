@@ -44,7 +44,9 @@ enum {
   RVAR_PROBABILITY_OPTION,
   MAX_FLIPS_OPTION,
   MAX_EXTRA_FLIPS_OPTION,
-  TIMEOUT_OPTION
+  TIMEOUT_OPTION,
+  BURN_IN_STEPS_OPTION,
+  SAMP_INTERVAL_OPTION,
 };
 
 // enum subcommand {
@@ -69,6 +71,8 @@ static struct option long_options[] = {
   {"max_flips", required_argument, 0, MAX_FLIPS_OPTION},
   {"max_extra_flips", required_argument, 0, MAX_EXTRA_FLIPS_OPTION},
   {"timeout", required_argument, 0, TIMEOUT_OPTION},
+  {"burn_in_steps", required_argument, 0, BURN_IN_STEPS_OPTION},
+  {"samp_interval", required_argument, 0, SAMP_INTERVAL_OPTION},
   {0, 0, 0, 0}
 };
 

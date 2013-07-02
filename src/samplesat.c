@@ -1844,7 +1844,7 @@ int32_t sample_sat_body(samp_table_t *table, double sa_probability,
 	choice = choose();
 	cprintf(
 			1,
-			"sample_sat_body: num_unsat = %d, choice = % .4e, sa_probability = % .4e\n",
+			"sample_sat_body: num_unsat = %d, choice = % .4f, sa_probability = % .4f\n",
 			clause_table->num_unsat_clauses, choice, sa_probability);
 	if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
 		/*
@@ -1859,17 +1859,22 @@ int32_t sample_sat_body(samp_table_t *table, double sa_probability,
 				1,
 				" in simulated annealing: num_unsat = %d, var = %d, dcost = %d\n",
 				clause_table->num_unsat_clauses, var, dcost);
-		//print_assignment(table);
+//		print_assignment(table);
 		if (dcost <= 0) {
-			//printf("Flipping for dcost\n");
+//			printf("Flipping ");
+//			print_atom(atom_table->atom[var], table);
+//			printf(" for dcost\n");
 			conflict = flip_unfixed_variable(table, var);
 		} else {
 			choice = choose();
 			if (choice < exp(-dcost / samp_temperature)) {
-				//printf("Flipping for temp\n");
+//				printf("Flipping ");
+//				print_atom(atom_table->atom[var], table);
+//				printf(" for temp\n");
 				conflict = flip_unfixed_variable(table, var);
 			}
 		}
+//		print_assignment(table);
 	} else {
 		/*
 		 * Walksat step
@@ -1885,7 +1890,9 @@ int32_t sample_sat_body(samp_table_t *table, double sa_probability,
 		}
 		//link points to chosen clause
 		var = choose_clause_var(table, link, assignment, rvar_probability);
-		cprintf(1, " in walksat: chose variable %d\n", var);
+//		printf(" in walksat: chose variable ");
+//		print_atom(atom_table->atom[var], table);
+//		printf("\n");
 		conflict = flip_unfixed_variable(table, var);
 	}
 	return conflict;
@@ -1996,6 +2003,10 @@ void update_pmodel(samp_table_t *table) {
 	}
 }
 
+/*
+ * To be replaced by other SAT solvers. It should just give a
+ * solution but not necessarily uniformly drawn.
+ */
 int32_t first_sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips) {
 	int32_t conflict;
@@ -2007,17 +2018,18 @@ int32_t first_sample_sat(samp_table_t *table, double sa_probability,
 	if (conflict == -1)
 		return -1;
 	uint32_t num_flips = max_flips;
-	while (num_flips > 0) {
+	while (num_flips > 0 && table->clause_table.num_unsat_clauses > 0) {
 		if (sample_sat_body(table, sa_probability, samp_temperature,
 				rvar_probability) == -1)
 			return -1;
 		num_flips--;
 	}
+	cprintf(1, "num of unsat clauses = %d\n", table->clause_table.num_unsat_clauses);
 	if (table->clause_table.num_unsat_clauses > 0) {
 		mcsat_err("Initialization failed to find a model; increase max_flips\n");
 		return -1;
 	}
-	update_pmodel(table);
+//	update_pmodel(table);
 	return 0;
 }
 
@@ -2043,7 +2055,8 @@ void move_unsat_to_dead_clauses(clause_table_t *clause_table) {
  */
 void sample_sat(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips,
-		uint32_t max_extra_flips) {
+		uint32_t max_extra_flips,
+		bool update_counts) {
 	clause_table_t *clause_table = &table->clause_table;
 	int32_t conflict;
 	//assert(valid_table(table));
@@ -2083,7 +2096,9 @@ void sample_sat(samp_table_t *table, double sa_probability,
 	if (conflict != -1 && table->clause_table.num_unsat_clauses == 0) {
 		//printf("Before update_pmodel\n");
 		//print_assignment(table);
-		update_pmodel(table);
+		if (update_counts) {
+			update_pmodel(table);
+		}
 	} else {
 		/*
 		 * Sample sat did not find a model (within max_flips)
@@ -2105,7 +2120,9 @@ void sample_sat(samp_table_t *table, double sa_probability,
 
 		empty_clause_lists(table);
 		init_clause_lists(&table->clause_table);
-		update_pmodel(table);
+		if (update_counts) {
+			update_pmodel(table);
+		}
 	}
 }
 
@@ -2126,12 +2143,16 @@ void sample_sat(samp_table_t *table, double sa_probability,
  *
  * Parameter for mc_sat:
  * - max_samples = number of samples generated
+ * - timeout = maximum running time for MCSAT
+ * - burn_in_steps = number of burn-in steps
+ * - samp_interval = sampling interval
  */
 void mc_sat(samp_table_t *table, uint32_t max_samples, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips,
-		uint32_t max_extra_flips, uint32_t timeout) {
+		uint32_t max_extra_flips, uint32_t timeout,
+		uint32_t burn_in_steps, uint32_t samp_interval) {
 	int32_t conflict;
-	uint32_t i;
+	uint32_t i, j;
 	time_t fintime = 0;
 
 	conflict = first_sample_sat(table, sa_probability, samp_temperature,
@@ -2149,10 +2170,18 @@ void mc_sat(samp_table_t *table, uint32_t max_samples, double sa_probability,
 	if (timeout != 0) {
 		fintime = time(NULL) + timeout;
 	}
+	for (i = 0; i < burn_in_steps; i++) {
+		sample_sat(table, sa_probability, samp_temperature, rvar_probability,
+				max_flips, max_extra_flips, false);
+	}
 	for (i = 0; i < max_samples; i++) {
 		cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
+		for (j = 1; j < samp_interval; j++) {
+			sample_sat(table, sa_probability, samp_temperature, rvar_probability,
+					max_flips, max_extra_flips, false);
+		}
 		sample_sat(table, sa_probability, samp_temperature, rvar_probability,
-				max_flips, max_extra_flips);
+				max_flips, max_extra_flips, true);
 		cprintf(1, "mc_sat: after round %d\n", i);
 		if (get_verbosity_level() > 0)
 			print_assignment(table);

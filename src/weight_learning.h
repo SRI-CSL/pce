@@ -10,7 +10,7 @@
 #include "vectors.h"
 #include "tables.h"
 #include "training_data.h"
-#include <lbfgs.h>
+#include "lbfgs.h"
 
 
 // this should be specified by the user, set it to 1 for L-BFGS, to 0 for gradient
