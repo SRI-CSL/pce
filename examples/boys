@@ -1,0 +1,16 @@
+sort Day;
+sort Child;
+const Mo, Tu, We, Th, Fr, Sa, Su: Day;
+const A, B: Child;
+predicate boy(Child) hidden;
+predicate born_on(Child, Day) hidden;
+
+add [c] born_on(c, Mo) or born_on(c, Tu) or born_on(c, We)
+     or born_on(c, Th) or born_on(c, Fr) or born_on(c, Sa)
+     or born_on(c, Su);
+add [c, d1, d2] (born_on(c, d1) and born_on(c, d2)) implies d1 = d2;
+add (born_on(A, Tu) and boy(A)) or (born_on(B, Tu) and boy(B));
+
+mcsat_params 10000, .5, 5, .05, 100, 5,,10000,;
+ask (boy(A) and boy(B));
+

@@ -22,33 +22,32 @@
  * rand() exists on mingw but random() does not
  */
 static inline int random(void) {
-  return rand();
+	return rand();
 }
 
 #endif
 
-int32_t pred_cardinality(pred_tbl_t *pred_tbl,
-			 sort_table_t *sort_table,
-			 int32_t predicate){
-  if (predicate < 0 || predicate >= pred_tbl->num_preds){
-    return -1;
-  }
-  int32_t card = 1;
-  pred_entry_t *entry = &(pred_tbl->entries[predicate]);
-  int32_t i;
-  for (i = 0; i < entry->arity; i++){
-    card *= sort_table->entries[entry->signature[i]].cardinality;
-  }
-  return card;
+int32_t pred_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table,
+		int32_t predicate) {
+	if (predicate < 0 || predicate >= pred_tbl->num_preds) {
+		return -1;
+	}
+	int32_t card = 1;
+	pred_entry_t *entry = &(pred_tbl->entries[predicate]);
+	int32_t i;
+	for (i = 0; i < entry->arity; i++) {
+		card *= sort_table->entries[entry->signature[i]].cardinality;
+	}
+	return card;
 }
 
 int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table) {
-  int32_t i;
-  int32_t card = 0;
-  for (i = 1; i < pred_tbl->num_preds; i++){
-    card += pred_cardinality(pred_tbl, sort_table, i);
-  }
-  return card;
+	int32_t i;
+	int32_t card = 0;
+	for (i = 1; i < pred_tbl->num_preds; i++) {
+		card += pred_cardinality(pred_tbl, sort_table, i);
+	}
+	return card;
 }
 
 //static clause_buffer_t rule_atom_buffer = {0, NULL}; 
@@ -69,7 +68,6 @@ int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table) {
 //     rule_atom_buffer.size = size;
 //   }
 // }
-
 
 // bool check_clause_instance(samp_table_t *table,
 // 			   substit_buffer_t *substit,
@@ -116,172 +114,224 @@ int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table) {
 //   return true;
 // }
 
-int32_t choose_random_atom(samp_table_t *table){
-  uint32_t i, atom_num, anum;
-  int32_t card, all_card, acard, pcard, predicate;
-  pred_tbl_t *pred_tbl = &table->pred_table.pred_tbl; // Indirect preds
-  atom_table_t *atom_table = &table->atom_table;
-  sort_table_t *sort_table = &table->sort_table;
-  pred_entry_t *pred_entry;
+/**
+ * choose a random atom for simulated annealing step in
+ * sample SAT. The lazy version of choose_unfixed_variable
+ */
+int32_t choose_random_atom(samp_table_t *table) {
+	uint32_t i, atom_num, anum;
+	int32_t card, all_card, acard, pcard, predicate;
+	pred_tbl_t *pred_tbl = &table->pred_table.pred_tbl; // Indirect preds
+	atom_table_t *atom_table = &table->atom_table;
+	sort_table_t *sort_table = &table->sort_table;
+	pred_entry_t *pred_entry;
 
-  // Get the number of possible indirect atoms
-  all_card = all_atoms_cardinality(pred_tbl, sort_table);
+	// Get the number of possible indirect atoms
+	all_card = all_atoms_cardinality(pred_tbl, sort_table);
 
-  atom_num = random_uint(all_card);
-  //assert(valid_table(table));
-
-  predicate = 1; // Skip past true
-  acard = 0;
-  while (true) {//determine the predicate
-    assert (predicate <= pred_tbl->num_preds);
-    pcard = pred_cardinality(pred_tbl, sort_table, predicate);
-    if (acard + pcard > atom_num) {
-      break;
-    }
-    acard += pcard;
-    predicate++;
-  }
-  //assert(valid_table(table));
-  assert(pred_cardinality(pred_tbl, sort_table, predicate) != 0);
-
-  anum = atom_num - acard; //gives the position of atom within predicate
-  //Now calculate the arguments.  We represent the arguments in
-  //little-endian form
-  pred_entry = &pred_tbl->entries[predicate];
-  int32_t *signature = pred_entry->signature;
-  int32_t arity = pred_entry->arity;
-  atom_buffer_resize(arity);
-  int32_t constant;
-  samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
-  //Build atom from atom_num by successive division
-  atom->pred = predicate;
-  for (i = 0; i < arity; i++){
-    card = sort_table->entries[signature[i]].cardinality;
-    constant = anum % card; //card can't be zero
-    anum = anum/card;
-    if (sort_table->entries[signature[i]].constants == NULL) {
-      // Must be an integer
-      atom->args[i] = constant;
-    } else {
-      atom->args[i] = sort_table->entries[signature[i]].constants[constant];
-      // Quick typecheck
-      assert(const_sort_index(atom->args[i], &table->const_table) == signature[i]);
-    }
-  }
-  
-  //assert(valid_table(table));
-
-  array_hmap_pair_t *atom_map;
-  atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
-				  arity + 1,
-				  (int32_t *) atom);
-  //assert(valid_table(table));
-  if (atom_map == NULL){//need to activate atom
-    if (get_verbosity_level() >= 0) {
-      printf("Activating atom (at round %d) ", atom_table->num_samples);
-      print_atom(atom, table);
-      printf("\n");
-      fflush(stdout);
-    }
-    activate_atom(table, atom);
-    atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
-				    arity + 1,
-				    (int32_t *) atom);
-    if (atom_map == NULL) {
-      printf("Something is wrong in choose_random_atom\n");
-      return 0;
-    } else {
-      return atom_map->val;
-    }
-  } else {
-    return atom_map->val;
-  }
-}
-
-int32_t lazy_sample_sat_body(samp_table_t *table, double sa_probability,
-			  double samp_temperature, double rvar_probability){
-  //Assumed that table is in a valid state with a random assignment.
-  //We first decide on simulated annealing vs. walksat.
-  clause_table_t *clause_table = &table->clause_table;
-  atom_table_t *atom_table = &table->atom_table;
-  samp_truth_value_t *assignment;
-  int32_t dcost;
-  double choice; 
-  int32_t var;
-  uint32_t clause_position;
-  samp_clause_t *link;
-  int32_t conflict = 0;
-
-  assignment = atom_table->assignment[atom_table->current_assignment];
-  //assert(valid_table(table));
-  choice = choose();
-  if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
-    /*
-     * Simulated annealing step
-     */
-    //printf("Doing simulated annealing step, num_unsat_clauses = %d\n",
-    //       clause_table->num_unsat_clauses);
-    // choose a random atom
-    //assert(valid_table(table));
-    var = choose_random_atom(table);
-    //var = choose_unfixed_variable(assignment, atom_table->num_vars,
-    //			  atom_table->num_unfixed_vars);
-    //assert(valid_table(table));
-    if (var == -1 || fixed_tval(assignment[var]) ) {
-      return;
-    }
-    cost_flip_unfixed_variable(table, &dcost, var);
-    //assert(valid_table(table));
-    if (dcost <= 0){
-      flip_unfixed_variable(table, var);
-      //assert(valid_table(table));
-    } else {
-      choice = choose();
-      if (choice < exp(-dcost/samp_temperature)) {
-	conflict = flip_unfixed_variable(table, var);
+	atom_num = random_uint(all_card);
 	//assert(valid_table(table));
-      }
-    }
-  } else {
-    /*
-     * Walksat step
-     */
-    //choose an unsat clause
-    clause_position = random_uint(clause_table->num_unsat_clauses);
-    link = clause_table->unsat_clauses;
-    while (clause_position != 0){
-      link = link->link;
-      clause_position--;
-    } 
-    //assert(valid_table(table));
-    //link points to chosen clause
-    var = choose_clause_var(table, link, assignment, rvar_probability);
-    conflict = flip_unfixed_variable(table, var);
-    //assert(valid_table(table));
-  }
-  return conflict;
+
+	predicate = 1; // Skip past true
+	acard = 0;
+	while (true) { //determine the predicate
+		assert(predicate <= pred_tbl->num_preds);
+		pcard = pred_cardinality(pred_tbl, sort_table, predicate);
+		if (acard + pcard > atom_num) {
+			break;
+		}
+		acard += pcard;
+		predicate++;
+	}
+	//assert(valid_table(table));
+	assert(pred_cardinality(pred_tbl, sort_table, predicate) != 0);
+
+	anum = atom_num - acard; //gives the position of atom within predicate
+	//Now calculate the arguments.  We represent the arguments in
+	//little-endian form
+	pred_entry = &pred_tbl->entries[predicate];
+	int32_t *signature = pred_entry->signature;
+	int32_t arity = pred_entry->arity;
+	atom_buffer_resize(arity);
+	int32_t constant;
+	samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
+	//Build atom from atom_num by successive division
+	atom->pred = predicate;
+	for (i = 0; i < arity; i++) {
+		card = sort_table->entries[signature[i]].cardinality;
+		constant = anum % card; //card can't be zero
+		anum = anum / card;
+		if (sort_table->entries[signature[i]].constants == NULL) {
+			// Must be an integer
+			atom->args[i] = constant;
+		} else {
+			atom->args[i] =
+					sort_table->entries[signature[i]].constants[constant];
+			// Quick typecheck
+			assert(
+					const_sort_index(atom->args[i], &table->const_table) == signature[i]);
+		}
+	}
+
+	//assert(valid_table(table));
+
+	array_hmap_pair_t *atom_map;
+	atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
+			(int32_t *) atom);
+	//assert(valid_table(table));
+	if (atom_map == NULL) { //need to activate atom
+		if (get_verbosity_level() >= 0) {
+			printf("Activating atom (at round %d) ", atom_table->num_samples);
+			print_atom(atom, table);
+			printf("\n");
+			fflush(stdout);
+		}
+		activate_atom(table, atom);
+		atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
+				(int32_t *) atom);
+		if (atom_map == NULL) {
+			printf("Something is wrong in choose_random_atom\n");
+			return 0;
+		} else {
+			return atom_map->val;
+		}
+	} else {
+		return atom_map->val;
+	}
 }
 
+/**
+ * TODO: To debug
+ * A predicate has default value of true or false
+ * A clause also has default value of true or false
+ *
+ * When the default value of a clause is true:
+ *     We initially calculate the M-membership for active clauses only.
+ *     If some clauses are activated later during the sample SAT,
+ *     they need to pass the M-membership test to be put into M.
+ *
+ *     e.g., Fr(x,y) and Sm(x) implies Sm(y)
+ *     i.e., ~Fr(x,y) or ~Sm(x) or Sm(y)
+ *     If Sm(A) is activated (as true) at some stage, do we need to
+ *     activate all the clauses related to it? No. We consider two cases.
+ *     If y\A, nothing changed, nothing will be activated.
+ *     If x\A, if there is some B, Fr(A,B) is also true, and Sm(B) is false
+ *     (inactive or active but with false value), [x\A,y\B] will be
+ *     activated.
+ *     How do we do it? We index the active atoms by each argument. e.g.,
+ *     Fr(A,?) or Fr(?,B). If a literal is activated to a satisfied
+ *     value, e.g., the y\A case above, do nothing. If a literal is
+ *     activated to an unsatisfied value, e.g., the x\A case, we check
+ *     the active atoms of Fr(x,y) indexed by Fr(A,y). Since Fr(x,y)
+ *     has a default value of false that makes the literal satisfied,
+ *     only the active atoms of Fr(x,y) may relate to a unsat clause.
+ *     Then we get only a small subset of substitution of y, which can
+ *     be used to verify the last literal (Sm(y)) easily.
+ *     (See the implementation details section in Poon and Domingos 08)
+ *
+ * When the default value of a clause is false:
+ *     Poon and Domingos 08 didn't consider this case.
+ *
+ * What to do with clauses with negative weight?
+ *
+ */
+int32_t lazy_sample_sat_body(samp_table_t *table, double sa_probability,
+		double samp_temperature, double rvar_probability) {
+	clause_table_t *clause_table = &table->clause_table;
+	atom_table_t *atom_table = &table->atom_table;
+	samp_truth_value_t *assignment;
+	int32_t dcost;
+	double choice;
+	int32_t var;
+	uint32_t clause_position;
+	samp_clause_t *link;
+	int32_t conflict = 0;
+
+	//Assumed that table is in a valid state with a random assignment.
+	//We first decide on simulated annealing vs. walksat.
+	assignment = atom_table->assignment[atom_table->current_assignment];
+	//assert(valid_table(table));
+	choice = choose();
+	if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
+		/*
+		 * Simulated annealing step
+		 */
+		//printf("Doing simulated annealing step, num_unsat_clauses = %d\n",
+		//       clause_table->num_unsat_clauses);
+		// choose a random atom
+		//assert(valid_table(table));
+		/**
+		 * TODO: Now this is the only place where atoms are activated.
+		 * It seems not right...
+		 */
+		var = choose_random_atom(table);
+		//var = choose_unfixed_variable(assignment, atom_table->num_vars,
+		//			  atom_table->num_unfixed_vars);
+		//assert(valid_table(table));
+		if (var == -1 || fixed_tval(assignment[var])) {
+			return 0;
+		}
+		/**
+		 * TODO: for the lazy version, we should active the variable
+		 * and related clauses. Is it okay to use the same function
+		 * as non-lazy version?
+		 */
+		cost_flip_unfixed_variable(table, &dcost, var);
+		//assert(valid_table(table));
+		if (dcost <= 0) {
+			flip_unfixed_variable(table, var);
+			//assert(valid_table(table));
+		} else {
+			choice = choose();
+			if (choice < exp(-dcost / samp_temperature)) {
+				conflict = flip_unfixed_variable(table, var);
+				//assert(valid_table(table));
+			}
+		}
+	} else {
+		/*
+		 * Walksat step
+		 */
+		//choose an unsat clause
+		clause_position = random_uint(clause_table->num_unsat_clauses);
+		link = clause_table->unsat_clauses;
+		while (clause_position != 0) {
+			link = link->link;
+			clause_position--;
+		}
+		//assert(valid_table(table));
+		//link points to chosen clause
+		var = choose_clause_var(table, link, assignment, rvar_probability);
+		conflict = flip_unfixed_variable(table, var);
+		//assert(valid_table(table));
+	}
+	return conflict;
+}
+
+/**
+ * TODO: To be replaced by a lazy SAT solver. Not necessarily
+ * need to be uniformly drawn.
+ */
 int32_t first_lazy_sample_sat(samp_table_t *table, double sa_probability,
-			      double samp_temperature, double rvar_probability,
-			      uint32_t max_flips){
-  int32_t conflict;
-  
-  conflict = init_sample_sat(table);
-  if (conflict == -1) return -1;
-  uint32_t num_flips = max_flips;
-  while (table->clause_table.num_unsat_clauses > 0 &&
-	 num_flips > 0){
-    lazy_sample_sat_body(table, sa_probability, samp_temperature,
-			 rvar_probability);
-    num_flips--;
-  }
-  if (table->clause_table.num_unsat_clauses > 0){
-    mcsat_err("Initialization failed to find a model; increase max_flips\n");
-    return -1;
-  }
-  update_pmodel(table);
-  return 0;
+		double samp_temperature, double rvar_probability, uint32_t max_flips) {
+	int32_t conflict;
+
+	conflict = init_sample_sat(table);
+	if (conflict == -1)
+		return -1;
+	uint32_t num_flips = max_flips;
+	while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0) {
+		lazy_sample_sat_body(table, sa_probability, samp_temperature,
+				rvar_probability);
+		num_flips--;
+	}
+	if (table->clause_table.num_unsat_clauses > 0) {
+		mcsat_err(
+				"Initialization failed to find a model; increase max_flips\n");
+		return -1;
+	}
+	update_pmodel(table);
+	return 0;
 }
 
 /*
@@ -290,50 +340,57 @@ int32_t first_lazy_sample_sat(samp_table_t *table, double sa_probability,
  * - compute a new assignment by sample_sat
  */
 void lazy_sample_sat(samp_table_t *table, double sa_probability,
-		     double samp_temperature, double rvar_probability,
-		     uint32_t max_flips, uint32_t max_extra_flips) {
-  clause_table_t *clause_table = &table->clause_table;
-  int32_t conflict;
-  //assert(valid_table(table));
-  conflict = reset_sample_sat(table);
-  //assert(valid_table(table));
-  uint32_t num_flips = max_flips;
-  while (num_flips > 0 && conflict == 0) {
-    if (clause_table->num_unsat_clauses == 0) {
-      if (max_extra_flips <= 0) {
-	break;
-      } else {
-	max_extra_flips--;
-      }
-    }
-    conflict = lazy_sample_sat_body(table, sa_probability, samp_temperature,
-				    rvar_probability);
-    //assert(valid_table(table));
-    num_flips--;
-  }
-    
-  if (conflict != -1 && table->clause_table.num_unsat_clauses == 0){
-    update_pmodel(table);
-  } else { 
-    /*
-     * Sample sat did not find a model (within max_flips)
-     * restore the earlier assignment
-     */
-    if (conflict == -1){
-      cprintf(2, "Hit a conflict.\n");
-    } else {
-      cprintf(2, "Failed to find a model.\n");
-    }
+		double samp_temperature, double rvar_probability, uint32_t max_flips,
+		uint32_t max_extra_flips, bool update_counts) {
+	clause_table_t *clause_table = &table->clause_table;
+	int32_t conflict;
+	//assert(valid_table(table));
+	/**
+	 * TODO: should use a lazy version to select clauses
+	 */
+	conflict = reset_sample_sat(table);
+	//assert(valid_table(table));
+	uint32_t num_flips = max_flips;
+	while (num_flips > 0 && conflict == 0) {
+		if (clause_table->num_unsat_clauses == 0) {
+			if (max_extra_flips <= 0) {
+				break;
+			} else {
+				max_extra_flips--;
+			}
+		}
+		conflict = lazy_sample_sat_body(table, sa_probability, samp_temperature,
+				rvar_probability);
+		//assert(valid_table(table));
+		num_flips--;
+	}
 
-    // Flip current_assignment (restore the saved assignment)
-    assert(table->atom_table.current_assignment == 0
-	   || table->atom_table.current_assignment == 1);
-    table->atom_table.current_assignment ^= 1;
-    
-    empty_clause_lists(table);
-    init_clause_lists(&table->clause_table);
-    update_pmodel(table);
-  }
+	if (conflict != -1 && table->clause_table.num_unsat_clauses == 0) {
+		if (update_counts) {
+			update_pmodel(table);
+		}
+	} else {
+		/*
+		 * Sample sat did not find a model (within max_flips)
+		 * restore the earlier assignment
+		 */
+		if (conflict == -1) {
+			cprintf(2, "Hit a conflict.\n");
+		} else {
+			cprintf(2, "Failed to find a model.\n");
+		}
+
+		// Flip current_assignment (restore the saved assignment)
+		assert(table->atom_table.current_assignment == 0
+				|| table->atom_table.current_assignment == 1);
+		table->atom_table.current_assignment ^= 1;
+
+		empty_clause_lists(table);
+		init_clause_lists(&table->clause_table);
+		if (update_counts) {
+			update_pmodel(table);
+		}
+	}
 }
 
 /*
@@ -353,37 +410,45 @@ void lazy_sample_sat(samp_table_t *table, double sa_probability,
  *
  * Parameter for mc_sat:
  * - max_samples = number of samples generated
+ * - timeout = maximum running time for MCSAT
+ * - burn_in_steps = number of burn-in steps
+ * - samp_interval = sampling interval
  */
 void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
-		 double sa_probability, double samp_temperature,
-		 double rvar_probability, uint32_t max_flips,
-		 uint32_t max_extra_flips, uint32_t timeout){
-  int32_t conflict;
-  uint32_t i;
-  time_t fintime = 0;
+		double sa_probability, double samp_temperature, double rvar_probability,
+		uint32_t max_flips, uint32_t max_extra_flips, uint32_t timeout,
+		uint32_t burn_in_steps, uint32_t samp_interval) {
+	int32_t conflict;
+	uint32_t i;
+	time_t fintime = 0;
 
-  conflict = first_lazy_sample_sat(table, sa_probability, samp_temperature,
-				   rvar_probability, max_flips);
-  if (conflict == -1) {
-    mcsat_err("Found conflict in initialization.\n");
-    return;
-  }
+	conflict = first_lazy_sample_sat(table, sa_probability, samp_temperature,
+			rvar_probability, max_flips);
+	if (conflict == -1) {
+		mcsat_err("Found conflict in initialization.\n");
+		return;
+	}
 
-  //  print_state(table, 0);  
-  //assert(valid_table(table));
-  if (timeout != 0) {
-    fintime = time(NULL) + timeout;
-  }
-  for (i = 0; i < max_samples; i++){
-    cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
-    lazy_sample_sat(table, sa_probability, samp_temperature,
-		    rvar_probability, max_flips, max_extra_flips);
-    //    print_state(table, i+1);
-    //assert(valid_table(table));
-    if (timeout != 0 && time(NULL) >= fintime) {
-      break;
-    }
-  }
+	//  print_state(table, 0);
+	//assert(valid_table(table));
+	if (timeout != 0) {
+		fintime = time(NULL) + timeout;
+	}
+	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
+		if (i >= burn_in_steps && i % samp_interval == 0) {
+			cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
+			lazy_sample_sat(table, sa_probability, samp_temperature,
+					rvar_probability, max_flips, max_extra_flips, true);
+		} else {
+			lazy_sample_sat(table, sa_probability, samp_temperature,
+					rvar_probability, max_flips, max_extra_flips, false);
+		}
+		//    print_state(table, i+1);
+		//assert(valid_table(table));
+		if (timeout != 0 && time(NULL) >= fintime) {
+			break;
+		}
+	}
 
-  //print_atoms(table);
+	//print_atoms(table);
 }

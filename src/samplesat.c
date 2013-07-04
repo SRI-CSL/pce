@@ -1795,7 +1795,7 @@ int32_t choose_clause_var(samp_table_t *table, samp_clause_t *link,
 
 	clear_integer_stack(&clause_var_stack);
 	for (i = 0; i < link->numlits; i++) {
-		if (!link->frozen[i] && !fixed_tval(
+		if (!link->frozen[i] &&reset_sample_sat !fixed_tval(
 				assignment[var_of(link->disjunct[i])]))
 			push_integer_stack(i, &clause_var_stack);
 	} //all unfrozen, unfixed vars are now in clause_var_stack
@@ -2004,7 +2004,7 @@ void update_pmodel(samp_table_t *table) {
 }
 
 /*
- * To be replaced by other SAT solvers. It should just give a
+ * TODO: To be replaced by other SAT solvers. It should just give a
  * solution but not necessarily uniformly drawn.
  */
 int32_t first_sample_sat(samp_table_t *table, double sa_probability,
@@ -2018,7 +2018,7 @@ int32_t first_sample_sat(samp_table_t *table, double sa_probability,
 	if (conflict == -1)
 		return -1;
 	uint32_t num_flips = max_flips;
-	while (num_flips > 0 && table->clause_table.num_unsat_clauses > 0) {
+	while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0) {
 		if (sample_sat_body(table, sa_probability, samp_temperature,
 				rvar_probability) == -1)
 			return -1;
@@ -2107,14 +2107,12 @@ void sample_sat(samp_table_t *table, double sa_probability,
 		if (conflict == -1) {
 			cprintf(2, "Hit a conflict.\n");
 		} else {
-			cprintf(
-					2,
-					"Failed to find a model. Consider increasing max_flips and max_tries - see mcsat help.\n");
+			cprintf(2, "Failed to find a model. \
+					Consider increasing max_flips and max_tries - see mcsat help.\n");
 		}
 
 		// Flip current_assignment (restore the saved assignment)
-		assert(
-				table->atom_table.current_assignment == 0
+		assert(table->atom_table.current_assignment == 0
 						|| table->atom_table.current_assignment == 1);
 		table->atom_table.current_assignment ^= 1;
 
@@ -2152,7 +2150,7 @@ void mc_sat(samp_table_t *table, uint32_t max_samples, double sa_probability,
 		uint32_t max_extra_flips, uint32_t timeout,
 		uint32_t burn_in_steps, uint32_t samp_interval) {
 	int32_t conflict;
-	uint32_t i, j;
+	uint32_t i;
 	time_t fintime = 0;
 
 	conflict = first_sample_sat(table, sa_probability, samp_temperature,
@@ -2170,18 +2168,15 @@ void mc_sat(samp_table_t *table, uint32_t max_samples, double sa_probability,
 	if (timeout != 0) {
 		fintime = time(NULL) + timeout;
 	}
-	for (i = 0; i < burn_in_steps; i++) {
-		sample_sat(table, sa_probability, samp_temperature, rvar_probability,
-				max_flips, max_extra_flips, false);
-	}
-	for (i = 0; i < max_samples; i++) {
-		cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
-		for (j = 1; j < samp_interval; j++) {
-			sample_sat(table, sa_probability, samp_temperature, rvar_probability,
-					max_flips, max_extra_flips, false);
+	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
+		if (i >= burn_in_steps && i % samp_interval == 0) {
+			cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
+			sample_sat(table, sa_probability, samp_temperature,
+					rvar_probability, max_flips, max_extra_flips, true);
+		} else {
+			sample_sat(table, sa_probability, samp_temperature,
+					rvar_probability, max_flips, max_extra_flips, false);
 		}
-		sample_sat(table, sa_probability, samp_temperature, rvar_probability,
-				max_flips, max_extra_flips, true);
 		cprintf(1, "mc_sat: after round %d\n", i);
 		if (get_verbosity_level() > 0)
 			print_assignment(table);
