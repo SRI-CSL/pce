@@ -956,6 +956,10 @@ extern bool read_eval(samp_table_t *table) {
 				int32_t ruleidx = add_rule(decl.clause, decl.weight,
 						decl.source, table);
 				// Create instances here rather than add_rule, as this is eager
+				/*
+				 * TODO: the instantiation phase should be moved to the
+				 * case that handles mcsat or ask
+				 */
 				if (ruleidx != -1) {
 					all_rule_instances(ruleidx, table);
 				}

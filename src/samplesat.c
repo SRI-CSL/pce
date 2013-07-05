@@ -1716,9 +1716,8 @@ int32_t reset_sample_sat(samp_table_t *table) {
 	 * Flip the assignment vectors:
 	 * - the current assignment is kept as a backup in case sample_sat fails
 	 */
-	assert(
-			atom_table->current_assignment == 0
-					|| atom_table->current_assignment == 1);
+	assert(atom_table->current_assignment == 0
+			|| atom_table->current_assignment == 1);
 	atom_table->current_assignment ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
 	new_assignment = atom_table->assignment[atom_table->current_assignment];
 
@@ -1795,7 +1794,7 @@ int32_t choose_clause_var(samp_table_t *table, samp_clause_t *link,
 
 	clear_integer_stack(&clause_var_stack);
 	for (i = 0; i < link->numlits; i++) {
-		if (!link->frozen[i] &&reset_sample_sat !fixed_tval(
+		if (!link->frozen[i] && !fixed_tval(
 				assignment[var_of(link->disjunct[i])]))
 			push_integer_stack(i, &clause_var_stack);
 	} //all unfrozen, unfixed vars are now in clause_var_stack
@@ -2139,7 +2138,7 @@ void sample_sat(samp_table_t *table, double sa_probability,
  * - max_extra_flips = number of additional (simulated annealing) steps to perform
  *   after a satisfying assignment is found
  *
- * Parameter for mc_sat:
+ * Parameters for mc_sat:
  * - max_samples = number of samples generated
  * - timeout = maximum running time for MCSAT
  * - burn_in_steps = number of burn-in steps
@@ -2526,9 +2525,10 @@ bool check_clause_instance(samp_table_t *table, samp_rule_t *rule, int32_t atom_
   return true;
 }
 
-// all_rule_instances takes a rule and generates all ground instances
-// based on the atoms, their predicates and corresponding sorts
-
+/**
+ * all_rule_instances takes a rule and generates all ground instances
+ * based on the atoms, their predicates and corresponding sorts
+ */
 void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t *table, int32_t atom_index) {
 
   clause_table_t *clause_table = &table->clause_table;
@@ -2653,6 +2653,7 @@ void all_pred_instances(char *pred, samp_table_t *table) {
 
 // Eager - called by MCSAT when a new rule is added.
 void all_rule_instances(int32_t rule_index, samp_table_t *table) {
+	printf("Eagerly instantiate all ground formulas");
 	rule_table_t *rule_table = &table->rule_table;
 	samp_rule_t *rule = rule_table->samp_rules[rule_index];
 	substit_buffer_resize(rule->num_vars);

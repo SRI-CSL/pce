@@ -11,7 +11,7 @@
  */
 
 /*
- * Truth values: explain??
+ * TODO: Truth values: explain??
  */
 typedef enum {
   v_undef = -1,
@@ -24,7 +24,7 @@ typedef enum {
 } samp_truth_value_t;
 
 /*
- * Boolean variables are repressented by 32bit integers.
+ * Boolean variables are represented by 32bit integers.
  * For a variable x, the positive literal is 2x, the negative
  * literal is 2x + 1.
  *
