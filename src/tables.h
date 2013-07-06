@@ -161,6 +161,9 @@ typedef struct var_entry_s {
   int32_t sort_index; 
 } var_entry_t;
 
+/* original formula that is recursively defined,
+ * will be converted to CNF later
+ */
 typedef struct input_formula_s {
   var_entry_t **vars; // NULL terminated list of vars
   input_fmla_t *fmla;
@@ -316,6 +319,7 @@ typedef struct rule_literal_s {
   rule_atom_t *atom;
 } rule_literal_t;
 
+/* ground clause */
 typedef struct samp_rule_s {
   int32_t num_lits; //number of literal entries
   int32_t num_vars; //number of variables
@@ -395,8 +399,8 @@ typedef struct samp_table_s {
   var_table_t var_table;
   pred_table_t pred_table;
   atom_table_t atom_table;
-  clause_table_t clause_table;
-  rule_table_t rule_table;
+  clause_table_t clause_table; // ground formulas (without variables)
+  rule_table_t rule_table; // formulas with variables
   query_table_t query_table;
   query_instance_table_t query_instance_table;
   source_table_t source_table;

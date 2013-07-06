@@ -168,8 +168,7 @@ int32_t choose_random_atom(samp_table_t *table) {
 			atom->args[i] =
 					sort_table->entries[signature[i]].constants[constant];
 			// Quick typecheck
-			assert(
-					const_sort_index(atom->args[i], &table->const_table) == signature[i]);
+			assert(const_sort_index(atom->args[i], &table->const_table) == signature[i]);
 		}
 	}
 
@@ -212,12 +211,16 @@ int32_t choose_random_atom(samp_table_t *table) {
  *
  *     e.g., Fr(x,y) and Sm(x) implies Sm(y)
  *     i.e., ~Fr(x,y) or ~Sm(x) or Sm(y)
+ *
  *     If Sm(A) is activated (as true) at some stage, do we need to
- *     activate all the clauses related to it? No. We consider two cases.
+ *     activate all the clauses related to it? No. We consider two cases:
+ *
  *     If y\A, nothing changed, nothing will be activated.
+ *
  *     If x\A, if there is some B, Fr(A,B) is also true, and Sm(B) is false
  *     (inactive or active but with false value), [x\A,y\B] will be
  *     activated.
+ *
  *     How do we do it? We index the active atoms by each argument. e.g.,
  *     Fr(A,?) or Fr(?,B). If a literal is activated to a satisfied
  *     value, e.g., the y\A case above, do nothing. If a literal is
@@ -230,10 +233,16 @@ int32_t choose_random_atom(samp_table_t *table) {
  *     (See the implementation details section in Poon and Domingos 08)
  *
  * When the default value of a clause is false:
- *     Poon and Domingos 08 didn't consider this case.
+ *     Poon and Domingos 08 didn't consider this case. In general, this case
+ *     can't be solved lazily, because we have to try to satisfy all the
+ *     ground clauses within the sample SAT. This is a rare case in real
+ *     applications, cause they are usually sparse.
  *
- * What to do with clauses with negative weight?
- *
+ * What would be the case when we consider clauses with negative weight? 
+ * Or more general, any formulas? First of all, MCSAT works for all
+ * FOL formulas as well. So if a input formula has a negative weight, we
+ * could nagate the formula and the weight. A Markov logic contains only
+ * clauses merely makes the function activation of lazy MC-SAT easiler.
  */
 int32_t lazy_sample_sat_body(samp_table_t *table, double sa_probability,
 		double samp_temperature, double rvar_probability) {

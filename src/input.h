@@ -53,7 +53,7 @@ typedef struct input_assert_decl_s {
 } input_assert_decl_t;
 
 typedef struct input_add_fdecl_s {
-  char **frozen;
+  char **frozen; // TODO: what is this?
   input_formula_t *formula;
   double weight;
   char *source;

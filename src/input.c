@@ -955,10 +955,10 @@ extern bool read_eval(samp_table_t *table) {
 				}
 				int32_t ruleidx = add_rule(decl.clause, decl.weight,
 						decl.source, table);
-				// Create instances here rather than add_rule, as this is eager
 				/*
-				 * TODO: the instantiation phase should be moved to the
-				 * case that handles mcsat or ask
+				 * Create instances here rather than add_rule, as this is eager
+				 * TODO: the instantiation phase should only exists in case of
+				 * eager mcsat.
 				 */
 				if (ruleidx != -1) {
 					all_rule_instances(ruleidx, table);
@@ -971,8 +971,7 @@ extern bool read_eval(samp_table_t *table) {
 			cprintf(2, "ask: clausifying formula\n");
 
 			if (get_dump_samples_path() != NULL) {
-				output(
-						" samples are not going to be dumped after the first ASK");
+				output(" samples are not going to be dumped after the first ASK");
 				set_dump_samples_path(NULL);
 			}
 
@@ -1011,12 +1010,12 @@ extern bool read_eval(samp_table_t *table) {
 			break;
 
 		}
-			//       case ASK_CLAUSE: {
-			// 	input_ask_decl_t decl = input_command.decl.ask_decl;
-			// 	assert(decl.clause->litlen == 1);
-			// 	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
-			// 	break;
-			//       }
+		//       case ASK_CLAUSE: {
+		// 	input_ask_decl_t decl = input_command.decl.ask_decl;
+		// 	assert(decl.clause->litlen == 1);
+		// 	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
+		// 	break;
+		//       }
 		case MCSAT: {
 			clock_t start, end;
 

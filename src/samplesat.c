@@ -2653,7 +2653,6 @@ void all_pred_instances(char *pred, samp_table_t *table) {
 
 // Eager - called by MCSAT when a new rule is added.
 void all_rule_instances(int32_t rule_index, samp_table_t *table) {
-	printf("Eagerly instantiate all ground formulas");
 	rule_table_t *rule_table = &table->rule_table;
 	samp_rule_t *rule = rule_table->samp_rules[rule_index];
 	substit_buffer_resize(rule->num_vars);
