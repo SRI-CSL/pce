@@ -88,6 +88,7 @@ void add_rule_to_pred(pred_table_t *pred_table, int32_t predicate,
 
 clause_buffer_t atom_buffer = { 0, NULL };
 
+/* TODO: what does this do */
 int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
   atom_table_t *atom_table = &(table->atom_table);
   pred_table_t *pred_table = &(table->pred_table);
@@ -1979,10 +1980,10 @@ void update_pmodel(samp_table_t *table) {
 	table->atom_table.num_samples++;
 	for (i = 0; i < num_vars; i++) {
 		if (assigned_true(assignment[i])) {
-			//if (i > 0) {
-			//printf("Atom %d was assigned true\n", i);
-			//fflush(stdout);
-			//}
+			if (get_verbosity_level() > 0 && i > 0) {
+				printf("Atom %d was assigned true\n", i);
+				fflush(stdout);
+			}
 			pmodel[i]++;
 		}
 	}
@@ -2169,7 +2170,8 @@ void mc_sat(samp_table_t *table, uint32_t max_samples, double sa_probability,
 	}
 	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
 		if (i >= burn_in_steps && i % samp_interval == 0) {
-			cprintf(2, "---- sample[%"PRIu32"] ---\n", i);
+			cprintf(2, "---- sample[%"PRIu32"] ---\n", 
+					(i - burn_in_steps) / samp_interval);
 			sample_sat(table, sa_probability, samp_temperature,
 					rvar_probability, max_flips, max_extra_flips, true);
 		} else {
@@ -3202,13 +3204,16 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 	arity = pred_arity(predicate, pred_table);
 	num_rules = pred_tbl->entries[predicate].num_rules;
 	rules = pred_tbl->entries[predicate].rules;
+
+	printf("Before activating clauses for ");
+	print_atom_now(atom, table);
+	dump_clause_table(table);
+
 	for (i = 0; i < num_rules; i++) {
 		rule_entry = rule_table->samp_rules[rules[i]];
 		rule_inst_true = false;
 		for (j = 0; j < rule_entry->num_lits; j++) {
-			cprintf(
-					2,
-					"Checking whether to activate rule %"PRId32", literal %"PRId32"\n",
+			cprintf(2, "Checking whether to activate rule %"PRId32", literal %"PRId32"\n",
 					rules[i], j);
 			if (match_atom_in_rule_atom(atom, rule_entry->literals[j], arity)) {
 				//then substit_buffer contains the matching substitution
@@ -3216,6 +3221,10 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 			}
 		}
 	}
+
+	printf("After activating clauses for ");
+	print_atom_now(atom, table);
+	dump_clause_table(table);
 }
 
 int32_t activate_atom(samp_table_t *table, samp_atom_t *atom) {

@@ -820,6 +820,9 @@ void init_rule_table(rule_table_t *table){
     (samp_rule_t **) safe_malloc(table->size * sizeof(samp_rule_t *));
 }
 
+/**
+ * Resize the rule table to be at least 1 more than num_rules
+ */
 void rule_table_resize(rule_table_t *rule_table){
   int32_t size = rule_table->size;
   int32_t num_rules = rule_table->num_rules;

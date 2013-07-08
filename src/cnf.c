@@ -750,8 +750,7 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 					}
 					// Need to update the clause table
 				} else {
-					mcsat_warn(
-							"Rule was seen before with MAX weight: unchanged\n");
+					mcsat_warn("Rule was seen before with MAX weight: unchanged\n");
 				}
 			}
 		}
