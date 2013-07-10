@@ -319,12 +319,14 @@ typedef struct rule_literal_s {
   rule_atom_t *atom;
 } rule_literal_t;
 
-/* ground clause */
+/*
+ * A quantified or partially quantified or ground clause. 
+ */
 typedef struct samp_rule_s {
   int32_t num_lits; //number of literal entries
   int32_t num_vars; //number of variables
   int32_t num_frozen; //number of frozen predicates
-  var_entry_t **vars; //The variables
+  var_entry_t **vars; //The (quantified) variables
   rule_literal_t **literals; //array of pointers to rule_literals
   int32_t *frozen_preds; //array of frozen predicates
   int32_t *clause_indices; //array of indices into clause_table

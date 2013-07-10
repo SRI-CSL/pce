@@ -621,6 +621,7 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 		char *source, bool add_weights) {
 	rule_table_t *rule_table = &samp_table.rule_table;
 	pred_table_t *pred_table = &samp_table.pred_table;
+	clause_table_t * clause_table = &samp_table.clause_table;
 	int32_t i, j, num_frozen, fpred_val, fpred_idx, *frozen_preds, current_rule,
 			num_lits, num_vars, atom_idx;
 	rule_literal_t ***lits, *lit;
@@ -657,8 +658,7 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 				fpred_idx = pred_val_to_index(fpred_val);
 				if (pred_epred(fpred_idx)) {
 					// A direct predicate - no sense in trying to fix it complain, but go on anyway
-					mcsat_warn(
-							"Predicate %s is observable, hence already frozen",
+					mcsat_warn("Predicate %s is observable, hence already frozen",
 							frozen[i]);
 				} else {
 					frozen_preds[j++] = fpred_idx;
@@ -671,13 +671,14 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 		frozen_preds = NULL;
 	}
 
+	int32_t *clause_lits;
 	if (formula->vars == NULL) {
 		// No variables, just assert the clauses
 
 		for (i = 0; lits[i] != NULL; i++) {
 			for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++) {
 			}
-			clause_buffer_resize(num_lits);
+			clause_lits = (int32_t *) safe_malloc(sizeof(int32_t) * num_lits);
 			found_indirect = false;
 			for (j = 0; j < num_lits; j++) {
 				lit = lits[i][j];
@@ -688,11 +689,17 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 						pred_table);
 				atom_idx = add_internal_atom(&samp_table, satom, true);
 				free_samp_atom(satom);
-				clause_buffer.data[j] =
-						lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
+				clause_lits[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
 			}
-			add_internal_clause(&samp_table, clause_buffer.data, num_lits,
-					frozen_preds, weight, found_indirect, add_weights);
+			int32_t clause_index = add_internal_clause(&samp_table, 
+					clause_lits, num_lits, frozen_preds, weight, 
+					found_indirect, add_weights);
+			safe_free(clause_lits);
+
+			if (get_verbosity_level() >= 1) {
+				print_clause(clause_table->samp_clauses[clause_index], &samp_table);
+				printf("\n");
+			}
 		}
 	} else { /* contains universally quantified variables */
 
@@ -720,6 +727,12 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 			clause->num_vars = num_vars;
 			set_fmla_clause_variables(clause, formula->vars);
 			found = NULL;
+
+			if (get_verbosity_level() >= 1) {
+				print_rule(clause, &samp_table, 0);
+				printf("\n");
+			}
+
 			// Now check if clause is in the table
 			for (j = 0; j < rule_table->num_rules; j++) {
 				if (clauses_equal(rule_table->samp_rules[j], clause)) {
@@ -843,19 +856,12 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
 	// Get the instances into the query_instance_table
 	all_query_instances(query, &samp_table);
 
-	if (lazy_mcsat()) {
-		// Run the specified number of samples
-		lazy_mc_sat(&samp_table, get_max_samples(), get_sa_probability(),
-				get_samp_temperature(), get_rvar_probability(), get_max_flips(),
-				get_max_extra_flips(), get_mcsat_timeout(), get_burn_in_steps(),
-				get_samp_interval());
-	} else {
-		// Run the specified number of samples
-		mc_sat(&samp_table, get_max_samples(), get_sa_probability(),
-				get_samp_temperature(), get_rvar_probability(), get_max_flips(),
-				get_max_extra_flips(), get_mcsat_timeout(), get_burn_in_steps(),
-				get_samp_interval());
-	}
+	// Run the specified number of samples
+	mc_sat(&samp_table, lazy_mcsat(), get_max_samples(), get_sa_probability(),
+			get_samp_temperature(), get_rvar_probability(), get_max_flips(),
+			get_max_extra_flips(), get_mcsat_timeout(), get_burn_in_steps(),
+			get_samp_interval());
+
 	query_instance_table = &samp_table.query_instance_table;
 	// Collect those above the threshold, sort, and print
 	if (ask_buffer.data == NULL) {

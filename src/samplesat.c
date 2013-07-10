@@ -88,69 +88,73 @@ void add_rule_to_pred(pred_table_t *pred_table, int32_t predicate,
 
 clause_buffer_t atom_buffer = { 0, NULL };
 
-/* TODO: what does this do */
+/**
+ * Adds an atom to the atom_table, returns the index
+ *
+ * TODO: what is top_p
+ */
 int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
-  atom_table_t *atom_table = &(table->atom_table);
-  pred_table_t *pred_table = &(table->pred_table);
-  clause_table_t *clause_table = &(table->clause_table);
-  rule_table_t *rule_table = &(table->rule_table);
-  int32_t i;
-  int32_t predicate = atom->pred;
-  int32_t arity = pred_arity(predicate, pred_table);
-  samp_bvar_t current_atom_index;
-  array_hmap_pair_t *atom_map;
-  samp_rule_t *rule;
-  atom_map = array_size_hmap_find(&(atom_table->atom_var_hash), arity + 1, //+1 for pred
-				  (int32_t *) atom);
-  if (atom_map == NULL) {
-    if (get_verbosity_level() >= 0) {
-      printf("add_internal_atom: Adding internal atom ");
-      print_atom_now(atom, table);
-      printf("\n");
-    }
+	atom_table_t *atom_table = &(table->atom_table);
+	pred_table_t *pred_table = &(table->pred_table);
+	clause_table_t *clause_table = &(table->clause_table);
+	rule_table_t *rule_table = &(table->rule_table);
+	int32_t i;
+	int32_t predicate = atom->pred;
+	int32_t arity = pred_arity(predicate, pred_table);
+	samp_bvar_t current_atom_index;
+	array_hmap_pair_t *atom_map;
+	samp_rule_t *rule;
+	atom_map = array_size_hmap_find(&(atom_table->atom_var_hash), arity + 1, //+1 for pred
+			(int32_t *) atom);
+	if (atom_map == NULL) {
+		if (get_verbosity_level() >= 5) {
+			printf("add_internal_atom: Adding internal atom ");
+			print_atom_now(atom, table);
+			printf("\n");
+		}
 
-    //assert(valid_table(table));
-    atom_table_resize(atom_table, clause_table);
-    current_atom_index = atom_table->num_vars++;
-    samp_atom_t * current_atom = (samp_atom_t *)
-      safe_malloc((arity + 1) * sizeof(int32_t));
-    current_atom->pred = predicate;
-    for (i = 0; i < arity; i++) {
-      current_atom->args[i] = atom->args[i];
-    }
-    atom_table->atom[current_atom_index] = current_atom;
-    // Keep track of the number of samples when atom was introduced - these
-    // will be subtracted in computing probs
-    atom_table->sampling_nums[current_atom_index] = atom_table->num_samples;
+		//assert(valid_table(table));
+		atom_table_resize(atom_table, clause_table);
+		current_atom_index = atom_table->num_vars++;
+		samp_atom_t * current_atom = (samp_atom_t *)
+			safe_malloc((arity + 1) * sizeof(int32_t));
+		current_atom->pred = predicate;
+		for (i = 0; i < arity; i++) {
+			current_atom->args[i] = atom->args[i];
+		}
+		atom_table->atom[current_atom_index] = current_atom;
+		// Keep track of the number of samples when atom was introduced - these
+		// will be subtracted in computing probs
+		atom_table->sampling_nums[current_atom_index] = atom_table->num_samples;
 
-    atom_map = array_size_hmap_get(&(atom_table->atom_var_hash), arity + 1,
-				   (int32_t *) current_atom);
-    atom_map->val = current_atom_index;
+		atom_map = array_size_hmap_get(&(atom_table->atom_var_hash), arity + 1,
+				(int32_t *) current_atom);
+		atom_map->val = current_atom_index;
 
-    if (pred_epred(predicate)) { //closed world assumption
-      atom_table->assignment[0][current_atom_index] = v_fixed_false;
-      atom_table->assignment[1][current_atom_index] = v_fixed_false;
-    } else {//set pmodel to 0
-      atom_table->pmodel[current_atom_index] = 0; //atom_table->num_samples/2;
-      atom_table->assignment[0][current_atom_index] = v_false;
-      atom_table->assignment[1][current_atom_index] = v_false;
-      atom_table->num_unfixed_vars++;
-    }
-    add_atom_to_pred(pred_table, predicate, current_atom_index);
-    clause_table->watched[pos_lit(current_atom_index)] = NULL;
-    clause_table->watched[neg_lit(current_atom_index)] = NULL;
-    //assert(valid_table(table));
-    if (top_p) {
-      pred_entry_t *entry = pred_entry(pred_table, predicate);
-      for (i = 0; i < entry->num_rules; i++) {
-	rule = rule_table->samp_rules[i];
-	all_rule_instances_rec(0, rule, table, current_atom_index);
-      }
-    }
-    return current_atom_index;
-  } else {
-    return atom_map->val;
-  }
+		if (pred_epred(predicate)) { //closed world assumption
+			atom_table->assignment[0][current_atom_index] = v_fixed_false;
+			atom_table->assignment[1][current_atom_index] = v_fixed_false;
+		} else {//set pmodel to 0
+			atom_table->pmodel[current_atom_index] = 0; //atom_table->num_samples/2;
+			atom_table->assignment[0][current_atom_index] = v_false;
+			atom_table->assignment[1][current_atom_index] = v_false;
+			atom_table->num_unfixed_vars++;
+		}
+		add_atom_to_pred(pred_table, predicate, current_atom_index);
+		clause_table->watched[pos_lit(current_atom_index)] = NULL;
+		clause_table->watched[neg_lit(current_atom_index)] = NULL;
+		//assert(valid_table(table));
+		if (top_p) {
+			pred_entry_t *entry = pred_entry(pred_table, predicate);
+			for (i = 0; i < entry->num_rules; i++) {
+				rule = rule_table->samp_rules[i];
+				all_rule_instances_rec(0, rule, table, current_atom_index);
+			}
+		}
+		return current_atom_index;
+	} else {
+		return atom_map->val;
+	}
 }
 
 void atom_buffer_resize(int32_t arity) {
@@ -179,75 +183,75 @@ void atom_buffer_resize(int32_t arity) {
 ivector_t new_intidx = {0, 0, NULL};
 
 int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
-  const_table_t *const_table = &table->const_table;
-  pred_table_t *pred_table = &table->pred_table;
-  sort_table_t *sort_table = &table->sort_table;
-  sort_entry_t entry;
+	const_table_t *const_table = &table->const_table;
+	pred_table_t *pred_table = &table->pred_table;
+	sort_table_t *sort_table = &table->sort_table;
+	sort_entry_t entry;
 
-  char * in_predicate = current_atom->pred;
-  int32_t pred_id = pred_index(in_predicate, pred_table);
-  if (pred_id == -1) {
-    mcsat_err("\nPredicate %s is not declared", in_predicate);
-    return -1;
-  }
-  int32_t predicate = pred_val_to_index(pred_id);
-  int32_t i;
-  int32_t *psig, intval, intsig;
-  int32_t arity = pred_arity(predicate, pred_table);
+	char * in_predicate = current_atom->pred;
+	int32_t pred_id = pred_index(in_predicate, pred_table);
+	if (pred_id == -1) {
+		mcsat_err("\nPredicate %s is not declared", in_predicate);
+		return -1;
+	}
+	int32_t predicate = pred_val_to_index(pred_id);
+	int32_t i;
+	int32_t *psig, intval, intsig;
+	int32_t arity = pred_arity(predicate, pred_table);
 
-  atom_buffer_resize(arity);
-  samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
-  atom->pred = predicate;
-  assert(atom->pred == predicate);
-  psig = pred_signature(predicate, pred_table);
-  new_intidx.size = 0;
-  for (i = 0; i < arity; i++) {
-    entry = sort_table->entries[psig[i]];
-    if (entry.constants == NULL) {
-      // Should be an integer
-      char *p = current_atom->args[i];
-      for (p = (p[0] == '+' || p[0] == '-') ? &p[1] : p; isdigit(*p); p++)
-	;
-      if (*p == '\0') {
-	intval = str2int(current_atom->args[i]);
-	if (intval < entry.lower_bound || intval > entry.upper_bound) {
-	  mcsat_err("\nInteger %s is out of bounds.", current_atom->args[i]);
-	  return -1;
+	atom_buffer_resize(arity);
+	samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
+	atom->pred = predicate;
+	assert(atom->pred == predicate);
+	psig = pred_signature(predicate, pred_table);
+	new_intidx.size = 0;
+	for (i = 0; i < arity; i++) {
+		entry = sort_table->entries[psig[i]];
+		if (entry.constants == NULL) {
+			// Should be an integer
+			char *p = current_atom->args[i];
+			for (p = (p[0] == '+' || p[0] == '-') ? &p[1] : p; isdigit(*p); p++)
+				;
+			if (*p == '\0') {
+				intval = str2int(current_atom->args[i]);
+				if (intval < entry.lower_bound || intval > entry.upper_bound) {
+					mcsat_err("\nInteger %s is out of bounds.", current_atom->args[i]);
+					return -1;
+				}
+				atom->args[i] = intval;
+				if (psig != NULL && entry.ints != NULL) {
+					if (add_int_const(intval, &sort_table->entries[psig[i]], sort_table)) {
+						// Keep track of the newly added int constants
+						ivector_push(&new_intidx, i);
+					}
+				}
+			} else {
+				mcsat_err("\nInvalid integer %s.", current_atom->args[i]);
+				return -1;
+			}
+		} else {
+			atom->args[i] = const_index(current_atom->args[i], const_table);
+			if (atom->args[i] == -1) {
+				mcsat_err("\nConstant %s is not declared.", current_atom->args[i]);
+				return -1;
+			}
+		}
 	}
-	atom->args[i] = intval;
-	if (psig != NULL && entry.ints != NULL) {
-	  if (add_int_const(intval, &sort_table->entries[psig[i]], sort_table)) {
-	    // Keep track of the newly added int constants
-	    ivector_push(&new_intidx, i);
-	  }
+	if (get_verbosity_level() >= 0) {
+		printf("add_atom: Adding internal atom ");
+		print_atom_now(atom, table);
+		printf("\n");
 	}
-      } else {
-	mcsat_err("\nInvalid integer %s.", current_atom->args[i]);
-	return -1;
-      }
-    } else {
-      atom->args[i] = const_index(current_atom->args[i], const_table);
-      if (atom->args[i] == -1) {
-	mcsat_err("\nConstant %s is not declared.", current_atom->args[i]);
-	return -1;
-      }
-    }
-  }
-  if (get_verbosity_level() >= 0) {
-    printf("add_atom: Adding internal atom ");
-    print_atom_now(atom, table);
-    printf("\n");
-  }
-  int32_t result = add_internal_atom(table, atom, true);
-  // Now we need to deal with the newly introduced integer constants
-  for (i = 0; i < new_intidx.size; i++) {
-    intval = atom->args[new_intidx.data[i]];
-    intsig = psig[new_intidx.data[i]];
-    create_new_const_atoms(intval, intsig, table);
-    create_new_const_rule_instances(intval, intsig, table, 0);
-    create_new_const_query_instances(intval, intsig, table, 0);
-  }
-  return result;
+	int32_t result = add_internal_atom(table, atom, true);
+	// Now we need to deal with the newly introduced integer constants
+	for (i = 0; i < new_intidx.size; i++) {
+		intval = atom->args[new_intidx.data[i]];
+		intsig = psig[new_intidx.data[i]];
+		create_new_const_atoms(intval, intsig, table);
+		create_new_const_rule_instances(intval, intsig, table, 0);
+		create_new_const_query_instances(intval, intsig, table, 0);
+	}
+	return result;
 }
 
 void add_source_to_assertion(char *source, int32_t atom_index,
@@ -290,32 +294,32 @@ void add_source_to_assertion(char *source, int32_t atom_index,
 }
 
 int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source) {
-  pred_table_t *pred_table = &table->pred_table;
-  char *in_predicate = current_atom->pred;
-  int32_t pred_id = pred_index(in_predicate, pred_table);
+	pred_table_t *pred_table = &table->pred_table;
+	char *in_predicate = current_atom->pred;
+	int32_t pred_id = pred_index(in_predicate, pred_table);
 
-  if (pred_id == -1) {
-    mcsat_err("assert: Predicate %s not found\n", in_predicate);
-    return -1;
-  }
-  pred_id = pred_val_to_index(pred_id);
-  if (pred_id >= 0) {
-    mcsat_err("assert: May not assert atoms with indirect predicate %s\n",
-	      in_predicate);
-    return -1;
-  }
+	if (pred_id == -1) {
+		mcsat_err("assert: Predicate %s not found\n", in_predicate);
+		return -1;
+	}
+	pred_id = pred_val_to_index(pred_id);
+	if (pred_id >= 0) {
+		mcsat_err("assert: May not assert atoms with indirect predicate %s\n",
+				in_predicate);
+		return -1;
+	}
 
-  int32_t atom_index = add_atom(table, current_atom);
-  if (atom_index == -1) {
-    return -1;
-  } else {
-    table->atom_table.assignment[0][atom_index] = v_fixed_true;
-    table->atom_table.assignment[1][atom_index] = v_fixed_true;
-    if (source != NULL) {
-      add_source_to_assertion(source, atom_index, table);
-    }
-    return atom_index;
-  }
+	int32_t atom_index = add_atom(table, current_atom);
+	if (atom_index == -1) {
+		return -1;
+	} else {
+		table->atom_table.assignment[0][atom_index] = v_fixed_true;
+		table->atom_table.assignment[1][atom_index] = v_fixed_true;
+		if (source != NULL) {
+			add_source_to_assertion(source, atom_index, table);
+		}
+		return atom_index;
+	}
 }
 
 bool member_frozen_preds(samp_literal_t lit, int32_t *frozen_preds,
@@ -338,92 +342,103 @@ bool member_frozen_preds(samp_literal_t lit, int32_t *frozen_preds,
 }
 
 /* add_internal_clause is an internal operation used to add a clause.  The
- external operation is add_rule, where the rule can be ground or
- quantified.  These clauses must already be simplified so that they do not
- contain any ground evidence literals.
+ * external operation is add_rule, where the rule can be ground or quantified.
+ * These clauses must already be simplified so that they do not contain any
+ * ground evidence literals.
  */
-
 int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
-			    int32_t length, int32_t *frozen_preds, double weight, bool indirect,
-			    bool add_weights) {
-  atom_table_t *atom_table = &table->atom_table;
-  uint32_t i, posidx;
-  clause_table_t *clause_table;
-  samp_clause_t **samp_clauses, *entry;
-  samp_literal_t lit;
-  array_hmap_pair_t *clause_map;
-  bool negs_all_true;
+		int32_t length, int32_t *frozen_preds, double weight, bool indirect,
+		bool add_weights) {
+	atom_table_t *atom_table = &table->atom_table;
+	uint32_t i, posidx;
+	clause_table_t *clause_table;
+	samp_clause_t **samp_clauses, *entry;
+	samp_literal_t lit;
+	array_hmap_pair_t *clause_map;
+	bool negs_all_true;
 
-  clause_table = &table->clause_table;
-  if (indirect) {
-    int_array_sort(clause, length);
-    clause_map = array_size_hmap_find(&(clause_table->clause_hash), length,
-				      (int32_t *) clause);
-    if (clause_map == NULL) {
-      clause_table_resize(clause_table);
-      if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < length) {
-	out_of_memory();
-      }
-      int32_t index = clause_table->num_clauses++;
-      entry = (samp_clause_t *)
-	safe_malloc(sizeof(samp_clause_t) + sizeof(bool *) + length * sizeof(int32_t));
-      entry->frozen = (bool *) safe_malloc(length * sizeof(bool));
-      samp_clauses = clause_table->samp_clauses;
-      samp_clauses[index] = entry;
-      entry->numlits = length;
-      entry->weight = weight;
-      entry->link = NULL;
-      for (i = 0; i < length; i++) {
-	entry->frozen[i] = member_frozen_preds(clause[i], frozen_preds, table);
-	entry->disjunct[i] = clause[i];
-      }
-      clause_map = array_size_hmap_get(&clause_table->clause_hash,
-				       length, (int32_t *) entry->disjunct);
-      clause_map->val = index;
-      // printf("\nAdded clause %"PRId32"\n", index);
-      return index;
-    } else {
-      if (add_weights) {
-	//Add the weight to the existing clause
-	samp_clauses = clause_table->samp_clauses;
-	if (DBL_MAX - weight >= samp_clauses[clause_map->val]->weight) {
-	  samp_clauses[clause_map->val]->weight += weight;
+	clause_table = &table->clause_table;
+	if (indirect) {
+		int_array_sort(clause, length);
+		clause_map = array_size_hmap_find(&(clause_table->clause_hash), length,
+				(int32_t *) clause);
+		if (clause_map == NULL) {
+			clause_table_resize(clause_table);
+			if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < length) {
+				out_of_memory();
+			}
+			int32_t index = clause_table->num_clauses++;
+			// TODO: why malloc this much space
+			entry = (samp_clause_t *)
+				safe_malloc(sizeof(samp_clause_t) + sizeof(bool *) + length * sizeof(int32_t));
+			entry->frozen = (bool *) safe_malloc(length * sizeof(bool));
+			samp_clauses = clause_table->samp_clauses;
+			samp_clauses[index] = entry;
+			entry->numlits = length;
+			entry->weight = weight;
+			entry->link = NULL;
+			for (i = 0; i < length; i++) {
+				entry->frozen[i] = member_frozen_preds(clause[i], frozen_preds, table);
+				entry->disjunct[i] = clause[i];
+			}
+			clause_map = array_size_hmap_get(&clause_table->clause_hash,
+					length, (int32_t *) entry->disjunct);
+			clause_map->val = index;
+			// printf("\nAdded clause %"PRId32"\n", index);
+
+			/* 
+			 * TODO: For lazy MC-SAT: The clause is always satisfied for the
+			 * previous assignment.  Calculates if it belongs to the subset of
+			 * clauses for the current round of sample SAT
+			 */
+
+			return index;
+		} else {
+			if (add_weights) {
+				//Add the weight to the existing clause
+				samp_clauses = clause_table->samp_clauses;
+				if (DBL_MAX - weight >= samp_clauses[clause_map->val]->weight) {
+					samp_clauses[clause_map->val]->weight += weight;
+				} else {
+					if (samp_clauses[clause_map->val]->weight != DBL_MAX) {
+						mcsat_warn("Weight overflows");
+					}
+					samp_clauses[clause_map->val]->weight = DBL_MAX;
+				} 
+				// TODO: do we need a similar check for negative weights?
+			}
+			return clause_map->val;
+		}
 	} else {
-	  samp_clauses[clause_map->val]->weight = DBL_MAX;
-	} //do we need a similar check for negative weights?
-      }
-      return clause_map->val;
-    }
-  } else {
-    // Clause only involves direct predicates - just set positive literal to true
-    samp_truth_value_t *assignment =
-      atom_table->assignment[atom_table->current_assignment];
-    negs_all_true = true;
-    posidx = -1;
-    for (i = 0; i < length; i++) {
-      lit = clause[i];
-      if (is_neg(lit)) {
-	// Check that atom is true
-	if (!assigned_true(assignment[var_of(lit)])) {
-	  negs_all_true = false;
-	  break;
+		// Clause only involves direct predicates - just set positive literal to true
+		samp_truth_value_t *assignment =
+			atom_table->assignment[atom_table->current_assignment];
+		negs_all_true = true;
+		posidx = -1;
+		for (i = 0; i < length; i++) {
+			lit = clause[i];
+			if (is_neg(lit)) {
+				// Check that atom is true
+				if (!assigned_true(assignment[var_of(lit)])) {
+					negs_all_true = false;
+					break;
+				}
+			} else {
+				if (assigned_true(assignment[var_of(lit)])) {
+					// Already true - exit
+					break;
+				} else {
+					posidx = i;
+				}
+			}
+		}
+		if (negs_all_true && posidx != -1) {
+			// Set assignment to fixed_true
+			atom_table->assignment[0][var_of(clause[posidx])] = v_fixed_true;
+			atom_table->assignment[1][var_of(clause[posidx])] = v_fixed_true;
+		}
+		return -1;
 	}
-      } else {
-	if (assigned_true(assignment[var_of(lit)])) {
-	  // Already true - exit
-	  break;
-	} else {
-	  posidx = i;
-	}
-      }
-    }
-    if (negs_all_true && posidx != -1) {
-      // Set assignment to fixed_true
-      atom_table->assignment[0][var_of(clause[posidx])] = v_fixed_true;
-      atom_table->assignment[1][var_of(clause[posidx])] = v_fixed_true;
-    }
-    return -1;
-  }
 }
 
 void add_source_to_clause(char *source, int32_t clause_index, double weight,
@@ -628,14 +643,14 @@ rule_atom_t * typecheck_atom(input_atom_t *atom, samp_rule_t *rule,
 				safe_free(new_atom);
 				return (rule_atom_t *) NULL;
 			} else
-			// Have a constant, check the sort
-			if (const_sort_index(constidx, const_table)
-					!= pred_entry.signature[argidx]) {
-				mcsat_err("Constant %s has wrong sort for predicate %s\n",
-						atom->args[argidx], pred);
-				safe_free(new_atom);
-				return (rule_atom_t *) NULL;
-			}
+				// Have a constant, check the sort
+				if (const_sort_index(constidx, const_table)
+						!= pred_entry.signature[argidx]) {
+					mcsat_err("Constant %s has wrong sort for predicate %s\n",
+							atom->args[argidx], pred);
+					safe_free(new_atom);
+					return (rule_atom_t *) NULL;
+				}
 			new_atom->args[argidx].kind = constant;
 			new_atom->args[argidx].value = constidx;
 		}
@@ -720,7 +735,7 @@ bool eql_rule_atom(rule_atom_t *atom1, rule_atom_t *atom2, samp_table_t *table) 
 bool eql_rule_literal(rule_literal_t *lit1, rule_literal_t *lit2,
 		samp_table_t *table) {
 	return ((lit1->neg == lit2->neg) && eql_rule_atom(lit1->atom, lit2->atom,
-			table));
+				table));
 }
 
 // Checks if the queries are the same - this is essentially a syntactic
@@ -946,7 +961,7 @@ void link_propagate(samp_table_t *table, samp_literal_t lit) {
 	//cprintf(0, "link_propagate called\n");
 
 	assignment
-			= table->atom_table.assignment[table->atom_table.current_assignment];
+		= table->atom_table.assignment[table->atom_table.current_assignment];
 
 	assert(assigned_false_lit(assignment, lit)); // ?? this assertion fails!
 
@@ -982,7 +997,7 @@ void link_propagate(samp_table_t *table, samp_literal_t lit) {
 			link = new_link;
 			assert(
 					assigned_true_lit(assignment,
-							table->clause_table.watched[tmp]->disjunct[0]));
+						table->clause_table.watched[tmp]->disjunct[0]));
 		} else {
 			/*
 			 * move the clause to the unsat_clause list
@@ -1039,6 +1054,7 @@ int32_t get_true_lit(samp_truth_value_t *assignment, samp_literal_t *disjunct,
  * Scans the unsat clauses to find those that are sat or to propagate
  * fixed truth values.  The propagating clauses are placed on the sat_clauses
  * list, and the propagated literals are placed in fixable_stack so that they
+ * TODO: unfinished comments
  *
  * Returns -1 if a conflict is detected, 0 otherwise.
  */
@@ -1049,7 +1065,7 @@ int32_t scan_unsat_clauses(samp_table_t *table) {
 	unsat_clause = *unsat_clause_ptr;
 	int32_t i;
 	samp_truth_value_t *assignment =
-			table->atom_table.assignment[table->atom_table.current_assignment];
+		table->atom_table.assignment[table->atom_table.current_assignment];
 	int32_t fixable;
 	samp_literal_t lit;
 	while (unsat_clause != NULL) {//see if the clause is fixed-unit propagating
@@ -1075,7 +1091,7 @@ int32_t scan_unsat_clauses(samp_table_t *table) {
 				unsat_clause = *unsat_clause_ptr;
 				assert(
 						assigned_true_lit(assignment,
-								table->clause_table.watched[lit]->disjunct[0]));
+							table->clause_table.watched[lit]->disjunct[0]));
 			} else {
 				unsat_clause_ptr = &(unsat_clause->link); //move to next unsat clause
 				unsat_clause = unsat_clause->link;
@@ -1102,7 +1118,7 @@ int32_t scan_unsat_clauses(samp_table_t *table) {
 			table->clause_table.sat_clauses = unsat_clause;
 			assert(
 					assigned_fixed_true_lit(assignment,
-							table->clause_table.sat_clauses->disjunct[0]));
+						table->clause_table.sat_clauses->disjunct[0]));
 			unsat_clause = *unsat_clause_ptr;
 			table->clause_table.num_unsat_clauses--;
 		}
@@ -1131,8 +1147,8 @@ int32_t flip_unfixed_variable(samp_table_t *table, int32_t var) {
 	//  double dcost = 0;   //dcost seems unnecessary
 	atom_table_t *atom_table = &table->atom_table;
 	samp_truth_value_t *assignment =
-			atom_table->assignment[atom_table->current_assignment];
-	cprintf(2, "Flipping variable %"PRId32" to %s\n", var,
+		atom_table->assignment[atom_table->current_assignment];
+	cprintf(4, "Flipping variable %"PRId32" to %s\n", var,
 			assigned_true(assignment[var]) ? "false" : "true");
 	if (assigned_true(assignment[var])) {
 		assignment[var] = v_false;
@@ -1155,7 +1171,7 @@ void cost_flip_unfixed_variable(samp_table_t *table, int32_t *dcost,
 	uint32_t i;
 	atom_table_t *atom_table = &(table->atom_table);
 	samp_truth_value_t *assignment =
-			atom_table->assignment[atom_table->current_assignment];
+		atom_table->assignment[atom_table->current_assignment];
 
 	if (assigned_true(assignment[var])) {
 		nlit = neg_lit(var);
@@ -1168,7 +1184,7 @@ void cost_flip_unfixed_variable(samp_table_t *table, int32_t *dcost,
 	while (link != NULL) {
 		i = 1;
 		while (i < link->numlits && assigned_false_lit(assignment,
-				link->disjunct[i])) {
+					link->disjunct[i])) {
 			i++;
 		}
 		if (i >= link->numlits) {
@@ -1193,19 +1209,6 @@ void cost_flip_unfixed_variable(samp_table_t *table, int32_t *dcost,
 /*
  * SELECTION OF LIVE CLAUSES
  */
-
-/*
- * Temporary print function for debugging
- * - print_clause is in util.c
- */
-
-static void print_list(samp_clause_t *link, samp_table_t *table) {
-	while (link != NULL) {
-		print_clause(link, table);
-		printf("\n");
-		link = link->link;
-	}
-}
 
 /**
  * Random number generator:
@@ -1267,18 +1270,8 @@ void kill_clauses(samp_table_t *table) {
 				clause_table->watched[lit], clause_table);
 	}
 
-	// TEMPORARY
-	if (get_verbosity_level() > 1) {
-		printf("Live clauses:\n");
-		print_list(clause_table->sat_clauses, table);
-		for (i = 0; i < atom_table->num_vars; i++) {
-			lit = pos_lit(i);
-			print_list(clause_table->watched[lit], table);
-			lit = neg_lit(i);
-			print_list(clause_table->watched[lit], table);
-		}
-		printf("\n");
-	}
+	//TEMPERORY
+	//print_live_clauses(table);
 }
 
 /*
@@ -1289,22 +1282,22 @@ int32_t fix_lit_true(samp_table_t *table, int32_t lit) {
 	uint32_t sign = sign_of_lit(lit);
 	atom_table_t *atom_table = &(table->atom_table);
 	samp_truth_value_t *assignment =
-			atom_table->assignment[atom_table->current_assignment];
+		atom_table->assignment[atom_table->current_assignment];
 
 	if (fixed_tval(assignment[var])) {
 		if (sign ? assigned_true(assignment[var]) : assigned_false(
-				assignment[var])) {
+					assignment[var])) {
 			return -1;//Conflict: The unit literal can't be fixed true,
 			//since it is fixed false
 		}
 	} else {
 		if (is_pos(lit)) {
-			cprintf(2, "Fixing %"PRId32" to true\n", var);
+			cprintf(4, "Fixing %"PRId32" to true\n", var);
 			assignment[var] = v_fixed_true;
 			table->atom_table.num_unfixed_vars--;
 			link_propagate(table, neg_lit(var));
 		} else {
-			cprintf(2, "Fixing %"PRId32" to false\n", var);
+			cprintf(4, "Fixing %"PRId32" to false\n", var);
 			assignment[var] = v_fixed_false;
 			table->atom_table.num_unfixed_vars--;
 			link_propagate(table, pos_lit(var));
@@ -1318,11 +1311,11 @@ int32_t fix_lit_false(samp_table_t *table, int32_t lit) {
 	uint32_t sign = sign_of_lit(lit);
 	atom_table_t *atom_table = &(table->atom_table);
 	samp_truth_value_t *assignment =
-			atom_table->assignment[atom_table->current_assignment];
+		atom_table->assignment[atom_table->current_assignment];
 
 	if (fixed_tval(assignment[var])) {
 		if (sign ? assigned_false(assignment[var]) : assigned_true(
-				assignment[var]))
+					assignment[var]))
 			return -1; //Conflict: The unit literal can't be fixed false,
 		//since it is fixed true
 	} else {
@@ -1341,7 +1334,9 @@ int32_t fix_lit_false(samp_table_t *table, int32_t lit) {
 	return 0;
 }
 
-//Fixes the truth values derived from unit and negative weight clauses
+/*
+ * Fixes the truth values derived from unit and negative weight clauses
+ */
 int32_t negative_unit_propagate(samp_table_t *table) {
 	samp_clause_t *link;
 	samp_clause_t **link_ptr;
@@ -1366,14 +1361,12 @@ int32_t negative_unit_propagate(samp_table_t *table) {
 				conflict = fix_lit_true(table, link->disjunct[0]);
 				if (conflict == -1) {
 					char *litstr = literal_string(link->disjunct[0], table);
-					cprintf(
-							1,
-							"negative_unit_propagate: conflict fixing lit %s to true: ",
+					cprintf(3, "negative_unit_propagate: conflict fixing lit %s to true: ",
 							litstr);
 					free(litstr);
 					return -1;
 				} else {
-					cprintf(1, "negative_unit_propagate: Picking unit clause\n");
+					cprintf(3, "negative_unit_propagate: Picking unit clause\n");
 				}
 			} else { //we have a negative weight clause
 				i = 0;
@@ -1382,9 +1375,7 @@ int32_t negative_unit_propagate(samp_table_t *table) {
 					conflict = fix_lit_false(table, lit);
 					if (conflict == -1) {
 						char *litstr = literal_string(lit, table);
-						cprintf(
-								1,
-								"negative_unit_propagate: conflict fixing lit %s to true: ",
+						cprintf(3, "negative_unit_propagate: conflict fixing lit %s to true: ",
 								litstr);
 						free(litstr);
 						return -1;
@@ -1393,7 +1384,6 @@ int32_t negative_unit_propagate(samp_table_t *table) {
 			}
 			link_ptr = &link->link;
 			link = link->link;
-
 		} else {
 			/*
 			 * Move the clause to the dead_negative_or_unit_clauses list
@@ -1408,29 +1398,30 @@ int32_t negative_unit_propagate(samp_table_t *table) {
 	return 0; //no conflict
 }
 
-/*  The initialization phase for the mcmcsat step.  First place all the clauses
- in the unsat list, and then use scan_unsat_clauses to move them into
- sat_clauses or the watched (sat) lists.
-
+/*  
+ * The initialization phase for the mcmcsat step. First place all the clauses
+ * in the unsat list, and then use scan_unsat_clauses to move them into
+ * sat_clauses or the watched (sat) lists.
  */
 
-//assigns a random truth value to unfixed vars and returns number of unfixed vars.
+/*
+ * Assigns random truth values to unfixed vars and returns number of unfixed
+ * vars (num_unfixed_vars).
+ */
 void init_random_assignment(samp_truth_value_t *assignment, int32_t num_vars,
 		int32_t *num_unfixed_vars) {
 	uint32_t i, num;
 	*num_unfixed_vars = 0;
 	num = num_vars;
-	cprintf(1, "init_random_assignment: num_vars = %d\n", num);
+	cprintf(3, "init_random_assignment: num_vars = %d\n", num);
 	for (i = 0; i < num_vars; i++) {
 		if (!fixed_tval(assignment[i])) {
 			if (choose() < 0.5) {
 				assignment[i] = v_false;
-				cprintf(1,
-						"init_random_assignment: assigned false to var %d\n", i);
+				cprintf(3, "init_random_assignment: assigned false to var %d\n", i);
 			} else {
 				assignment[i] = v_true;
-				cprintf(1, "init_random_assignment: assigned true to var %d\n",
-						i);
+				cprintf(3, "init_random_assignment: assigned true to var %d\n", i);
 			}
 			(*num_unfixed_vars)++;
 		} else {
@@ -1446,7 +1437,7 @@ void push_clause(samp_clause_t *clause, samp_clause_t **list) {
 
 void push_negative_unit_clause(clause_table_t *clause_table, uint32_t i) {
 	clause_table->samp_clauses[i]->link
-			= clause_table->negative_or_unit_clauses;
+		= clause_table->negative_or_unit_clauses;
 	clause_table->negative_or_unit_clauses = clause_table->samp_clauses[i];
 }
 
@@ -1475,7 +1466,7 @@ void empty_clause_lists(samp_table_t *table) {
 	int32_t num_unfixed = 0;
 	for (i = 0; i < atom_table->num_vars; i++) {
 		if (!fixed_tval(
-				atom_table->assignment[atom_table->current_assignment][i])) {
+					atom_table->assignment[atom_table->current_assignment][i])) {
 			num_unfixed++;
 		}
 		atom_table->num_unfixed_vars = num_unfixed;
@@ -1521,6 +1512,10 @@ void init_clause_lists(clause_table_t *clause_table) {
 	}
 }
 
+/*
+ * Initializes for the first execution of sample SAT.
+ * Only hard clauses are considered. Randomizes all active atoms.
+ */
 int32_t init_sample_sat(samp_table_t *table) {
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &(table->atom_table);
@@ -1538,7 +1533,7 @@ int32_t init_sample_sat(samp_table_t *table) {
 		return -1;
 	int32_t num_unfixed_vars;
 	samp_truth_value_t *assignment =
-			atom_table->assignment[atom_table->current_assignment];
+		atom_table->assignment[atom_table->current_assignment];
 	init_random_assignment(assignment, atom_table->num_vars, &num_unfixed_vars);
 	atom_table->num_unfixed_vars = num_unfixed_vars;
 	if (scan_unsat_clauses(table) == -1) {
@@ -1548,32 +1543,32 @@ int32_t init_sample_sat(samp_table_t *table) {
 }
 
 /* The next step is to define the main samplesat procedure.  Here we have placed
- some clauses among the dead clauses, and are trying to satisfy the live ones.
- The first step is to perform negative_unit propagation.  Then we pick a
- random assignment to the remaining variables.
+   some clauses among the dead clauses, and are trying to satisfy the live ones.
+   The first step is to perform negative_unit propagation.  Then we pick a
+   random assignment to the remaining variables.
 
- Scan the clauses, if there is a fixed-satisfied, it goes in sat_clauses.
- If there is a fixed-unsat, we have a conflict.
- If there is a sat clause, we place it in watched list.
- If the sat clause has a fixed-propagation, then we mark the variable
- as having a fixed truth value, and move the clause to sat_clauses, while
- link-propagating this truth value.  When scanning, look for unit propagation in
- unsat clause list.
+   Scan the clauses, if there is a fixed-satisfied, it goes in sat_clauses.
+   If there is a fixed-unsat, we have a conflict.
+   If there is a sat clause, we place it in watched list.
+   If the sat clause has a fixed-propagation, then we mark the variable
+   as having a fixed truth value, and move the clause to sat_clauses, while
+   link-propagating this truth value.  When scanning, look for unit propagation in
+   unsat clause list.
 
- We then randomly flip a variable, and move all the resulting satisfied clauses
- to the sat/watched list using the scan_unsat_clauses operation.
- When this is done, if we have no unsat clauses, we stop.
- Otherwise, either pick a random unfixed variable and flip it,
- or pick a random unsat clause and a flip either a random variable or the
- minimal dcost variable and flip it.  Keep flipping until there are no unsat clauses.
- 
- First scan the dead clauses to move the satisfied ones to the appropriate
- lists.  Then move all the unsatisfied clauses to the dead list.
- Then select-and-move the satisfied clauses to the unsat list.
- Pick a random truth assignment.  Then repeat the scan-propagate loop.
- Then selectively, either pick an unfixed variable and flip and scan, or
- pick an unsat clause and, selectively, a variable and flip and scan.
- */
+   We then randomly flip a variable, and move all the resulting satisfied clauses
+   to the sat/watched list using the scan_unsat_clauses operation.
+   When this is done, if we have no unsat clauses, we stop.
+   Otherwise, either pick a random unfixed variable and flip it,
+   or pick a random unsat clause and a flip either a random variable or the
+   minimal dcost variable and flip it.  Keep flipping until there are no unsat clauses.
+
+   First scan the dead clauses to move the satisfied ones to the appropriate
+   lists.  Then move all the unsatisfied clauses to the dead list.
+   Then select-and-move the satisfied clauses to the unsat list.
+   Pick a random truth assignment.  Then repeat the scan-propagate loop.
+   Then selectively, either pick an unfixed variable and flip and scan, or
+   pick an unsat clause and, selectively, a variable and flip and scan.
+   */
 
 /*
  * Like init_sample_sat, but takes an existing state and sets it up for a
@@ -1605,9 +1600,7 @@ void restore_sat_dead_clauses(clause_table_t *clause_table,
 			link->link = clause_table->watched[lit];
 			clause_table->watched[lit] = link;
 			link = next;
-			assert(
-					assigned_true_lit(assignment,
-							clause_table->watched[lit]->disjunct[0]));
+			assert(assigned_true_lit(assignment, clause_table->watched[lit]->disjunct[0]));
 		} else {
 			cprintf(2, "---> dead clause %p stays dead (val = %"PRId32")\n",
 					link, val); //BD
@@ -1789,6 +1782,10 @@ int32_t choose_unfixed_variable(samp_truth_value_t *assignment,
 	return y;
 }
 
+/**
+ * TODO: Is the returned variable always active?
+ * if not, we should activate it somewhere
+ */
 int32_t choose_clause_var(samp_table_t *table, samp_clause_t *link,
 		samp_truth_value_t *assignment, double rvar_probability) {
 	uint32_t i, var;
@@ -1796,7 +1793,7 @@ int32_t choose_clause_var(samp_table_t *table, samp_clause_t *link,
 	clear_integer_stack(&clause_var_stack);
 	for (i = 0; i < link->numlits; i++) {
 		if (!link->frozen[i] && !fixed_tval(
-				assignment[var_of(link->disjunct[i])]))
+					assignment[var_of(link->disjunct[i])]))
 			push_integer_stack(i, &clause_var_stack);
 	} //all unfrozen, unfixed vars are now in clause_var_stack
 
@@ -1812,9 +1809,7 @@ int32_t choose_clause_var(samp_table_t *table, samp_clause_t *link,
 			cost_flip_unfixed_variable(
 					table,
 					&vcost,
-					var_of(
-							link->disjunct[nth_integer_stack(i,
-									&clause_var_stack)]));
+					var_of(link->disjunct[nth_integer_stack(i, &clause_var_stack)]));
 			if (vcost < dcost) {
 				dcost = vcost;
 				vcost = 0;
@@ -1826,14 +1821,14 @@ int32_t choose_clause_var(samp_table_t *table, samp_clause_t *link,
 	return var_of(link->disjunct[nth_integer_stack(var, &clause_var_stack)]);
 }
 
-int32_t sample_sat_body(samp_table_t *table, double sa_probability,
+int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probability,
 		double samp_temperature, double rvar_probability) {
 	// Assumed that table is in a valid state with a random assignment.
 	// We first decide on simulated annealing vs. walksat.
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &(table->atom_table);
 	samp_truth_value_t *assignment =
-			atom_table->assignment[atom_table->current_assignment];
+		atom_table->assignment[atom_table->current_assignment];
 	int32_t dcost;
 	double choice;
 	int32_t var;
@@ -1842,39 +1837,42 @@ int32_t sample_sat_body(samp_table_t *table, double sa_probability,
 	int32_t conflict = 0;
 
 	choice = choose();
-	cprintf(
-			1,
-			"sample_sat_body: num_unsat = %d, choice = % .4f, sa_probability = % .4f\n",
+	cprintf(3, "sample_sat_body: num_unsat = %d, choice = % .4f, sa_probability = % .4f\n",
 			clause_table->num_unsat_clauses, choice, sa_probability);
 	if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
 		/*
 		 * Simulated annealing step
 		 */
-		var = choose_unfixed_variable(assignment, atom_table->num_vars,
-				atom_table->num_unfixed_vars);
-		if (var == -1)
+		if (!lazy) {
+			var = choose_unfixed_variable(assignment, atom_table->num_vars,
+					atom_table->num_unfixed_vars);
+		} else {
+			var = choose_random_atom(table);
+		}
+
+		if (var == -1 || fixed_tval(assignment[var])) {
 			return 0;
+		}
+		
 		cost_flip_unfixed_variable(table, &dcost, var);
-		cprintf(
-				1,
-				" in simulated annealing: num_unsat = %d, var = %d, dcost = %d\n",
+		cprintf(3, " in simulated annealing: num_unsat = %d, var = %d, dcost = %d\n",
 				clause_table->num_unsat_clauses, var, dcost);
-//		print_assignment(table);
+		//		print_assignment(table);
 		if (dcost <= 0) {
-//			printf("Flipping ");
-//			print_atom(atom_table->atom[var], table);
-//			printf(" for dcost\n");
+			//			printf("Flipping ");
+			//			print_atom(atom_table->atom[var], table);
+			//			printf(" for dcost\n");
 			conflict = flip_unfixed_variable(table, var);
 		} else {
 			choice = choose();
 			if (choice < exp(-dcost / samp_temperature)) {
-//				printf("Flipping ");
-//				print_atom(atom_table->atom[var], table);
-//				printf(" for temp\n");
+				//				printf("Flipping ");
+				//				print_atom(atom_table->atom[var], table);
+				//				printf(" for temp\n");
 				conflict = flip_unfixed_variable(table, var);
 			}
 		}
-//		print_assignment(table);
+		//		print_assignment(table);
 	} else {
 		/*
 		 * Walksat step
@@ -1890,9 +1888,9 @@ int32_t sample_sat_body(samp_table_t *table, double sa_probability,
 		}
 		//link points to chosen clause
 		var = choose_clause_var(table, link, assignment, rvar_probability);
-//		printf(" in walksat: chose variable ");
-//		print_atom(atom_table->atom[var], table);
-//		printf("\n");
+		//		printf(" in walksat: chose variable ");
+		//		print_atom(atom_table->atom[var], table);
+		//		printf("\n");
 		conflict = flip_unfixed_variable(table, var);
 	}
 	return conflict;
@@ -1959,20 +1957,23 @@ void update_query_pmodel(samp_table_t *table) {
 			}
 			// None was true, kick out
 			goto done;
-			cont: continue;
+cont: continue;
 		}
 		// Each conjunct was true, so the assignment is a model - increase the
 		// pmodel counter
 		if (qinst->lit[j] == NULL) {
 			qinst->pmodel++;
 		}
-		done: continue;
+done: continue;
 	}
 }
 
+/*
+ * Updates the counts based on the current sample
+ */
 void update_pmodel(samp_table_t *table) {
 	samp_truth_value_t *assignment =
-			table->atom_table.assignment[table->atom_table.current_assignment];
+		table->atom_table.assignment[table->atom_table.current_assignment];
 	int32_t num_vars = table->atom_table.num_vars;
 	int32_t *pmodel = table->atom_table.pmodel;
 	int32_t i;
@@ -1980,7 +1981,7 @@ void update_pmodel(samp_table_t *table) {
 	table->atom_table.num_samples++;
 	for (i = 0; i < num_vars; i++) {
 		if (assigned_true(assignment[i])) {
-			if (get_verbosity_level() > 0 && i > 0) {
+			if (get_verbosity_level() >= 3 && i > 0) {
 				printf("Atom %d was assigned true\n", i);
 				fflush(stdout);
 			}
@@ -1998,38 +1999,46 @@ void update_pmodel(samp_table_t *table) {
 		append_assignment_to_file(get_dump_samples_path(), table);
 	}
 
-	if (get_verbosity_level() > 1) {
+	if (get_verbosity_level() >= 1) {
 		print_model(table);
 	}
 }
 
 /*
+ * A SAT solver for only the hard formulas
+ *
  * TODO: To be replaced by other SAT solvers. It should just give a
  * solution but not necessarily uniformly drawn.
  */
-int32_t first_sample_sat(samp_table_t *table, double sa_probability,
+int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips) {
 	int32_t conflict;
+
 	conflict = init_sample_sat(table);
-	if (get_verbosity_level() > 0) {
-		printf("After init_sample_sat:\n  ");
-		print_assignment(table);
-	}
+
 	if (conflict == -1)
 		return -1;
+
+	if (get_verbosity_level() >= 2) {
+		printf("After init_sample_sat:\n");
+		print_assignment(table);
+		print_clause_table(table, 0);
+	}
+
 	uint32_t num_flips = max_flips;
 	while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0) {
-		if (sample_sat_body(table, sa_probability, samp_temperature,
-				rvar_probability) == -1)
+		if (sample_sat_body(table, lazy, sa_probability, samp_temperature,
+					rvar_probability) == -1)
 			return -1;
 		num_flips--;
 	}
-	cprintf(1, "num of unsat clauses = %d\n", table->clause_table.num_unsat_clauses);
+
 	if (table->clause_table.num_unsat_clauses > 0) {
+		printf("num of unsat clauses = %d\n", table->clause_table.num_unsat_clauses);
 		mcsat_err("Initialization failed to find a model; increase max_flips\n");
 		return -1;
 	}
-//	update_pmodel(table);
+
 	return 0;
 }
 
@@ -2053,20 +2062,23 @@ void move_unsat_to_dead_clauses(clause_table_t *clause_table) {
  * - select a set of live clauses from the current assignment
  * - compute a new assignment by sample_sat
  */
-void sample_sat(samp_table_t *table, double sa_probability,
+void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips,
-		uint32_t max_extra_flips,
-		bool update_counts) {
+		uint32_t max_extra_flips, bool draw_sample) {
 	clause_table_t *clause_table = &table->clause_table;
 	int32_t conflict;
+
 	//assert(valid_table(table));
 	conflict = reset_sample_sat(table);
-	if (get_verbosity_level() >= 1) {
-		printf("sample_sat: after reset_sample_sat, %d unsat_clauses\n  ",
+
+	if (get_verbosity_level() >= 2) {
+		printf("sample_sat: after reset_sample_sat, %d unsat_clauses\n",
 				table->clause_table.num_unsat_clauses);
 		print_assignment(table);
+		print_clause_table(table, 0);
 	}
 	//assert(valid_table(table));
+
 	uint32_t num_flips = max_flips;
 	while (num_flips > 0 && conflict == 0) {
 		if (clause_table->num_unsat_clauses == 0) {
@@ -2076,7 +2088,7 @@ void sample_sat(samp_table_t *table, double sa_probability,
 				max_extra_flips--;
 			}
 		}
-		conflict = sample_sat_body(table, sa_probability, samp_temperature,
+		conflict = sample_sat_body(table, lazy, sa_probability, samp_temperature,
 				rvar_probability);
 		//assert(valid_table(table));
 		num_flips--;
@@ -2088,15 +2100,16 @@ void sample_sat(samp_table_t *table, double sa_probability,
 		num_flips = genrand_uint(max_extra_flips);
 		//}
 		while (num_flips > 0 && conflict == 0) {
-			conflict = sample_sat_body(table, 1, DBL_MAX, rvar_probability);
+			conflict = sample_sat_body(table, lazy, 1, DBL_MAX, rvar_probability);
 			//assert(valid_table(table));
 			num_flips--;
 		}
 	}
+
 	if (conflict != -1 && table->clause_table.num_unsat_clauses == 0) {
 		//printf("Before update_pmodel\n");
 		//print_assignment(table);
-		if (update_counts) {
+		if (draw_sample) {
 			update_pmodel(table);
 		}
 	} else {
@@ -2108,17 +2121,17 @@ void sample_sat(samp_table_t *table, double sa_probability,
 			cprintf(2, "Hit a conflict.\n");
 		} else {
 			cprintf(2, "Failed to find a model. \
-					Consider increasing max_flips and max_tries - see mcsat help.\n");
+Consider increasing max_flips and max_tries - see mcsat help.\n");
 		}
 
 		// Flip current_assignment (restore the saved assignment)
 		assert(table->atom_table.current_assignment == 0
-						|| table->atom_table.current_assignment == 1);
+				|| table->atom_table.current_assignment == 1);
 		table->atom_table.current_assignment ^= 1;
 
 		empty_clause_lists(table);
 		init_clause_lists(&table->clause_table);
-		if (update_counts) {
+		if (draw_sample) {
 			update_pmodel(table);
 		}
 	}
@@ -2145,257 +2158,256 @@ void sample_sat(samp_table_t *table, double sa_probability,
  * - burn_in_steps = number of burn-in steps
  * - samp_interval = sampling interval
  */
-void mc_sat(samp_table_t *table, uint32_t max_samples, double sa_probability,
+void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips,
 		uint32_t max_extra_flips, uint32_t timeout,
 		uint32_t burn_in_steps, uint32_t samp_interval) {
 	int32_t conflict;
 	uint32_t i;
 	time_t fintime = 0;
+	bool draw_sample; // whether we use the current round of MCMC as a sample
 
-	conflict = first_sample_sat(table, sa_probability, samp_temperature,
+	conflict = first_sample_sat(table, lazy, sa_probability, samp_temperature,
 			rvar_probability, max_flips);
+
 	if (conflict == -1) {
 		mcsat_err("Found conflict in initialization.\n");
 		return;
 	}
-	if (get_verbosity_level() > 0) {
-		printf("mc_sat: after round 0:\n  ");
+	if (get_verbosity_level() >= 1) {
+		printf("\nMC-SAT initial assignment (all hard clauses are satisifed): \n");
 		print_assignment(table);
+		print_clause_table(table, 0);
 	}
-	//  print_state(table, 0);
 	//assert(valid_table(table));
+
 	if (timeout != 0) {
 		fintime = time(NULL) + timeout;
 	}
 	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
-		if (i >= burn_in_steps && i % samp_interval == 0) {
-			cprintf(2, "---- sample[%"PRIu32"] ---\n", 
+		bool draw_sample = (i >= burn_in_steps && i % samp_interval == 0);
+		if (draw_sample) {
+			cprintf(1, "\n---- Sample[%"PRIu32"] ---\n", 
 					(i - burn_in_steps) / samp_interval);
-			sample_sat(table, sa_probability, samp_temperature,
-					rvar_probability, max_flips, max_extra_flips, true);
-		} else {
-			sample_sat(table, sa_probability, samp_temperature,
-					rvar_probability, max_flips, max_extra_flips, false);
 		}
-		cprintf(1, "mc_sat: after round %d\n", i);
-		if (get_verbosity_level() > 0)
+		sample_sat(table, lazy, sa_probability, samp_temperature,
+				rvar_probability, max_flips, max_extra_flips, draw_sample);
+
+		if (get_verbosity_level() >= 2) {
+			printf("\nMC-SAT: after round %d\n", i);
 			print_assignment(table);
-		//print_assignment(table);
-		//    print_state(table, i+1);
+		}
 		//assert(valid_table(table));
+
 		if (timeout != 0 && time(NULL) >= fintime) {
 			printf("Timeout after %"PRIu32" samples\n", i);
 			break;
 		}
 	}
-
-	//print_atoms(table);
 }
 
 // Recurse through the all the possible constants (except at j, which is fixed to the
 // new constant being added) and add each resulting atom.
 void new_const_atoms_at(int32_t idx, int32_t newcidx, int32_t arity,
 		int32_t *psig, samp_atom_t *atom, samp_table_t *table) {
-  sort_table_t *sort_table = &table->sort_table;
-  sort_entry_t entry;
-  int32_t i;
+	sort_table_t *sort_table = &table->sort_table;
+	sort_entry_t entry;
+	int32_t i;
 
-  if (idx == arity) {
-    if (get_verbosity_level() > 2) {
-      printf("new_const_atoms_at: Adding internal atom ");
-      print_atom_now(atom, table);
-      printf("\n");
-    }
-    add_internal_atom(table, atom, false);
-  } else if (idx == newcidx) {
-    // skip over the new constant - it's already set in atom args.
-    new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
-  } else {
-    entry = sort_table->entries[psig[idx]];
-    if (entry.constants == NULL) {
-      // An integer
-      if (entry.ints == NULL) {
-	for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
-	  atom->args[idx] = i;
-	  new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
+	if (idx == arity) {
+		if (get_verbosity_level() > 2) {
+			printf("new_const_atoms_at: Adding internal atom ");
+			print_atom_now(atom, table);
+			printf("\n");
+		}
+		add_internal_atom(table, atom, false);
+	} else if (idx == newcidx) {
+		// skip over the new constant - it's already set in atom args.
+		new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
+	} else {
+		entry = sort_table->entries[psig[idx]];
+		if (entry.constants == NULL) {
+			// An integer
+			if (entry.ints == NULL) {
+				for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
+					atom->args[idx] = i;
+					new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
+				}
+			} else {
+				for (i = 0; i < entry.cardinality; i++) {
+					atom->args[idx] = entry.ints[i];
+					new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
+				}
+			}
+		} else {
+			for (i = 0; i < entry.cardinality; i++) {
+				atom->args[idx] = entry.constants[i];
+				new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
+			}
+		}
 	}
-      } else {
-	for (i = 0; i < entry.cardinality; i++) {
-	  atom->args[idx] = entry.ints[i];
-	  new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
-	}
-      }
-    } else {
-      for (i = 0; i < entry.cardinality; i++) {
-	atom->args[idx] = entry.constants[i];
-	new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
-      }
-    }
-  }
 }
 
 // When new constants are introduced, may need to add new atoms
 void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
-  sort_table_t *sort_table = &table->sort_table;
-  pred_table_t *pred_table = &table->pred_table;
-  pred_entry_t *pentry;
-  int32_t i, j, pval, arity;
-  samp_atom_t *atom;
+	sort_table_t *sort_table = &table->sort_table;
+	pred_table_t *pred_table = &table->pred_table;
+	pred_entry_t *pentry;
+	int32_t i, j, pval, arity;
+	samp_atom_t *atom;
 
-  if (lazy_mcsat()) {
-    return;
-  }
-  for (i = 0; i < pred_table->evpred_tbl.num_preds; i++) {
-    pentry = &pred_table->evpred_tbl.entries[i];
-    pval = 2 * i;
-    arity = pentry->arity;
-    atom_buffer_resize(arity);
-    atom = (samp_atom_t *) atom_buffer.data;
-    atom->pred = pred_val_to_index(pval);
-    for (j = 0; j < arity; j++) {
-      if (subsort_p(csort, pentry->signature[j], sort_table)) {
-	atom->args[j] = cidx;
-	new_const_atoms_at(0, j, arity, pentry->signature, atom, table);
-      }
-    }
-  }
-  for (i = 0; i < pred_table->pred_tbl.num_preds; i++) {
-    pentry = &pred_table->pred_tbl.entries[i];
-    pval = (2 * i) + 1;
-    arity = pentry->arity;
-    atom_buffer_resize(arity);
-    atom = (samp_atom_t *) atom_buffer.data;
-    atom->pred = pred_val_to_index(pval);
-    for (j = 0; j < arity; j++) {
-      if (subsort_p(csort, pentry->signature[j], sort_table)) {
-	atom->args[j] = cidx;
-	new_const_atoms_at(0, j, arity, pentry->signature, atom, table);
-      }
-    }
-  }
+	if (lazy_mcsat()) {
+		return;
+	}
+	for (i = 0; i < pred_table->evpred_tbl.num_preds; i++) {
+		pentry = &pred_table->evpred_tbl.entries[i];
+		pval = 2 * i;
+		arity = pentry->arity;
+		atom_buffer_resize(arity);
+		atom = (samp_atom_t *) atom_buffer.data;
+		atom->pred = pred_val_to_index(pval);
+		for (j = 0; j < arity; j++) {
+			if (subsort_p(csort, pentry->signature[j], sort_table)) {
+				atom->args[j] = cidx;
+				new_const_atoms_at(0, j, arity, pentry->signature, atom, table);
+			}
+		}
+	}
+	for (i = 0; i < pred_table->pred_tbl.num_preds; i++) {
+		pentry = &pred_table->pred_tbl.entries[i];
+		pval = (2 * i) + 1;
+		arity = pentry->arity;
+		atom_buffer_resize(arity);
+		atom = (samp_atom_t *) atom_buffer.data;
+		atom->pred = pred_val_to_index(pval);
+		for (j = 0; j < arity; j++) {
+			if (subsort_p(csort, pentry->signature[j], sort_table)) {
+				atom->args[j] = cidx;
+				new_const_atoms_at(0, j, arity, pentry->signature, atom, table);
+			}
+		}
+	}
 }
 
 bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs, samp_table_t *table) {
-  pred_table_t *pred_table = &table->pred_table;
-  int32_t j, arity, *nargs, argidx;
-  bool builtin_result, retval;
+	pred_table_t *pred_table = &table->pred_table;
+	int32_t j, arity, *nargs, argidx;
+	bool builtin_result, retval;
 
-  assert(lit->atom->builtinop != 0);
-  arity = atom_arity(lit->atom, pred_table);
-  nargs = (int32_t *) safe_malloc(arity * sizeof(int32_t));
-  for (j = 0; j < arity; j++) {
-    argidx = lit->atom->args[j].value;
-    if (lit->atom->args[j].kind == variable) {
-      nargs[j] = substs[argidx].const_index;
-    } else {
-      nargs[j] = argidx;
-    }
-  }
-  builtin_result = call_builtin(lit->atom->builtinop, arity, nargs);
-  retval = builtin_result ? (lit->neg ? false : true) : (lit->neg ? true : false);
-  safe_free(nargs);
-  return retval;
-}
-
-// Given a rule, a -1 terminated array of constants corresponding to the
-// variables of the rule, and a samp_table, returns the substituted clause.
-// Checks that the constants array is the right length, and the sorts match.
-// Returns -1 if there is a problem.
-int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *table) {
-  const_table_t *const_table = &table->const_table;
-  sort_table_t *sort_table = &table->sort_table;
-  // atom_table_t *atom_table = &table->atom_table;
-  pred_table_t *pred_table = &table->pred_table;
-  sort_entry_t *sort_entry;
-  int32_t vsort, csort, csubst;
-  // array_hmap_pair_t *atom_map;
-  int32_t i, j, litidx;
-  bool found_indirect;
-
-  for (i = 0; i < rule->num_vars; i++) {
-    csubst = substs[i].const_index;
-    if (csubst == INT32_MIN) {
-      mcsat_err(
-		"substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
-		i, rule->num_vars);
-      return -1;
-    }
-    vsort = rule->vars[i]->sort_index;
-    sort_entry = &sort_table->entries[vsort];
-    if (sort_entry->constants == NULL) {
-      // It's an integer; check that its value is within the sort
-      if (!(sort_entry->lower_bound <= csubst && csubst
-	    <= sort_entry->upper_bound)) {
-	mcsat_err("substit: integer is out of bounds %"PRId32"\n", i);
-	return -1;
-      }
-    } else {
-      csort = const_sort_index(substs[i].const_index, const_table);
-      if (!subsort_p(csort, vsort, sort_table)) {
-	mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
-	return -1;
-      }
-    }
-  }
-  if (substs != NULL && substs[i].const_index != INT32_MIN) {
-    mcsat_err("substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
-	      i, rule->num_vars);
-    return -1;
-  }
-  // Everything is OK, do the substitution
-  // We just use the clause_buffer - first make sure it's big enough
-  clause_buffer_resize(rule->num_lits);
-  litidx = 0;
-  found_indirect = false;
-  for (i = 0; i < rule->num_lits; i++) {
-    rule_literal_t *lit = rule->literals[i];
-    int32_t arity = atom_arity(lit->atom, pred_table);
-    if (lit->atom->builtinop != 0) {
-      // Have a builtin - just test.  If false, keep going, else done with this rule
-      if (builtin_inst_p(lit, substs, table)) {
-	return -1;
-      }
-    } else {
-      // Not a builtin
-      samp_atom_t *new_atom = rule_atom_to_samp_atom(lit->atom, pred_table);
-      for (j = 0; j < arity; j++) {
-	int32_t argidx = new_atom->args[j];
-	if (lit->atom->args[j].kind == variable) {
-	  // Have a var
-	  new_atom->args[j] = substs[argidx].const_index;
+	assert(lit->atom->builtinop != 0);
+	arity = atom_arity(lit->atom, pred_table);
+	nargs = (int32_t *) safe_malloc(arity * sizeof(int32_t));
+	for (j = 0; j < arity; j++) {
+		argidx = lit->atom->args[j].value;
+		if (lit->atom->args[j].kind == variable) {
+			nargs[j] = substs[argidx].const_index;
+		} else {
+			nargs[j] = argidx;
+		}
 	}
-      }
-      // atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
-      // 				      arity+1, //+1 for pred
-      // 				      (int32_t *) new_atom);
-      if (get_verbosity_level() > 2) {
-	printf("substit_rule: Adding internal atom ");
-	print_atom_now(new_atom, table);
-	printf("\n");
-      }
-      int32_t added_atom = add_internal_atom(table, new_atom, false);
-      if (added_atom == -1) {
-	// This shouldn't happen, but if it does, we need to free up space
-	safe_free(new_atom);
-	mcsat_err("substit: Bad atom\n");
-	return -1;
-      }
-      if (new_atom->pred > 0) {
-	found_indirect = true;
-      }
-      //if (atom_map != NULL) {
-      // already had the atom - free it
-      safe_free(new_atom);
-      //}
-      clause_buffer.data[litidx++] = lit->neg ? neg_lit(added_atom)
-	: pos_lit(added_atom);
-    }
-  }
-  return add_internal_clause(table, clause_buffer.data, litidx,
-			     rule->frozen_preds, rule->weight, found_indirect, true);
+	builtin_result = call_builtin(lit->atom->builtinop, arity, nargs);
+	retval = builtin_result ? (lit->neg ? false : true) : (lit->neg ? true : false);
+	safe_free(nargs);
+	return retval;
 }
 
+/* 
+ * Given a rule, a -1 terminated array of constants corresponding to the
+ * variables of the rule, and a samp_table, returns the substituted clause.
+ * Checks that the constants array is the right length, and the sorts match.
+ * Returns -1 if there is a problem.
+ *
+ *
+ */
+int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *table) {
+	const_table_t *const_table = &table->const_table;
+	sort_table_t *sort_table = &table->sort_table;
+	// atom_table_t *atom_table = &table->atom_table;
+	pred_table_t *pred_table = &table->pred_table;
+	sort_entry_t *sort_entry;
+	int32_t vsort, csort, csubst;
+	// array_hmap_pair_t *atom_map;
+	int32_t i, j, litidx;
+	bool found_indirect;
+
+	for (i = 0; i < rule->num_vars; i++) {
+		csubst = substs[i].const_index;
+		if (csubst == INT32_MIN) {
+			mcsat_err("substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
+					i, rule->num_vars);
+			return -1;
+		}
+		vsort = rule->vars[i]->sort_index;
+		sort_entry = &sort_table->entries[vsort];
+		if (sort_entry->constants == NULL) {
+			// It's an integer; check that its value is within the sort
+			if (!(sort_entry->lower_bound <= csubst && csubst
+						<= sort_entry->upper_bound)) {
+				mcsat_err("substit: integer is out of bounds %"PRId32"\n", i);
+				return -1;
+			}
+		} else {
+			csort = const_sort_index(substs[i].const_index, const_table);
+			if (!subsort_p(csort, vsort, sort_table)) {
+				mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
+				return -1;
+			}
+		}
+	}
+	if (substs != NULL && substs[i].const_index != INT32_MIN) {
+		mcsat_err("substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
+				i, rule->num_vars);
+		return -1;
+	}
+	// Everything is OK, do the substitution
+	// We just use the clause_buffer - first make sure it's big enough
+	clause_buffer_resize(rule->num_lits);
+	litidx = 0;
+	found_indirect = false;
+	for (i = 0; i < rule->num_lits; i++) {
+		rule_literal_t *lit = rule->literals[i];
+		int32_t arity = atom_arity(lit->atom, pred_table);
+		if (lit->atom->builtinop != 0) {
+			// Have a builtin - just test.  If false, keep going, else done with this rule
+			if (builtin_inst_p(lit, substs, table)) {
+				return -1;
+			}
+		} else {
+			// Not a builtin
+			samp_atom_t *new_atom = rule_atom_to_samp_atom(lit->atom, pred_table);
+			for (j = 0; j < arity; j++) {
+				int32_t argidx = new_atom->args[j];
+				if (lit->atom->args[j].kind == variable) {
+					// Have a var
+					new_atom->args[j] = substs[argidx].const_index;
+				}
+			}
+			// atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
+			// 				      arity+1, //+1 for pred
+			// 				      (int32_t *) new_atom);
+			int32_t added_atom = add_internal_atom(table, new_atom, false);
+			if (added_atom == -1) {
+				// This shouldn't happen, but if it does, we need to free up space
+				safe_free(new_atom);
+				mcsat_err("substit: Bad atom\n");
+				return -1;
+			}
+			if (new_atom->pred > 0) {
+				found_indirect = true;
+			}
+			//if (atom_map != NULL) {
+			// already had the atom - free it
+			safe_free(new_atom);
+			//}
+			clause_buffer.data[litidx++] = lit->neg ? neg_lit(added_atom)
+				: pos_lit(added_atom);
+		}
+	}
+	return add_internal_clause(table, clause_buffer.data, litidx,
+			rule->frozen_preds, rule->weight, found_indirect, true);
+}
+
+/* Be careful when using a global variable */
 static clause_buffer_t rule_atom_buffer = { 0, NULL };
 
 void rule_atom_buffer_resize(int32_t length) {
@@ -2420,184 +2432,205 @@ void rule_atom_buffer_resize(int32_t length) {
  * Given an atom (index), checks if the given possible rule instances should
  * be added to the clauses.  Called from all_rule_instances_rec when lazy
  * flag is set.
+ *
+ * FIXME: what is the criteria of deciding whether to instantiate a clause?
  */
 bool check_clause_instance(samp_table_t *table, samp_rule_t *rule, int32_t atom_index) {
-  //index of atom being activated
-  //Use a local buffer to build the literals and check
-  //if they are active and not fixed true.
-  pred_table_t *pred_table = &(table->pred_table);
-  //pred_tbl_t *pred_tbl = &(pred_table->pred_tbl);
-  atom_table_t *atom_table = &table->atom_table;
-  int32_t predicate, arity, i, j, num_non_false;
-  rule_atom_t *atom;
-  samp_atom_t *rule_inst_atom;
-  array_hmap_pair_t *atom_map;
-  samp_truth_value_t *assignment;
-  bool found_atom_index = false;
-  int32_t found_atom_position = -1;
-  bool neg;
-  // FIXME: Need to keep track of non-false atoms - if there is only one,
-  // then activate it, if necessary, at the end.  Have to do two loops, the
+	//index of atom being activated
+	//Use a local buffer to build the literals and check
+	//if they are active and not fixed true.
+	pred_table_t *pred_table = &(table->pred_table);
+	//pred_tbl_t *pred_tbl = &(pred_table->pred_tbl);
+	atom_table_t *atom_table = &table->atom_table;
+	int32_t predicate, arity, i, j, num_non_false;
+	rule_atom_t *atom;
+	samp_atom_t *rule_inst_atom;
+	array_hmap_pair_t *atom_map;
+	samp_truth_value_t *assignment;
+	bool found_atom_index = false;
+	int32_t found_atom_position = -1;
+	bool neg;
 
-  // more than one, then we return false.  Otherwise we do the second loop,
-  // and activate the inactive atom if there is one.
-  assignment
-    = table->atom_table.assignment[table->atom_table.current_assignment];
-  num_non_false = 0;
-
-  for (i = 0; i < rule->num_lits; i++) {//for each literal
-    atom = rule->literals[i]->atom;
-    neg = rule->literals[i]->neg;
-    predicate = atom->pred;
-    arity = atom_arity(atom, pred_table);
-    rule_atom_buffer_resize(arity);
-    rule_inst_atom = (samp_atom_t *) rule_atom_buffer.data;
-    rule_inst_atom->pred = predicate;
-    for (j = 0; j < arity; j++) {//copy each instantiated argument
-      if (atom->args[j].kind == variable) {
-	rule_inst_atom->args[j]
-	  = substit_buffer.entries[atom->args[j].value].const_index;
-      } else {
-	rule_inst_atom->args[j] = atom->args[j].value;
-      }
-    }
-    //find the index of the atom
-    atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
-				    (int32_t *) rule_inst_atom);
-
-    // check for witness predicate - fixed false if NULL atom_map
-    if (atom_map != NULL && atom_map->val == atom_index) {
-      found_atom_index = true;
-      found_atom_position = i;
-    } else {
-      if (atom_map == NULL ||
-	  (neg ? assigned_false(assignment[atom_map->val])
-	       : assigned_true(assignment[atom_map->val]))) {
-	if (num_non_false == 0) {
-	  num_non_false = 1;
-	} else {
-	  return false;
+	if (get_verbosity_level() >= 6) {
+		printf("Checking ");
+		print_rule_substit(rule, &substit_buffer, table);
+		printf("\n");
 	}
-      }
-    }
-    if (atom_map != NULL) {
-      if (rule->literals[i]->neg && assignment[atom_map->val]
-	  == v_fixed_false) {
-	return false;//literal is fixed true
-      }
-      if (!rule->literals[i]->neg && assignment[atom_map->val]
-	  == v_fixed_true) {
-	return false;//literal is fixed true
-      }
-    }
 
-  }
-  if (atom_index != -1 && !found_atom_index)
-    return false;
-  assert(num_non_false <= 1);
-  // Now we do the flipping
-  for (i = 0; i < rule->num_lits; i++) {//for each literal
-    if (i != found_atom_position) {//if literal is not the one being activated
-      atom = rule->literals[i]->atom;
-      if (atom->builtinop == 0) {
-	predicate = atom->pred;
-	arity = pred_arity(predicate, pred_table);
-	rule_atom_buffer_resize(arity);
-	rule_inst_atom = (samp_atom_t *) rule_atom_buffer.data;
-	rule_inst_atom->pred = predicate;
-	for (j = 0; j < arity; j++) {//copy each instantiated argument
-	  if (atom->args[j].kind == variable) {
-	    rule_inst_atom->args[j]
-	      = substit_buffer.entries[atom->args[j].value].const_index;
-	  } else {
-	    rule_inst_atom->args[j] = atom->args[j].value;
-	  }
+	// FIXME: Need to keep track of non-false atoms - if there is only one,
+	// then activate it, if necessary, at the end.  Have to do two loops, the
+
+	// more than one, then we return false.  Otherwise we do the second loop,
+	// and activate the inactive atom if there is one.
+	assignment = table->atom_table.assignment[table->atom_table.current_assignment];
+	num_non_false = 0;
+
+	for (i = 0; i < rule->num_lits; i++) {//for each literal
+		atom = rule->literals[i]->atom;
+		neg = rule->literals[i]->neg;
+		predicate = atom->pred;
+		arity = atom_arity(atom, pred_table);
+		rule_atom_buffer_resize(arity);
+		rule_inst_atom = (samp_atom_t *) rule_atom_buffer.data;
+		rule_inst_atom->pred = predicate;
+		for (j = 0; j < arity; j++) {//copy each instantiated argument
+			if (atom->args[j].kind == variable) {
+				rule_inst_atom->args[j] = substit_buffer.entries[atom->args[j].value].const_index;
+			} else {
+				rule_inst_atom->args[j] = atom->args[j].value;
+			}
+		}
+		//find the index of the atom
+		atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
+				(int32_t *) rule_inst_atom);
+
+		// check for witness predicate - fixed false if NULL atom_map
+		if (atom_map != NULL && atom_map->val == atom_index) {
+			found_atom_index = true;
+			found_atom_position = i;
+		} else {
+			/* 
+			 * If the atom is not active, or the literal is satisfied,
+			 * we call the literal non-false. We allow at most 1
+			 * such literal in the clause, otherwise we discard the
+			 * clause.
+			 */
+			if (atom_map == NULL ||
+					(neg ? assigned_false(assignment[atom_map->val])
+					 : assigned_true(assignment[atom_map->val]))) {
+				if (num_non_false == 0) {
+					num_non_false = 1;
+				} else {
+					return false;
+				}
+			}
+		}
+		if (atom_map != NULL) {
+			if (rule->literals[i]->neg && assignment[atom_map->val]
+					== v_fixed_false) {
+				return false;//literal is fixed true
+			}
+			if (!rule->literals[i]->neg && assignment[atom_map->val]
+					== v_fixed_true) {
+				return false;//literal is fixed true
+			}
+		}
+
 	}
-	//find the index of the atom
-	atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
-					arity + 1, (int32_t *) rule_inst_atom);
-	// check for witness predicate - fixed false if NULL atom_map
-	if (atom_map == NULL) {
-	  activate_atom(table, rule_inst_atom);
-	  return false;//atom is inactive
+	if (atom_index != -1 && !found_atom_index)
+		return false;
+	assert(num_non_false <= 1);
+
+	// Now we do the flipping
+	for (i = 0; i < rule->num_lits; i++) {//for each literal
+		if (i != found_atom_position) {//if literal is not the one being activated
+			atom = rule->literals[i]->atom;
+			if (atom->builtinop == 0) {
+				predicate = atom->pred;
+				arity = pred_arity(predicate, pred_table);
+				rule_atom_buffer_resize(arity);
+				rule_inst_atom = (samp_atom_t *) rule_atom_buffer.data;
+				rule_inst_atom->pred = predicate;
+				for (j = 0; j < arity; j++) {//copy each instantiated argument
+					if (atom->args[j].kind == variable) {
+						rule_inst_atom->args[j]
+							= substit_buffer.entries[atom->args[j].value].const_index;
+					} else {
+						rule_inst_atom->args[j] = atom->args[j].value;
+					}
+				}
+				//find the index of the atom
+				atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
+						arity + 1, (int32_t *) rule_inst_atom);
+				// check for witness predicate - fixed false if NULL atom_map
+				if (atom_map == NULL) {
+					activate_atom(table, rule_inst_atom);
+					return false;//atom is inactive
+				}
+			}
+		}
 	}
-      }
-    }
-  }
-  return true;
+
+	return true;
 }
 
 /**
  * all_rule_instances takes a rule and generates all ground instances
  * based on the atoms, their predicates and corresponding sorts
+ *
+ * TODO: what does this do for non-lazy inference
  */
 void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t *table, int32_t atom_index) {
 
-  clause_table_t *clause_table = &table->clause_table;
-  int prev_num_clauses;
+	clause_table_t *clause_table = &table->clause_table;
+	int prev_num_clauses;
 
-  if (substit_buffer.entries[vidx].fixed) {
-    // Simply do the substitution, or go to the next var
-    if (vidx == rule->num_vars - 1) {
-      substit_buffer.entries[vidx + 1].const_index = INT32_MIN;
-      if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
-	if (lazy_mcsat()) {
-	  prev_num_clauses = clause_table->num_clauses;
-	}
-	substit_rule(rule, substit_buffer.entries, table);
-	if (lazy_mcsat()) {
-	  if (prev_num_clauses < clause_table->num_clauses) {
-	    assert(prev_num_clauses + 1 == clause_table->num_clauses);
-	    push_clause(clause_table->samp_clauses[prev_num_clauses],
-			&(clause_table->unsat_clauses));
-	  }
-	}
-      }
-    } else {
-      all_rule_instances_rec(vidx + 1, rule, table, atom_index);
-    }
-  } else {
-    sort_table_t *sort_table = &table->sort_table;
-    int32_t vsort = rule->vars[vidx]->sort_index;
-    sort_entry_t entry = sort_table->entries[vsort];
-    int32_t i;
-    for (i = 0; i < entry.cardinality; i++) {
-      if (entry.constants == NULL) {
-	if (entry.ints == NULL) {
-	  // Have a subrange
-	  substit_buffer.entries[vidx].const_index
-	    = entry.lower_bound + i;
+	if (substit_buffer.entries[vidx].fixed) {
+		// Simply do the substitution, or go to the next var
+		if (vidx == rule->num_vars - 1) {
+			substit_buffer.entries[vidx + 1].const_index = INT32_MIN;
+			if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
+				if (lazy_mcsat()) {
+					prev_num_clauses = clause_table->num_clauses;
+				}
+				substit_rule(rule, substit_buffer.entries, table);
+				if (lazy_mcsat()) {
+					if (prev_num_clauses < clause_table->num_clauses) {
+						assert(prev_num_clauses + 1 == clause_table->num_clauses);
+						push_clause(clause_table->samp_clauses[prev_num_clauses],
+								&(clause_table->unsat_clauses));
+					}
+				}
+			}
+		} else {
+			all_rule_instances_rec(vidx + 1, rule, table, atom_index);
+		}
 	} else {
-	  substit_buffer.entries[vidx].const_index = entry.ints[i];
+		sort_table_t *sort_table = &table->sort_table;
+		int32_t vsort = rule->vars[vidx]->sort_index;
+		sort_entry_t entry = sort_table->entries[vsort];
+		int32_t i;
+		for (i = 0; i < entry.cardinality; i++) {
+			if (entry.constants == NULL) {
+				if (entry.ints == NULL) {
+					// Have a subrange
+					substit_buffer.entries[vidx].const_index
+						= entry.lower_bound + i;
+				} else {
+					substit_buffer.entries[vidx].const_index = entry.ints[i];
+				}
+			} else {
+				substit_buffer.entries[vidx].const_index = entry.constants[i];
+			}
+			if (vidx == rule->num_vars - 1) {
+				substit_buffer.entries[vidx + 1].const_index = INT32_MIN;
+				if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
+
+					if (get_verbosity_level() >= 5) {
+						printf("Rule ");
+						print_rule_substit(rule, &substit_buffer, table);
+						printf(" is being activated.\n");
+					}
+
+					if (lazy_mcsat()) {
+						prev_num_clauses = clause_table->num_clauses;
+					}
+					substit_rule(rule, substit_buffer.entries, table);
+					if (lazy_mcsat()) {
+						if (prev_num_clauses < clause_table->num_clauses) {
+							assert(prev_num_clauses + 1 == clause_table->num_clauses);
+							// TODO: check if it is okay if we always add clause to
+							// the unsat_clauses
+							push_clause(clause_table->samp_clauses[prev_num_clauses],
+									&(clause_table->unsat_clauses));
+						}
+					}
+				}
+			} else {
+				all_rule_instances_rec(vidx + 1, rule, table, atom_index);
+			}
+		}
 	}
-      } else {
-	substit_buffer.entries[vidx].const_index = entry.constants[i];
-      }
-      if (vidx == rule->num_vars - 1) {
-	substit_buffer.entries[vidx + 1].const_index = INT32_MIN;
-	if (!lazy_mcsat() || check_clause_instance(table, rule,
-						   atom_index)) {
-	  cprintf(2, "Rule is being activated\n");
-	  if (lazy_mcsat())
-	    {
-	      prev_num_clauses = clause_table->num_clauses;
-	    }
-	  substit_rule(rule, substit_buffer.entries, table);
-	  // TODO: check if it is okay if we always add clause to
-	  // the unsat_clauses
-	  if (lazy_mcsat()) {
-	    if (prev_num_clauses < clause_table->num_clauses) {
-	      assert(prev_num_clauses + 1 == clause_table->num_clauses);
-	      push_clause(clause_table->samp_clauses[prev_num_clauses],
-			  &(clause_table->unsat_clauses));
-	    }
-	  }
-	}
-      } else {
-	all_rule_instances_rec(vidx + 1, rule, table, atom_index);
-      }
-    }
-  }
 }
 
 // Fills in the substit_buffer, creates atoms when arity is reached
@@ -2665,13 +2698,25 @@ void all_rule_instances(int32_t rule_index, samp_table_t *table) {
 	all_rule_instances_rec(0, rule, table, -1);
 }
 
-// Note that substit_buffer.entries has been set up already
+/**
+ * Note that substit_buffer.entries has been set up already
+ */
 void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 		int32_t atom_index) {
 	int32_t i;
-	for (i = 0; i < substit_buffer.size; i++) {
-		substit_buffer.entries[i].fixed = false;
+
+//	for (i = 0; i < substit_buffer.size; i++) {
+//		substit_buffer.entries[i].fixed = false;
+//	}
+
+	if (get_verbosity_level() >= 5) {
+		printf("Instantiating for ");
+		print_atom(table->atom_table.atom[atom_index], table);
+		printf(": ");
+		print_rule_substit(rule, &substit_buffer, table);
+		printf("\n");
 	}
+
 	all_rule_instances_rec(0, rule, table, atom_index);
 }
 
@@ -2708,179 +2753,179 @@ void create_new_const_rule_instances(int32_t constidx, int32_t csort,
 // whereas substit_query updates the query_instance_table.
 
 int32_t add_subst_query_instance(samp_literal_t **litinst, substit_entry_t *substs,
-				 samp_query_t *query, samp_table_t *table) {
-  query_instance_table_t *query_instance_table = &table->query_instance_table;
-  query_table_t *query_table = &table->query_table;
-  sort_table_t *sort_table = &table->sort_table;
-  samp_query_instance_t *qinst;
-  sort_entry_t *sort_entry;
-  int32_t i, qindex, vsort;
+		samp_query_t *query, samp_table_t *table) {
+	query_instance_table_t *query_instance_table = &table->query_instance_table;
+	query_table_t *query_table = &table->query_table;
+	sort_table_t *sort_table = &table->sort_table;
+	samp_query_instance_t *qinst;
+	sort_entry_t *sort_entry;
+	int32_t i, qindex, vsort;
 
-  for (i = 0; i < query_instance_table->num_queries; i++) {
-    if (eql_query_instance_lits(litinst,
-				query_instance_table->query_inst[i]->lit)) {
-      break;
-    }
-  }
-  qindex = i;
-  if (i < query_instance_table->num_queries) {
-    // Already have this instance - just associate it with the query
-    qinst = query_instance_table->query_inst[i];
-    extend_ivector(&qinst->query_indices);
-    // find the index of the current query
-    for (i = 0; i < query_table->num_queries; i++) {
-      if (query_table->query[i] == query) {
-	break;
-      }
-    }
-    qinst->query_indices.data[qinst->query_indices.size] = i;
-    qinst->query_indices.size++;
-    safe_free(litinst);
-  } else {
-    query_instance_table_resize(query_instance_table);
-    qinst = (samp_query_instance_t *) safe_malloc(
-						  sizeof(samp_query_instance_t));
-    query_instance_table->query_inst[qindex] = qinst;
-    query_instance_table->num_queries += 1;
-    for (i = 0; i < query_table->num_queries; i++) {
-      if (query_table->query[i] == query) {
-	break;
-      }
-    }
-    //qinst->query_index = i;
-    init_ivector(&qinst->query_indices, 1);
-    qinst->query_indices.data[0] = i;
-    qinst->query_indices.size++;
-    qinst->sampling_num = table->atom_table.num_samples;
-    qinst->pmodel = 0;
-    // Copy the substs - used to return the formula instances
-    qinst->subst = (int32_t *) safe_malloc(
-					   query->num_vars * sizeof(int32_t));
-    qinst->constp = (bool *) safe_malloc(query->num_vars * sizeof(bool));
-    for (i = 0; i < query->num_vars; i++) {
-      qinst->subst[i] = substs[i].const_index;
-      vsort = query->vars[i]->sort_index;
-      sort_entry = &sort_table->entries[vsort];
-      qinst->constp[i] = (sort_entry->constants != NULL);
-    }
-    qinst->lit = litinst;
-  }
-  return qindex;
+	for (i = 0; i < query_instance_table->num_queries; i++) {
+		if (eql_query_instance_lits(litinst,
+					query_instance_table->query_inst[i]->lit)) {
+			break;
+		}
+	}
+	qindex = i;
+	if (i < query_instance_table->num_queries) {
+		// Already have this instance - just associate it with the query
+		qinst = query_instance_table->query_inst[i];
+		extend_ivector(&qinst->query_indices);
+		// find the index of the current query
+		for (i = 0; i < query_table->num_queries; i++) {
+			if (query_table->query[i] == query) {
+				break;
+			}
+		}
+		qinst->query_indices.data[qinst->query_indices.size] = i;
+		qinst->query_indices.size++;
+		safe_free(litinst);
+	} else {
+		query_instance_table_resize(query_instance_table);
+		qinst = (samp_query_instance_t *) safe_malloc(
+				sizeof(samp_query_instance_t));
+		query_instance_table->query_inst[qindex] = qinst;
+		query_instance_table->num_queries += 1;
+		for (i = 0; i < query_table->num_queries; i++) {
+			if (query_table->query[i] == query) {
+				break;
+			}
+		}
+		//qinst->query_index = i;
+		init_ivector(&qinst->query_indices, 1);
+		qinst->query_indices.data[0] = i;
+		qinst->query_indices.size++;
+		qinst->sampling_num = table->atom_table.num_samples;
+		qinst->pmodel = 0;
+		// Copy the substs - used to return the formula instances
+		qinst->subst = (int32_t *) safe_malloc(
+				query->num_vars * sizeof(int32_t));
+		qinst->constp = (bool *) safe_malloc(query->num_vars * sizeof(bool));
+		for (i = 0; i < query->num_vars; i++) {
+			qinst->subst[i] = substs[i].const_index;
+			vsort = query->vars[i]->sort_index;
+			sort_entry = &sort_table->entries[vsort];
+			qinst->constp[i] = (sort_entry->constants != NULL);
+		}
+		qinst->lit = litinst;
+	}
+	return qindex;
 }
 
 int32_t substit_query(samp_query_t *query, substit_entry_t *substs, samp_table_t *table) {
-  const_table_t *const_table = &table->const_table;
-  sort_table_t *sort_table = &table->sort_table;
-  pred_table_t *pred_table = &table->pred_table;
-  atom_table_t *atom_table = &table->atom_table;
-  sort_entry_t *sort_entry;
-  samp_atom_t *new_atom;
-  int32_t i, j, k, vsort, csort, csubst, arity, argidx, added_atom, numlits,
-    litnum;
-  rule_literal_t ***lit;
-  samp_literal_t **litinst;
+	const_table_t *const_table = &table->const_table;
+	sort_table_t *sort_table = &table->sort_table;
+	pred_table_t *pred_table = &table->pred_table;
+	atom_table_t *atom_table = &table->atom_table;
+	sort_entry_t *sort_entry;
+	samp_atom_t *new_atom;
+	int32_t i, j, k, vsort, csort, csubst, arity, argidx, added_atom, numlits,
+			litnum;
+	rule_literal_t ***lit;
+	samp_literal_t **litinst;
 
-  for (i = 0; i < query->num_vars; i++) {
-    csubst = substs[i].const_index;
-    if (csubst == INT32_MIN) {
-      mcsat_err(
-		"substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
-		i, query->num_vars);
-      return -1;
-    }
-    vsort = query->vars[i]->sort_index;
-    sort_entry = &sort_table->entries[vsort];
-    if (sort_entry->constants == NULL) {
-      // It's an integer; check that its value is within the sort
-      if (!(sort_entry->lower_bound <= csubst && csubst
-	    <= sort_entry->upper_bound)) {
-	mcsat_err("substit: integer is out of bounds %"PRId32"\n", i);
-	return -1;
-      }
-    } else {
-      csort = const_sort_index(substs[i].const_index, const_table);
-      if (!subsort_p(csort, vsort, sort_table)) {
-	mcsat_err(
-		  "substit: Constant/variable sorts do not match at %"PRId32"\n",
-		  i);
-	return -1;
-      }
-    }
-  }
-  if (substs != NULL && substs[i].const_index != INT32_MIN) {
-    mcsat_err(
-	      "substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
-	      i, query->num_vars);
-    return -1;
-  }
-  // Everything is OK, do the substitution
-  lit = query->literals;
-  litinst = (samp_literal_t **) safe_malloc(
-					    (query->num_clauses + 1) * sizeof(samp_literal_t *));
-  for (i = 0; i < query->num_clauses; i++) {
-    numlits = 0;
-    for (j = 0; lit[i][j] != NULL; j++) {
-      if (lit[i][j]->atom->builtinop != 0) {
-	// Have a builtin - just test.  If false, keep going, else done
-	// with this query clause
-	if (builtin_inst_p(lit[i][j], substs, table)) {
-	  numlits = 0;
-	  break;
+	for (i = 0; i < query->num_vars; i++) {
+		csubst = substs[i].const_index;
+		if (csubst == INT32_MIN) {
+			mcsat_err(
+					"substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
+					i, query->num_vars);
+			return -1;
+		}
+		vsort = query->vars[i]->sort_index;
+		sort_entry = &sort_table->entries[vsort];
+		if (sort_entry->constants == NULL) {
+			// It's an integer; check that its value is within the sort
+			if (!(sort_entry->lower_bound <= csubst && csubst
+						<= sort_entry->upper_bound)) {
+				mcsat_err("substit: integer is out of bounds %"PRId32"\n", i);
+				return -1;
+			}
+		} else {
+			csort = const_sort_index(substs[i].const_index, const_table);
+			if (!subsort_p(csort, vsort, sort_table)) {
+				mcsat_err(
+						"substit: Constant/variable sorts do not match at %"PRId32"\n",
+						i);
+				return -1;
+			}
+		}
 	}
-      } else {
-	numlits++;
-      }
-    }
-    if (numlits > 0) { // Can ignore clauses for which numlits == 0
-      litinst[i] = (samp_literal_t *) safe_malloc(
-						  (numlits + 1) * sizeof(samp_literal_t));
-      litnum = 0;
-      for (j = 0; lit[i][j] != NULL; j++) {
-	if (lit[i][j]->atom->builtinop == 0) {
-	  arity = pred_arity(lit[i][j]->atom->pred, pred_table);
-	  new_atom = rule_atom_to_samp_atom(lit[i][j]->atom,
-					    pred_table);
-	  for (k = 0; k < arity; k++) {
-	    argidx = new_atom->args[k];
-	    if (lit[i][j]->atom->args[k].kind == variable) {
-	      // Have a var, index to var (and hence, const) array is -(argidx + 1)
-	      new_atom->args[k] = substs[argidx].const_index;
-	    }
-	  }
-	  if (lazy_mcsat()) {
-	    array_hmap_pair_t *atom_map;
-	    atom_map = array_size_hmap_find(
-					    &(atom_table->atom_var_hash), arity + 1, //+1 for pred
-					    (int32_t *) new_atom);
-	    if (atom_map != NULL) {
-	      added_atom = atom_map->val;
-	    } else {
-	      added_atom = -1;
-	    }
-	  } else {
-	    if (get_verbosity_level() > 1) {
-	      printf("substit_query: Adding internal atom ");
-	      print_atom_now(new_atom, table);
-	      printf("\n");
-	    }
-	    added_atom = add_internal_atom(table, new_atom, false);
-	  }
-	  if (added_atom == -1) {
-	    // This shouldn't happen, but if it does, we need to free up space
-	    free_samp_atom(new_atom);
-	    mcsat_err("substit: Bad atom\n");
-	    return -1;
-	  }
-	  free_samp_atom(new_atom);
-	  litinst[i][litnum++] = lit[i][j]->neg ? neg_lit(added_atom)
-	    : pos_lit(added_atom);
+	if (substs != NULL && substs[i].const_index != INT32_MIN) {
+		mcsat_err(
+				"substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
+				i, query->num_vars);
+		return -1;
 	}
-      }
-      litinst[i][litnum++] = -1; // end-marker - NULL doesn't work
-    }
-  }
-  litinst[i] = NULL;
-  return add_subst_query_instance(litinst, substs, query, table);
+	// Everything is OK, do the substitution
+	lit = query->literals;
+	litinst = (samp_literal_t **) safe_malloc(
+			(query->num_clauses + 1) * sizeof(samp_literal_t *));
+	for (i = 0; i < query->num_clauses; i++) {
+		numlits = 0;
+		for (j = 0; lit[i][j] != NULL; j++) {
+			if (lit[i][j]->atom->builtinop != 0) {
+				// Have a builtin - just test.  If false, keep going, else done
+				// with this query clause
+				if (builtin_inst_p(lit[i][j], substs, table)) {
+					numlits = 0;
+					break;
+				}
+			} else {
+				numlits++;
+			}
+		}
+		if (numlits > 0) { // Can ignore clauses for which numlits == 0
+			litinst[i] = (samp_literal_t *) safe_malloc(
+					(numlits + 1) * sizeof(samp_literal_t));
+			litnum = 0;
+			for (j = 0; lit[i][j] != NULL; j++) {
+				if (lit[i][j]->atom->builtinop == 0) {
+					arity = pred_arity(lit[i][j]->atom->pred, pred_table);
+					new_atom = rule_atom_to_samp_atom(lit[i][j]->atom,
+							pred_table);
+					for (k = 0; k < arity; k++) {
+						argidx = new_atom->args[k];
+						if (lit[i][j]->atom->args[k].kind == variable) {
+							// Have a var, index to var (and hence, const) array is -(argidx + 1)
+							new_atom->args[k] = substs[argidx].const_index;
+						}
+					}
+					if (lazy_mcsat()) {
+						array_hmap_pair_t *atom_map;
+						atom_map = array_size_hmap_find(
+								&(atom_table->atom_var_hash), arity + 1, //+1 for pred
+								(int32_t *) new_atom);
+						if (atom_map != NULL) {
+							added_atom = atom_map->val;
+						} else {
+							added_atom = -1;
+						}
+					} else {
+						if (get_verbosity_level() > 1) {
+							printf("substit_query: Adding internal atom ");
+							print_atom_now(new_atom, table);
+							printf("\n");
+						}
+						added_atom = add_internal_atom(table, new_atom, false);
+					}
+					if (added_atom == -1) {
+						// This shouldn't happen, but if it does, we need to free up space
+						free_samp_atom(new_atom);
+						mcsat_err("substit: Bad atom\n");
+						return -1;
+					}
+					free_samp_atom(new_atom);
+					litinst[i][litnum++] = lit[i][j]->neg ? neg_lit(added_atom)
+						: pos_lit(added_atom);
+				}
+			}
+			litinst[i][litnum++] = -1; // end-marker - NULL doesn't work
+		}
+	}
+	litinst[i] = NULL;
+	return add_subst_query_instance(litinst, substs, query, table);
 }
 
 bool check_query_instance(samp_query_t *query, samp_table_t *table) {
@@ -2904,7 +2949,7 @@ bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 			for (k = 0; k < arity; k++) {//copy each instantiated argument
 				if (atom->args[k].kind == variable) {
 					rule_inst_atom->args[k]
-							= substit_buffer.entries[atom->args[k].value].const_index;
+						= substit_buffer.entries[atom->args[k].value].const_index;
 				} else {
 					rule_inst_atom->args[k] = atom->args[k].value;
 				}
@@ -2932,12 +2977,12 @@ bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 
 			if (query->literals[i][j]->neg
 					&& (samp_truth_value_t) atom_table->assignment[atom_table->current_assignment][atom_map->val]
-							== v_fixed_false) {
+					== v_fixed_false) {
 				return false;//literal is fixed true
 			}
 			if (!query->literals[i][j]->neg
 					&& (samp_truth_value_t) atom_table->assignment[atom_table->current_assignment][atom_map->val]
-							== v_fixed_true) {
+					== v_fixed_true) {
 				return false;//literal is fixed true
 			}
 		}
@@ -2970,7 +3015,7 @@ void all_query_instances_rec(int32_t vidx, samp_query_t *query,
 				if (entry.ints == NULL) {
 					// Have a subrange
 					substit_buffer.entries[vidx].const_index
-							= entry.lower_bound + i;
+						= entry.lower_bound + i;
 				} else {
 					substit_buffer.entries[vidx].const_index = entry.ints[i];
 				}
@@ -3109,8 +3154,8 @@ bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
 	}
 	// Now go through comparing the args of the atoms
 	for (i = 0; i < arity; i++) {
-		if (lit->atom->args[i].kind == constant || lit->atom->args[i].kind
-				== integer) {
+		if (lit->atom->args[i].kind == constant 
+				|| lit->atom->args[i].kind == integer) {
 			// Constants must be equal
 			if (atom->args[i] != lit->atom->args[i].value) {
 				return false;
@@ -3189,6 +3234,9 @@ bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
 //   return true;
 // }
 
+/**
+ * Activates the rules relavent to a given atom
+ */
 void activate_rules(int32_t atom_index, samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	pred_table_t *pred_table = &table->pred_table;
@@ -3205,15 +3253,19 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 	num_rules = pred_tbl->entries[predicate].num_rules;
 	rules = pred_tbl->entries[predicate].rules;
 
-	printf("Before activating clauses for ");
-	print_atom_now(atom, table);
-	dump_clause_table(table);
+//	printf("Before activating clauses for ");
+//	print_atom_now(atom, table);
+//	dump_clause_table(table);
 
+	/** TODO: for each ground clause related to the atom, if it is activated
+	 * already, we do nothing.  Otherwise we activate it, and calculate whether
+	 * it belongs to the subset of clauses for sample SAT in this round.
+	 */
 	for (i = 0; i < num_rules; i++) {
 		rule_entry = rule_table->samp_rules[rules[i]];
 		rule_inst_true = false;
 		for (j = 0; j < rule_entry->num_lits; j++) {
-			cprintf(2, "Checking whether to activate rule %"PRId32", literal %"PRId32"\n",
+			cprintf(6, "Checking whether to activate rule %"PRId32", literal %"PRId32"\n",
 					rules[i], j);
 			if (match_atom_in_rule_atom(atom, rule_entry->literals[j], arity)) {
 				//then substit_buffer contains the matching substitution
@@ -3222,40 +3274,49 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 		}
 	}
 
-	printf("After activating clauses for ");
-	print_atom_now(atom, table);
-	dump_clause_table(table);
+//	printf("After activating clauses for ");
+//	print_atom_now(atom, table);
+//	dump_clause_table(table);
 }
 
+/*
+ * Each rule involving the predicate in the atom is instantiated in all
+ * possible extensions of the given atom. Only the fixed falsifiable instances
+ * are retained.
+ */
 int32_t activate_atom(samp_table_t *table, samp_atom_t *atom) {
-	//Each rule involving the predicate in the atom is instantiated
-	//in all possible extensions of the given atom.  Only the
-	//fixed falsifiable instances are retained.
 
 	int32_t atom_index;
 
 	//assert(valid_table(table));
-	if (get_verbosity_level() > 1) {
+
+	if (get_verbosity_level() >= 5) {
 		printf("activate_atom: Adding internal atom ");
 		print_atom_now(atom, table);
 		printf("\n");
 	}
+
 	atom_index = add_internal_atom(table, atom, false);
 	//assert(valid_table(table));
+
 	assert(table->atom_table.num_vars == atom_index + 1);
+	/* If new atoms are activated within activate_rules,
+	 * they are again being activated. This creates a transitive
+	 * closure for the given atom. */
 	while (atom_index < table->atom_table.num_vars) {
 		activate_rules(atom_index, table);
 		atom_index += 1;
 	}
 	//assert(valid_table(table));
+
 	return 0;
 }
 
 /* query_match compares the atom from the samplesat table to the pattern
- atom patom.  They match if the predicates match, and if the variables
- represented by bindings (initially all -1) can be consistently bound.
- Note that this modifies the bindings.
- */
+   atom patom.  They match if the predicates match, and if the variables
+   represented by bindings (initially all -1) can be consistently bound.
+   Note that this modifies the bindings.
+   */
 // static bool query_match(samp_atom_t *atom, samp_atom_t *patom,
 // 			int32_t *bindings, samp_table_t *table) {
 //   pred_table_t *pred_table = &(table->pred_table);
@@ -3288,7 +3349,7 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom) {
 // }
 
 static inline void
-		sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
+sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 
 // Based on Bruno's sort_int_array - works on two arrays in parallel
 static void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);

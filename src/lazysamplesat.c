@@ -178,14 +178,12 @@ int32_t choose_random_atom(samp_table_t *table) {
 			(int32_t *) atom);
 	//assert(valid_table(table));
 	if (atom_map == NULL) { //need to activate atom
-		if (get_verbosity_level() >= 0) {
-			printf("Activating atom (at round %d) ", atom_table->num_samples);
+		if (get_verbosity_level() >= 5) {
+			printf("Activating atom (at sample %d) ", atom_table->num_samples);
 			print_atom(atom, table);
 			printf("\n");
-			fflush(stdout);
 		}
 
-		print_assignment(table);
 		activate_atom(table, atom);
 
 		atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
@@ -242,161 +240,160 @@ int32_t choose_random_atom(samp_table_t *table) {
  * formula and the weight. A Markov logic contains only clauses merely makes
  * the function activation of lazy MC-SAT easier.
  */
-int32_t lazy_sample_sat_body(samp_table_t *table, double sa_probability,
-		double samp_temperature, double rvar_probability) {
-	clause_table_t *clause_table = &table->clause_table;
-	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment;
-	int32_t dcost;
-	double choice;
-	int32_t var;
-	uint32_t clause_position;
-	samp_clause_t *link;
-	int32_t conflict = 0;
-
-	//Assumed that table is in a valid state with a random assignment.
-	//We first decide on simulated annealing vs. walksat.
-	assignment = atom_table->assignment[atom_table->current_assignment];
-	//assert(valid_table(table));
-	choice = choose();
-	if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
-		/*
-		 * Simulated annealing step
-		 */
-		//printf("Doing simulated annealing step, num_unsat_clauses = %d\n",
-		//       clause_table->num_unsat_clauses);
-
-		// choose a random atom
-		//assert(valid_table(table));
-		var = choose_random_atom(table);
-		//var = choose_unfixed_variable(assignment, atom_table->num_vars,
-		//			  atom_table->num_unfixed_vars);
-		//assert(valid_table(table));
-
-		if (var == -1 || fixed_tval(assignment[var])) {
-			return 0;
-		}
-
-		/**
-		 * TODO: for the lazy version, we should active the variable
-		 * and related clauses. Is it okay to use the same function
-		 * as non-lazy version?
-		 */
-		cost_flip_unfixed_variable(table, &dcost, var);
-		//assert(valid_table(table));
-		if (dcost <= 0) {
-			flip_unfixed_variable(table, var);
-			//assert(valid_table(table));
-		} else {
-			choice = choose();
-			if (choice < exp(-dcost / samp_temperature)) {
-				conflict = flip_unfixed_variable(table, var);
-				//assert(valid_table(table));
-			}
-		}
-	} else {
-		/*
-		 * Walksat step
-		 */
-		//choose an unsat clause
-		clause_position = random_uint(clause_table->num_unsat_clauses);
-		link = clause_table->unsat_clauses;
-		while (clause_position != 0) {
-			link = link->link;
-			clause_position--;
-		}
-		//assert(valid_table(table));
-		//link points to chosen clause
-		var = choose_clause_var(table, link, assignment, rvar_probability);
-		conflict = flip_unfixed_variable(table, var);
-		//assert(valid_table(table));
-	}
-	return conflict;
-}
+//int32_t lazy_sample_sat_body(samp_table_t *table, double sa_probability,
+//		double samp_temperature, double rvar_probability) {
+//	clause_table_t *clause_table = &table->clause_table;
+//	atom_table_t *atom_table = &table->atom_table;
+//	samp_truth_value_t *assignment;
+//	int32_t dcost;
+//	double choice;
+//	int32_t var;
+//	uint32_t clause_position;
+//	samp_clause_t *link;
+//	int32_t conflict = 0;
+//
+//	//Assumed that table is in a valid state with a random assignment.
+//	//We first decide on simulated annealing vs. walksat.
+//	assignment = atom_table->assignment[atom_table->current_assignment];
+//	//assert(valid_table(table));
+//	choice = choose();
+//	if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
+//		/*
+//		 * Simulated annealing step
+//		 */
+//		//printf("Doing simulated annealing step, num_unsat_clauses = %d\n",
+//		//       clause_table->num_unsat_clauses);
+//
+//		// choose a random atom
+//		//assert(valid_table(table));
+//		var = choose_random_atom(table);
+//		//var = choose_unfixed_variable(assignment, atom_table->num_vars,
+//		//			  atom_table->num_unfixed_vars);
+//		//assert(valid_table(table));
+//
+//		if (var == -1 || fixed_tval(assignment[var])) {
+//			return 0;
+//		}
+//
+//		/**
+//		 * TODO: for the lazy version, we should active the variable
+//		 * and related clauses. Is it okay to use the same function
+//		 * as non-lazy version?
+//		 */
+//		cost_flip_unfixed_variable(table, &dcost, var);
+//		//assert(valid_table(table));
+//		if (dcost <= 0) {
+//			conflict = flip_unfixed_variable(table, var);
+//			//assert(valid_table(table));
+//		} else {
+//			choice = choose();
+//			if (choice < exp(-dcost / samp_temperature)) {
+//				conflict = flip_unfixed_variable(table, var);
+//				//assert(valid_table(table));
+//			}
+//		}
+//	} else {
+//		/*
+//		 * Walksat step
+//		 */
+//		//choose an unsat clause
+//		clause_position = random_uint(clause_table->num_unsat_clauses);
+//		link = clause_table->unsat_clauses;
+//		while (clause_position != 0) {
+//			link = link->link;
+//			clause_position--;
+//		}
+//		//assert(valid_table(table));
+//		//link points to chosen clause
+//		var = choose_clause_var(table, link, assignment, rvar_probability);
+//		conflict = flip_unfixed_variable(table, var);
+//		//assert(valid_table(table));
+//	}
+//	return conflict;
+//}
 
 /**
  * TODO: To be replaced by a lazy SAT solver. Not necessarily
  * need to be uniformly drawn.
  */
-int32_t first_lazy_sample_sat(samp_table_t *table, double sa_probability,
-		double samp_temperature, double rvar_probability, uint32_t max_flips) {
-	int32_t conflict;
-
-	conflict = init_sample_sat(table);
-	if (conflict == -1)
-		return -1;
-	uint32_t num_flips = max_flips;
-	while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0) {
-		lazy_sample_sat_body(table, sa_probability, samp_temperature,
-				rvar_probability);
-		num_flips--;
-	}
-	if (table->clause_table.num_unsat_clauses > 0) {
-		mcsat_err(
-				"Initialization failed to find a model; increase max_flips\n");
-		return -1;
-	}
-	update_pmodel(table);
-	return 0;
-}
+//int32_t first_lazy_sample_sat(samp_table_t *table, double sa_probability,
+//		double samp_temperature, double rvar_probability, uint32_t max_flips) {
+//	int32_t conflict;
+//
+//	conflict = init_sample_sat(table);
+//	if (conflict == -1)
+//		return -1;
+//	uint32_t num_flips = max_flips;
+//	while (table->clause_table.num_unsat_clauses > 0 && num_flips > 0) {
+//		lazy_sample_sat_body(table, sa_probability, samp_temperature,
+//				rvar_probability);
+//		num_flips--;
+//	}
+//	if (table->clause_table.num_unsat_clauses > 0) {
+//		mcsat_err("Initialization failed to find a model; increase max_flips\n");
+//		return -1;
+//	}
+//	update_pmodel(table);
+//	return 0;
+//}
 
 /*
  * One round of the mc_sat loop:
  * - select a set of live clauses from the current assignment
  * - compute a new assignment by sample_sat
  */
-void lazy_sample_sat(samp_table_t *table, double sa_probability,
-		double samp_temperature, double rvar_probability, uint32_t max_flips,
-		uint32_t max_extra_flips, bool update_counts) {
-	clause_table_t *clause_table = &table->clause_table;
-	int32_t conflict;
-
-	//assert(valid_table(table));
-	conflict = reset_sample_sat(table);
-	//assert(valid_table(table));
-
-	uint32_t num_flips = max_flips;
-	while (num_flips > 0 && conflict == 0) {
-		if (clause_table->num_unsat_clauses == 0) {
-			if (max_extra_flips <= 0) {
-				break;
-			} else {
-				max_extra_flips--;
-			}
-		}
-		conflict = lazy_sample_sat_body(table, sa_probability, samp_temperature,
-				rvar_probability);
-		//assert(valid_table(table));
-		num_flips--;
-	}
-
-	if (conflict != -1 && table->clause_table.num_unsat_clauses == 0) {
-		if (update_counts) {
-			update_pmodel(table);
-		}
-	} else {
-		/*
-		 * Sample sat did not find a model (within max_flips)
-		 * restore the earlier assignment
-		 */
-		if (conflict == -1) {
-			cprintf(2, "Hit a conflict.\n");
-		} else {
-			cprintf(2, "Failed to find a model.\n");
-		}
-
-		// Flip current_assignment (restore the saved assignment)
-		assert(table->atom_table.current_assignment == 0
-				|| table->atom_table.current_assignment == 1);
-		table->atom_table.current_assignment ^= 1;
-
-		empty_clause_lists(table);
-		init_clause_lists(&table->clause_table);
-		if (update_counts) {
-			update_pmodel(table);
-		}
-	}
-}
+//void lazy_sample_sat(samp_table_t *table, double sa_probability,
+//		double samp_temperature, double rvar_probability, uint32_t max_flips,
+//		uint32_t max_extra_flips, bool update_counts) {
+//	clause_table_t *clause_table = &table->clause_table;
+//	int32_t conflict;
+//
+//	//assert(valid_table(table));
+//	conflict = reset_sample_sat(table);
+//	//assert(valid_table(table));
+//
+//	uint32_t num_flips = max_flips;
+//	while (num_flips > 0 && conflict == 0) {
+//		if (clause_table->num_unsat_clauses == 0) {
+//			if (max_extra_flips <= 0) {
+//				break;
+//			} else {
+//				max_extra_flips--;
+//			}
+//		}
+//		conflict = lazy_sample_sat_body(table, sa_probability, samp_temperature,
+//				rvar_probability);
+//		//assert(valid_table(table));
+//		num_flips--;
+//	}
+//
+//	if (conflict != -1 && table->clause_table.num_unsat_clauses == 0) {
+//		if (update_counts) {
+//			update_pmodel(table);
+//		}
+//	} else {
+//		/*
+//		 * Sample sat did not find a model (within max_flips)
+//		 * restore the earlier assignment
+//		 */
+//		if (conflict == -1) {
+//			cprintf(2, "Hit a conflict.\n");
+//		} else {
+//			cprintf(2, "Failed to find a model.\n");
+//		}
+//
+//		// Flip current_assignment (restore the saved assignment)
+//		assert(table->atom_table.current_assignment == 0
+//				|| table->atom_table.current_assignment == 1);
+//		table->atom_table.current_assignment ^= 1;
+//
+//		empty_clause_lists(table);
+//		init_clause_lists(&table->clause_table);
+//		if (update_counts) {
+//			update_pmodel(table);
+//		}
+//	}
+//}
 
 /*
  * Top-level LAZY-MCSAT call
@@ -419,42 +416,42 @@ void lazy_sample_sat(samp_table_t *table, double sa_probability,
  * - burn_in_steps = number of burn-in steps
  * - samp_interval = sampling interval
  */
-void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
-		double sa_probability, double samp_temperature, double rvar_probability,
-		uint32_t max_flips, uint32_t max_extra_flips, uint32_t timeout,
-		uint32_t burn_in_steps, uint32_t samp_interval) {
-	int32_t conflict;
-	uint32_t i;
-	time_t fintime = 0;
-
-	conflict = first_lazy_sample_sat(table, sa_probability, samp_temperature,
-			rvar_probability, max_flips);
-	if (conflict == -1) {
-		mcsat_err("Found conflict in initialization.\n");
-		return;
-	}
-
-	//  print_state(table, 0);
-	//assert(valid_table(table));
-	if (timeout != 0) {
-		fintime = time(NULL) + timeout;
-	}
-	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
-		if (i >= burn_in_steps && i % samp_interval == 0) {
-			cprintf(0, "---- sample[%"PRIu32"] ---\n", 
-					(i - burn_in_steps) / samp_interval);
-			lazy_sample_sat(table, sa_probability, samp_temperature,
-					rvar_probability, max_flips, max_extra_flips, true);
-		} else {
-			lazy_sample_sat(table, sa_probability, samp_temperature,
-					rvar_probability, max_flips, max_extra_flips, false);
-		}
-		//    print_state(table, i+1);
-		//assert(valid_table(table));
-		if (timeout != 0 && time(NULL) >= fintime) {
-			break;
-		}
-	}
-
-	//print_atoms(table);
-}
+//void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
+//		double sa_probability, double samp_temperature, double rvar_probability,
+//		uint32_t max_flips, uint32_t max_extra_flips, uint32_t timeout,
+//		uint32_t burn_in_steps, uint32_t samp_interval) {
+//	int32_t conflict;
+//	uint32_t i;
+//	time_t fintime = 0;
+//
+//	conflict = first_lazy_sample_sat(table, sa_probability, samp_temperature,
+//			rvar_probability, max_flips);
+//	if (conflict == -1) {
+//		mcsat_err("Found conflict in initialization.\n");
+//		return;
+//	}
+//
+//	//  print_state(table, 0);
+//	//assert(valid_table(table));
+//	if (timeout != 0) {
+//		fintime = time(NULL) + timeout;
+//	}
+//	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
+//		if (i >= burn_in_steps && i % samp_interval == 0) {
+//			cprintf(1, "---- sample[%"PRIu32"] ---\n",
+//					(i - burn_in_steps) / samp_interval);
+//			lazy_sample_sat(table, sa_probability, samp_temperature,
+//					rvar_probability, max_flips, max_extra_flips, true);
+//		} else {
+//			lazy_sample_sat(table, sa_probability, samp_temperature,
+//					rvar_probability, max_flips, max_extra_flips, false);
+//		}
+//		//    print_state(table, i+1);
+//		//assert(valid_table(table));
+//		if (timeout != 0 && time(NULL) >= fintime) {
+//			break;
+//		}
+//	}
+//
+//	//print_atoms(table);
+//}

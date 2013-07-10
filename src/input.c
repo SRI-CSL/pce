@@ -934,7 +934,7 @@ extern bool read_eval(samp_table_t *table) {
 		}
 		case ADD: {
 			input_add_fdecl_t decl = input_command.decl.add_fdecl;
-			cprintf(2, "Clausifying and adding formula\n");
+			cprintf(1, "\nClausifying and adding formula\n");
 			add_cnf(decl.frozen, decl.formula, decl.weight, decl.source, true);
 			break;
 		}
@@ -957,8 +957,6 @@ extern bool read_eval(samp_table_t *table) {
 						decl.source, table);
 				/*
 				 * Create instances here rather than add_rule, as this is eager
-				 * TODO: the instantiation phase should only exists in case of
-				 * eager mcsat.
 				 */
 				if (ruleidx != -1) {
 					all_rule_instances(ruleidx, table);
@@ -968,7 +966,7 @@ extern bool read_eval(samp_table_t *table) {
 		}
 		case ASK: {
 			input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
-			cprintf(2, "ask: clausifying formula\n");
+			cprintf(1, "Ask: clausifying formula\n");
 
 			if (get_dump_samples_path() != NULL) {
 				output(" samples are not going to be dumped after the first ASK");
@@ -1020,8 +1018,7 @@ extern bool read_eval(samp_table_t *table) {
 			clock_t start, end;
 
 			start = clock();
-			output(
-					"Calling %sMCSAT with parameters (set using mcsat_params):\n",
+			output("Calling %sMCSAT with parameters (set using mcsat_params):\n",
 					lazy_mcsat() ? "LAZY_" : "");
 			output(" max_samples = %"PRId32"\n", get_max_samples());
 			output(" sa_probability = %f\n", get_sa_probability());
@@ -1032,6 +1029,7 @@ extern bool read_eval(samp_table_t *table) {
 			output(" timeout = %"PRId32"\n", get_mcsat_timeout());
 			output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
 			output(" samp_interval = %"PRId32"\n", get_samp_interval());
+			output("\n");
 
 			if (get_dump_samples_path() != NULL) {
 				output(" dumping samples to %s\n", get_dump_samples_path());
@@ -1039,19 +1037,12 @@ extern bool read_eval(samp_table_t *table) {
 						get_max_samples() + 1);
 			}
 
-			if (lazy_mcsat()) {
-				lazy_mc_sat(table, get_max_samples(), get_sa_probability(),
-						get_samp_temperature(), get_rvar_probability(),
-						get_max_flips(), get_max_extra_flips(),
-						get_mcsat_timeout(), get_burn_in_steps(),
-						get_samp_interval());
-			} else {
-				mc_sat(table, get_max_samples(), get_sa_probability(),
-						get_samp_temperature(), get_rvar_probability(),
-						get_max_flips(), get_max_extra_flips(),
-						get_mcsat_timeout(), get_burn_in_steps(),
-						get_samp_interval());
-			}
+			mc_sat(table, lazy_mcsat(), get_max_samples(),
+					get_sa_probability(), get_samp_temperature(),
+					get_rvar_probability(), get_max_flips(),
+					get_max_extra_flips(), get_mcsat_timeout(),
+					get_burn_in_steps(), get_samp_interval());
+
 			end = clock();
 			output(" running took: %f seconds",
 					(double) (end - start) / CLOCKS_PER_SEC);
@@ -1073,7 +1064,7 @@ extern bool read_eval(samp_table_t *table) {
 				output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
 				output(" samp_interval = %"PRId32"\n", get_samp_interval());
 			} else {
-				output("Setting MCSAT parameters:\n");
+				output("\nSetting MCSAT parameters:\n");
 				if (decl.max_samples >= 0) {
 					output(" max_samples was %"PRId32", now %"PRId32"\n",
 							get_max_samples(), decl.max_samples);

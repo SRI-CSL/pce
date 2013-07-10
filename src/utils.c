@@ -41,7 +41,6 @@ int32_t *intarray_copy(int32_t *signature, int32_t length){
 /*asserts a db atom to the atoms table and sets its truth value as v_db_true
   A db atom has an evidence predicate which must be negative. 
  */
-
 pred_entry_t *pred_entry(pred_table_t *pred_table, int32_t predicate){
   if (predicate <= 0){
     return &(pred_table->evpred_tbl.entries[-predicate]);
@@ -50,6 +49,7 @@ pred_entry_t *pred_entry(pred_table_t *pred_table, int32_t predicate){
   }
 }
 
+/* Be careful when using a global variable */
 clause_buffer_t clause_buffer = {0, NULL};
 
 void clause_buffer_resize (int32_t length){
@@ -123,7 +123,6 @@ bool assigned_fixed_false_lit(samp_truth_value_t *assignment,
   }
 }
 
-
 /** Evaluates a clause to false (-1) or to the literal index evaluating to true.
  */
 int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
@@ -147,9 +146,9 @@ int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
   return -1;
 }
 
+/* Be careful when using a global variable */
 substit_buffer_t substit_buffer = {0, NULL};
 
-// Fill this in later
 void substit_buffer_resize(int32_t length) {
   if (substit_buffer.entries == NULL) {
     substit_buffer.entries = (substit_entry_t *)
