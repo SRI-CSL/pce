@@ -364,6 +364,9 @@ void print_live_clauses(samp_table_t *table) {
 }
 
 void print_clause_table(samp_table_t *table, int32_t num_vars){
+	if (num_vars < 0) {
+		num_vars = table->atom_table.num_vars;
+	}
 	clause_table_t *clause_table = &(table->clause_table);
 	print_clauses(table);
 	output("Sat clauses: \n");
@@ -531,16 +534,16 @@ extern void dump_clause_table (samp_table_t *table) {
 /*
  * Prints a rule with a substitution
  */
-void print_rule_substit(samp_rule_t *rule, substit_buffer_t *substit, samp_table_t *table) {
+void print_rule_substit(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *table) {
 	int32_t i;
 	const_table_t *const_table = &table->const_table;
 	print_rule(rule, table, 0);
 	for (i = 0; i < rule->num_vars; i++)
 		printf(" [%s\\%s%s]", 
 				rule->vars[i]->name,
-				substit->entries[i].const_index != INT32_MIN ?
-				const_name(substit_buffer.entries[i].const_index, const_table) : "?",
-				substit->entries[i].fixed ? " fixed" : "");
+				substs[i].const_index != INT32_MIN ?
+				const_name(substs[i].const_index, const_table) : "*",
+				substs[i].fixed ? " fixed" : "");
 }
 
 void print_rule_atom_arg (rule_atom_arg_t *arg, var_entry_t **vars, const_table_t *const_table) {

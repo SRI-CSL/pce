@@ -18,6 +18,7 @@
 #include "lazysamplesat.h"
 #include "vectors.h"
 #include "SFMT.h"
+#include "yacc.tab.h"
 
 #include "weight_learning.h"
 #include "training_data.h"
@@ -104,11 +105,12 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 	samp_bvar_t current_atom_index;
 	array_hmap_pair_t *atom_map;
 	samp_rule_t *rule;
+
 	atom_map = array_size_hmap_find(&(atom_table->atom_var_hash), arity + 1, //+1 for pred
 			(int32_t *) atom);
 	if (atom_map == NULL) {
 		if (get_verbosity_level() >= 5) {
-			printf("add_internal_atom: Adding internal atom ");
+			printf("[add_internal_atom] Adding internal atom ");
 			print_atom_now(atom, table);
 			printf("\n");
 		}
@@ -147,7 +149,7 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 		if (top_p) {
 			pred_entry_t *entry = pred_entry(pred_table, predicate);
 			for (i = 0; i < entry->num_rules; i++) {
-				rule = rule_table->samp_rules[i];
+				rule = rule_table->samp_rules[entry->rules[i]];
 				all_rule_instances_rec(0, rule, table, current_atom_index);
 			}
 		}
@@ -1413,15 +1415,15 @@ void init_random_assignment(samp_truth_value_t *assignment, int32_t num_vars,
 	uint32_t i, num;
 	*num_unfixed_vars = 0;
 	num = num_vars;
-	cprintf(3, "init_random_assignment: num_vars = %d\n", num);
+	cprintf(3, "[init_random_assignment] num_vars = %d\n", num);
 	for (i = 0; i < num_vars; i++) {
 		if (!fixed_tval(assignment[i])) {
 			if (choose() < 0.5) {
 				assignment[i] = v_false;
-				cprintf(3, "init_random_assignment: assigned false to var %d\n", i);
+				cprintf(3, "[init_random_assignment] assigned false to var %d\n", i);
 			} else {
 				assignment[i] = v_true;
-				cprintf(3, "init_random_assignment: assigned true to var %d\n", i);
+				cprintf(3, "[init_random_assignment] assigned true to var %d\n", i);
 			}
 			(*num_unfixed_vars)++;
 		} else {
@@ -1837,16 +1839,24 @@ int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probability,
 	int32_t conflict = 0;
 
 	choice = choose();
-	cprintf(3, "sample_sat_body: num_unsat = %d, choice = % .4f, sa_probability = % .4f\n",
+	cprintf(3, "\n[sample_sat_body] num_unsat = %d, choice = % .4f, sa_probability = % .4f\n",
 			clause_table->num_unsat_clauses, choice, sa_probability);
 	if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
 		/*
 		 * Simulated annealing step
 		 */
+		cprintf(3, "[sample_sat_body] simulated annealing\n");
+
 		if (!lazy) {
 			var = choose_unfixed_variable(assignment, atom_table->num_vars,
 					atom_table->num_unfixed_vars);
 		} else {
+			/* What it does for lazy sample SAT is to choose a random atom,
+			 * regardless whether its value is fixed or not (because we can 
+			 * calculate the total number of atoms and it is convenient to
+			 * randomly choose one from them). If its value is fixed, we skip
+			 * this flip using the following statement (return 0).
+			 */
 			var = choose_random_atom(table);
 		}
 
@@ -1855,42 +1865,46 @@ int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probability,
 		}
 		
 		cost_flip_unfixed_variable(table, &dcost, var);
-		cprintf(3, " in simulated annealing: num_unsat = %d, var = %d, dcost = %d\n",
+		cprintf(3, "[sample_sat_body] simulated annealing num_unsat = %d, var = %d, dcost = %d\n",
 				clause_table->num_unsat_clauses, var, dcost);
-		//		print_assignment(table);
 		if (dcost <= 0) {
-			//			printf("Flipping ");
-			//			print_atom(atom_table->atom[var], table);
-			//			printf(" for dcost\n");
 			conflict = flip_unfixed_variable(table, var);
 		} else {
 			choice = choose();
 			if (choice < exp(-dcost / samp_temperature)) {
-				//				printf("Flipping ");
-				//				print_atom(atom_table->atom[var], table);
-				//				printf(" for temp\n");
 				conflict = flip_unfixed_variable(table, var);
 			}
 		}
-		//		print_assignment(table);
 	} else {
 		/*
 		 * Walksat step
 		 */
-		//choose an unsat clause
-		//printf("Walksat\n");
+		cprintf(3, "[sample_sat_body] WalkSAT\n");
+
+		/* choose an unsat clause, link points to chosen clause */
 		// clause_position = random_uint(clause_table->num_unsat_clauses);
 		clause_position = genrand_uint(clause_table->num_unsat_clauses);
 		link = clause_table->unsat_clauses;
+		/*
+		 * TODO: This is very inefficient when the number of unsat clauses
+		 * is very large. We should consider a different data structure than
+		 * a link to store the unsatisfied clauses. This data structure should
+		 * support random access (for getting a random unsat clause) as well
+		 * as fast insert/remove.
+		 */
 		while (clause_position != 0) {
 			link = link->link;
 			clause_position--;
 		}
-		//link points to chosen clause
+
 		var = choose_clause_var(table, link, assignment, rvar_probability);
-		//		printf(" in walksat: chose variable ");
-		//		print_atom(atom_table->atom[var], table);
-		//		printf("\n");
+		if (get_verbosity_level() >= 3) {
+			printf("[sample_sat_body] WalkSAT chose variable ");
+			print_atom(atom_table->atom[var], table);
+			printf(" from unsat clause ");
+			print_clause(link, table);
+			printf("\n");
+		}
 		conflict = flip_unfixed_variable(table, var);
 	}
 	return conflict;
@@ -2022,7 +2036,7 @@ int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 	if (get_verbosity_level() >= 2) {
 		printf("After init_sample_sat:\n");
 		print_assignment(table);
-		print_clause_table(table, 0);
+		print_clause_table(table, -1);
 	}
 
 	uint32_t num_flips = max_flips;
@@ -2043,7 +2057,7 @@ int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 }
 
 /*
- * This function is not used??
+ * FIXME: This function is not used??
  */
 void move_unsat_to_dead_clauses(clause_table_t *clause_table) {
 	samp_clause_t **link_ptr = &(clause_table->dead_clauses);
@@ -2065,6 +2079,7 @@ void move_unsat_to_dead_clauses(clause_table_t *clause_table) {
 void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips,
 		uint32_t max_extra_flips, bool draw_sample) {
+	atom_table_t *atom_table = &table->atom_table;
 	clause_table_t *clause_table = &table->clause_table;
 	int32_t conflict;
 
@@ -2072,10 +2087,10 @@ void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 	conflict = reset_sample_sat(table);
 
 	if (get_verbosity_level() >= 2) {
-		printf("sample_sat: after reset_sample_sat, %d unsat_clauses\n",
+		printf("\n[sample_sat] after reset_sample_sat, %d unsat_clauses\n",
 				table->clause_table.num_unsat_clauses);
 		print_assignment(table);
-		print_clause_table(table, 0);
+		print_clause_table(table, -1);
 	}
 	//assert(valid_table(table));
 
@@ -2162,6 +2177,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 		double samp_temperature, double rvar_probability, uint32_t max_flips,
 		uint32_t max_extra_flips, uint32_t timeout,
 		uint32_t burn_in_steps, uint32_t samp_interval) {
+	atom_table_t *atom_table = &table->atom_table;
 	int32_t conflict;
 	uint32_t i;
 	time_t fintime = 0;
@@ -2177,7 +2193,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	if (get_verbosity_level() >= 1) {
 		printf("\nMC-SAT initial assignment (all hard clauses are satisifed): \n");
 		print_assignment(table);
-		print_clause_table(table, 0);
+		print_clause_table(table, -1);
 	}
 	//assert(valid_table(table));
 
@@ -2316,8 +2332,6 @@ bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs, samp_table_t *
  * variables of the rule, and a samp_table, returns the substituted clause.
  * Checks that the constants array is the right length, and the sorts match.
  * Returns -1 if there is a problem.
- *
- *
  */
 int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *table) {
 	const_table_t *const_table = &table->const_table;
@@ -2359,6 +2373,7 @@ int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *t
 				i, rule->num_vars);
 		return -1;
 	}
+
 	// Everything is OK, do the substitution
 	// We just use the clause_buffer - first make sure it's big enough
 	clause_buffer_resize(rule->num_lits);
@@ -2428,10 +2443,10 @@ void rule_atom_buffer_resize(int32_t length) {
 	}
 }
 
-/**
- * Given an atom (index), checks if the given possible rule instances should
- * be added to the clauses.  Called from all_rule_instances_rec when lazy
- * flag is set.
+/** 
+ * [lazy MC-SAT only]  Given an atom (index), checks if the given possible
+ * rule instances should be added to the clauses.  Called from
+ * all_rule_instances_rec when lazy flag is set.
  *
  * FIXME: what is the criteria of deciding whether to instantiate a clause?
  */
@@ -2554,37 +2569,93 @@ bool check_clause_instance(samp_table_t *table, samp_rule_t *rule, int32_t atom_
 	return true;
 }
 
-/**
- * all_rule_instances takes a rule and generates all ground instances
- * based on the atoms, their predicates and corresponding sorts
+/*
+ * [lazy MC-SAT only] Returns the default value of a builtinop
+ * or user defined predicate of a rule atom.
  *
- * TODO: what does this do for non-lazy inference
+ * 0: false; 1: true; -1: neither
  */
-void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t *table, int32_t atom_index) {
+int32_t get_default_value(rule_atom_t *rule_atom, pred_table_t *pred_table) {
+	int32_t predidx;
+	pred_entry_t *pred;
 
+	switch (rule_atom->builtinop)  {
+	case EQ:
+	case PLUS:
+	case MINUS:
+	case TIMES:
+	case DIV:
+	case REM:
+		return 0;
+	case NEQ:
+		return 1;
+	case 0:
+		predidx = rule_atom->pred;
+		pred = pred_entry(pred_table, predidx);
+		// TODO: default value is always false
+		bool default_value = false;
+		if (default_value)
+			return 1;
+		else 
+			return 0;
+	default:
+		return -1;
+	}
+}
+
+/**
+ * [Only for lazy MC-SAT] Instantiate all rules
+ */
+void smart_rule_instances(int32_t vidx, samp_rule_t *rule, samp_table_t *table, 
+		int32_t atom_index) {
 	clause_table_t *clause_table = &table->clause_table;
+	pred_table_t *pred_table = &table->pred_table;
 	int prev_num_clauses;
+	int32_t i;
+	int32_t *lits_status; // if a literal has been visited and so on
 
-	if (substit_buffer.entries[vidx].fixed) {
-		// Simply do the substitution, or go to the next var
-		if (vidx == rule->num_vars - 1) {
-			substit_buffer.entries[vidx + 1].const_index = INT32_MIN;
-			if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
-				if (lazy_mcsat()) {
-					prev_num_clauses = clause_table->num_clauses;
-				}
-				substit_rule(rule, substit_buffer.entries, table);
-				if (lazy_mcsat()) {
-					if (prev_num_clauses < clause_table->num_clauses) {
-						assert(prev_num_clauses + 1 == clause_table->num_clauses);
-						push_clause(clause_table->samp_clauses[prev_num_clauses],
-								&(clause_table->unsat_clauses));
-					}
+	lits_status = (int32_t *) safe_malloc(sizeof(int32_t) * rule->num_lits);
+	for (i = 0; i < rule->num_lits; i++) {
+		int32_t default_value = get_default_value(rule->literals[i]->atom, pred_table);
+		if ((rule->literals[i]->neg && default_value == 1)
+				|| (!rule->literals[i]->neg && default_value == 0)) {
+			lits_status[i] = 1;
+		}
+	}
+
+	/* termination of the recursion */
+	if (vidx == rule->num_vars) {
+		substit_buffer.entries[vidx].const_index = INT32_MIN;
+		if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
+			if (lazy_mcsat()) {
+				prev_num_clauses = clause_table->num_clauses;
+			}
+			if (get_verbosity_level() >= 5) {
+				printf("Rule ");
+				print_rule_substit(rule, substit_buffer.entries, table);
+				printf(" is being activated ...\n");
+			}
+			int32_t success = substit_rule(rule, substit_buffer.entries, table);
+			if (get_verbosity_level() >= 5) {
+				if (success < 0) {
+					printf("Failed.\n");
+				} else {
+					printf("Succeeded.\n");
 				}
 			}
-		} else {
-			all_rule_instances_rec(vidx + 1, rule, table, atom_index);
+			if (lazy_mcsat()) {
+				if (prev_num_clauses < clause_table->num_clauses) {
+					assert(prev_num_clauses + 1 == clause_table->num_clauses);
+					push_clause(clause_table->samp_clauses[prev_num_clauses],
+							&(clause_table->unsat_clauses));
+				}
+			}
 		}
+		return;
+	}
+
+	if (substit_buffer.entries[vidx].fixed) {
+		all_rule_instances_rec(vidx + 1, rule, table, atom_index);
 	} else {
 		sort_table_t *sort_table = &table->sort_table;
 		int32_t vsort = rule->vars[vidx]->sort_index;
@@ -2602,33 +2673,73 @@ void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t *table
 			} else {
 				substit_buffer.entries[vidx].const_index = entry.constants[i];
 			}
-			if (vidx == rule->num_vars - 1) {
-				substit_buffer.entries[vidx + 1].const_index = INT32_MIN;
-				if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
+			all_rule_instances_rec(vidx + 1, rule, table, atom_index);
+		}
+	}
+}
 
-					if (get_verbosity_level() >= 5) {
-						printf("Rule ");
-						print_rule_substit(rule, &substit_buffer, table);
-						printf(" is being activated.\n");
-					}
+/**
+ * all_rule_instances takes a rule and generates all ground instances
+ * based on the atoms, their predicates and corresponding sorts
+ *
+ * For eager MC-SAT, it is called by all_rule_instances with atom_index equal to -1;
+ * For lazy MC-SAT, the implementation is not efficient.
+ */
+void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t *table, int32_t atom_index) {
+	clause_table_t *clause_table = &table->clause_table;
+	int prev_num_clauses;
 
-					if (lazy_mcsat()) {
-						prev_num_clauses = clause_table->num_clauses;
-					}
-					substit_rule(rule, substit_buffer.entries, table);
-					if (lazy_mcsat()) {
-						if (prev_num_clauses < clause_table->num_clauses) {
-							assert(prev_num_clauses + 1 == clause_table->num_clauses);
-							// TODO: check if it is okay if we always add clause to
-							// the unsat_clauses
-							push_clause(clause_table->samp_clauses[prev_num_clauses],
-									&(clause_table->unsat_clauses));
-						}
-					}
+	/* termination of the recursion */
+	if (vidx == rule->num_vars) {
+		substit_buffer.entries[vidx].const_index = INT32_MIN;
+		if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
+			if (lazy_mcsat()) {
+				prev_num_clauses = clause_table->num_clauses;
+			}
+			if (get_verbosity_level() >= 5) {
+				printf("[all_rule_instances_rec] Rule ");
+				print_rule_substit(rule, substit_buffer.entries, table);
+				printf(" is being activated ...\n");
+			}
+			int32_t success = substit_rule(rule, substit_buffer.entries, table);
+			if (get_verbosity_level() >= 5) {
+				if (success < 0) {
+					printf("Failed.\n");
+				} else {
+					printf("Succeeded.\n");
+				}
+			}
+			if (lazy_mcsat()) {
+				if (prev_num_clauses < clause_table->num_clauses) {
+					assert(prev_num_clauses + 1 == clause_table->num_clauses);
+					push_clause(clause_table->samp_clauses[prev_num_clauses],
+							&(clause_table->unsat_clauses));
+				}
+			}
+		}
+		return;
+	}
+
+	if (substit_buffer.entries[vidx].fixed) {
+		all_rule_instances_rec(vidx + 1, rule, table, atom_index);
+	} else {
+		sort_table_t *sort_table = &table->sort_table;
+		int32_t vsort = rule->vars[vidx]->sort_index;
+		sort_entry_t entry = sort_table->entries[vsort];
+		int32_t i;
+		for (i = 0; i < entry.cardinality; i++) {
+			if (entry.constants == NULL) {
+				if (entry.ints == NULL) {
+					// Have a subrange
+					substit_buffer.entries[vidx].const_index
+						= entry.lower_bound + i;
+				} else {
+					substit_buffer.entries[vidx].const_index = entry.ints[i];
 				}
 			} else {
-				all_rule_instances_rec(vidx + 1, rule, table, atom_index);
+				substit_buffer.entries[vidx].const_index = entry.constants[i];
 			}
+			all_rule_instances_rec(vidx + 1, rule, table, atom_index);
 		}
 	}
 }
@@ -2705,15 +2816,11 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 		int32_t atom_index) {
 	int32_t i;
 
-//	for (i = 0; i < substit_buffer.size; i++) {
-//		substit_buffer.entries[i].fixed = false;
-//	}
-
 	if (get_verbosity_level() >= 5) {
-		printf("Instantiating for ");
+		printf("[fixed_const_rule_instances] Instantiating for ");
 		print_atom(table->atom_table.atom[atom_index], table);
 		printf(": ");
-		print_rule_substit(rule, &substit_buffer, table);
+		print_rule_substit(rule, substit_buffer.entries, table);
 		printf("\n");
 	}
 
@@ -3058,14 +3165,14 @@ int32_t samp_query_to_query_instance(samp_query_t *query, samp_table_t *table) {
 				argidx = new_atom->args[k];
 			}
 			if (get_verbosity_level() > 1) {
-				printf("samp_query_to_query_instance: Adding internal atom ");
+				printf("[samp_query_to_query_instance] Adding internal atom ");
 				print_atom_now(new_atom, table);
 				printf("\n");
 			}
 			added_atom = add_internal_atom(table, new_atom, false);
 			if (added_atom == -1) {
 				// This shouldn't happen, but if it does, we need to free up space
-				mcsat_err("samp_query_to_query_instance: Bad atom\n");
+				mcsat_err("[samp_query_to_query_instance] Bad atom\n");
 				return -1;
 			}
 			litinst[i][j] = lit[i][j]->neg ? neg_lit(added_atom) : pos_lit(
@@ -3234,8 +3341,48 @@ bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
 //   return true;
 // }
 
-/**
+/*
  * Activates the rules relavent to a given atom
+ *
+ * TODO: To debug.  A predicate has default value of true or false.  A clause
+ * also has default value of true or false.
+ *
+ * When the default value of a clause is true: We initially calculate the
+ * M-membership for active clauses only.  If some clauses are activated later
+ * during the sample SAT, they need to pass the M-membership test to be put
+ * into M.
+ *
+ *     e.g., Fr(x,y) and Sm(x) implies Sm(y) i.e., ~Fr(x,y) or ~Sm(x) or Sm(y)
+ *
+ *     If Sm(A) is activated (as true) at some stage, do we need to activate
+ *     all the clauses related to it? No. We consider two cases:
+ *
+ *     If y\A, nothing changed, nothing will be activated.
+ *
+ *     If x\A, if there is some B, Fr(A,B) is also true, and Sm(B) is false
+ *     (inactive or active but with false value), [x\A,y\B] will be activated.
+ *
+ *     How do we do it? We index the active atoms by each argument. e.g.,
+ *     Fr(A,?) or Fr(?,B). If a literal is activated to a satisfied value,
+ *     e.g., the y\A case above, do nothing. If a literal is activated to an
+ *     unsatisfied value, e.g., the x\A case, we check the active atoms of
+ *     Fr(x,y) indexed by Fr(A,y). Since Fr(x,y) has a default value of false
+ *     that makes the literal satisfied, only the active atoms of Fr(x,y) may
+ *     relate to a unsat clause.  Then we get only a small subset of
+ *     substitution of y, which can be used to verify the last literal (Sm(y))
+ *     easily.  (See the implementation details section in Poon and Domingos
+ *     08)
+ *
+ * When the default value of a clause is false: Poon and Domingos 08 didn't
+ * consider this case. In general, this case can't be solved lazily, because we
+ * have to try to satisfy all the ground clauses within the sample SAT. This is
+ * a rare case in real applications, cause they are usually sparse.
+ *
+ * What would be the case when we consider clauses with negative weight?  Or
+ * more general, any formulas? First of all, MCSAT works for all FOL formulas,
+ * not just clauses. So if a input formula has a negative weight, we could nagate the
+ * formula and the weight. A Markov logic contains only clauses merely makes
+ * the function activation of lazy MC-SAT easier.
  */
 void activate_rules(int32_t atom_index, samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
@@ -3253,11 +3400,8 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 	num_rules = pred_tbl->entries[predicate].num_rules;
 	rules = pred_tbl->entries[predicate].rules;
 
-//	printf("Before activating clauses for ");
-//	print_atom_now(atom, table);
-//	dump_clause_table(table);
-
-	/** TODO: for each ground clause related to the atom, if it is activated
+	/** 
+	 * TODO: for each ground clause related to the atom, if it is activated
 	 * already, we do nothing.  Otherwise we activate it, and calculate whether
 	 * it belongs to the subset of clauses for sample SAT in this round.
 	 */
@@ -3265,18 +3409,14 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 		rule_entry = rule_table->samp_rules[rules[i]];
 		rule_inst_true = false;
 		for (j = 0; j < rule_entry->num_lits; j++) {
-			cprintf(6, "Checking whether to activate rule %"PRId32", literal %"PRId32"\n",
-					rules[i], j);
+//			cprintf(6, "Checking whether to activate rule %"PRId32", literal %"PRId32"\n",
+//					rules[i], j);
 			if (match_atom_in_rule_atom(atom, rule_entry->literals[j], arity)) {
 				//then substit_buffer contains the matching substitution
 				fixed_const_rule_instances(rule_entry, table, atom_index);
 			}
 		}
 	}
-
-//	printf("After activating clauses for ");
-//	print_atom_now(atom, table);
-//	dump_clause_table(table);
 }
 
 /*
@@ -3291,7 +3431,7 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom) {
 	//assert(valid_table(table));
 
 	if (get_verbosity_level() >= 5) {
-		printf("activate_atom: Adding internal atom ");
+		printf("[activate_atom] Activating atom ");
 		print_atom_now(atom, table);
 		printf("\n");
 	}
@@ -3300,9 +3440,10 @@ int32_t activate_atom(samp_table_t *table, samp_atom_t *atom) {
 	//assert(valid_table(table));
 
 	assert(table->atom_table.num_vars == atom_index + 1);
-	/* If new atoms are activated within activate_rules,
-	 * they are again being activated. This creates a transitive
-	 * closure for the given atom. */
+	/* If new atoms are found within activate_rules,
+	 * they are again activated. This creates a transitive
+	 * closure for the given atom. 
+	 */
 	while (atom_index < table->atom_table.num_vars) {
 		activate_rules(atom_index, table);
 		atom_index += 1;

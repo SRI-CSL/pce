@@ -38,8 +38,12 @@ int32_t *intarray_copy(int32_t *signature, int32_t length){
   return new_signature;
 }
 
-/*asserts a db atom to the atoms table and sets its truth value as v_db_true
-  A db atom has an evidence predicate which must be negative. 
+/*
+ * asserts a db atom to the atoms table and sets its truth value as v_db_true
+ * A db atom has an evidence predicate which must be negative. FIXME: 
+ * wrong comments
+ *
+ * Retrieves a predicate by the index
  */
 pred_entry_t *pred_entry(pred_table_t *pred_table, int32_t predicate){
   if (predicate <= 0){

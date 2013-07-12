@@ -177,12 +177,8 @@ int32_t choose_random_atom(samp_table_t *table) {
 	atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
 			(int32_t *) atom);
 	//assert(valid_table(table));
+
 	if (atom_map == NULL) { //need to activate atom
-		if (get_verbosity_level() >= 5) {
-			printf("Activating atom (at sample %d) ", atom_table->num_samples);
-			print_atom(atom, table);
-			printf("\n");
-		}
 
 		activate_atom(table, atom);
 
@@ -199,47 +195,6 @@ int32_t choose_random_atom(samp_table_t *table) {
 	}
 }
 
-/** 
- * TODO: To debug.  A predicate has default value of true or false.  A clause
- * also has default value of true or false.
- *
- * When the default value of a clause is true: We initially calculate the
- * M-membership for active clauses only.  If some clauses are activated later
- * during the sample SAT, they need to pass the M-membership test to be put
- * into M.
- *
- *     e.g., Fr(x,y) and Sm(x) implies Sm(y) i.e., ~Fr(x,y) or ~Sm(x) or Sm(y)
- *
- *     If Sm(A) is activated (as true) at some stage, do we need to activate
- *     all the clauses related to it? No. We consider two cases:
- *
- *     If y\A, nothing changed, nothing will be activated.
- *
- *     If x\A, if there is some B, Fr(A,B) is also true, and Sm(B) is false
- *     (inactive or active but with false value), [x\A,y\B] will be activated.
- *
- *     How do we do it? We index the active atoms by each argument. e.g.,
- *     Fr(A,?) or Fr(?,B). If a literal is activated to a satisfied value,
- *     e.g., the y\A case above, do nothing. If a literal is activated to an
- *     unsatisfied value, e.g., the x\A case, we check the active atoms of
- *     Fr(x,y) indexed by Fr(A,y). Since Fr(x,y) has a default value of false
- *     that makes the literal satisfied, only the active atoms of Fr(x,y) may
- *     relate to a unsat clause.  Then we get only a small subset of
- *     substitution of y, which can be used to verify the last literal (Sm(y))
- *     easily.  (See the implementation details section in Poon and Domingos
- *     08)
- *
- * When the default value of a clause is false: Poon and Domingos 08 didn't
- * consider this case. In general, this case can't be solved lazily, because we
- * have to try to satisfy all the ground clauses within the sample SAT. This is
- * a rare case in real applications, cause they are usually sparse.
- *
- * What would be the case when we consider clauses with negative weight?  Or
- * more general, any formulas? First of all, MCSAT works for all FOL formulas
- * as well. So if a input formula has a negative weight, we could nagate the
- * formula and the weight. A Markov logic contains only clauses merely makes
- * the function activation of lazy MC-SAT easier.
- */
 //int32_t lazy_sample_sat_body(samp_table_t *table, double sa_probability,
 //		double samp_temperature, double rvar_probability) {
 //	clause_table_t *clause_table = &table->clause_table;

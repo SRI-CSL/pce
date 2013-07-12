@@ -11,7 +11,7 @@
  */
 
 /*
- * TODO: Truth values: explain??
+ * TODO: Truth values
  */
 typedef enum {
   v_undef = -1,
@@ -122,7 +122,7 @@ typedef struct input_sortdef_s {
 
 typedef struct input_atom_s {
   char *pred;
-  int32_t builtinop;
+  int32_t builtinop; // = 0: not a built-in-op, > 0: built-in-op
   char **args;
 } input_atom_t;
 
@@ -209,7 +209,7 @@ typedef  struct sort_table_s {
 #define INIT_MODEL_TABLE_SIZE 64
 #define INIT_SUBSTIT_TABLE_SIZE 8 // number of vars in rules - likely to be small
 
-typedef  struct pred_entry_s {
+typedef struct pred_entry_s {
   int32_t arity;//number of arguments; negative for evidence predicate
   int32_t *signature;//pointer to an array of sort indices
   char *name;//print name

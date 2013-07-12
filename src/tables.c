@@ -640,7 +640,7 @@ void init_atom_table(atom_table_t *table) {
 /*
  * When atom_table is resized, the watched literals must also be resized. 
  */
-void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
+void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table) {
   int32_t size, num_vars, i;
 
   num_vars = atom_table->num_vars;
@@ -665,7 +665,8 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table){
   if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= size){
     out_of_memory();
   }
-  clause_table->watched = (samp_clause_t **) safe_realloc(clause_table->watched, 2*size*sizeof(samp_clause_t *));
+  clause_table->watched = (samp_clause_t **) safe_realloc(
+		  clause_table->watched, 2*size*sizeof(samp_clause_t *));
 
   for (i = atom_table->size; i < size; i++) {
     atom_table->pmodel[i] = 0;//was -1
