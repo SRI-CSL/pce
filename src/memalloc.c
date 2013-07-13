@@ -76,3 +76,11 @@ char *clone_string(const char *str) {
   strcpy(tmp->str, str);
   return tmp->str;
 }
+
+/* clone a piece of memory */
+void *clone_memory(void *memory, size_t size) {
+	void *tmp = safe_malloc(size);
+	memcpy(tmp, memory, size);
+	return tmp;
+}
+

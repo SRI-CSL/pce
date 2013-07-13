@@ -292,7 +292,6 @@ typedef struct clause_table_s {
 // added to the clause table.  The variables list is kept with each rule,
 // and the literal list is a list of actual literals, in order to reference
 // the variables.
-
 typedef enum {constant, variable, integer} arg_kind_t;
 
 // In a rule, an argument may be:
@@ -310,7 +309,7 @@ typedef struct rule_atom_arg_s {
 
 typedef struct rule_atom_s {
   int32_t pred;
-  int32_t builtinop;
+  int32_t builtinop; // = 0: not a built-in-op, > 0: built-in-op
   rule_atom_arg_t *args;
 } rule_atom_t;
 
@@ -450,7 +449,7 @@ extern int32_t pred_val_to_index(int32_t val);
 
 extern bool atom_eatom(int32_t atom_id, pred_table_t *pred_table, atom_table_t *atom_table);
 
-extern pred_entry_t *pred_entry(pred_table_t *pred_table, int32_t predicate);
+extern pred_entry_t *get_pred_entry(pred_table_t *pred_table, int32_t predicate);
 
 extern int32_t pred_arity(int32_t predicate, pred_table_t *pred_table);
 

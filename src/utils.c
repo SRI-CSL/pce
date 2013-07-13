@@ -45,7 +45,7 @@ int32_t *intarray_copy(int32_t *signature, int32_t length){
  *
  * Retrieves a predicate by the index
  */
-pred_entry_t *pred_entry(pred_table_t *pred_table, int32_t predicate){
+pred_entry_t *get_pred_entry(pred_table_t *pred_table, int32_t predicate){
   if (predicate <= 0){
     return &(pred_table->evpred_tbl.entries[-predicate]);
   } else {

@@ -37,7 +37,7 @@ void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule,
 
 static void add_atom_to_pred(pred_table_t *pred_table, int32_t predicate,
 		int32_t current_atom_index) {
-	pred_entry_t *entry = pred_entry(pred_table, predicate);
+	pred_entry_t *entry = get_pred_entry(pred_table, predicate);
 	int32_t size;
 	if (entry->num_atoms >= entry->size_atoms) {
 		if (entry->size_atoms == 0) {
@@ -60,7 +60,7 @@ static void add_atom_to_pred(pred_table_t *pred_table, int32_t predicate,
 
 void add_rule_to_pred(pred_table_t *pred_table, int32_t predicate,
 		int32_t current_rule_index) {
-	pred_entry_t *entry = pred_entry(pred_table, predicate);
+	pred_entry_t *entry = get_pred_entry(pred_table, predicate);
 	int32_t i, size;
 
 	for (i = 0; i < entry->num_rules; i++) {
@@ -147,7 +147,7 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 		clause_table->watched[neg_lit(current_atom_index)] = NULL;
 		//assert(valid_table(table));
 		if (top_p) {
-			pred_entry_t *entry = pred_entry(pred_table, predicate);
+			pred_entry_t *entry = get_pred_entry(pred_table, predicate);
 			for (i = 0; i < entry->num_rules; i++) {
 				rule = rule_table->samp_rules[entry->rules[i]];
 				all_rule_instances_rec(0, rule, table, current_atom_index);
@@ -2110,6 +2110,7 @@ void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 	}
 	//printf("After flipping:\n");
 	//print_assignment(table);
+
 	//if (max_extra_flips < num_flips){
 	if (conflict != -1 && table->clause_table.num_unsat_clauses == 0) {
 		num_flips = genrand_uint(max_extra_flips);
@@ -2591,7 +2592,7 @@ int32_t get_default_value(rule_atom_t *rule_atom, pred_table_t *pred_table) {
 		return 1;
 	case 0:
 		predidx = rule_atom->pred;
-		pred = pred_entry(pred_table, predidx);
+		pred = get_pred_entry(pred_table, predidx);
 		// TODO: default value is always false
 		bool default_value = false;
 		if (default_value)
@@ -2600,81 +2601,6 @@ int32_t get_default_value(rule_atom_t *rule_atom, pred_table_t *pred_table) {
 			return 0;
 	default:
 		return -1;
-	}
-}
-
-/**
- * [Only for lazy MC-SAT] Instantiate all rules
- */
-void smart_rule_instances(int32_t vidx, samp_rule_t *rule, samp_table_t *table, 
-		int32_t atom_index) {
-	clause_table_t *clause_table = &table->clause_table;
-	pred_table_t *pred_table = &table->pred_table;
-	int prev_num_clauses;
-	int32_t i;
-	int32_t *lits_status; // if a literal has been visited and so on
-
-	lits_status = (int32_t *) safe_malloc(sizeof(int32_t) * rule->num_lits);
-	for (i = 0; i < rule->num_lits; i++) {
-		int32_t default_value = get_default_value(rule->literals[i]->atom, pred_table);
-		if ((rule->literals[i]->neg && default_value == 1)
-				|| (!rule->literals[i]->neg && default_value == 0)) {
-			lits_status[i] = 1;
-		}
-	}
-
-	/* termination of the recursion */
-	if (vidx == rule->num_vars) {
-		substit_buffer.entries[vidx].const_index = INT32_MIN;
-		if (!lazy_mcsat() || check_clause_instance(table, rule, atom_index)) {
-			if (lazy_mcsat()) {
-				prev_num_clauses = clause_table->num_clauses;
-			}
-			if (get_verbosity_level() >= 5) {
-				printf("Rule ");
-				print_rule_substit(rule, substit_buffer.entries, table);
-				printf(" is being activated ...\n");
-			}
-			int32_t success = substit_rule(rule, substit_buffer.entries, table);
-			if (get_verbosity_level() >= 5) {
-				if (success < 0) {
-					printf("Failed.\n");
-				} else {
-					printf("Succeeded.\n");
-				}
-			}
-			if (lazy_mcsat()) {
-				if (prev_num_clauses < clause_table->num_clauses) {
-					assert(prev_num_clauses + 1 == clause_table->num_clauses);
-					push_clause(clause_table->samp_clauses[prev_num_clauses],
-							&(clause_table->unsat_clauses));
-				}
-			}
-		}
-		return;
-	}
-
-	if (substit_buffer.entries[vidx].fixed) {
-		all_rule_instances_rec(vidx + 1, rule, table, atom_index);
-	} else {
-		sort_table_t *sort_table = &table->sort_table;
-		int32_t vsort = rule->vars[vidx]->sort_index;
-		sort_entry_t entry = sort_table->entries[vsort];
-		int32_t i;
-		for (i = 0; i < entry.cardinality; i++) {
-			if (entry.constants == NULL) {
-				if (entry.ints == NULL) {
-					// Have a subrange
-					substit_buffer.entries[vidx].const_index
-						= entry.lower_bound + i;
-				} else {
-					substit_buffer.entries[vidx].const_index = entry.ints[i];
-				}
-			} else {
-				substit_buffer.entries[vidx].const_index = entry.constants[i];
-			}
-			all_rule_instances_rec(vidx + 1, rule, table, atom_index);
-		}
 	}
 }
 
@@ -2810,11 +2736,17 @@ void all_rule_instances(int32_t rule_index, samp_table_t *table) {
 }
 
 /**
+ * [lazy only] Instantiate all rule instances relevant to an atom
+ * 
  * Note that substit_buffer.entries has been set up already
  */
 void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 		int32_t atom_index) {
-	int32_t i;
+	clause_table_t *clause_table = &table->clause_table;
+	pred_table_t *pred_table = &table->pred_table;
+	int prev_num_clauses;
+	int32_t i, order;
+	int32_t *ordered_lits; // the order of the lits in which they are checked
 
 	if (get_verbosity_level() >= 5) {
 		printf("[fixed_const_rule_instances] Instantiating for ");
@@ -2824,7 +2756,86 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 		printf("\n");
 	}
 
-	all_rule_instances_rec(0, rule, table, atom_index);
+	ordered_lits = (int32_t *) safe_malloc(sizeof(int32_t) * rule->num_lits);
+	order = 0;
+	for (i = 0; i < rule->num_lits; i++) {
+		int32_t default_value = get_default_value(rule->literals[i]->atom, pred_table);
+		if ((rule->literals[i]->neg && default_value == 1)
+				|| (!rule->literals[i]->neg && default_value == 0)) {
+			ordered_lits[order] = i;
+			order++;
+		}
+	}
+
+	/* termination symbol */
+	ordered_lits[order] = -1;
+
+	smart_rule_instances_rec(0, ordered_lits, rule, table, atom_index);
+
+	safe_free(ordered_lits);
+}
+
+/*
+ * [lazy only] Recursively enumerate the rule instances
+ */
+void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_rule_t *rule,
+		samp_table_t *table, int32_t atom_index) {
+	pred_table_t *pred_table = &table->pred_table;
+	atom_table_t *atom_table = &table->atom_table;
+	int32_t litidx = ordered_lits[order];
+	rule_atom_t *rule_atom = rule->literals[litidx]->atom;
+	int32_t i, j, var_index;
+
+	/* when all non-default predicates have been considered,
+	 * recursively enumerate the rest */
+	if (ordered_lits[order] < 0) {
+		all_rule_instances_rec(0, rule, table, atom_index);
+	}
+
+	//int32_t vsort = rule->vars[vidx]->sort_index;
+	if (rule_atom->builtinop > 0) { // is a builtin operator
+	}
+
+	int32_t predidx = rule_atom->pred;
+	pred_entry_t *pred_entry = get_pred_entry(pred_table, predidx);
+
+	/*
+	 * The atom arguments that are consistent with the current substitution.
+	 * Can be used to efficiently retrieve the active atoms
+	 */
+	int32_t *atom_arg_index = (int32_t *) safe_malloc(sizeof(int32_t) * pred_entry->arity);
+	for (i = 0; i < pred_entry->arity; i++) {
+		if (rule_atom->args[i].kind == variable) {
+			/* make the value consistent with the substitution */
+			atom_arg_index[i] = substit_buffer.entries[rule_atom->args[i].value].const_index;
+		} else {
+			atom_arg_index[i] = rule_atom->args[i].value;
+		}
+	}
+
+	/* 
+	 * for an evidential predicate, check all non-default valued atoms;
+	 * for a non-evidential predicate, check all active atoms.
+	 */
+	for (i = 0; i < pred_entry->num_atoms; i++) {
+		samp_atom_t *atom = atom_table->atom[pred_entry->atoms[i]];
+		for (j = 0; j < pred_entry->arity; j++) {
+			// TODO: how to determine if a variable has a fixed value,
+			// entries[i].fixed or entries[i].const_index == INT32_MIN?
+			// Now we assume both.
+			if (atom_arg_index[j] != INT32_MIN &&
+					atom_arg_index[j] != atom->args[j]) {
+				return; // incompatible
+			}
+			// index of the variable in the rule's quantifier list
+			var_index = rule_atom->args[i].value;
+			substit_buffer.entries[var_index].fixed = true;
+			substit_buffer.entries[var_index].const_index = atom->args[j]; // for free variable
+			smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
+		}
+	}
+
+	safe_free(atom_arg_index);
 }
 
 // Called by MCSAT when a new constant is added.
@@ -3342,7 +3353,7 @@ bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
 // }
 
 /*
- * Activates the rules relavent to a given atom
+ * [lazy only] Activates the rules relevant to a given atom
  *
  * TODO: To debug.  A predicate has default value of true or false.  A clause
  * also has default value of true or false.
@@ -3420,9 +3431,9 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 }
 
 /*
- * Each rule involving the predicate in the atom is instantiated in all
- * possible extensions of the given atom. Only the fixed falsifiable instances
- * are retained.
+ * [lazy only] Each rule involving the predicate in the atom is instantiated
+ * in all possible extensions of the given atom. Only the fixed falsifiable
+ * instances are retained.
  */
 int32_t activate_atom(samp_table_t *table, samp_atom_t *atom) {
 
