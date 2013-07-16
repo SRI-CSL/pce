@@ -972,8 +972,11 @@ extern bool read_eval(samp_table_t *table) {
 				output(" samples are not going to be dumped after the first ASK");
 				set_dump_samples_path(NULL);
 			}
+			
+			/* TODO: add all queries and run mcsat in the end */
+			//add_cnf_query(decl.formula);
 
-			// mcsat runs in this subroutine
+			/* the following call will run mcsat once for each query */
 			ask_cnf(decl.formula, decl.threshold, decl.numresults);
 			// Results are in ask_buffer - print them out
 			print_ask_results(decl.formula, table);

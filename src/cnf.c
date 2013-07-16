@@ -782,9 +782,8 @@ static int cmp_pmodels(const void *p1, const void *p2) {
 	return n1 < n2 ? 1 : n1 > n2 ? -1 : 0;
 }
 
-// Similar to cnf_ask, but the role of it is to add queries one by one
+// Similar to ask_cnf, but the role of it is to add queries one by one
 // to allow sampling of them at the same time by a later call to mc_sat()
-
 void add_cnf_query(input_formula_t *formula) {
 	rule_literal_t ***lits;
 	samp_query_t *query;
@@ -819,13 +818,12 @@ void add_cnf_query(input_formula_t *formula) {
 }
 
 // Generates the CNF form of a formula, and updates the query and
-// query_instance tables.  These are analogous to the rule and clause
-// tables, respectively.  Thus queries without variables are immediately
+// query_instance tables. These are analogous to the rule and clause
+// tables, respectively. Thus queries without variables are immediately
 // added to the query_instance table, while queries with variables are
 // added to the query table, and instances of them are generated as needed
 // and added to the query_instance table.
 // Result is a sorted list of samp_query_instance_t's in the ask_buffer.
-
 void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
 	query_instance_table_t *query_instance_table;
 	rule_literal_t ***lits;
@@ -885,3 +883,4 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
 	// To clear it out for the next query, call the following
 	// reset_query_instance_table(query_instance_table);
 }
+

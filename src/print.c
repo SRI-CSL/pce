@@ -426,7 +426,6 @@ void print_assignment(samp_table_t *table){
 	fflush(stdout);
 }
 
-
 extern void dump_sort_table (samp_table_t *table) {
 	sort_table_t *sort_table = &(table->sort_table);
 	const_table_t *const_table = &(table->const_table);

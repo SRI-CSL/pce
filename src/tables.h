@@ -346,6 +346,12 @@ typedef struct rule_table_s {
 
 // Similar to rules, but we can't separate the clauses, so the literals
 // array is one level deeper.
+/* TODO: Does not have to cnf-lize the query formulas, because we only
+ * need to evaluate the formulas given an assignment. It could also
+ * support lazy option, in which we examine the quantified formula w.r.t.
+ * an assignment and only instantiate the ground formulas that have a
+ * non-default value (Normally the default value is false).
+ */
 typedef struct samp_query_s {
   int32_t *source_index; // The source of this query, e.g., formula, learner id
   int32_t num_clauses;
