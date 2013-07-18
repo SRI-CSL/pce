@@ -132,6 +132,8 @@ extern bool subsort_p(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
 extern int32_t least_common_supersort(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
 extern int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
 
-samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, pred_table_t *pred_table);
-  
+extern int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table);
+extern samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, pred_table_t *pred_table);
+extern samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, samp_table_t *table);
+
 #endif /* __UTILS_H */     

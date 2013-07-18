@@ -179,9 +179,7 @@ int32_t choose_random_atom(samp_table_t *table) {
 	//assert(valid_table(table));
 
 	if (atom_map == NULL) { //need to activate atom
-
-		activate_atom(table, atom);
-
+		add_and_activate_atom(table, atom);
 		atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
 				(int32_t *) atom);
 		if (atom_map == NULL) {

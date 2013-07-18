@@ -28,6 +28,8 @@ extern void output(const char *fmt, ...);
 extern void mcsat_err(const char *fmt, ...);
 extern void mcsat_warn(const char *fmt, ...);
 extern char * get_string_from_buffer(string_buffer_t *strbuf);
+extern char *literal_string(samp_literal_t lit, samp_table_t *table);
+extern char *atom_string(samp_atom_t *atom, samp_table_t *table);
 
 extern void dump_sort_table (samp_table_t *table);
 extern void dump_pred_table (samp_table_t *table);
@@ -45,6 +47,8 @@ extern void print_literal(samp_literal_t lit, samp_table_t *table);
 extern void print_clause(samp_clause_t *clause, samp_table_t *table);
 extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,
 				 int32_t indent, bool include_prob);
+extern void print_rule (samp_rule_t *rule, samp_table_t *table, int indent);
+extern void print_rule_substit(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *table);
 extern void print_rule_clause (rule_literal_t **lit, var_entry_t **vars,
 			       samp_table_t *table);
 extern void print_rule_atom (rule_atom_t *ratom, bool neg, var_entry_t **vars,

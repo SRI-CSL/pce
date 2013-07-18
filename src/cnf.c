@@ -687,7 +687,9 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 				}
 				samp_atom_t *satom = rule_atom_to_samp_atom(lit->atom,
 						pred_table);
-				atom_idx = add_internal_atom(&samp_table, satom, true);
+				// FIXME what is top_p? should it be true or false?
+				//atom_idx = add_internal_atom(&samp_table, satom, true);
+				atom_idx = add_internal_atom(&samp_table, satom, false);
 				free_samp_atom(satom);
 				clause_lits[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
 			}
@@ -752,7 +754,11 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 						add_rule_to_pred(pred_table, pred, current_rule);
 					}
 				}
-				all_rule_instances(current_rule, &samp_table);
+				if (!lazy_mcsat()) {
+					all_rule_instances(current_rule, &samp_table);
+				} else {
+					smart_rule_instances(current_rule, &samp_table);
+				}
 			} else {
 				if (found->weight != DBL_MAX) {
 					mcsat_warn("Rule was seen before, adding weights\n");

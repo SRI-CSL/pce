@@ -53,6 +53,7 @@ void cprintf(int32_t level, const char *fmt, ...){
 	}
 }
 
+/* get a copy of the buffer */
 extern char *get_string_from_buffer (string_buffer_t *strbuf) {
 	char *new_str;
 	if (strbuf->size == 0) {
@@ -84,7 +85,12 @@ void string_buffer_resize (string_buffer_t *strbuf, int32_t delta) {
 	}
 }
 
-// Output to stdout or output_buffer
+/*
+ * Output to stdout or output_buffer
+ *
+ * when output_to_string is true, print to output_buffer,
+ * otherwise print to stdout
+ */
 extern void output(const char *fmt, ...) {
 	int32_t out_size, index;
 	va_list argp;
@@ -164,29 +170,29 @@ void mcsat_warn(const char *fmt, ...) {
 void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
 	char *buffer;
 	int32_t i, j; 
-	printf("num of evpreds: %"PRId32"\n", pred_table->evpred_tbl.num_preds);
+	output("num of evpreds: %"PRId32"\n", pred_table->evpred_tbl.num_preds);
 	for (i = 0; i < pred_table->evpred_tbl.num_preds; i++){
-		printf("evpred[%"PRId32"] = ", i);
+		output("evpred[%"PRId32"] = ", i);
 		buffer = pred_table->evpred_tbl.entries[i].name;
-		printf("index(%"PRId32"); ", pred_index(buffer, pred_table));
-		printf( "%s(", buffer);
+		output("index(%"PRId32"); ", pred_index(buffer, pred_table));
+		output( "%s(", buffer);
 		for (j = 0; j < pred_table->evpred_tbl.entries[i].arity; j++){
-			if (j != 0) printf(", ");
-			printf("%s", sort_table->entries[pred_table->evpred_tbl.entries[i].signature[j]].name);
+			if (j != 0) output(", ");
+			output("%s", sort_table->entries[pred_table->evpred_tbl.entries[i].signature[j]].name);
 		}
-		printf(")\n");
+		output(")\n");
 	}
-	printf("num of preds: %"PRId32"\n", pred_table->pred_tbl.num_preds);
+	output("num of preds: %"PRId32"\n", pred_table->pred_tbl.num_preds);
 	for (i = 0; i < pred_table->pred_tbl.num_preds; i++){
-		printf("\n pred[%"PRId32"] = ", i);
+		output("\n pred[%"PRId32"] = ", i);
 		buffer = pred_table->pred_tbl.entries[i].name;
-		printf("index(%"PRId32"); ", pred_index(buffer, pred_table));
-		printf("%s(", buffer);
+		output("index(%"PRId32"); ", pred_index(buffer, pred_table));
+		output("%s(", buffer);
 		for (j = 0; j < pred_table->pred_tbl.entries[i].arity; j++){
-			if (j != 0) printf(", ");
-			printf("%s", sort_table->entries[pred_table->pred_tbl.entries[i].signature[j]].name);
+			if (j != 0) output(", ");
+			output("%s", sort_table->entries[pred_table->pred_tbl.entries[i].signature[j]].name);
 		}
-		printf(")\n");
+		output(")\n");
 	}
 }
 
@@ -195,6 +201,16 @@ char *literal_string(samp_literal_t lit, samp_table_t *table) {
 	char *result;
 	output_to_string = true;
 	print_literal(lit, table);
+	result = get_string_from_buffer(&output_buffer);
+	output_to_string = oldout;
+	return result;
+}
+
+char *atom_string(samp_atom_t *atom, samp_table_t *table) {
+	bool oldout = output_to_string;
+	char *result;
+	output_to_string = true;
+	print_atom(atom, table);
 	result = get_string_from_buffer(&output_buffer);
 	output_to_string = oldout;
 	return result;
@@ -232,7 +248,6 @@ char *literal_string(samp_literal_t lit, samp_table_t *table) {
 //   strcat(result, ")");
 //   return result;
 // }
-
 
 void print_atom(samp_atom_t *atom, samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
@@ -338,7 +353,7 @@ void print_clauses(samp_table_t *table){
 void print_clause_list(samp_clause_t *link, samp_table_t *table){
 	while (link != NULL){
 		print_clause(link, table);
-		printf("\n");
+		output("\n");
 		link = link->link;
 	}
 }
@@ -351,16 +366,16 @@ void print_live_clauses(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	int32_t i, lit;
 
-	printf("\nLive (sat) clauses:\n");
+	output("\nLive (sat) clauses:\n");
 	print_clause_list(clause_table->sat_clauses, table);
-	printf("Watched clauses:\n");
+	output("Watched clauses:\n");
 	for (i = 0; i < atom_table->num_vars; i++) {
 		lit = pos_lit(i);
 		print_clause_list(clause_table->watched[lit], table);
 		lit = neg_lit(i);
 		print_clause_list(clause_table->watched[lit], table);
 	}
-	printf("\n");
+	output("\n");
 }
 
 void print_clause_table(samp_table_t *table, int32_t num_vars){
@@ -421,9 +436,8 @@ void print_assignment(samp_table_t *table){
 	for (i = 0; i < atom_table->num_vars; i++) {
 		print_atom(atom_table->atom[i], table);
 		assigned_true(assignment[i]) ? output(": T ") : output(": F ");
-		printf("\n");
+		output("\n");
 	}
-	fflush(stdout);
 }
 
 extern void dump_sort_table (samp_table_t *table) {
@@ -538,7 +552,7 @@ void print_rule_substit(samp_rule_t *rule, substit_entry_t *substs, samp_table_t
 	const_table_t *const_table = &table->const_table;
 	print_rule(rule, table, 0);
 	for (i = 0; i < rule->num_vars; i++)
-		printf(" [%s\\%s%s]", 
+		output(" [%s\\%s%s]", 
 				rule->vars[i]->name,
 				substs[i].const_index != INT32_MIN ?
 				const_name(substs[i].const_index, const_table) : "*",

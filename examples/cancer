@@ -26,6 +26,6 @@ add Fr(Ann, Bob);
 add Fr(Bob, Carl);
 add Fr(Dee, Earl);
 
-mcsat_params 10000;
+mcsat_params 100;
 mcsat;
-dumptable atom;
+#dumptable atom;

@@ -172,7 +172,11 @@ ifeq ($(findstring $(MCSAT_MODE),valgrind quantify purify),$(MCSAT_MODE))
 CFLAGS := $(CFLAGS) -O3 -fomit-frame-pointer -g $(PIC) 
 CPPFLAGS := $(CPPFLAGS) -DNDEBUG
 else
+ifeq ($(MCSAT_MODE),debug) 
+CFLAGS := $(CFLAGS) -ggdb
+else 
 CFLAGS := $(CFLAGS) -g
+endif
 endif
 endif
 endif

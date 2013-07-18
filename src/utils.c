@@ -278,7 +278,8 @@ int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_t
     return gcs;
   }
 }
-      
+
+/* Converts a rule_atom to a samp_atom */
 samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, pred_table_t *pred_table) {
   int32_t i;
   int32_t arity = ratom->builtinop == 0
@@ -290,4 +291,27 @@ samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, pred_table_t *pred_table
     satom->args[i] = ratom->args[i].value;
   }
   return satom;
+}
+
+/* Returns the index of an atom, if not exist, returns -1 */
+int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table) {
+	pred_table_t *pred_table = &table->pred_table;
+	atom_table_t *atom_table = &table->atom_table;
+	int32_t arity = atom_arity(atom, pred_table);
+	array_hmap_pair_t *atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
+			arity + 1, (int32_t *) atom);
+	if (atom_map == NULL) {
+		return -1;
+	}
+}
+
+/* Converts a rule_literal to a samp_literal */
+samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, samp_table_t *table) {
+  pred_table_t *pred_table = &table->pred_table;
+  atom_table_t *atom_table = &table->atom_table;
+  bool neg = rlit->neg;
+  rule_atom_t *ratom = rlit->atom;
+  samp_atom_t *satom = rule_atom_to_samp_atom(ratom, pred_table);
+  int32_t atom_index = samp_atom_index(satom, table);
+  return neg? pos_lit(atom_index) : neg_lit(atom_index);
 }

@@ -67,6 +67,7 @@ static inline samp_bvar_t var_of(samp_literal_t l) {
   return l>>1;
 }
 
+/* the same as is_neg, 0: pos; 1: neg */
 static inline uint32_t sign_of_lit(samp_literal_t l) {
   return ((uint32_t) l) & 1;
 }
@@ -81,6 +82,7 @@ static inline bool opposite(samp_literal_t l1, samp_literal_t l2) {
   return (l1 ^ l2) == 1;
 }
 
+/* can be replaced by sign_of_lit */
 // true if l has positive polarity (i.e., l = pos_lit(x))
 static inline bool is_pos(samp_literal_t l) {
   return !(l & 1);
@@ -127,7 +129,7 @@ typedef struct input_atom_s {
 } input_atom_t;
 
 typedef struct input_literal_s {
-  bool neg;
+  bool neg; // true: with negation; false: without negation
   input_atom_t *atom;
 } input_literal_t;
 
@@ -161,7 +163,8 @@ typedef struct var_entry_s {
   int32_t sort_index; 
 } var_entry_t;
 
-/* original formula that is recursively defined,
+/* 
+ * Original formula that is recursively defined,
  * will be converted to CNF later
  */
 typedef struct input_formula_s {
@@ -170,16 +173,19 @@ typedef struct input_formula_s {
 } input_formula_t;
 
 
-//Each sort has a name (string), and a cardinality.  Each element is also assigned
-//a number; the elements are prefixed with the sort.
+/*
+ * Each sort has a name (string), and a cardinality. Each element is also assigned
+ * a number; the elements are prefixed with the sort.
+ */
 typedef struct sort_entry_s {
   int32_t size;
   int32_t cardinality; //number of elements in sort i
-  char *name;//print name of the sort
-  int32_t *constants; //array of constants in the given sort
+  char *name; //print name of the sort
+  int32_t *constants; // array of constants in the given sort, NULL when
+                      // it is a integer sort
   int32_t *ints; // array of integers for sparse integer sorts
   int32_t lower_bound; // lower and upper bounds for integer sorts
-  int32_t upper_bound; //    (could be a union type)
+  int32_t upper_bound; // (could be a union type)
   int32_t *subsorts; // array of subsort indices
   int32_t *supersorts; // array of supersort indices
 } sort_entry_t;
@@ -263,13 +269,16 @@ typedef struct atom_table_s {
   int32_t num_vars;  //number of bvars
   int32_t num_unfixed_vars;
   samp_atom_t **atom; // atom_entry_t *entries;
+  bool *active; // if an atom is active
   int32_t *sampling_nums; // Keeps track of number of samplings when atom was
                       // introduced - used for more accurate probs.
   uint32_t current_assignment; //which of two assignment arrays is current
-  samp_truth_value_t *assignment[2];//maps atom ids to samp_truth_value_t
+  samp_truth_value_t *assignment[2];// maps atom ids to samp_truth_value_t
   int32_t num_samples;
-  int32_t *pmodel;
-  array_hmap_t atom_var_hash; //maps atoms to variables
+  int32_t *pmodel; // TODO what is this
+  // Maps atoms to variables. Uses the predicate index + indices of the arguments,
+  // an array with total length of arity + 1, as the key
+  array_hmap_t atom_var_hash; 
 } atom_table_t;
 
 
@@ -314,7 +323,7 @@ typedef struct rule_atom_s {
 } rule_atom_t;
 
 typedef struct rule_literal_s {
-  bool neg;
+  bool neg; // true: with negation; false: without negation
   rule_atom_t *atom;
 } rule_literal_t;
 

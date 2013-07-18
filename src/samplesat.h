@@ -28,6 +28,20 @@ extern clause_buffer_t atom_buffer;
 
 extern void atom_buffer_resize(int32_t arity);
 
+/* this is static */
+// extern clause_buffer_t rule_atom_buffer;
+
+extern void rule_atom_buffer_resize(int32_t length);
+
+extern int32_t rule_atom_default_value(rule_atom_t *rule_atom, pred_table_t *pred_table);
+extern int32_t pred_default_value(pred_entry_t *pred);
+
+extern int32_t set_atom_tval(int32_t var, samp_truth_value_t tval, samp_table_t *table);
+
+extern int32_t fix_lit_tval(samp_table_t *table, int32_t lit, bool tval);
+extern int32_t fix_lit_true(samp_table_t *table, int32_t lit);
+extern int32_t fix_lit_false(samp_table_t *table, int32_t lit);
+
 extern int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
 
 extern int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p);
@@ -66,6 +80,12 @@ extern int32_t add_subst_query_instance(samp_literal_t **litinst, substit_entry_
 					samp_query_t *query, samp_table_t *table);
 
 extern void all_rule_instances(int32_t rule, samp_table_t *table);
+
+extern void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_rule_t *rule,
+		samp_table_t *table, int32_t atom_index);
+
+extern void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, 
+		samp_table_t *table, int32_t atom_index);
 
 extern int32_t samp_query_to_query_instance(samp_query_t *query,
 					    samp_table_t *table);
@@ -110,7 +130,9 @@ extern void create_new_const_query_instances(int32_t constidx,
 					     samp_table_t *table,
 					     int32_t atom_index);
 
-extern int32_t activate_atom(samp_table_t *table, samp_atom_t *atom);
+extern int32_t add_and_activate_atom(samp_table_t *table, samp_atom_t *atom);
+extern int32_t activate_atom(samp_table_t *table, int32_t atom_index);
+//extern int32_t activate_atom(samp_table_t *table, samp_atom_t *atom);
 
 extern void link_propagate(samp_table_t *table,
 		    samp_literal_t lit);
@@ -123,8 +145,9 @@ extern int32_t scan_unsat_clauses(samp_table_t *table);
 
 extern int32_t negative_unit_propagate(samp_table_t *table);
   
-extern void init_random_assignment(samp_truth_value_t *assignment, int32_t num_vars,
-				   int32_t *num_unfixed_vars);
+//extern void init_random_assignment(samp_truth_value_t *assignment, int32_t num_vars,
+//				   int32_t *num_unfixed_vars);
+extern void init_random_assignment(samp_table_t *table, int32_t *num_unfixed_vars);
 
 extern int32_t init_sample_sat(samp_table_t *table);
 

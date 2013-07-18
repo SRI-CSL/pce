@@ -619,6 +619,7 @@ void init_atom_table(atom_table_t *table) {
     out_of_memory();
   }
   table->atom = (samp_atom_t **) safe_malloc(table->size * sizeof(samp_atom_t *));
+  table->active = (bool *) safe_malloc(table->size * sizeof(bool));
   table->assignment[0] = (samp_truth_value_t *)
     safe_malloc(table->size * sizeof(samp_truth_value_t));
   table->assignment[1] = (samp_truth_value_t *)
@@ -653,6 +654,8 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table) {
   size += size/2;
   atom_table->atom = (samp_atom_t **)
     safe_realloc(atom_table->atom, size * sizeof(samp_atom_t *));
+  atom_table->active = (bool *)
+    safe_realloc(atom_table->active, size * sizeof(bool));
   atom_table->sampling_nums = (int32_t *)
     safe_realloc(atom_table->sampling_nums, size * sizeof(int32_t));
   atom_table->assignment[0] = (samp_truth_value_t *) 

@@ -10,11 +10,13 @@
 #include "integer_stack.h"
 #include "utils.h"
 
-extern void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
-			double sa_probability, double samp_temperature,
-			double rvar_probability, uint32_t max_flips,
-			uint32_t max_extra_flips, uint32_t timeout,
-			uint32_t burn_in_steps, uint32_t samp_interval
-			);
+//extern void lazy_mc_sat(samp_table_t *table, uint32_t max_samples,
+//			double sa_probability, double samp_temperature,
+//			double rvar_probability, uint32_t max_flips,
+//			uint32_t max_extra_flips, uint32_t timeout,
+//			uint32_t burn_in_steps, uint32_t samp_interval
+//			);
+
+int32_t choose_random_atom(samp_table_t *table);
 
 #endif /* __LAZYSAMPLESAT_H */     

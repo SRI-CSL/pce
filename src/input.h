@@ -205,6 +205,8 @@ extern double get_rvar_probability();
 extern int32_t get_max_flips();
 extern int32_t get_max_extra_flips();
 extern int32_t get_mcsat_timeout();
+extern int32_t get_burn_in_steps();
+extern int32_t get_samp_interval();
 
 extern void set_max_samples(int32_t m);
 extern void set_sa_probability(double d);
@@ -213,6 +215,8 @@ extern void set_rvar_probability(double d);
 extern void set_max_flips(int32_t m);
 extern void set_max_extra_flips(int32_t m);
 extern void set_mcsat_timeout(int32_t m);
+extern void set_burn_in_steps(int32_t m);
+extern void set_samp_interval(int32_t m);
 
 extern bool strict_constants();
 extern void set_strict_constants(bool val);
