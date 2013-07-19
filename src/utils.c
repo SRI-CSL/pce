@@ -138,17 +138,17 @@ int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
   return -1;
 }
 
-/** Evaluates a clause to -1 if all literals are false, and i if the
-   i'th literal is true, in the given assignment. 
-*/
-int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
-  int32_t i;
-  for (i = 0; i < clause->numlits; i++){
-    if (assigned_true_lit(assignment, clause->disjunct[i]))
-      return i;
-  }
-  return -1;
-}
+///** Evaluates a clause to -1 if all literals are false, and i if the
+//   i'th literal is true, in the given assignment. 
+//*/
+//int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
+//  int32_t i;
+//  for (i = 0; i < clause->numlits; i++){
+//    if (assigned_true_lit(assignment, clause->disjunct[i]))
+//      return i;
+//  }
+//  return -1;
+//}
 
 /* Be careful when using a global variable */
 substit_buffer_t substit_buffer = {0, NULL};

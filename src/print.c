@@ -109,7 +109,7 @@ extern void output(const char *fmt, ...) {
 		output_buffer.size += out_size;
 		pthread_mutex_unlock(&pmutex);
 	}
-	if (!output_to_string || verbosity_level > 1) {
+	if (!output_to_string) {
 		va_start(argp, fmt);
 		vprintf(fmt, argp);
 		va_end(argp);
@@ -196,6 +196,11 @@ void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
 	}
 }
 
+/* 
+ * Returns the string for a literal 
+ * remember to free the string after use, the same for atom_string
+ * and var_string
+ */
 char *literal_string(samp_literal_t lit, samp_table_t *table) {
 	bool oldout = output_to_string;
 	char *result;
@@ -206,6 +211,7 @@ char *literal_string(samp_literal_t lit, samp_table_t *table) {
 	return result;
 }
 
+/* Returns the string for an atom */
 char *atom_string(samp_atom_t *atom, samp_table_t *table) {
 	bool oldout = output_to_string;
 	char *result;
@@ -214,6 +220,13 @@ char *atom_string(samp_atom_t *atom, samp_table_t *table) {
 	result = get_string_from_buffer(&output_buffer);
 	output_to_string = oldout;
 	return result;
+}
+
+/* Returns the string for an atom index */
+char *var_string(int32_t var, samp_table_t *table) {
+	atom_table_t *atom_table = &table->atom_table;
+	samp_atom_t *atom = atom_table->atom[var];
+	return atom_string(atom, table);
 }
 
 // Returns a newly allocated string
@@ -379,10 +392,9 @@ void print_live_clauses(samp_table_t *table) {
 }
 
 void print_clause_table(samp_table_t *table, int32_t num_vars){
-	if (num_vars < 0) {
-		num_vars = table->atom_table.num_vars;
-	}
 	clause_table_t *clause_table = &(table->clause_table);
+	atom_table_t *atom_table = &table->atom_table;
+
 	print_clauses(table);
 	output("Sat clauses: \n");
 	samp_clause_t *link = clause_table->sat_clauses;
@@ -390,17 +402,23 @@ void print_clause_table(samp_table_t *table, int32_t num_vars){
 	output("Unsat clauses: \n");
 	link = clause_table->unsat_clauses;
 	print_clause_list(link, table);  
-	output("Watched clauses: \n");
-	int32_t i, lit;
-	for (i = 0; i < num_vars; i++){
-		lit = pos_lit(i);
-		output("lit[%"PRId32"]: ", lit);
-		link = clause_table->watched[lit];
-		print_clause_list(link, table);
-		lit = neg_lit(i);
-		output("lit[%"PRId32"]: ", lit);
-		link = clause_table->watched[lit];
-		print_clause_list(link, table);
+	if (num_vars < 0) {
+		num_vars = atom_table->num_vars;
+	}
+	if (num_vars > 0) {
+		output("Watched clauses: \n");
+		int32_t i, lit;
+		for (i = 0; i < num_vars; i++){
+			lit = pos_lit(i);
+			output("lit[%"PRId32"]: ", lit);
+			link = clause_table->watched[lit];
+			print_clause_list(link, table);
+			lit = neg_lit(i);
+			output("lit[%"PRId32"]: ", lit);
+			link = clause_table->watched[lit];
+			print_clause_list(link, table);
+		}
+		output("\n");
 	}
 	output("Dead clauses:\n");
 	link = clause_table->dead_clauses;
@@ -411,6 +429,7 @@ void print_clause_table(samp_table_t *table, int32_t num_vars){
 	output("Dead negative/unit clauses:\n");
 	link = clause_table->dead_negative_or_unit_clauses;
 	print_clause_list(link, table);
+	output("\n");
 }
 
 void print_state(samp_table_t *table, uint32_t round){
@@ -434,6 +453,7 @@ void print_assignment(samp_table_t *table){
 	int32_t i;
 
 	for (i = 0; i < atom_table->num_vars; i++) {
+		atom_table->active[i] ? output("* ") : output ("  ");
 		print_atom(atom_table->atom[i], table);
 		assigned_true(assignment[i]) ? output(": T ") : output(": F ");
 		output("\n");
@@ -604,6 +624,7 @@ extern void print_rule_atom (rule_atom_t *ratom, bool neg, var_entry_t **vars,
 	}
 }
 
+/* Prints a quantified clause */
 void print_rule (samp_rule_t *rule, samp_table_t *table, int indent) {
 	rule_literal_t *lit;
 	int32_t j;

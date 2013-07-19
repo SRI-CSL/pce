@@ -27,9 +27,10 @@ extern void cprintf(int32_t level, const char *fmt, ...);
 extern void output(const char *fmt, ...);
 extern void mcsat_err(const char *fmt, ...);
 extern void mcsat_warn(const char *fmt, ...);
-extern char * get_string_from_buffer(string_buffer_t *strbuf);
+extern char *get_string_from_buffer(string_buffer_t *strbuf);
 extern char *literal_string(samp_literal_t lit, samp_table_t *table);
 extern char *atom_string(samp_atom_t *atom, samp_table_t *table);
+extern char *var_string(int32_t var, samp_table_t *table);
 
 extern void dump_sort_table (samp_table_t *table);
 extern void dump_pred_table (samp_table_t *table);

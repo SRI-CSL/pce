@@ -1036,8 +1036,7 @@ extern bool read_eval(samp_table_t *table) {
 
 			if (get_dump_samples_path() != NULL) {
 				output(" dumping samples to %s\n", get_dump_samples_path());
-				init_samples_output(get_dump_samples_path(),
-						get_max_samples() + 1);
+				init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
 			}
 
 			mc_sat(table, lazy_mcsat(), get_max_samples(),

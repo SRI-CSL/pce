@@ -12,6 +12,9 @@
 
 #define MCSAT_CONFLICT 21
 
+extern clause_buffer_t atom_buffer;
+extern bool hard_only;
+
 extern int32_t add_var(var_table_t *var_table,
 		       char *name,
 		       sort_table_t *sort_table,
@@ -23,8 +26,6 @@ extern int32_t add_var(var_table_t *var_table,
 /* 		     int32_t arity, */
 /* 		     sort_table_t *sort_table, */
 /* 		     char **in_signature); */
-
-extern clause_buffer_t atom_buffer;
 
 extern void atom_buffer_resize(int32_t arity);
 
@@ -183,6 +184,4 @@ bool eql_query_instance_lits(samp_literal_t **lit1, samp_literal_t **lit2);
 
 void retract_source(char *source, samp_table_t *table);
 
-uint32_t genrand_uint(uint32_t n);
-  
 #endif /* __SAMPLESAT_H */
