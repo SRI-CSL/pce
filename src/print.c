@@ -448,8 +448,7 @@ void print_state(samp_table_t *table, uint32_t round){
 
 void print_assignment(samp_table_t *table){
 	atom_table_t *atom_table = &(table->atom_table);
-	samp_truth_value_t *assignment =
-		atom_table->assignment[atom_table->current_assignment];
+	samp_truth_value_t *assignment = atom_table->current_assignment;
 	int32_t i;
 
 	for (i = 0; i < atom_table->num_vars; i++) {
@@ -567,16 +566,14 @@ extern void dump_clause_table (samp_table_t *table) {
 /*
  * Prints a rule with a substitution
  */
-void print_rule_substit(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *table) {
+void print_rule_substit(samp_rule_t *rule, int32_t *substs, samp_table_t *table) {
 	int32_t i;
 	const_table_t *const_table = &table->const_table;
 	print_rule(rule, table, 0);
-	for (i = 0; i < rule->num_vars; i++)
-		output(" [%s\\%s%s]", 
-				rule->vars[i]->name,
-				substs[i].const_index != INT32_MIN ?
-				const_name(substs[i].const_index, const_table) : "*",
-				substs[i].fixed ? " fixed" : "");
+	for (i = 0; i < rule->num_vars; i++) {
+		output(" [%s\\%s]", rule->vars[i]->name,
+				substs[i] != INT32_MIN ?  const_name(substs[i], const_table) : "*");
+	}
 }
 
 void print_rule_atom_arg (rule_atom_arg_t *arg, var_entry_t **vars, const_table_t *const_table) {

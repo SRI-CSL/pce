@@ -156,12 +156,12 @@ extern void init_samples_output(char *path, int32_t n_samples) {
 }
 
 extern void append_assignment_to_file(char *path, samp_table_t *table) {
-	samp_truth_value_t *assignment;
-	atom_table_t *atom_table;
-	int32_t i, j, num_vars;
 	pred_table_t *pred_table = &table->pred_table;
 	const_table_t *const_table = &table->const_table;
 	sort_table_t *sort_table = &table->sort_table;
+	atom_table_t *atom_table = &table->atom_table;
+	samp_truth_value_t *assignment = atom_table->current_assignment;
+	int32_t i, j, num_vars;
 	sort_entry_t *entry;
 	int32_t *psig;
 	samp_atom_t *atom;
@@ -173,8 +173,6 @@ extern void append_assignment_to_file(char *path, samp_table_t *table) {
 		exit(1);
 	}
 
-	atom_table = &table->atom_table;
-	assignment = atom_table->assignment[atom_table->current_assignment];
 	num_vars = atom_table->num_vars;
 	for (i = 0; i < num_vars; i++) {
 		if (assigned_false(assignment[i])) {

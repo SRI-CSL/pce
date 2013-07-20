@@ -74,10 +74,11 @@ typedef struct clause_buffer_s {
   int32_t *data;
 } clause_buffer_t;
 
-typedef struct substit_entry_s {
-  int32_t const_index;
-  bool fixed;
-} substit_entry_t;
+typedef int32_t substit_entry_t;
+//typedef struct substit_entry_s {
+//  int32_t const_index;
+//  bool fixed;
+//} substit_entry_t;
 
 typedef struct substit_buffer_s {
   int32_t size;
@@ -133,7 +134,9 @@ extern int32_t least_common_supersort(int32_t sig1, int32_t sig2, sort_table_t *
 extern int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
 
 extern int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table);
-extern samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, pred_table_t *pred_table);
-extern samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, samp_table_t *table);
+extern samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, substit_entry_t *substs,
+		pred_table_t *pred_table);
+extern samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, substit_entry_t *substs,
+		samp_table_t *table);
 
 #endif /* __UTILS_H */     

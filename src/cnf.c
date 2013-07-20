@@ -685,7 +685,7 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 				if (lit->atom->pred > 0) {
 					found_indirect = true;
 				}
-				samp_atom_t *satom = rule_atom_to_samp_atom(lit->atom,
+				samp_atom_t *satom = rule_atom_to_samp_atom(lit->atom, NULL,
 						pred_table);
 				// FIXME what is top_p? should it be true or false?
 				//atom_idx = add_internal_atom(&samp_table, satom, true);
@@ -727,6 +727,7 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 			clause->frozen_preds = frozen_preds;
 			//set_clause_variables(clause);
 			clause->num_vars = num_vars;
+			init_array_hmap(&clause->subst_hash, ARRAY_HMAP_DEFAULT_SIZE);
 			set_fmla_clause_variables(clause, formula->vars);
 			found = NULL;
 

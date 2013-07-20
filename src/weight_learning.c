@@ -757,7 +757,7 @@ extern void update_covariance_matrix_statistics(samp_table_t *table) {
 
 	qinst_table = &table->query_instance_table;
 	atom_table = &table->atom_table;
-	assignment = atom_table->assignment[atom_table->current_assignment];
+	assignment = atom_table->current_assignment;
 	apmodel = table->atom_table.pmodel;
 
 	double normalized_true_groundings[covariance_matrix->N];

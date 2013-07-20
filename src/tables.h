@@ -272,8 +272,9 @@ typedef struct atom_table_s {
   bool *active; // if an atom is active
   int32_t *sampling_nums; // Keeps track of number of samplings when atom was
                       // introduced - used for more accurate probs.
-  uint32_t current_assignment; //which of two assignment arrays is current
   samp_truth_value_t *assignment[2];// maps atom ids to samp_truth_value_t
+  uint32_t current_assignment_index; //which of two assignment arrays is current
+  samp_truth_value_t *current_assignment; // the current assignment
   int32_t num_samples;
   int32_t *pmodel; // TODO what is this
   // Maps atoms to variables. Uses the predicate index + indices of the arguments,
@@ -327,9 +328,7 @@ typedef struct rule_literal_s {
   rule_atom_t *atom;
 } rule_literal_t;
 
-/*
- * A quantified or partially quantified or ground clause. 
- */
+/* A quantified clause */
 typedef struct samp_rule_s {
   int32_t num_lits; //number of literal entries
   int32_t num_vars; //number of variables
@@ -339,6 +338,7 @@ typedef struct samp_rule_s {
   int32_t *frozen_preds; //array of frozen predicates
   int32_t *clause_indices; //array of indices into clause_table
   double weight;
+  array_hmap_t subst_hash; // a hashset used to check duplicate
 } samp_rule_t;
 
 typedef struct rule_table_s {
@@ -482,7 +482,7 @@ extern samp_atom_t *atom_copy(samp_atom_t *atom, int32_t arity);
 
 extern void init_clause_table(clause_table_t *table);
 
-extern void clause_table_resize(clause_table_t *clause_table);
+extern void clause_table_resize(clause_table_t *clause_table, int32_t num_lits);
 
 extern void init_rule_table(rule_table_t *table);
 
@@ -512,6 +512,7 @@ extern bool valid_atom_table(atom_table_t *atom_table,
 			     pred_table_t *pred_table,
 			     const_table_t *const_table,
 			     sort_table_t *sort_table);
+
 extern int32_t add_const_internal (char *name, int32_t sort_index,
 				   samp_table_t *table);
 
