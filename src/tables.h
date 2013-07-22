@@ -97,11 +97,13 @@ static inline bool is_neg(samp_literal_t l) {
  */
 #define SAMP_INIT_CLAUSE_SIZE 8
 
-//A clause has weight/status and a -1-terminated array of literals
-//disjunct[0] is watched and should have assignment true, when
-//such a literal exists.  The low-bit for link is one if the clause is dead.
+/* 
+ * A clause has weight/status and a -1-terminated array of literals
+ * disjunct[0] is watched and should have assignment true, when
+ * such a literal exists. The low-bit for link is one if the clause is dead.
+ */
 typedef struct samp_clause_s {
-  double weight;//weight of the clause: 0 for hard clause
+  double weight;//weight of the clause: 0 for hard clause FIXME or DBL_MAX?
   struct samp_clause_s *link; //link to next clause for a given watched literal
   int32_t numlits;
   bool *frozen; // array indicating whether associated literal is frozen
