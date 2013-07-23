@@ -527,8 +527,8 @@ void link_propagate(samp_table_t *table, samp_literal_t lit) {
 		numlits = link->numlits;
 		disjunct = link->disjunct;
 
-		assert(disjunct[0] == lit && numlits > 1);
-		assert(assigned_false_lit(assignment, disjunct[0]));
+		//assert(disjunct[0] == lit && numlits > 1);
+		//assert(assigned_false_lit(assignment, disjunct[0]));
 
 		i = get_true_lit(assignment, disjunct, numlits);
 		//i = 1;
@@ -537,19 +537,17 @@ void link_propagate(samp_table_t *table, samp_literal_t lit) {
 		//}
 
 		if (i < numlits) {
-			/*
-			 * the clause is still true: make tmp = disjunct[i] the new watched literal
-			 */
+			/* the clause is still true: make tmp = disjunct[i] the new watched literal */
 			new_watched = disjunct[i];
-			disjunct[i] = disjunct[0];
-			disjunct[0] = new_watched;
+			//disjunct[i] = disjunct[0];
+			//disjunct[0] = new_watched;
 
 			// add the clause to the head of watched[tmp]
 			next_link = link->link;
 			*link_ptr = next_link;
-			push_clause(link, &clause_table->watched[disjunct[0]]);
+			push_clause(link, &clause_table->watched[new_watched]);
 			assert(assigned_true_lit(assignment,
-						clause_table->watched[disjunct[0]]->disjunct[0]));
+						clause_table->watched[new_watched]->disjunct[i]));
 		} else {
 			/* move the clause to the unsat_clause list */
 			//cprintf(0, "Adding to usat_clauses\n");
@@ -617,16 +615,18 @@ int32_t scan_unsat_clauses(samp_table_t *table) {
 				//      *dcost -= unsat_clause->weight;  //subtract weight from dcost
 				//swap literal to watched position
 				lit = unsat_clause->disjunct[i]; 
-				unsat_clause->disjunct[i] = unsat_clause->disjunct[0];
-				unsat_clause->disjunct[0] = lit;
+				//unsat_clause->disjunct[i] = unsat_clause->disjunct[0];
+				//unsat_clause->disjunct[0] = lit;
 
 				*unsat_clause_ptr = unsat_clause->link;
-				unsat_clause->link = clause_table->watched[lit]; //push into watched list
-				clause_table->watched[lit] = unsat_clause;
+				//push into watched list
+				push_clause(unsat_clause, &clause_table->watched[lit]);
+				//unsat_clause->link = clause_table->watched[lit]; 
+				//clause_table->watched[lit] = unsat_clause;
 				clause_table->num_unsat_clauses--;
 				unsat_clause = *unsat_clause_ptr;
 				assert(assigned_true_lit(assignment,
-							clause_table->watched[lit]->disjunct[0]));
+							clause_table->watched[lit]->disjunct[i]));
 			} else {
 				unsat_clause_ptr = &(unsat_clause->link); //move to next unsat clause
 				unsat_clause = unsat_clause->link;
@@ -634,8 +634,8 @@ int32_t scan_unsat_clauses(samp_table_t *table) {
 		} else { // we need to fix the truth value of disjunct[fixable]
 			// swap the literal to the front
 			lit = unsat_clause->disjunct[fixable]; 
-			unsat_clause->disjunct[fixable] = unsat_clause->disjunct[0];
-			unsat_clause->disjunct[0] = lit;
+			//unsat_clause->disjunct[fixable] = unsat_clause->disjunct[0];
+			//unsat_clause->disjunct[0] = lit;
 
 			atom_str = var_string(var_of(lit), table);
 			cprintf(2, "[scan_unsat_clauses] Fixing variable %s\n", atom_str);
@@ -655,7 +655,7 @@ int32_t scan_unsat_clauses(samp_table_t *table) {
 			*unsat_clause_ptr = unsat_clause->link;
 			push_clause(unsat_clause, &clause_table->sat_clauses);
 			assert(assigned_fixed_true_lit(assignment,
-						clause_table->sat_clauses->disjunct[0]));
+						clause_table->sat_clauses->disjunct[fixable]));
 			unsat_clause = *unsat_clause_ptr;
 			clause_table->num_unsat_clauses--;
 		}

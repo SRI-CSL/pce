@@ -261,12 +261,12 @@ int32_t push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
 			//      *dcost -= clause->weight;  //subtract weight from dcost
 			//swap literal to watched position
 			lit = clause->disjunct[i]; 
-			clause->disjunct[i] = clause->disjunct[0];
-			clause->disjunct[0] = lit;
+			//clause->disjunct[i] = clause->disjunct[0];
+			//clause->disjunct[0] = lit;
 
 			push_clause(clause, &clause_table->watched[lit]);
 			assert(assigned_true_lit(assignment,
-						clause_table->watched[lit]->disjunct[0]));
+						clause_table->watched[lit]->disjunct[i]));
 		} else {
 			push_clause(clause, &clause_table->unsat_clauses);
 			clause_table->num_unsat_clauses++;
@@ -274,8 +274,8 @@ int32_t push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
 	} else { // we need to fix the truth value of disjunct[fixable]
 		// swap the literal to the front
 		lit = clause->disjunct[fixable]; 
-		clause->disjunct[fixable] = clause->disjunct[0];
-		clause->disjunct[0] = lit;
+		//clause->disjunct[fixable] = clause->disjunct[0];
+		//clause->disjunct[0] = lit;
 
 		atom_str = var_string(var_of(lit), table);
 		cprintf(2, "[scan_unsat_clauses] Fixing variable %s\n", atom_str);
@@ -294,7 +294,7 @@ int32_t push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
 		//}
 		push_clause(clause, &clause_table->sat_clauses);
 		assert(assigned_fixed_true_lit(assignment,
-					clause_table->sat_clauses->disjunct[0]));
+					clause_table->sat_clauses->disjunct[fixable]));
 	}
 }
 

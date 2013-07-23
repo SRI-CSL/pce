@@ -1019,14 +1019,14 @@ void restore_sat_dead_clauses(clause_table_t *clause_table,
 					link, val); //BD
 			// swap disjunct[0] and disjunct[val]
 			lit = link->disjunct[val];
-			link->disjunct[val] = link->disjunct[0];
-			link->disjunct[0] = lit;
+			//link->disjunct[val] = link->disjunct[0];
+			//link->disjunct[0] = lit;
 			next = link->link;
 			push_clause(link, &clause_table->watched[lit]);
 			//link->link = clause_table->watched[lit];
 			//clause_table->watched[lit] = link;
 			link = next;
-			assert(assigned_true_lit(assignment, clause_table->watched[lit]->disjunct[0]));
+			assert(assigned_true_lit(assignment, clause_table->watched[lit]->disjunct[val]));
 		} else {
 			cprintf(2, "---> dead clause %p stays dead (val = %"PRId32")\n",
 					link, val); //BD
