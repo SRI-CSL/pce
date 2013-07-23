@@ -8,6 +8,7 @@
 #include "int_array_sort.h"
 #include "array_hash_map.h"
 #include "utils.h"
+#include "SFMT.h"
 
 /*  These copy operations assume that size input to safe_malloc can't 
  *  overflow since there are existing structures of the given size. 
@@ -326,3 +327,94 @@ samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, substit_entry_t *subst
 	int32_t atom_index = samp_atom_index(satom, table);
 	return neg? pos_lit(atom_index) : neg_lit(atom_index);
 }
+
+// insertion sort
+void isort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
+	uint32_t i, j;
+	int32_t x, y;
+	double u, v;
+
+	for (i = 1; i < n; i++) {
+		x = a[i];
+		u = p[i];
+		j = 0;
+		while (p[j] > u)
+			j++;
+		while (j < i) {
+			y = a[j];
+			v = p[j];
+			a[j] = x;
+			p[j] = u;
+			x = y;
+			u = v;
+			j++;
+		}
+		a[j] = x;
+		p[j] = u;
+	}
+}
+
+inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
+	if (n <= 10) {
+		isort_query_atoms_and_probs(a, p, n);
+	} else {
+		qsort_query_atoms_and_probs(a, p, n);
+	}
+}
+
+// quick sort: requires n > 1
+void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
+	uint32_t i, j;
+	int32_t x, y;
+	double u, v;
+
+	// u = random pivot
+	// i = random_uint(n);
+	i = genrand_uint(n);
+	x = a[i];
+	u = p[i];
+
+	// swap x and a[0], u and p[0]
+	a[i] = a[0];
+	p[i] = p[0];
+	a[0] = x;
+	p[0] = u;
+
+	i = 0;
+	j = n;
+
+	do {
+		j--;
+	} while (p[j] < u);
+	do {
+		i++;
+	} while (i <= j && p[i] > u);
+
+	while (i < j) {
+		y = a[i];
+		v = p[i];
+		a[i] = a[j];
+		p[i] = p[j];
+		a[j] = y;
+		p[j] = v;
+
+		do {
+			j--;
+		} while (p[j] < u);
+		do {
+			i++;
+		} while (p[i] > u);
+	}
+
+	// pivot goes into a[j]
+	a[0] = a[j];
+	p[0] = p[j];
+	a[j] = x;
+	p[j] = u;
+
+	// sort a[0...j-1] and a[j+1 .. n-1]
+	sort_query_atoms_and_probs(a, p, j);
+	j++;
+	sort_query_atoms_and_probs(a + j, p + j, n - j);
+}
+

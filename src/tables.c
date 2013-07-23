@@ -846,6 +846,72 @@ void rule_table_resize(rule_table_t *rule_table){
 	rule_table->size = size; 
 }
 
+/* Prepares for adding a new atom for a pred entry*/
+void pred_atom_table_resize(pred_entry_t *pred_entry) {
+	int32_t size;
+	if (pred_entry->num_atoms >= pred_entry->size_atoms) {
+		if (pred_entry->size_atoms == 0) {
+			pred_entry->atoms = (int32_t *) safe_malloc(
+					INIT_ATOM_PRED_SIZE * sizeof(int32_t));
+			pred_entry->size_atoms = INIT_ATOM_PRED_SIZE;
+		} else {
+			size = pred_entry->size_atoms;
+			if (MAXSIZE(sizeof(int32_t), 0) - size <= size / 2) {
+				out_of_memory();
+			}
+			size += size / 2;
+			pred_entry->atoms = (int32_t *) safe_realloc(pred_entry->atoms,
+					size * sizeof(int32_t));
+			pred_entry->size_atoms = size;
+		}
+	}
+}
+
+/* Adds a new atom for a pred entry */
+void add_atom_to_pred(pred_table_t *pred_table, int32_t predicate,
+		int32_t current_atom_index) {
+	pred_entry_t *entry = get_pred_entry(pred_table, predicate);
+	pred_atom_table_resize(entry);
+	entry->atoms[entry->num_atoms++] = current_atom_index;
+}
+
+/* Prepares for adding a rule for a pred entry */
+void pred_rule_table_resize(pred_entry_t *pred_entry) {
+	int32_t size;
+	if (pred_entry->num_rules >= pred_entry->size_rules) {
+		if (pred_entry->size_rules == 0) {
+			pred_entry->rules = (int32_t *) safe_malloc(
+					INIT_RULE_PRED_SIZE * sizeof(int32_t));
+			pred_entry->size_rules = INIT_RULE_PRED_SIZE;
+		} else {
+			size = pred_entry->size_rules;
+			if (MAXSIZE(sizeof(int32_t), 0) - size <= size / 2) {
+				out_of_memory();
+			}
+			size += size / 2;
+			pred_entry->rules = (int32_t *) safe_realloc(pred_entry->rules,
+					size * sizeof(int32_t));
+			pred_entry->size_rules = size;
+		}
+	}
+}
+
+/* Adds a rule for a pred entry */
+void add_rule_to_pred(pred_table_t *pred_table, int32_t predicate,
+		int32_t current_rule_index) {
+	pred_entry_t *entry = get_pred_entry(pred_table, predicate);
+	int32_t i, size;
+
+	/* if alreay exists, return */
+	for (i = 0; i < entry->num_rules; i++) {
+		if (entry->rules[i] == current_rule_index) {
+			return;
+		}
+	}
+
+	pred_rule_table_resize(entry);
+	entry->rules[entry->num_rules++] = current_rule_index;
+}
 
 /* Checks the validity of the table for assertions within other functions.
    valid_sort_table checks that the sort size is nonnegative, num_sorts is

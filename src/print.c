@@ -196,6 +196,25 @@ void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
 	}
 }
 
+inline char *string_of_tval(samp_truth_value_t tval) {
+	switch (tval) {
+	case v_undef:
+		return "undef";
+	case v_false:
+		return "false";
+	case v_true:
+		return "true";
+	case v_fixed_false:
+		return "fixed false";
+	case v_fixed_true:
+		return "fixed true";
+	case v_db_false:
+		return "db false";
+	case v_db_true:
+		return "db true";
+	}
+}
+
 /* 
  * Returns the string for a literal 
  * remember to free the string after use, the same for atom_string
@@ -454,8 +473,7 @@ void print_assignment(samp_table_t *table){
 	for (i = 0; i < atom_table->num_vars; i++) {
 		atom_table->active[i] ? output("* ") : output ("  ");
 		print_atom(atom_table->atom[i], table);
-		assigned_true(assignment[i]) ? output(": T ") : output(": F ");
-		output("\n");
+		output(": %s\n", string_of_tval(assignment[i]));
 	}
 }
 

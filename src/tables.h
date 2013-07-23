@@ -522,6 +522,15 @@ extern int32_t add_const(char *name, char * sort_name, samp_table_t *table);
 
 extern char *const_name(int32_t const_index, const_table_t *const_table);
 
+void pred_atom_table_resize(pred_entry_t *pred_entry);
+void add_atom_to_pred(pred_table_t *pred_table, int32_t predicate,
+		int32_t current_atom_index);
+
+void pred_rule_table_resize(pred_entry_t *pred_entry);
+extern void add_rule_to_pred(pred_table_t *pred_table,
+			     int32_t predicate,
+			     int32_t current_rule_index);
+
 // The builtin binary predicates
 
 extern char* builtinop_string (int32_t bop);

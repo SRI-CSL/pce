@@ -34,6 +34,14 @@ extern int32_t imin(int32_t i, int32_t j);
  */
 extern char *str_copy(char *s);
 
+extern bool assigned_undef(samp_truth_value_t value);
+extern bool assigned_true(samp_truth_value_t value);
+extern bool assigned_false(samp_truth_value_t value);
+extern bool assigned_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
+extern bool assigned_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
+extern bool assigned_fixed_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
+extern bool assigned_fixed_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
+
 static inline bool db_tval(samp_truth_value_t v){
   return (v == v_db_true || v == v_db_false);
 }
@@ -46,6 +54,17 @@ static inline bool unfixed_tval(samp_truth_value_t v){
   return (v == v_true || v == v_false);
 }
 
+static inline samp_truth_value_t unfix_tval(samp_truth_value_t v) {
+	if (assigned_true(v)) {
+		return v_true;
+	} 
+	else if (assigned_false(v)) {
+		return v_false;
+	}
+	else {
+		return v_undef;
+	}
+}
 
 /*
  * This function is too large to be inlined
@@ -69,6 +88,10 @@ static inline samp_truth_value_t negate_tval(samp_truth_value_t v){
   }
 }
 
+/* TODO 
+ * change name to intarray_buffer so that it is more general;
+ * currently it is used to represent an atom buffer 
+ */
 typedef struct clause_buffer_s {
   int32_t size;
   int32_t *data;
@@ -110,14 +133,6 @@ extern void substit_buffer_resize(int32_t length);
 
 extern char *const_sort_name(int32_t const_idx, samp_table_t *table);
 
-extern bool assigned_undef(samp_truth_value_t value);
-extern bool assigned_true(samp_truth_value_t value);
-extern bool assigned_false(samp_truth_value_t value);
-extern bool assigned_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
-extern bool assigned_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
-extern bool assigned_fixed_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
-extern bool assigned_fixed_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
-
 extern int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
 extern int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
 
@@ -138,5 +153,13 @@ extern samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, substit_entry_t *
 		pred_table_t *pred_table);
 extern samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, substit_entry_t *substs,
 		samp_table_t *table);
+
+extern inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
+
+// Based on Bruno's sort_int_array - works on two arrays in parallel
+extern void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
+
+// insertion sort
+extern void isort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 
 #endif /* __UTILS_H */     

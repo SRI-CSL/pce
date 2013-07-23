@@ -13,7 +13,6 @@
 #include "input.h"
 #include "cnf.h"
 #include "samplesat.h"
-#include "lazysamplesat.h"
 #include "weight_learning.h"
 #include "training_data.h"
 
