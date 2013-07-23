@@ -894,7 +894,7 @@ int32_t init_first_sample_sat(samp_table_t *table) {
 	empty_clause_lists(table);
 	init_clause_lists(clause_table);
 
-	if (get_verbosity_level() >= 5) {
+	if (get_verbosity_level() >= 4) {
 		printf("\n[init_first_sample_sat] Started ...\n");
 		print_assignment(table);
 		print_clause_table(table, -1);
@@ -904,7 +904,7 @@ int32_t init_first_sample_sat(samp_table_t *table) {
 	if (conflict == -1)
 		return -1;
 
-	if (get_verbosity_level() >= 5) {
+	if (get_verbosity_level() >= 4) {
 		printf("\n[init_first_sample_sat] After negative_unit_propagation:\n");
 		print_assignment(table);
 		print_clause_table(table, -1);
@@ -914,7 +914,7 @@ int32_t init_first_sample_sat(samp_table_t *table) {
 	init_random_assignment(table, &num_unfixed_vars);
 	atom_table->num_unfixed_vars = num_unfixed_vars;
 
-	if (get_verbosity_level() >= 5) {
+	if (get_verbosity_level() >= 4) {
 		printf("\n[init_first_sample_sat] After init_random_assignment:\n");
 		print_assignment(table);
 		print_clause_table(table, -1);

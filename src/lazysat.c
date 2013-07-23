@@ -416,6 +416,18 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 	safe_free(ordered_lits);
 }
 
+/* Lazy only */
+void smart_rule_instances(int32_t rule_index, samp_table_t *table) {
+	rule_table_t *rule_table = &table->rule_table;
+	samp_rule_t *rule = rule_table->samp_rules[rule_index];
+	substit_buffer_resize(rule->num_vars);
+	int32_t i;
+	for (i = 0; i < substit_buffer.size; i++) {
+		substit_buffer.entries[i] = INT32_MIN;
+	}
+	fixed_const_rule_instances(rule, table, NULL);
+}
+
 /*
  * [lazy only] Recursively enumerate the rule instances
  */
