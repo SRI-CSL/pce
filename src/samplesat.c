@@ -111,7 +111,7 @@ void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 
 	cprintf(2, "[sample_sat] started ...\n");
 
-	init_sample_sat(table);
+	conflict = init_sample_sat(table);
 
 	uint32_t num_flips = max_flips;
 	while (num_flips > 0 && conflict == 0) {
@@ -480,13 +480,15 @@ int32_t flip_unfixed_variable(samp_table_t *table, int32_t var) {
 	//  double dcost = 0;   //dcost seems unnecessary
 	atom_table_t *atom_table = &table->atom_table;
 	samp_truth_value_t *assignment = atom_table->current_assignment;
-	cprintf(4, "Flipping variable %"PRId32" to %s\n", var,
+	cprintf(4, "[flip_unfixed_variable] Flipping variable %"PRId32" to %s\n", var,
 			assigned_true(assignment[var]) ? "false" : "true");
 	if (assigned_true(assignment[var])) {
-		assignment[var] = v_false;
+		set_atom_tval(var, v_false, table);
+		//assignment[var] = v_false;
 		link_propagate(table, pos_lit(var));
 	} else {
-		assignment[var] = v_true;
+		set_atom_tval(var, v_true, table);
+		//assignment[var] = v_true;
 		link_propagate(table, neg_lit(var));
 	}
 	if (scan_unsat_clauses(table) == -1) {

@@ -390,6 +390,22 @@ void print_clause_list(samp_clause_t *link, samp_table_t *table){
 	}
 }
 
+void print_watched_clause(samp_literal_t lit, samp_table_t *table) {
+	clause_table_t *clause_table = &table->clause_table;
+	samp_clause_t *link = clause_table->watched[lit];
+	if (link != NULL)  {
+		output("[");
+		print_literal(lit, table);
+		output("]\n");
+		while (link != NULL) {
+			output("    ");
+			print_clause(link, table);
+			output("\n");
+			link = link->link;
+		}
+	}
+}
+
 /*
  * Prints live clauses for the current round of MC-SAT
  */
@@ -428,16 +444,9 @@ void print_clause_table(samp_table_t *table, int32_t num_vars){
 		output("Watched clauses: \n");
 		int32_t i, lit;
 		for (i = 0; i < num_vars; i++){
-			lit = pos_lit(i);
-			output("lit[%"PRId32"]: ", lit);
-			link = clause_table->watched[lit];
-			print_clause_list(link, table);
-			lit = neg_lit(i);
-			output("lit[%"PRId32"]: ", lit);
-			link = clause_table->watched[lit];
-			print_clause_list(link, table);
+			print_watched_clause(pos_lit(i), table);
+			print_watched_clause(neg_lit(i), table);
 		}
-		output("\n");
 	}
 	output("Dead clauses:\n");
 	link = clause_table->dead_clauses;
