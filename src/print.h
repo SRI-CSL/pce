@@ -1,17 +1,6 @@
 #ifndef __PRINT_H
 #define __PRINT_H 1
 
-typedef struct string_buffer_s {
-  uint32_t capacity;
-  uint32_t size;
-  char *string;
-} string_buffer_t;
-
-extern bool output_to_string;
-extern string_buffer_t output_buffer;
-extern string_buffer_t error_buffer;
-extern string_buffer_t warning_buffer;
-
 /*
  * - A verbosity_level controls the amount of output produced
  *   it's set to 1 by default. Can be changed via set_verbosity_level
@@ -19,7 +8,6 @@ extern string_buffer_t warning_buffer;
  *   cprintf(level, <format>, ...) does nothing if level > verbosity_level
  *   otherwise, it's the same as printf(<format>, ...)
  */
-
 extern void set_verbosity_level(int32_t level);
 extern int32_t get_verbosity_level();
 extern void cprintf(int32_t level, const char *fmt, ...);
@@ -27,7 +15,6 @@ extern void cprintf(int32_t level, const char *fmt, ...);
 extern void output(const char *fmt, ...);
 extern void mcsat_err(const char *fmt, ...);
 extern void mcsat_warn(const char *fmt, ...);
-extern char *get_string_from_buffer(string_buffer_t *strbuf);
 
 inline char *string_of_tval(samp_truth_value_t tval);
 
@@ -47,6 +34,13 @@ extern void summarize_atom_table (samp_table_t *table);
 extern void summarize_clause_table (samp_table_t *table);
 extern void summarize_rule_table (samp_table_t *samp_table);
 
+extern void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table);
+extern void print_atoms(samp_table_t *samp_table);
+extern void print_atom(samp_atom_t *atom, samp_table_t *table);
+extern void print_clauses(samp_table_t *samp_table);
+extern void print_clause_table(samp_table_t *table);
+extern void print_rules(rule_table_t *rule_table);
+extern void print_state(samp_table_t *table, uint32_t round);
 extern void print_literal(samp_literal_t lit, samp_table_t *table);
 extern void print_clause(samp_clause_t *clause, samp_table_t *table);
 extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,

@@ -1,3 +1,4 @@
+#include <float.h>
 #include <string.h>
 #include "memalloc.h"
 #include "utils.h"
@@ -13,8 +14,8 @@ void init_sort_table(sort_table_t *sort_table){
 	}
 	sort_table->size = size;
 	sort_table->num_sorts = 0;
-	sort_table->entries = (sort_entry_t*)
-		safe_malloc(size*sizeof(sort_entry_t));
+	sort_table->entries = (sort_entry_t*)safe_malloc(
+			size*sizeof(sort_entry_t));
 	/*  for (i=0; i<size; i++){//this is not really needed
 		sort_table->entries[i].cardinality = 0;
 		sort_table->entries[i].name = NULL;
@@ -257,9 +258,6 @@ void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort) {
 	add_subsort_consts_to_supersort(subidx, supidx, sort_table);
 }
 
-/* The same functionality is repeated for constants
-*/
-
 void init_const_table(const_table_t *const_table){
 	int32_t size = INIT_CONST_TABLE_SIZE;
 	if (size >= MAXSIZE(sizeof(const_entry_t), 0)){
@@ -317,9 +315,11 @@ void add_const_to_sort(int32_t const_index,
 	}
 }
 
-// Internal form of add_const, checks if const already exists, and verifies
-// its sort if it does.  Returns 0 if it is newly added, 1 if it is already
-// there, and -1 if there is an error (e.g., sort mismatch).
+/*
+ * Internal form of add_const, checks if const already exists, and verifies
+ * its sort if it does.  Returns 0 if it is newly added, 1 if it is already
+ * there, and -1 if there is an error (e.g., sort mismatch).
+ */
 int32_t add_const_internal (char *name, int32_t sort_index,
 		samp_table_t *table) {
 	const_table_t *const_table = &(table->const_table);
@@ -358,8 +358,10 @@ int32_t add_const_internal (char *name, int32_t sort_index,
 	}
 }
 
-// Adds a constant to the const_table.  If the constant already exists,
-// simply prints a message, but does not check that the signature is correct.
+/*
+ * Adds a constant to the const_table.  If the constant already exists,
+ * simply prints a message, but does not check that the signature is correct.
+ */
 int32_t add_const(char *name, char *sort_name, samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	int32_t res;
@@ -396,9 +398,6 @@ int32_t const_sort_index(int32_t const_index,
 		const_table_t *const_table){
 	return const_table->entries[const_index].sort_index;
 }
-
-/* The same functionality is repeated for variables
-*/
 
 void init_var_table(var_table_t *var_table){
 	int32_t size = INIT_VAR_TABLE_SIZE;
@@ -458,55 +457,7 @@ char *var_name(int32_t var_index,
 	return var_table->entries[var_index].name;
 }
 
-/* The same routines for adding predicate symbols
-*/
-bool pred_epred(int32_t predicate){
-	return (predicate <= 0);
-}
-
-int32_t pred_val_to_index(int32_t val){
-	if (val & 1){
-		return ((val-1)/2);
-	} else {
-		return -(val/2);
-	}
-}
-
-bool atom_eatom(int32_t atom_id, pred_table_t *pred_table, atom_table_t *atom_table){
-	return pred_epred(atom_table->atom[atom_id]->pred);
-}
-
-
-int32_t pred_arity(int32_t predicate, pred_table_t *pred_table){
-	int32_t arity;
-	if (predicate <= 0){
-		arity = pred_table->evpred_tbl.entries[-predicate].arity;
-	} else {
-		arity = pred_table->pred_tbl.entries[predicate].arity;
-	}
-	return arity;
-}
-
-int32_t *pred_signature(int32_t predicate, pred_table_t *pred_table){
-	if (predicate <= 0){
-		return pred_table->evpred_tbl.entries[-predicate].signature;
-	} else {
-		return pred_table->pred_tbl.entries[predicate].signature;
-	}
-}
-
-int32_t pred_index(char * predicate, pred_table_t *pred_table){
-	return stbl_find(&(pred_table->pred_name_index), predicate);
-}
-
-char * pred_name(int32_t pred, pred_table_t *pred_table){
-	if (pred <= 0){
-		return pred_table->evpred_tbl.entries[-pred].name;
-	} else
-		return pred_table->pred_tbl.entries[pred].name;
-}
-
-static char * truepred = "true"; //the true evidence predicate occupies the 0 slot
+static char *truepred = "true"; //the true evidence predicate occupies the 0 slot
 
 void init_pred_table(pred_table_t *pred_table){
 	int32_t size = INIT_PRED_TABLE_SIZE;
@@ -609,6 +560,126 @@ int32_t add_pred(pred_table_t *pred_table,
 	}
 }
 
+/* Prepares for adding a new atom for a pred entry*/
+void pred_atom_table_resize(pred_entry_t *pred_entry) {
+	int32_t size;
+	if (pred_entry->num_atoms >= pred_entry->size_atoms) {
+		if (pred_entry->size_atoms == 0) {
+			pred_entry->atoms = (int32_t *) safe_malloc(
+					INIT_ATOM_PRED_SIZE * sizeof(int32_t));
+			pred_entry->size_atoms = INIT_ATOM_PRED_SIZE;
+		} else {
+			size = pred_entry->size_atoms;
+			if (MAXSIZE(sizeof(int32_t), 0) - size <= size / 2) {
+				out_of_memory();
+			}
+			size += size / 2;
+			pred_entry->atoms = (int32_t *) safe_realloc(pred_entry->atoms,
+					size * sizeof(int32_t));
+			pred_entry->size_atoms = size;
+		}
+	}
+}
+
+/* Adds a new atom for a pred entry */
+void add_atom_to_pred(pred_table_t *pred_table, int32_t predicate,
+		int32_t current_atom_index) {
+	pred_entry_t *entry = get_pred_entry(pred_table, predicate);
+	pred_atom_table_resize(entry);
+	entry->atoms[entry->num_atoms++] = current_atom_index;
+}
+
+/* Prepares for adding a rule for a pred entry */
+void pred_rule_table_resize(pred_entry_t *pred_entry) {
+	int32_t size;
+	if (pred_entry->num_rules >= pred_entry->size_rules) {
+		if (pred_entry->size_rules == 0) {
+			pred_entry->rules = (int32_t *) safe_malloc(
+					INIT_RULE_PRED_SIZE * sizeof(int32_t));
+			pred_entry->size_rules = INIT_RULE_PRED_SIZE;
+		} else {
+			size = pred_entry->size_rules;
+			if (MAXSIZE(sizeof(int32_t), 0) - size <= size / 2) {
+				out_of_memory();
+			}
+			size += size / 2;
+			pred_entry->rules = (int32_t *) safe_realloc(pred_entry->rules,
+					size * sizeof(int32_t));
+			pred_entry->size_rules = size;
+		}
+	}
+}
+
+/* Adds a rule for a pred entry */
+void add_rule_to_pred(pred_table_t *pred_table, int32_t predicate,
+		int32_t current_rule_index) {
+	pred_entry_t *entry = get_pred_entry(pred_table, predicate);
+	int32_t i, size;
+
+	/* if alreay exists, return */
+	for (i = 0; i < entry->num_rules; i++) {
+		if (entry->rules[i] == current_rule_index) {
+			return;
+		}
+	}
+
+	pred_rule_table_resize(entry);
+	entry->rules[entry->num_rules++] = current_rule_index;
+}
+
+bool pred_epred(int32_t predicate){
+	return (predicate <= 0);
+}
+
+int32_t pred_val_to_index(int32_t val){
+	if (val & 1){
+		return ((val-1)/2);
+	} else {
+		return -(val/2);
+	}
+}
+
+/* Whether atom_id is an evidence atom */
+bool atom_eatom(int32_t atom_id, pred_table_t *pred_table, atom_table_t *atom_table){
+	return pred_epred(atom_table->atom[atom_id]->pred);
+}
+
+
+int32_t pred_arity(int32_t predicate, pred_table_t *pred_table){
+	int32_t arity;
+	if (predicate <= 0){
+		arity = pred_table->evpred_tbl.entries[-predicate].arity;
+	} else {
+		arity = pred_table->pred_tbl.entries[predicate].arity;
+	}
+	return arity;
+}
+
+int32_t *pred_signature(int32_t predicate, pred_table_t *pred_table){
+	if (predicate <= 0){
+		return pred_table->evpred_tbl.entries[-predicate].signature;
+	} else {
+		return pred_table->pred_tbl.entries[predicate].signature;
+	}
+}
+
+int32_t pred_index(char * predicate, pred_table_t *pred_table){
+	return stbl_find(&(pred_table->pred_name_index), predicate);
+}
+
+char * pred_name(int32_t pred, pred_table_t *pred_table){
+	if (pred <= 0){
+		return pred_table->evpred_tbl.entries[-pred].name;
+	} else {
+		return pred_table->pred_tbl.entries[pred].name;
+	}
+}
+
+/* FIXME */
+inline int32_t pred_default_value(pred_entry_t *pred) {
+	return false;
+}
+
 void init_atom_table(atom_table_t *table) {
 	uint32_t i;
 
@@ -678,7 +749,6 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table) {
 	atom_table->size = size;
 }
 
-
 void init_clause_table(clause_table_t *table){
 	table->size = INIT_CLAUSE_TABLE_SIZE;
 	table->num_clauses = 0;
@@ -718,6 +788,58 @@ void clause_table_resize(clause_table_t *clause_table, int32_t num_lits){
 	if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < num_lits) {
 		out_of_memory();
 	}
+}
+
+/* Pushes a clause to some clause linked list */
+void inline push_clause(samp_clause_t *clause, samp_clause_t **list) {
+	clause->link = *list;
+	*list = clause;
+}
+
+/* Pushes a clause to the negative unit clause linked list */
+void inline push_negative_or_unit_clause(clause_table_t *clause_table, uint32_t i) {
+	push_clause(clause_table->samp_clauses[i], &clause_table->negative_or_unit_clauses);
+	//	clause_table->samp_clauses[i]->link = clause_table->negative_or_unit_clauses;
+	//	clause_table->negative_or_unit_clauses = clause_table->samp_clauses[i];
+}
+
+/* Pushes a clause to the unsat clause linked list */
+void inline push_unsat_clause(clause_table_t *clause_table, uint32_t i) {
+	push_clause(clause_table->samp_clauses[i], &clause_table->unsat_clauses);
+	//	clause_table->samp_clauses[i]->link = clause_table->unsat_clauses;
+	//	clause_table->unsat_clauses = clause_table->samp_clauses[i];
+	clause_table->num_unsat_clauses++;
+}
+
+void inline push_sat_clause(clause_table_t *clause_table, uint32_t i) {
+	push_clause(clause_table->samp_clauses[i], &clause_table->sat_clauses);
+}
+
+void init_rule_table(rule_table_t *table){
+	table->size = INIT_RULE_TABLE_SIZE;
+	table->num_rules = 0;
+	if (table->size >= MAXSIZE(sizeof(samp_rule_t *), 0)){
+		out_of_memory();
+	}
+	table->samp_rules =
+		(samp_rule_t **) safe_malloc(table->size * sizeof(samp_rule_t *));
+}
+
+/*
+ * Resize the rule table to be at least 1 more than num_rules
+ */
+void rule_table_resize(rule_table_t *rule_table){
+	int32_t size = rule_table->size;
+	int32_t num_rules = rule_table->num_rules;
+	if (num_rules < size) return;
+	if (MAXSIZE(sizeof(samp_rule_t *), 0) - size <= (size/2)){
+		out_of_memory();
+	}
+	size += size/2;
+	rule_table->samp_rules = (samp_rule_t **)
+		safe_realloc(rule_table->samp_rules,
+				size * sizeof(samp_rule_t *));
+	rule_table->size = size; 
 }
 
 void init_query_table(query_table_t *table) {
@@ -805,6 +927,144 @@ void reset_source_table(source_table_t *table) {
 	table->num_entries = 0;
 }
 
+void add_source_to_clause(char *source, int32_t clause_index, double weight,
+		samp_table_t *table) {
+	source_table_t *source_table = &table->source_table;
+	source_entry_t *source_entry;
+	int32_t numclauses, srcidx;
+
+	for (srcidx = 0; srcidx < source_table->num_entries; srcidx++) {
+		if (strcmp(source, source_table->entry[srcidx]->name) == 0) {
+			break;
+		}
+	}
+	if (srcidx == source_table->num_entries) {
+		source_table_extend(source_table);
+		source_entry = (source_entry_t *) safe_malloc(sizeof(source_entry_t));
+		source_table->entry[srcidx] = source_entry;
+		source_entry->name = source;
+		source_entry->assertion = NULL;
+		source_entry->clause = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+		source_entry->weight = (double *) safe_malloc(2 * sizeof(double));
+		source_entry->clause[0] = clause_index;
+		source_entry->clause[1] = -1;
+		source_entry->weight[0] = weight;
+		source_entry->weight[1] = -1;
+	} else {
+		source_entry = source_table->entry[srcidx];
+		if (source_entry->clause == NULL) {
+			source_entry->clause = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+			source_entry->weight = (double *) safe_malloc(2 * sizeof(double));
+			source_entry->clause[0] = clause_index;
+			source_entry->clause[1] = -1;
+			source_entry->weight[0] = clause_index;
+			source_entry->weight[1] = -1;
+		} else {
+			for (numclauses = 0; source_entry->assertion[numclauses] != -1; numclauses++) {
+			}
+			source_entry->clause = (int32_t *) safe_realloc(
+					source_entry->clause, (numclauses + 2) * sizeof(int32_t));
+			source_entry->weight = (double *) safe_realloc(
+					source_entry->weight, (numclauses + 2) * sizeof(double));
+			source_entry->clause[numclauses] = clause_index;
+			source_entry->clause[numclauses + 1] = -1;
+			source_entry->weight[numclauses] = weight;
+			source_entry->weight[numclauses + 1] = -1;
+		}
+	}
+}
+
+void add_source_to_assertion(char *source, int32_t atom_index,
+		samp_table_t *table) {
+	source_table_t *source_table = &table->source_table;
+	source_entry_t *source_entry;
+	int32_t numassn, srcidx;
+
+	for (srcidx = 0; srcidx < source_table->num_entries; srcidx++) {
+		if (strcmp(source, source_table->entry[srcidx]->name) == 0) {
+			break;
+		}
+	}
+	if (srcidx == source_table->num_entries) {
+		source_table_extend(source_table);
+		source_entry = (source_entry_t *) safe_malloc(sizeof(source_entry_t));
+		source_table->entry[srcidx] = source_entry;
+		source_entry->name = source;
+		source_entry->assertion = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+		source_entry->assertion[0] = atom_index;
+		source_entry->assertion[1] = -1;
+		source_entry->clause = NULL;
+		source_entry->weight = NULL;
+	} else {
+		source_entry = source_table->entry[srcidx];
+		if (source_entry->assertion == NULL) {
+			source_entry->assertion = (int32_t *) safe_malloc(
+					2 * sizeof(int32_t));
+			source_entry->assertion[0] = atom_index;
+			source_entry->assertion[1] = -1;
+		} else {
+			for (numassn = 0; source_entry->assertion[numassn] != -1; numassn++) {
+			}
+			source_entry->assertion = (int32_t *) safe_realloc(
+					source_entry->assertion, (numassn + 2) * sizeof(int32_t));
+			source_entry->assertion[numassn] = atom_index;
+			source_entry->assertion[numassn + 1] = -1;
+		}
+	}
+}
+
+/* TODO what does this do */
+void retract_source(char *source, samp_table_t *table) {
+	source_table_t *source_table = &table->source_table;
+	clause_table_t *clause_table = &table->clause_table;
+	source_entry_t *source_entry;
+	int32_t i, j, srcidx, sidx, clause_idx;
+	samp_clause_t *clause;
+	double wt;
+
+	for (srcidx = 0; srcidx < source_table->num_entries; srcidx++) {
+		if (strcmp(source, source_table->entry[srcidx]->name) == 0) {
+			break;
+		}
+	}
+	if (srcidx == source_table->num_entries) {
+		mcsat_err("\nSource %s unknown\n", source);
+		return;
+	}
+	source_entry = source_table->entry[srcidx];
+	if (source_entry->assertion != NULL) {
+		// Not sure what to do here
+	}
+	if (source_entry->clause != NULL) {
+		for (i = 0; source_entry->clause[i] != -1; i++) {
+			clause_idx = source_entry->clause[i];
+			clause = clause_table->samp_clauses[clause_idx];
+			if (source_entry->weight[i] == DBL_MAX) {
+				// Need to go through all other sources and add them up
+				wt = 0.0;
+				for (sidx = 0; sidx < source_table->num_entries; sidx++) {
+					if (sidx != srcidx && source_table->entry[sidx]->clause
+							!= NULL) {
+						for (j = 0; source_table->entry[sidx]->clause[j] != -1; j++) {
+							if (source_table->entry[sidx]->clause[j]
+									== clause_idx) {
+								wt += source_table->entry[sidx]->weight[j];
+								// Assume clause occurs only once for given source,
+								// as we can simply sum up all such occurrences.
+								break;
+							}
+						}
+					}
+				}
+				clause->weight = wt;
+			} else if (clause->weight != DBL_MAX) {
+				// Subtract the weight of this source from the clause
+				clause->weight -= source_entry->weight[i];
+			} // Nothing to do if current weight is DBL_MAX
+		}
+	}
+}
+
 void init_samp_table(samp_table_t *table) {
 	init_sort_table(&table->sort_table);
 	init_const_table(&table->const_table);
@@ -819,104 +1079,11 @@ void init_samp_table(samp_table_t *table) {
 	init_integer_stack(&table->fixable_stack, 0);
 }
 
-void init_rule_table(rule_table_t *table){
-	table->size = INIT_RULE_TABLE_SIZE;
-	table->num_rules = 0;
-	if (table->size >= MAXSIZE(sizeof(samp_rule_t *), 0)){
-		out_of_memory();
-	}
-	table->samp_rules =
-		(samp_rule_t **) safe_malloc(table->size * sizeof(samp_rule_t *));
-}
-
-/**
- * Resize the rule table to be at least 1 more than num_rules
+/* 
+ * Checks the validity of the table for assertions within other functions.
+ * valid_sort_table checks that the sort size is nonnegative, num_sorts is
+ * at most size, and each sort name is hashed to the right index.
  */
-void rule_table_resize(rule_table_t *rule_table){
-	int32_t size = rule_table->size;
-	int32_t num_rules = rule_table->num_rules;
-	if (num_rules < size) return;
-	if (MAXSIZE(sizeof(samp_rule_t *), 0) - size <= (size/2)){
-		out_of_memory();
-	}
-	size += size/2;
-	rule_table->samp_rules = (samp_rule_t **)
-		safe_realloc(rule_table->samp_rules,
-				size * sizeof(samp_rule_t *));
-	rule_table->size = size; 
-}
-
-/* Prepares for adding a new atom for a pred entry*/
-void pred_atom_table_resize(pred_entry_t *pred_entry) {
-	int32_t size;
-	if (pred_entry->num_atoms >= pred_entry->size_atoms) {
-		if (pred_entry->size_atoms == 0) {
-			pred_entry->atoms = (int32_t *) safe_malloc(
-					INIT_ATOM_PRED_SIZE * sizeof(int32_t));
-			pred_entry->size_atoms = INIT_ATOM_PRED_SIZE;
-		} else {
-			size = pred_entry->size_atoms;
-			if (MAXSIZE(sizeof(int32_t), 0) - size <= size / 2) {
-				out_of_memory();
-			}
-			size += size / 2;
-			pred_entry->atoms = (int32_t *) safe_realloc(pred_entry->atoms,
-					size * sizeof(int32_t));
-			pred_entry->size_atoms = size;
-		}
-	}
-}
-
-/* Adds a new atom for a pred entry */
-void add_atom_to_pred(pred_table_t *pred_table, int32_t predicate,
-		int32_t current_atom_index) {
-	pred_entry_t *entry = get_pred_entry(pred_table, predicate);
-	pred_atom_table_resize(entry);
-	entry->atoms[entry->num_atoms++] = current_atom_index;
-}
-
-/* Prepares for adding a rule for a pred entry */
-void pred_rule_table_resize(pred_entry_t *pred_entry) {
-	int32_t size;
-	if (pred_entry->num_rules >= pred_entry->size_rules) {
-		if (pred_entry->size_rules == 0) {
-			pred_entry->rules = (int32_t *) safe_malloc(
-					INIT_RULE_PRED_SIZE * sizeof(int32_t));
-			pred_entry->size_rules = INIT_RULE_PRED_SIZE;
-		} else {
-			size = pred_entry->size_rules;
-			if (MAXSIZE(sizeof(int32_t), 0) - size <= size / 2) {
-				out_of_memory();
-			}
-			size += size / 2;
-			pred_entry->rules = (int32_t *) safe_realloc(pred_entry->rules,
-					size * sizeof(int32_t));
-			pred_entry->size_rules = size;
-		}
-	}
-}
-
-/* Adds a rule for a pred entry */
-void add_rule_to_pred(pred_table_t *pred_table, int32_t predicate,
-		int32_t current_rule_index) {
-	pred_entry_t *entry = get_pred_entry(pred_table, predicate);
-	int32_t i, size;
-
-	/* if alreay exists, return */
-	for (i = 0; i < entry->num_rules; i++) {
-		if (entry->rules[i] == current_rule_index) {
-			return;
-		}
-	}
-
-	pred_rule_table_resize(entry);
-	entry->rules[entry->num_rules++] = current_rule_index;
-}
-
-/* Checks the validity of the table for assertions within other functions.
-   valid_sort_table checks that the sort size is nonnegative, num_sorts is
-   at most size, and each sort name is hashed to the right index.
-   */
 bool valid_sort_table(sort_table_t *sort_table){
 	if (sort_table->size < 0 || sort_table->num_sorts > sort_table->size)
 		return false;
@@ -929,8 +1096,7 @@ bool valid_sort_table(sort_table_t *sort_table){
 	return true;
 }
 
-/* Checks that the const names are hashed to the right index.
-*/
+/* Checks that the const names are hashed to the right index. */
 bool valid_const_table(const_table_t *const_table, sort_table_t *sort_table){
 	if (const_table->size < 0 || const_table->num_consts > const_table->size)
 		return false;
@@ -944,10 +1110,10 @@ bool valid_const_table(const_table_t *const_table, sort_table_t *sort_table){
 	return true;
 }
 
-/* Checks that evpred and pred names are hashed to the right index, and
-   have a valid signature. 
-   */
-
+/* 
+ * Checks that evpred and pred names are hashed to the right index, and
+ * have a valid signature. 
+ */
 bool valid_pred_table(pred_table_t *pred_table,
 		sort_table_t *sort_table,
 		atom_table_t *atom_table){

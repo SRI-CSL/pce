@@ -162,34 +162,15 @@ extern bool read_eval(samp_table_t *table);
 extern void read_eval_print_loop(char *input, samp_table_t *table);
 extern void load_mcsat_file(char *file, samp_table_t *table);
 
-#define INIT_INPUT_CLAUSE_BUFFER_SIZE 8
-#define INIT_INPUT_LITERAL_BUFFER_SIZE 8
-#define INIT_INPUT_ATOM_BUFFER_SIZE 8
-
-typedef struct input_clause_buffer_s {
-  uint32_t capacity;
-  uint32_t size;
-  input_clause_t **clauses;
-} input_clause_buffer_t;
-
-typedef struct input_literal_buffer_s {
-  uint32_t capacity;
-  uint32_t size;
-  input_literal_t *literals;
-} input_literal_buffer_t;
-
-typedef struct input_atom_buffer_s {
-  uint32_t capacity;
-  uint32_t size;
-  input_atom_t *atoms;
-} input_atom_buffer_t;
-
-extern input_clause_buffer_t input_clause_buffer;
-extern input_literal_buffer_t input_literal_buffer;
-extern input_atom_buffer_t input_atom_buffer;
-
 extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t *table);
+extern bool add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table);
 extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
+extern int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source);
+extern int32_t add_rule(input_clause_t *in_rule, double weight, char *source,
+			samp_table_t *samp_table);
+extern int32_t add_query(var_entry_t **vars, rule_literal_t ***lits,
+			 samp_table_t *table);
+
 extern void dumptable(int32_t tbl, samp_table_t *table);
 
 extern void set_print_exp_p(bool flag);
@@ -250,9 +231,6 @@ extern void free_samp_query_instance(samp_query_instance_t *qinst);
 extern input_fmla_t *yy_fmla(int32_t op, input_fmla_t *arg1, input_fmla_t *arg2);
 extern input_fmla_t *yy_atom_to_fmla (input_atom_t *atom);
 extern input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
-
-extern int32_t str2int(char *cnst);
-extern bool add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table);
 
 void set_training_data_file(char *path);
 

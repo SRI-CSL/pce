@@ -6,6 +6,7 @@
 #include <math.h>
 #include <float.h>
 #include <time.h>
+
 #include "memalloc.h"
 #include "prng.h"
 #include "int_array_sort.h"
@@ -16,34 +17,12 @@
 #include "input.h"
 #include "vectors.h"
 #include "SFMT.h"
+#include "buffer.h"
+
 #include "yacc.tab.h"
 #include "samplesat.h"
 
-clause_buffer_t atom_buffer = { 0, NULL };
-
-/* Allocates enough space for atom_buffer */
-void atom_buffer_resize(clause_buffer_t *atom_buffer, int32_t arity) {
-	int32_t size = atom_buffer->size;
-
-	if (size < arity + 1) {
-		if (size == 0) {
-			size = INIT_ATOM_SIZE;
-		} else {
-			if (MAXSIZE(sizeof(int32_t), 0) - size <= size / 2) {
-				out_of_memory();
-			}
-			size += size / 2;
-		}
-		if (size < arity + 1) {
-			if (MAXSIZE(sizeof(int32_t), 0) <= arity)
-				out_of_memory();
-			size = arity + 1;
-		}
-		atom_buffer->data = (int32_t *) safe_realloc(atom_buffer->data,
-				size * sizeof(int32_t));
-		atom_buffer->size = size;
-	}
-}
+extern atom_buffer_t samp_atom_buffer;
 
 /*
  * A SAT solver for only the hard formulas
@@ -73,6 +52,12 @@ void first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		printf("num of unsat clauses = %d\n", clause_table->num_unsat_clauses);
 		mcsat_err("Initialization failed to find a model; increase max_flips\n");
 		return -1;
+	}
+
+	if (get_verbosity_level() >= 1) {
+		printf("\n[first_sample_sat] initial assignment:\n");
+		print_assignment(table);
+		print_clause_table(table);
 	}
 
 	return 0;
@@ -339,9 +324,9 @@ int32_t choose_random_atom(samp_table_t *table) {
 	pred_entry = &pred_tbl->entries[predicate];
 	int32_t *signature = pred_entry->signature;
 	int32_t arity = pred_entry->arity;
-	atom_buffer_resize(&atom_buffer, arity);
+	atom_buffer_resize(&samp_atom_buffer, arity);
 	int32_t constant;
-	samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
+	samp_atom_t *atom = (samp_atom_t *) samp_atom_buffer.data;
 	//Build atom from atom_num by successive division
 	atom->pred = predicate;
 	for (i = 0; i < arity; i++) {
@@ -743,7 +728,7 @@ int32_t set_atom_tval(int32_t var, samp_truth_value_t tval, samp_table_t *table)
 	assignment[var] = tval;
 
 	/* If the atom is inactive AND the value is non-default, activate the atom. */
-	if (!atom_table->active[var]
+	if (lazy_mcsat() && !atom_table->active[var]
 			&& assigned_true(tval) != pred_default_value(pred_entry)) {
 		activate_atom(table, var);
 	}
@@ -899,7 +884,7 @@ int32_t init_first_sample_sat(samp_table_t *table) {
 	if (get_verbosity_level() >= 4) {
 		printf("\n[init_first_sample_sat] Started ...\n");
 		print_assignment(table);
-		print_clause_table(table, -1);
+		print_clause_table(table);
 	}
 
 	conflict = negative_unit_propagate(table);
@@ -909,7 +894,7 @@ int32_t init_first_sample_sat(samp_table_t *table) {
 	if (get_verbosity_level() >= 4) {
 		printf("\n[init_first_sample_sat] After negative_unit_propagation:\n");
 		print_assignment(table);
-		print_clause_table(table, -1);
+		print_clause_table(table);
 	}
 
 	int32_t num_unfixed_vars;
@@ -919,7 +904,7 @@ int32_t init_first_sample_sat(samp_table_t *table) {
 	if (get_verbosity_level() >= 4) {
 		printf("\n[init_first_sample_sat] After init_random_assignment:\n");
 		print_assignment(table);
-		print_clause_table(table, -1);
+		print_clause_table(table);
 	}
 
 	/* Till now all the live clauses are in unsat_clauses */
@@ -1007,7 +992,7 @@ int32_t init_sample_sat(samp_table_t *table) {
 		printf("[init_sample_sat] After randomization, unsat = %d:\n",
 				clause_table->num_unsat_clauses);
 		print_assignment(table);
-		print_clause_table(table, -1);
+		print_clause_table(table);
 	}
 
 	return 0;

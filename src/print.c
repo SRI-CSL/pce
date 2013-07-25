@@ -10,16 +10,15 @@
 #include "tables.h"
 #include "input.h"
 #include "print.h"
-
-#define INIT_STRING_BUFFER_SIZE 32
+#include "buffer.h"
 
 pthread_mutex_t pmutex = PTHREAD_MUTEX_INITIALIZER;
 
-bool output_to_string = false;
+static bool output_to_string = false;
 
-string_buffer_t output_buffer = {0, 0, NULL};
-string_buffer_t error_buffer = {0, 0, NULL};
-string_buffer_t warning_buffer = {0, 0, NULL};
+static string_buffer_t output_buffer = {0, 0, NULL};
+static string_buffer_t error_buffer = {0, 0, NULL};
+static string_buffer_t warning_buffer = {0, 0, NULL};
 
 /*
  * verbosity of the output information
@@ -50,38 +49,6 @@ void cprintf(int32_t level, const char *fmt, ...){
 		va_start(argp, fmt);
 		vprintf(fmt, argp);
 		va_end(argp);
-	}
-}
-
-/* get a copy of the buffer */
-extern char *get_string_from_buffer (string_buffer_t *strbuf) {
-	char *new_str;
-	if (strbuf->size == 0) {
-		return "";
-	} else {
-		new_str = (char *) safe_malloc((strbuf->size+1) * sizeof(char));
-		strcpy(new_str, strbuf->string);
-		strbuf->size = 0;
-		return new_str;
-	}
-}
-
-void string_buffer_resize (string_buffer_t *strbuf, int32_t delta) {
-	if (strbuf->capacity == 0) {
-		strbuf->string = (char *)
-			safe_malloc(INIT_STRING_BUFFER_SIZE * sizeof(char));
-		strbuf->capacity = INIT_STRING_BUFFER_SIZE;
-	}
-	uint32_t size = strbuf->size;
-	uint32_t capacity = strbuf->capacity;
-	if (size+delta >= capacity){
-		if (MAX_SIZE(sizeof(char), 0) - capacity <= delta){
-			out_of_memory();
-		}
-		capacity += delta;
-		strbuf->string = (char *)
-			safe_realloc(strbuf->string, capacity * sizeof(char));
-		strbuf->capacity = capacity;
 	}
 }
 
@@ -414,35 +381,34 @@ void print_live_clauses(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	int32_t i, lit;
 
-	output("\nLive (sat) clauses:\n");
+	output("Sat clauses:\n");
 	print_clause_list(clause_table->sat_clauses, table);
+	int32_t num_vars = atom_table->num_vars;
 	output("Watched clauses:\n");
-	for (i = 0; i < atom_table->num_vars; i++) {
-		lit = pos_lit(i);
-		print_clause_list(clause_table->watched[lit], table);
-		lit = neg_lit(i);
-		print_clause_list(clause_table->watched[lit], table);
+	for (i = 0; i < num_vars; i++){
+		print_watched_clause(pos_lit(i), table);
+		print_watched_clause(neg_lit(i), table);
 	}
+	output("Unsat clauses:\n");
+	print_clause_list(clause_table->unsat_clauses, table);
 	output("\n");
 }
 
-void print_clause_table(samp_table_t *table, int32_t num_vars){
+void print_clause_table(samp_table_t *table) {
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &table->atom_table;
+	int32_t i;
 
-	print_clauses(table);
-	output("Sat clauses: \n");
+	//print_clauses(table);
+	output("Sat clauses:\n");
 	samp_clause_t *link = clause_table->sat_clauses;
 	print_clause_list(link, table);
-	output("Unsat clauses: \n");
+	output("Unsat clauses:\n");
 	link = clause_table->unsat_clauses;
 	print_clause_list(link, table);  
-	if (num_vars < 0) {
-		num_vars = atom_table->num_vars;
-	}
+	int32_t num_vars = atom_table->num_vars;
 	if (num_vars > 0) {
-		output("Watched clauses: \n");
-		int32_t i, lit;
+		output("Watched clauses:\n");
 		for (i = 0; i < num_vars; i++){
 			print_watched_clause(pos_lit(i), table);
 			print_watched_clause(neg_lit(i), table);
@@ -466,7 +432,7 @@ void print_state(samp_table_t *table, uint32_t round){
 		output("==============================================================\n");
 		print_atoms(table);
 		output("==============================================================\n");
-		print_clause_table(table, atom_table->num_vars);
+		print_clause_table(table);
 	} else if (verbosity_level > 1) {
 		output("Generated sample %"PRId32"...\n", round);
 	} else if (verbosity_level > 0) {

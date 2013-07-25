@@ -6,6 +6,7 @@
 #include <math.h>
 #include <float.h>
 #include <time.h>
+
 #include "memalloc.h"
 #include "prng.h"
 #include "int_array_sort.h"
@@ -13,18 +14,22 @@
 #include "gcd.h"
 #include "utils.h"
 #include "print.h"
-#include "input.h"
 #include "vectors.h"
-#include "SFMT.h"
+#include "buffer.h"
+
 #include "yacc.tab.h"
-#include "samplesat.h"
-#include "mcmc.h"
 #include "lazysat.h"
 
+extern atom_buffer_t rule_atom_buffer;
+extern clause_buffer_t clause_buffer;
+extern substit_buffer_t substit_buffer;
+
+extern bool hard_only;
+
 /*
- * TODO: can be replaced by literal_falsifiable
- *
  * Evaluates a builtin literal (a builtin operation with an optional negation)
+ *
+ * TODO: can be replaced by literal_falsifiable
  */
 bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs, samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
@@ -47,8 +52,6 @@ bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs, samp_table_t *
 	safe_free(nargs);
 	return retval;
 }
-
-extern clause_buffer_t rule_atom_buffer;
 
 /* Tests whether a literal is falsifiable, i.e., is not fixed to be satisfied */
 bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, samp_table_t *table) {
@@ -180,12 +183,12 @@ int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *t
 	//}
 
 	/* check if the value is fixed to be true, if so discard it */
-	if (!check_clause_falsifiable(rule, substs, table)) {
+	if (lazy_mcsat() && !check_clause_falsifiable(rule, substs, table)) {
 		return -1;
 	}
 
 	/* check duplicates and insert to hashset */
-	if (!check_clause_duplicate(rule, substs, table)) {
+	if (lazy_mcsat() && !check_clause_duplicate(rule, substs, table)) {
 		return -1;
 	}
 
@@ -298,8 +301,6 @@ int32_t push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
 	}
 }
 
-extern bool hard_only;
-
 /*
  * Pushes a newly created clause to the corresponding list
  * 
@@ -334,13 +335,6 @@ void push_newly_activated_clause(int32_t clsidx, samp_table_t *table) {
 			push_clause(clause, &clause_table->dead_clauses);
 		}
 	}
-}
-
-/* 
- * FIXME
- */
-int32_t inline pred_default_value(pred_entry_t *pred) {
-	return false;
 }
 
 /*
@@ -391,11 +385,13 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 	int32_t *ordered_lits; // the order of the lits in which they are checked
 
 	if (get_verbosity_level() >= 5) {
-		printf("[fixed_const_rule_instances] Instantiating for ");
-		print_atom(table->atom_table.atom[atom_index], table);
-		printf(": ");
+		printf("[fixed_const_rule_instances] Instantiating ");
 		print_rule_substit(rule, substit_buffer.entries, table);
-		printf("\n");
+		if (atom_index > 0) {
+			printf(" for ");
+			print_atom(table->atom_table.atom[atom_index], table);
+		}
+		printf(":\n");
 	}
 
 	ordered_lits = (int32_t *) safe_malloc(sizeof(int32_t) * rule->num_lits);
@@ -425,7 +421,7 @@ void smart_rule_instances(int32_t rule_index, samp_table_t *table) {
 	for (i = 0; i < substit_buffer.size; i++) {
 		substit_buffer.entries[i] = INT32_MIN;
 	}
-	fixed_const_rule_instances(rule, table, NULL);
+	fixed_const_rule_instances(rule, table, -1);
 }
 
 /*
@@ -441,11 +437,11 @@ void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_rule_t 
 	 * recursively enumerate the rest variables that haven't been
 	 * assigned a constant */
 	if (litidx < 0) {
-//		if (get_verbosity_level() >= 5) {
-//			printf("[smart_rule_instances_rec] Partially instantiated rule ");
-//			print_rule_substit(rule, substit_buffer.entries, table);
-//			printf(" ...\n");
-//		}
+		if (get_verbosity_level() >= 5) {
+			printf("[smart_rule_instances_rec] Partially instantiated rule ");
+			print_rule_substit(rule, substit_buffer.entries, table);
+			printf(" ...\n");
+		}
 		all_rule_instances_rec(0, rule, table, atom_index);
 		return;
 	}

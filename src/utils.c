@@ -9,15 +9,16 @@
 #include "array_hash_map.h"
 #include "utils.h"
 #include "SFMT.h"
-
-/*  These copy operations assume that size input to safe_malloc can't 
- *  overflow since there are existing structures of the given size. 
- */
+#include "buffer.h"
 
 int32_t imax(int32_t i, int32_t j) {return i<j ? j : i;}
 int32_t imin(int32_t i, int32_t j) {return i>j ? j : i;}
 
-char * str_copy(char *name){
+/*  
+ * These copy operations assume that size input to safe_malloc can't 
+ * overflow since there are existing structures of the given size. 
+ */
+char *str_copy(char *name){
 	int32_t len = strlen(name);
 	char * new_name = (char *) safe_malloc(++len * sizeof(char));
 	memcpy(new_name, name, len);
@@ -39,39 +40,24 @@ int32_t *intarray_copy(int32_t *signature, int32_t length){
 	return new_signature;
 }
 
-/*
- * asserts a db atom to the atoms table and sets its truth value as v_db_true
- * A db atom has an evidence predicate which must be negative. FIXME: 
- * wrong comments
- *
- * Retrieves a predicate by the index
- */
-pred_entry_t *get_pred_entry(pred_table_t *pred_table, int32_t predicate){
-	if (predicate <= 0){
-		return &(pred_table->evpred_tbl.entries[-predicate]);
-	} else {
-		return &(pred_table->pred_tbl.entries[predicate]); 
-	}
-}
+/* converts string to integer */
+int32_t str2int(char *cnst) {
+	int32_t i;
+	long int lcnst;
 
-/* Be careful when using a global variable */
-clause_buffer_t clause_buffer = {0, NULL};
-
-void clause_buffer_resize (int32_t length){
-	if (clause_buffer.data == NULL){
-		clause_buffer.data = (int32_t *) safe_malloc(INIT_CLAUSE_SIZE * sizeof(int32_t));
-		clause_buffer.size = INIT_CLAUSE_SIZE;
-	}
-	int32_t size = clause_buffer.size;
-	if (size < length){
-		if (MAXSIZE(sizeof(int32_t), 0) - size <= size/2){
-			out_of_memory();
+	for (i = (cnst[0] == '+' || cnst[0] == '-') ? 1 : 0; cnst[i] != '\0'; i++) {
+		if (!isdigit(cnst[i])) {
+			mcsat_err("%s is not a valid integer\n", cnst);
 		}
-		size += size/2;
-		clause_buffer.data =
-			(int32_t  *) safe_realloc(clause_buffer.data, size * sizeof(int32_t));
-		clause_buffer.size = size;
 	}
+	lcnst = strtol(cnst, NULL, 10);
+	if (lcnst > INT32_MAX) {
+		mcsat_err("Integer %s is too big, above %"PRId32"", cnst, INT32_MAX);
+	}
+	if (lcnst < INT32_MIN) {
+		mcsat_err("Integer %s is too small, below %"PRId32"", cnst, INT32_MIN);
+	}
+	return (int32_t) lcnst;
 }
 
 bool assigned_undef(samp_truth_value_t value){
@@ -140,39 +126,16 @@ int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
 	return -1;
 }
 
-///** Evaluates a clause to -1 if all literals are false, and i if the
-//   i'th literal is true, in the given assignment. 
-//*/
-//int32_t eval_neg_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
-//  int32_t i;
-//  for (i = 0; i < clause->numlits; i++){
-//    if (assigned_true_lit(assignment, clause->disjunct[i]))
-//      return i;
-//  }
-//  return -1;
-//}
-
-/* Be careful when using a global variable */
-substit_buffer_t substit_buffer = {0, NULL};
-
-void substit_buffer_resize(int32_t length) {
-	if (substit_buffer.entries == NULL) {
-		substit_buffer.entries = (substit_entry_t *)
-			safe_malloc(INIT_SUBSTIT_TABLE_SIZE * sizeof(substit_entry_t));
-		substit_buffer.size = INIT_SUBSTIT_TABLE_SIZE;
-	}
-	int32_t size = substit_buffer.size;
-	if (size < length){
-		if (MAXSIZE(sizeof(substit_entry_t), 0) - size <= size/2){
-			out_of_memory();
-		}
-		size += size/2;
-		substit_buffer.entries = (substit_entry_t *)
-			safe_realloc(substit_buffer.entries, size * sizeof(substit_entry_t));
-		substit_buffer.size = size;
+/* retrieves a predicate structure by the index */
+pred_entry_t *get_pred_entry(pred_table_t *pred_table, int32_t predicate){
+	if (predicate <= 0){
+		return &(pred_table->evpred_tbl.entries[-predicate]);
+	} else {
+		return &(pred_table->pred_tbl.entries[predicate]); 
 	}
 }
 
+/* returns the sort name of a constant */
 char *const_sort_name(int32_t const_idx, samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	const_table_t *const_table = &table->const_table;
@@ -182,6 +145,7 @@ char *const_sort_name(int32_t const_idx, samp_table_t *table) {
 	return sort_table->entries[const_sig].name;
 }
 
+/* frees an array of strings */
 void free_strings (char **string) {
 	int32_t i;
 
@@ -281,9 +245,10 @@ int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_t
 	}
 }
 
+extern substit_buffer_t substit_buffer;
+
 /* 
- * Converts a rule_atom to a samp_atom.
- * If ratom is a builtinop, return NULL
+ * Converts a rule_atom to a samp_atom. If ratom is a builtinop, return NULL.
  */
 samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, substit_entry_t *substs, 
 		pred_table_t *pred_table) {

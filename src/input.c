@@ -66,10 +66,6 @@ void set_pce_rand_seed(uint32_t seed) {
 	rand_reset();
 }
 
-input_clause_buffer_t input_clause_buffer = { 0, 0, NULL };
-input_literal_buffer_t input_literal_buffer = { 0, 0, NULL };
-input_atom_buffer_t input_atom_buffer = { 0, 0, NULL };
-
 int32_t get_max_samples() {
 	return max_samples;
 }
@@ -148,88 +144,6 @@ extern char* get_dump_samples_path() {
 
 extern void set_dump_samples_path(char *path) {
 	dump_samples_path = path;
-}
-
-void input_clause_buffer_resize() {
-	if (input_clause_buffer.capacity == 0) {
-		input_clause_buffer.clauses = (input_clause_t **) safe_malloc(
-				INIT_INPUT_CLAUSE_BUFFER_SIZE * sizeof(input_clause_t *));
-		input_clause_buffer.capacity = INIT_INPUT_CLAUSE_BUFFER_SIZE;
-	} else {
-		uint32_t size = input_clause_buffer.size;
-		uint32_t capacity = input_clause_buffer.capacity;
-		if (size + 1 >= capacity) {
-			if (MAX_SIZE(sizeof(input_clause_t), 0) - capacity
-					<= capacity / 2) {
-				out_of_memory();
-			}
-			capacity += capacity / 2;
-			cprintf(2, "Increasing clause buffer to %"PRIu32"\n", capacity);
-			input_clause_buffer.clauses = (input_clause_t **) safe_realloc(
-					input_clause_buffer.clauses,
-					capacity * sizeof(input_clause_t *));
-			input_clause_buffer.capacity = capacity;
-		}
-	}
-}
-
-void input_literal_buffer_resize() {
-	if (input_literal_buffer.capacity == 0) {
-		input_literal_buffer.literals = (input_literal_t *) safe_malloc(
-				INIT_INPUT_LITERAL_BUFFER_SIZE * sizeof(input_literal_t));
-		input_literal_buffer.capacity = INIT_INPUT_LITERAL_BUFFER_SIZE;
-	} else {
-		uint32_t size = input_literal_buffer.size;
-		uint32_t capacity = input_literal_buffer.capacity;
-		if (size + 1 >= capacity) {
-			if (MAX_SIZE(sizeof(input_literal_t), 0) - capacity
-					<= capacity / 2) {
-				out_of_memory();
-			}
-			capacity += capacity / 2;
-			cprintf(2, "Increasing literal buffer to %"PRIu32"\n", capacity);
-			input_literal_buffer.literals = (input_literal_t *) safe_realloc(
-					input_literal_buffer.literals,
-					capacity * sizeof(input_literal_t));
-			input_literal_buffer.capacity = capacity;
-		}
-	}
-}
-
-void input_atom_buffer_resize() {
-	if (input_atom_buffer.capacity == 0) {
-		input_atom_buffer.atoms = (input_atom_t *) safe_malloc(
-				INIT_INPUT_ATOM_BUFFER_SIZE * sizeof(input_atom_t));
-		input_atom_buffer.capacity = INIT_INPUT_ATOM_BUFFER_SIZE;
-	} else {
-		uint32_t size = input_atom_buffer.size;
-		uint32_t capacity = input_atom_buffer.capacity;
-		if (size + 1 >= capacity) {
-			if (MAX_SIZE(sizeof(input_atom_t), 0) - capacity <= capacity / 2) {
-				out_of_memory();
-			}
-			capacity += capacity / 2;
-			cprintf(2, "Increasing atom buffer to %"PRIu32"\n", capacity);
-			input_atom_buffer.atoms = (input_atom_t *) safe_realloc(
-					input_atom_buffer.atoms, capacity * sizeof(input_atom_t));
-			input_atom_buffer.capacity = capacity;
-		}
-	}
-}
-
-input_clause_t *new_input_clause() {
-	input_clause_buffer_resize();
-	return input_clause_buffer.clauses[input_clause_buffer.size++];
-}
-
-input_literal_t *new_input_literal() {
-	input_literal_buffer_resize();
-	return &input_literal_buffer.literals[input_literal_buffer.size++];
-}
-
-input_atom_t *new_input_atom() {
-	input_atom_buffer_resize();
-	return &input_atom_buffer.atoms[input_atom_buffer.size++];
 }
 
 void free_atom(input_atom_t *atom) {
@@ -614,7 +528,7 @@ help [command];\n\
 	}
 }
 
-extern int32_t add_predicate(char *pred, char **sort, bool directp,
+int32_t add_predicate(char *pred, char **sort, bool directp,
 		samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	pred_table_t *pred_table = &table->pred_table;
@@ -650,26 +564,7 @@ extern int32_t add_predicate(char *pred, char **sort, bool directp,
 	return 0;
 }
 
-extern int32_t str2int(char *cnst) {
-	int32_t i;
-	long int lcnst;
-
-	for (i = (cnst[0] == '+' || cnst[0] == '-') ? 1 : 0; cnst[i] != '\0'; i++) {
-		if (!isdigit(cnst[i])) {
-			mcsat_err("%s is not a valid integer\n", cnst);
-		}
-	}
-	lcnst = strtol(cnst, NULL, 10);
-	if (lcnst > INT32_MAX) {
-		mcsat_err("Integer %s is too big, above %"PRId32"", cnst, INT32_MAX);
-	}
-	if (lcnst < INT32_MIN) {
-		mcsat_err("Integer %s is too small, below %"PRId32"", cnst, INT32_MIN);
-	}
-	return (int32_t) lcnst;
-}
-
-extern bool add_int_const(int32_t icnst, sort_entry_t *entry,
+bool add_int_const(int32_t icnst, sort_entry_t *entry,
 		sort_table_t *sort_table) {
 	sort_entry_t *supentry;
 	int32_t i, j;
@@ -712,7 +607,7 @@ extern bool add_int_const(int32_t icnst, sort_entry_t *entry,
 	return true;
 }
 
-extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
+int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	const_table_t *const_table = &table->const_table;
 	var_table_t *var_table = &table->var_table;
@@ -770,6 +665,245 @@ extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
 		}
 	}
 	return 0;
+}
+
+int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source) {
+	pred_table_t *pred_table = &table->pred_table;
+	char *in_predicate = current_atom->pred;
+	int32_t pred_id = pred_index(in_predicate, pred_table);
+
+	if (pred_id == -1) {
+		mcsat_err("assert: Predicate %s not found\n", in_predicate);
+		return -1;
+	}
+	pred_id = pred_val_to_index(pred_id);
+	if (pred_id >= 0) {
+		mcsat_err("assert: May not assert atoms with indirect predicate %s\n",
+				in_predicate);
+		return -1;
+	}
+
+	int32_t atom_index = add_atom(table, current_atom);
+	if (atom_index == -1) {
+		return -1;
+	} else {
+		table->atom_table.assignment[0][atom_index] = v_fixed_true;
+		table->atom_table.assignment[1][atom_index] = v_fixed_true;
+		if (source != NULL) {
+			add_source_to_assertion(source, atom_index, table);
+		}
+		return atom_index;
+	}
+}
+
+/*
+ * new_samp_rule sets up a samp_rule, initializing what it can, and leaving
+ * the rest to typecheck_atom.  In particular, the variable sorts are set to -1,
+ * and the literals are uninitialized.
+ */
+static samp_rule_t *new_samp_rule(input_clause_t *rule) {
+	int i;
+	samp_rule_t *new_rule = (samp_rule_t *) safe_malloc(sizeof(samp_rule_t));
+	// Allocate the vars
+	new_rule->num_vars = rule->varlen;
+	var_entry_t **vars = (var_entry_t **) safe_malloc(
+			rule->varlen * sizeof(var_entry_t *));
+	for (i = 0; i < rule->varlen; i++) {
+		vars[i] = (var_entry_t *) safe_malloc(sizeof(var_entry_t));
+		vars[i]->name = str_copy(rule->variables[i]);
+		vars[i]->sort_index = -1;
+	}
+	new_rule->vars = vars;
+	// Now the literals
+	new_rule->num_lits = rule->litlen;
+	rule_literal_t **lits = (rule_literal_t **) safe_malloc(
+			rule->litlen * sizeof(rule_literal_t *));
+	for (i = 0; i < rule->litlen; i++) {
+		lits[i] = (rule_literal_t *) safe_malloc(sizeof(rule_literal_t));
+		lits[i]->neg = rule->literals[i]->neg;
+	}
+	new_rule->literals = lits;
+	return new_rule;
+}
+
+/*
+ * Given an atom, a pred_table, an array of variables, and a const_table
+ * return true if:
+ *   atom->pred is in the pred_table
+ *   the arities match
+ *   for each arg:
+ *     the arg is either in the variable array or the const table
+ *     and its sort is the same as for the pred.
+ * Assumes that the variable array has already been checked for:
+ *   no duplicates
+ *   no clashes with the const_table (this is OK if shadowing is allowed,
+ *      and the variables are checked for first, for this possibility).
+ * The var_sorts array is the same length as the variables array, and
+ *    initialized to all -1.  As sorts are determined from the pred, the
+ *    array is set to the corresponding sort index.  If the sort is already
+ *    set, it is checked to see that it is the same.  Thus an error is flagged
+ *    if different occurrences of a variable are used with inconsistent sorts.
+ * If all goes well, a samp_atom_t is returned, with the predicate and args
+ *    replaced by indexes.  Note that variables are replaced with negative indices,
+ *    i.e., for variable number n, the index is -(n + 1)
+ */
+static rule_atom_t * typecheck_atom(input_atom_t *atom, samp_rule_t *rule,
+		samp_table_t *samp_table) {
+	pred_table_t *pred_table = &(samp_table->pred_table);
+	const_table_t *const_table = &(samp_table->const_table);
+	char *pred = atom->pred;
+	int32_t pred_val = pred_index(pred, pred_table);
+	if (pred_val == -1) {
+		mcsat_err("Predicate %s not previously declared\n", pred);
+		return (rule_atom_t *) NULL;
+	}
+	int32_t pred_idx = pred_val_to_index(pred_val);
+	pred_entry_t pred_entry;
+	if (pred_idx < 0) {
+		pred_entry = pred_table->evpred_tbl.entries[-pred_idx];
+	} else {
+		pred_entry = pred_table->pred_tbl.entries[pred_idx];
+	}
+	int32_t arglen = 0;
+	while (atom->args[arglen] != NULL) {
+		arglen++;
+	}
+	if (pred_entry.arity != arglen) {
+		mcsat_err(
+				"Predicate %s has arity %"PRId32", but given %"PRId32" args\n",
+				pred, pred_entry.arity, arglen);
+		return (rule_atom_t *) NULL;
+	}
+	int argidx;
+	//  int32_t size = pred_entry.arity * sizeof(int32_t);
+	// Create a new atom - note that we will need to free it if there is an error
+	rule_atom_t *new_atom = (rule_atom_t *) safe_malloc(sizeof(rule_atom_t));
+	new_atom->args = (rule_atom_arg_t *) safe_malloc(
+			pred_entry.arity * sizeof(rule_atom_arg_t));
+	new_atom->pred = pred_idx;
+	for (argidx = 0; argidx < arglen; argidx++) {
+		int32_t varidx = -1;
+		int j;
+		for (j = 0; j < rule->num_vars; j++) {
+			if (strcmp(atom->args[argidx], rule->vars[j]->name) == 0) {
+				varidx = j;
+				break;
+			}
+		}
+		if (varidx != -1) {
+			if (rule->vars[varidx]->sort_index == -1) {
+				// Sort not set, we set it to the corresponding pred sort
+				rule->vars[varidx]->sort_index = pred_entry.signature[argidx];
+			}
+			// Check that sort matches, else it's an error
+			else if (rule->vars[varidx]->sort_index
+					!= pred_entry.signature[argidx]) {
+				mcsat_err("Variable %s used with multiple sorts\n",
+						rule->vars[varidx]->name);
+				safe_free(new_atom);
+				return (rule_atom_t *) NULL;
+			}
+			new_atom->args[argidx].kind = variable;
+			new_atom->args[argidx].value = varidx;
+		} else {
+			// Not a variable, should be in the const_table
+			int32_t constidx = const_index(atom->args[argidx], const_table);
+			if (constidx == -1) {
+				mcsat_err("Argument %s not found\n", atom->args[argidx]);
+				safe_free(new_atom);
+				return (rule_atom_t *) NULL;
+			} else
+				// Have a constant, check the sort
+				if (const_sort_index(constidx, const_table)
+						!= pred_entry.signature[argidx]) {
+					mcsat_err("Constant %s has wrong sort for predicate %s\n",
+							atom->args[argidx], pred);
+					safe_free(new_atom);
+					return (rule_atom_t *) NULL;
+				}
+			new_atom->args[argidx].kind = constant;
+			new_atom->args[argidx].value = constidx;
+		}
+	} // End of arg loop
+	return new_atom;
+}
+
+/* Adds an input rule into the samp_table */
+int32_t add_rule(input_clause_t *rule, double weight, char *source,
+		samp_table_t *samp_table) {
+	rule_table_t *rule_table = &(samp_table->rule_table);
+	pred_table_t *pred_table = &(samp_table->pred_table);
+	int32_t i;
+	// Make sure rule has variables - else it is a ground clause
+	assert(rule->varlen > 0);
+	// Might as well make sure it also has literals
+	assert(rule->litlen > 0);
+	// Need to check that variables are all used, and used consistently
+	// Need to check args against predicate signatures.
+	// We will use the new_rule for the variables
+	samp_rule_t *new_rule = new_samp_rule(rule);
+	new_rule->weight = weight;
+	for (i = 0; i < rule->litlen; i++) {
+		input_atom_t *in_atom = rule->literals[i]->atom;
+		rule_atom_t *atom = typecheck_atom(in_atom, new_rule, samp_table);
+		if (atom == NULL) {
+			// Free up the earlier atoms
+			int32_t j;
+			for (j = 0; j < i; j++) {
+				safe_free(new_rule->literals[j]->atom);
+			}
+			safe_free(new_rule);
+			return -1;
+		}
+		new_rule->literals[i]->atom = atom;
+	}
+	// New rule is OK, now add it to the rule_table.  For now, we ignore the
+	// fact that it may already be there - a future optimization is to
+	// recognize duplicate rules and add their weights.
+	int32_t current_rule = rule_table->num_rules;
+	rule_table_resize(rule_table);
+	rule_table->samp_rules[current_rule] = new_rule;
+	rule_table->num_rules += 1;
+	// Now loop through the literals, adding the current rule to each pred
+	for (i = 0; i < rule->litlen; i++) {
+		int32_t pred = new_rule->literals[i]->atom->pred;
+		add_rule_to_pred(pred_table, pred, current_rule);
+	}
+	return current_rule;
+}
+
+int32_t add_query(var_entry_t **vars, rule_literal_t ***lits,
+		samp_table_t *table) {
+	query_table_t *query_table = &table->query_table;
+	samp_query_t *query;
+	int32_t i, numvars, query_index;
+
+	for (i = 0; i < query_table->num_queries; i++) {
+		if (eql_query_entries(lits, query_table->query[i], table)) {
+			return i;
+		}
+	}
+	// Now save the query in the query_table
+	query_index = query_table->num_queries;
+	query_table_resize(query_table);
+	query = (samp_query_t *) safe_malloc(sizeof(samp_query_t));
+	query_table->query[query_table->num_queries++] = query;
+	for (i = 0; lits[i] != NULL; i++) {
+	}
+	query->num_clauses = i;
+	if (vars == NULL) {
+		numvars = 0;
+	} else {
+		for (numvars = 0; vars[numvars] != NULL; numvars++) {
+		}
+	}
+	query->num_vars = numvars;
+	query->literals = lits;
+	query->vars = vars;
+	query->source_index = NULL;
+	// Need to create instances and add to query_instance_table
+	all_query_instances(query, table);
+	return query_index;
 }
 
 void print_ask_results(input_formula_t *fmla, samp_table_t *table) {
