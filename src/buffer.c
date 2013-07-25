@@ -34,7 +34,7 @@ input_atom_t *new_input_atom() {
 }
 
 /* Allocates enough space for an atom_buffer */
-void atom_buffer_resize(clause_buffer_t *atom_buffer, int32_t arity) {
+void atom_buffer_resize(atom_buffer_t *atom_buffer, int32_t arity) {
 	int32_t size = atom_buffer->size;
 
 	if (size < arity + 1) {

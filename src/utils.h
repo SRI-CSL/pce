@@ -16,6 +16,8 @@
  */
 #define MAXSIZE(size, offset) ((UINT32_MAX - (offset))/(size))
 
+/* generates a random number in [0, 1) */
+inline double choose();
 
 /*
  * min and max of two integers

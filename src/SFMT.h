@@ -32,6 +32,7 @@
 #define SFMT_H
 
 #include <stdio.h>
+#include <math.h>
 
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
   #include <inttypes.h>

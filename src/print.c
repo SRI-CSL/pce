@@ -9,8 +9,9 @@
 #include "utils.h"
 #include "tables.h"
 #include "input.h"
-#include "print.h"
+
 #include "buffer.h"
+#include "print.h"
 
 pthread_mutex_t pmutex = PTHREAD_MUTEX_INITIALIZER;
 

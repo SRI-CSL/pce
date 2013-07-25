@@ -9,9 +9,12 @@
 #include "input.h"
 #include "print.h"
 #include "vectors.h"
-#include "cnf.h"
 #include "weight_learning.h"
 #include "tables.h"
+
+#include "mcmc.h"
+#include "ground.h"
+#include "cnf.h"
 
 pvector_t ask_buffer = { 0, 0, NULL };
 

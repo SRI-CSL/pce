@@ -7,6 +7,8 @@
 
 #ifndef WEIGHT_LEARNING_H_
 #define WEIGHT_LEARNING_H_
+
+#include "input.h"
 #include "vectors.h"
 #include "tables.h"
 #include "training_data.h"

@@ -211,10 +211,6 @@ extern void input_clause_buffer_resize ();
 extern void input_literal_buffer_resize ();
 extern void input_atom_buffer_resize ();
 
-extern input_clause_t *new_input_clause ();
-extern input_literal_t *new_input_literal ();
-extern input_atom_t *new_input_atom ();
-
 extern void free_atom(input_atom_t *atom);
 extern void free_clause(input_clause_t *clause);
 

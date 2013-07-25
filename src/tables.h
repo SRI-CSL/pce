@@ -456,17 +456,21 @@ extern char *const_name(int32_t const_index, const_table_t *const_table);
 
 // functions for var table
 extern int32_t var_index(char *name, var_table_t *var_table);
+extern int32_t add_var(var_table_t *var_table,
+		char *name,
+		sort_table_t *sort_table,
+		char * sort_name);
 
 // functions for pred_table
 extern void init_pred_table(pred_table_t *pred_table);
 extern int32_t add_pred(pred_table_t *pred_table, char *name, bool evidence,
 		int32_t arity, sort_table_t *sort_table, char **in_signature);
 
-void pred_atom_table_resize(pred_entry_t *pred_entry);
-void add_atom_to_pred(pred_table_t *pred_table, int32_t predicate,
+extern void pred_atom_table_resize(pred_entry_t *pred_entry);
+extern void add_atom_to_pred(pred_table_t *pred_table, int32_t predicate,
 		int32_t current_atom_index);
 
-void pred_rule_table_resize(pred_entry_t *pred_entry);
+extern void pred_rule_table_resize(pred_entry_t *pred_entry);
 extern void add_rule_to_pred(pred_table_t *pred_table,
 		int32_t predicate,
 		int32_t current_rule_index);
@@ -484,16 +488,16 @@ extern int32_t *pred_signature(int32_t predicate, pred_table_t *pred_table);
 // functions for atom_table
 extern void init_atom_table(atom_table_t *table);
 extern void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table);
-extern samp_atom_t *atom_copy(samp_atom_t *atom, int32_t arity);
 
 // functions for clause_table
 extern void init_clause_table(clause_table_t *table);
 extern void clause_table_resize(clause_table_t *clause_table, int32_t num_lits);
 
-void inline push_clause(samp_clause_t *clause, samp_clause_t **list);
-void inline push_negative_or_unit_clause(clause_table_t *clause_table, uint32_t i);
-void inline push_unsat_clause(clause_table_t *clause_table, uint32_t i);
-void inline push_sat_clause(clause_table_t *clause_table, uint32_t i);
+extern void inline push_clause(samp_clause_t *clause, samp_clause_t **list);
+extern void inline push_negative_or_unit_clause(clause_table_t *clause_table, uint32_t i);
+extern void inline push_unsat_clause(clause_table_t *clause_table, uint32_t i);
+extern void inline push_sat_clause(clause_table_t *clause_table, uint32_t i);
+extern void move_sat_to_unsat_clauses(clause_table_t *clause_table);
 
 // functions for rule_table
 extern void init_rule_table(rule_table_t *table);
@@ -515,7 +519,8 @@ extern void reset_source_table(source_table_t *table);
 
 extern void add_source_to_clause(char *source, int32_t clause_index, double weight,
 		samp_table_t *table);
-
+extern void add_source_to_assertion(char *source, int32_t atom_index,
+		samp_table_t *table);
 extern void retract_source(char *source, samp_table_t *table);
 
 // functions for samp_table (the struct of all table)

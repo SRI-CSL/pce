@@ -50,7 +50,7 @@ typedef struct string_buffer_s {
 
 extern void substit_buffer_resize(int32_t length);
 extern void clause_buffer_resize(int32_t length);
-extern void atom_buffer_resize(clause_buffer_t *atom_buffer, int32_t arity);
+extern void atom_buffer_resize(atom_buffer_t *atom_buffer, int32_t arity);
 
 extern input_clause_t *new_input_clause();
 extern input_literal_t *new_input_literal();

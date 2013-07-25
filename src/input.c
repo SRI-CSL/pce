@@ -5,16 +5,20 @@
 #include <float.h>
 #include <string.h>
 #include <time.h>
+
 #include "memalloc.h"
 #include "utils.h"
 #include "parser.h"
 #include "print.h"
 #include "SFMT.h"
-#include "input.h"
 #include "cnf.h"
 #include "samplesat.h"
 #include "weight_learning.h"
 #include "training_data.h"
+
+#include "ground.h"
+#include "mcmc.h"
+#include "input.h"
 
 extern int yyparse();
 extern void free_parse_data();

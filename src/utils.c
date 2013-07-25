@@ -14,6 +14,16 @@
 int32_t imax(int32_t i, int32_t j) {return i<j ? j : i;}
 int32_t imin(int32_t i, int32_t j) {return i>j ? j : i;}
 
+/*
+ * Random number generator:
+ * - returns a floating point number in the interval [0.0, 1.0)
+ */
+inline double choose() {
+	//return ((double) random()) / ((double) RAND_MAX + 1.0);
+	//return ((double) gen_rand64()) / ((double) UINT64_MAX + 1.0);
+	return genrand_real2();
+}
+
 /*  
  * These copy operations assume that size input to safe_malloc can't 
  * overflow since there are existing structures of the given size. 

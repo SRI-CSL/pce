@@ -18,7 +18,7 @@
 #include "vectors.h"
 #include "buffer.h"
 
-#include "lazysat.h"
+#include "weight_learning.h"
 #include "samplesat.h"
 #include "mcmc.h"
 
@@ -75,7 +75,7 @@ atom_buffer_t rule_atom_buffer = { 0, NULL };
  * - a clause of weight W is killed with probability exp(-|W|)
  *   (if W == DBL_MAX then it's a hard clause and it's not killed).
  */
-void kill_clause_list(samp_clause_t **link_ptr, samp_clause_t *link,
+static void kill_clause_list(samp_clause_t **link_ptr, samp_clause_t *link,
 		clause_table_t *clause_table) {
 	samp_clause_t *next;
 
@@ -105,7 +105,7 @@ void kill_clause_list(samp_clause_t **link_ptr, samp_clause_t *link,
  * The satisfied clauses are either in sat_clauses or in the
  * watched list of each active literal.
  */
-void kill_clauses(samp_table_t *table) {
+static void kill_clauses(samp_table_t *table) {
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &(table->atom_table);
 	int32_t i, lit;
@@ -133,7 +133,7 @@ void kill_clauses(samp_table_t *table) {
  * Sets all the clause lists in clause_table to NULL, except for
  * the list of all active clauses.
  */
-void empty_clause_lists(samp_table_t *table) {
+static void empty_clause_lists(samp_table_t *table) {
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &(table->atom_table);
 
@@ -161,7 +161,7 @@ void empty_clause_lists(samp_table_t *table) {
  * is non-negative.  Non-hard clauses go into dead_negative_or_unit_clauses
  * or dead_clauses, respectively.
  */
-void init_clause_lists(clause_table_t *clause_table) {
+static void init_clause_lists(clause_table_t *clause_table) {
 	uint32_t i;
 	samp_clause_t *clause;
 
@@ -193,7 +193,7 @@ void init_clause_lists(clause_table_t *clause_table) {
  * - move all dead clauses that are satisfied by assignment
  *   into an appropriate watched literal list
  */
-void restore_sat_dead_clauses(clause_table_t *clause_table,
+static void restore_sat_dead_clauses(clause_table_t *clause_table,
 		samp_truth_value_t *assignment) {
 	int32_t lit, val;
 	samp_clause_t *link, *next;
@@ -232,7 +232,7 @@ void restore_sat_dead_clauses(clause_table_t *clause_table,
  * - any clause satisfied by assignment is moved into the list of (not dead)
  *   unit or negative weight clauses.
  */
-void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
+static void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
 		samp_truth_value_t *assignment) {
 	bool restore;
 	samp_clause_t *link, *next;
@@ -261,42 +261,6 @@ void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
 	*link_ptr = NULL;
 }
 
-/* TODO A very slow function to calculate the length of a linked list */
-static int32_t length_clause_list(samp_clause_t *link) {
-	int32_t length = 0;
-	while (link != NULL) {
-		link = link->link;
-		length++;
-	}
-	return length;
-}
-
-void move_sat_to_unsat_clauses(clause_table_t *clause_table) {
-	int32_t length = length_clause_list(clause_table->sat_clauses);
-	samp_clause_t **link_ptr = &(clause_table->unsat_clauses);
-	samp_clause_t *link = clause_table->unsat_clauses;
-	while (link != NULL) {
-		link_ptr = &(link->link);
-		link = link->link;
-	}
-	*link_ptr = clause_table->sat_clauses;
-	clause_table->sat_clauses = NULL;
-	clause_table->num_unsat_clauses += length;
-}
-
-/* FIXME: This function is not used?? */
-void move_unsat_to_dead_clauses(clause_table_t *clause_table) {
-	samp_clause_t **link_ptr = &(clause_table->dead_clauses);
-	samp_clause_t *link = clause_table->dead_clauses;
-	while (link != NULL) {
-		link_ptr = &(link->link);
-		link = link->link;
-	}
-	*link_ptr = clause_table->unsat_clauses;
-	clause_table->unsat_clauses = NULL;
-	clause_table->num_unsat_clauses = 0;
-}
-
 /*
  * Prepare for a new round in mcsat:
  * - select a new set of live clauses
@@ -304,7 +268,7 @@ void move_unsat_to_dead_clauses(clause_table_t *clause_table) {
  * - return -1 if a conflict is detected by unit propagation (in the fixed clauses)
  * - return 0 otherwise
  */
-int32_t reset_sample_sat(samp_table_t *table) {
+static int32_t reset_sample_sat(samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
 	samp_truth_value_t *assignment = atom_table->current_assignment;
@@ -342,7 +306,7 @@ int32_t reset_sample_sat(samp_table_t *table) {
 /*
  * Updates the counts for the query formulas
  */
-void update_query_pmodel(samp_table_t *table) {
+static void update_query_pmodel(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	query_instance_table_t *qinst_table = &table->query_instance_table;
 	samp_query_instance_t *qinst;
@@ -397,7 +361,7 @@ done: continue;
 /*
  * Updates the counts based on the current sample
  */
-void update_pmodel(samp_table_t *table) {
+static void update_pmodel(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	samp_truth_value_t *assignment = atom_table->current_assignment;
 	int32_t num_vars = table->atom_table.num_vars;
@@ -456,6 +420,8 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 		double samp_temperature, double rvar_probability, uint32_t max_flips,
 		uint32_t max_extra_flips, uint32_t timeout,
 		uint32_t burn_in_steps, uint32_t samp_interval) {
+	clause_table_t *clause_table = &table->clause_table;
+	atom_table_t *atom_table = &table->atom_table;
 	int32_t conflict;
 	uint32_t i;
 	time_t fintime = 0;
@@ -464,6 +430,9 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	cprintf(1, "[mc_sat] MC-SAT started ...\n");
 
 	hard_only = true;
+
+	empty_clause_lists(table);
+	init_clause_lists(clause_table);
 
 	first_sample_sat(table, lazy, sa_probability, samp_temperature,
 			rvar_probability, max_flips);
@@ -491,6 +460,26 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 
 		sample_sat(table, lazy, sa_probability, samp_temperature,
 				rvar_probability, max_flips, max_extra_flips);
+
+		/*
+		 * If Sample sat did not find a model (within max_flips)
+		 * restore the earlier assignment
+		 */
+		if (conflict == -1 || clause_table->num_unsat_clauses > 0) {
+			if (conflict == -1) {
+				cprintf(2, "Hit a conflict.\n");
+			} else {
+				cprintf(2, "Failed to find a model. \
+						Consider increasing max_flips and max_tries - see mcsat help.\n");
+			}
+
+			// Flip current_assignment (restore the saved assignment)
+			atom_table->current_assignment_index ^= 1;
+			atom_table->current_assignment = atom_table->assignment[atom_table->current_assignment_index];
+
+			empty_clause_lists(table);
+			init_clause_lists(&table->clause_table);
+		}
 
 		if (draw_sample) {
 			update_pmodel(table);
