@@ -10,7 +10,7 @@
 #include "utils.h"
 
 /* Global buffers */
-atom_buffer_t samp_atom_buffer = { 0, NULL };
+atom_buffer_t samp_atom_buffer = { 0, NULL, 0};
 clause_buffer_t clause_buffer = {0, NULL};
 substit_buffer_t substit_buffer = {0, NULL};
 
@@ -35,6 +35,9 @@ input_atom_t *new_input_atom() {
 
 /* Allocates enough space for an atom_buffer */
 void atom_buffer_resize(atom_buffer_t *atom_buffer, int32_t arity) {
+	assert(atom_buffer->lock == 0);
+	atom_buffer->lock = 1;
+
 	int32_t size = atom_buffer->size;
 
 	if (size < arity + 1) {
@@ -55,6 +58,12 @@ void atom_buffer_resize(atom_buffer_t *atom_buffer, int32_t arity) {
 				size * sizeof(int32_t));
 		atom_buffer->size = size;
 	}
+}
+
+/* used with atom_buffer_resize to check if there is a conflict */
+void atom_buffer_release(atom_buffer_t *atom_buffer) {
+	assert(atom_buffer->lock == 1);
+	atom_buffer->lock = 0;
 }
 
 void clause_buffer_resize (int32_t length){

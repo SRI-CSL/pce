@@ -12,6 +12,7 @@
 typedef struct atom_buffer_s {
 	int32_t size;
 	int32_t *data;
+	int32_t lock;
 } atom_buffer_t;
 
 typedef struct clause_buffer_s {

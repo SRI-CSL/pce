@@ -10,21 +10,19 @@
  * MCSAT MAIN DATA STRUCTURES
  */
 
-/*
- * TODO: Truth values
- */
+/* Truth values */
 typedef enum {
-	v_undef = -1,
-	v_false = 0,
-	v_true = 1,
-	v_fixed_false = 2,
-	v_fixed_true = 3,
-	v_db_false = 4,
-	v_db_true = 5
+	v_undef = -1, // undefined
+	v_false = 0, // false
+	v_true = 1, // true
+	v_fixed_false = 2, // false fixed by unit propagation
+	v_fixed_true = 3, // true fixed by unit propagation
+	v_db_false = 4, // false fixed by input db
+	v_db_true = 5 // true fixed by input db
 } samp_truth_value_t;
 
 /*
- * Boolean variables are represented by 32bit integers.
+ * Boolean variables (atoms) are represented by 32bit integers.
  * For a variable x, the positive literal is 2x, the negative
  * literal is 2x + 1.
  *
@@ -55,6 +53,8 @@ static inline samp_literal_t neg_lit(samp_bvar_t x) {
 }
 
 /*
+ * makes a positive or negative literal from an atom
+ *
  * mk_lit(x, 0) = pos_lit(x)
  * mk_lit(x, 1) = neg_lit(x)
  */
@@ -63,6 +63,7 @@ static inline samp_literal_t mk_lit(samp_bvar_t x, uint32_t sign) {
 	return (x<<1)|sign;
 }
 
+/* returns the atom of a literal */
 static inline samp_bvar_t var_of(samp_literal_t l) {
 	return l>>1;
 }
@@ -72,12 +73,15 @@ static inline uint32_t sign_of_lit(samp_literal_t l) {
 	return ((uint32_t) l) & 1;
 }
 
-// negation of literal l
+/* negation of literal l */
 static inline samp_literal_t not(samp_literal_t l) {
 	return l ^ 1;
 }
 
-// check whether l1 and l2 are opposite
+/* 
+ * check whether l1 and l2 are opposite, i.e., same atom with
+ * different signs
+ */
 static inline bool opposite(samp_literal_t l1, samp_literal_t l2) {
 	return (l1 ^ l2) == 1;
 }
@@ -91,11 +95,6 @@ static inline bool is_pos(samp_literal_t l) {
 static inline bool is_neg(samp_literal_t l) {
 	return (l & 1);
 }
-
-/*
- * TODO what's this
- */
-#define SAMP_INIT_CLAUSE_SIZE 8
 
 /* 
  * A clause has weight/status and a -1-terminated array of literals
@@ -174,7 +173,6 @@ typedef struct input_formula_s {
 	input_fmla_t *fmla;
 } input_formula_t;
 
-
 /*
  * Each sort has a name (string), and a cardinality. Each element is also assigned
  * a number; the elements are prefixed with the sort.
@@ -192,7 +190,7 @@ typedef struct sort_entry_s {
 	int32_t *supersorts; // array of supersort indices
 } sort_entry_t;
 
-typedef  struct sort_table_s {
+typedef struct sort_table_s {
 	int32_t size;
 	int32_t num_sorts; //number of sorts
 	stbl_t sort_name_index;//table giving index for sort name

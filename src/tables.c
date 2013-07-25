@@ -675,9 +675,10 @@ char * pred_name(int32_t pred, pred_table_t *pred_table){
 	}
 }
 
-/* FIXME */
+/* FIXME 
+ * 0: false; 1: true; -1: undef */
 inline int32_t pred_default_value(pred_entry_t *pred) {
-	return false;
+	return 0;
 }
 
 void init_atom_table(atom_table_t *table) {

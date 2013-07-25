@@ -17,8 +17,9 @@
 #include "yacc.tab.h"
 #include "ground.h"
 
+static atom_buffer_t rule_atom_buffer = {0, NULL, 0};
+
 extern atom_buffer_t samp_atom_buffer;
-extern atom_buffer_t rule_atom_buffer;
 extern clause_buffer_t clause_buffer;
 extern substit_buffer_t substit_buffer;
 
@@ -214,6 +215,7 @@ void all_pred_instances(char *pred, samp_table_t *table) {
 	atom = (samp_atom_t *) samp_atom_buffer.data;
 	atom->pred = predval;
 	all_pred_instances_rec(0, psig, arity, atom, table);
+	atom_buffer_release(&samp_atom_buffer);
 }
 
 /*
@@ -313,9 +315,10 @@ static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, sa
 		else if (predicate <= 0) { // for evidence predicate
 			value = assigned_true(assignment[atom_map->val]);
 		} else { // non-evidence predicate has unfixed value;
-			return true;
+			value = -1; // neither true nor false
 		}
 	}
+	atom_buffer_release(&rule_atom_buffer);
 	return (neg == value); // if the literal is unsat
 }
 
@@ -883,8 +886,8 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 			atom = query->literals[i][j]->atom;
 			predicate = atom->pred;
 			arity = pred_arity(predicate, pred_table);
-			atom_buffer_resize(&rule_atom_buffer, arity);
-			rule_inst_atom = (samp_atom_t *) rule_atom_buffer.data;
+			atom_buffer_resize(&samp_atom_buffer, arity);
+			rule_inst_atom = (samp_atom_t *) samp_atom_buffer.data;
 			rule_inst_atom->pred = predicate;
 			for (k = 0; k < arity; k++) {//copy each instantiated argument
 				if (atom->args[k].kind == variable) {
@@ -910,6 +913,7 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 				atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
 						arity + 1, (int32_t *) rule_inst_atom);
 			}
+			atom_buffer_release(&samp_atom_buffer);
 
 			assert(atom_map != NULL);
 			// check for witness predicate - fixed false if NULL atom_map
@@ -1068,6 +1072,7 @@ void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
 				new_const_atoms_at(0, j, arity, pentry->signature, atom, table);
 			}
 		}
+		atom_buffer_release(&samp_atom_buffer);
 	}
 	for (i = 0; i < pred_table->pred_tbl.num_preds; i++) {
 		pentry = &pred_table->pred_tbl.entries[i];
@@ -1082,6 +1087,7 @@ void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
 				new_const_atoms_at(0, j, arity, pentry->signature, atom, table);
 			}
 		}
+		atom_buffer_release(&samp_atom_buffer);
 	}
 }
 
@@ -1206,46 +1212,38 @@ int32_t activate_atom(samp_table_t *table, int32_t atom_index) {
 /*
  * [lazy only] Activates the rules relevant to a given atom
  *
- * TODO: To debug.  A predicate has default value of true or false.  A clause
- * also has default value of true or false.
+ * e.g., Fr(x,y) and Sm(x) implies Sm(y), i.e., ~Fr(x,y) or ~Sm(x) or Sm(y).
+ * If Sm(A) is activated (to be true) at some stage, do we need to activate all
+ * the clauses related to it? No. We consider two cases:
  *
- * When the default value of a clause is true: We initially calculate the
- * M-membership for active clauses only.  If some clauses are activated later
- * during the sample SAT, they need to pass the M-membership test to be put
- * into M.
+ * If y\A, nothing changed, nothing will be activated.
  *
- *     e.g., Fr(x,y) and Sm(x) implies Sm(y) i.e., ~Fr(x,y) or ~Sm(x) or Sm(y)
+ * If x\A, if there is some B, so that both ~Fr(A,B) and Sm(B) are falsifiable,
+ * that is, Fr(A,B) is active or true by default, and Sm(B) is active or false
+ * by default, [x\A,y\B] will be activated.
  *
- *     If Sm(A) is activated (as true) at some stage, do we need to activate
- *     all the clauses related to it? No. We consider two cases:
+ * How do we do it? We index (TODO haven't implemented yet) the active atoms by
+ * each argument. e.g., Fr(A,?) or Fr(?,B). If a literal is activated to a
+ * satisfied value, e.g., the y\A case above, do nothing. If a literal is
+ * activated to an unsatisfied value, e.g., the x\A case, we check the active
+ * atoms of Fr(x,y) indexed by Fr(A,y).  Since Fr(x,y) has a default value of
+ * false that makes the literal satisfied, only the active atoms of Fr(x,y) may
+ * relate to a unsat clause.  Then we get only a small subset of substitution
+ * of y, which can be used to verify the last literal (Sm(y)) easily.  (See the
+ * implementation details section in Poon and Domingos 08)
  *
- *     If y\A, nothing changed, nothing will be activated.
- *
- *     If x\A, if there is some B, Fr(A,B) is also true, and Sm(B) is false
- *     (inactive or active but with false value), [x\A,y\B] will be activated.
- *
- *     How do we do it? We index the active atoms by each argument. e.g.,
- *     Fr(A,?) or Fr(?,B). If a literal is activated to a satisfied value,
- *     e.g., the y\A case above, do nothing. If a literal is activated to an
- *     unsatisfied value, e.g., the x\A case, we check the active atoms of
- *     Fr(x,y) indexed by Fr(A,y). Since Fr(x,y) has a default value of false
- *     that makes the literal satisfied, only the active atoms of Fr(x,y) may
- *     relate to a unsat clause.  Then we get only a small subset of
- *     substitution of y, which can be used to verify the last literal (Sm(y))
- *     easily.  (See the implementation details section in Poon and Domingos
- *     08)
- *
- * When the default value of a clause is false: Poon and Domingos 08 didn't
- * consider this case. In general, this case can't be solved lazily, because we
- * have to try to satisfy all the ground clauses within the sample SAT. This is
- * a rare case in real applications, cause they are usually sparse.
- *
- * What would be the case when we consider clauses with negative weight?  Or
- * more general, any formulas? First of all, MCSAT works for all FOL formulas,
- * not just clauses. So if a input formula has a negative weight, we could nagate the
- * formula and the weight. A Markov logic contains only clauses merely makes
- * the function activation of lazy MC-SAT easier.
+ * In the beginning of each step of MC-SAT, we reselect the live clauses from
+ * the currently ACTIVE sat clauses based on their weights. If a clause is
+ * later activated during the sample SAT, a random test is conducted to decide
+ * whether it should be put into the live clause set.
+
+ * What would be the case of clauses with negative weight?  Or more general,
+ * any formulas with positive or negative weights?  MC-SAT actually works for
+ * any FOL formulas, not just clauses. So if a input formula has a negative
+ * weight, we could nagate the formula and the weight at the same time, and 
+ * then deal with the positive weight formula (in cnf form).
  */
+
 void activate_rules(int32_t atom_index, samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	pred_table_t *pred_table = &table->pred_table;
@@ -1255,9 +1253,11 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 	samp_rule_t *rule_entry;
 	int32_t i, j, predicate, arity, num_rules, *rules;
 	bool rule_inst_true;
+	pred_entry_t *pred_entry;
 
 	atom = atom_table->atom[atom_index];
 	predicate = atom->pred;
+	pred_entry = get_pred_entry(pred_table, predicate);
 	arity = pred_arity(predicate, pred_table);
 	num_rules = pred_tbl->entries[predicate].num_rules;
 	rules = pred_tbl->entries[predicate].rules;
@@ -1274,7 +1274,11 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 		for (j = 0; j < rule_entry->num_lits; j++) {
 //			cprintf(6, "Checking whether to activate rule %"PRId32", literal %"PRId32"\n",
 //					rules[i], j);
-			if (match_atom_in_rule_atom(atom, rule_entry->literals[j], arity)) {
+			if (match_atom_in_rule_atom(atom, rule_entry->literals[j], arity)
+					/* if the literal was unsat by default, do nothing */
+					/* TODO this condition is not right when looking for initial unsat clauses */
+					//&& is_neg(rule_entry->literals[j]) != pred_default_value(pred_entry)
+					) {
 				//then substit_buffer contains the matching substitution
 				fixed_const_rule_instances(rule_entry, table, atom_index);
 			}
@@ -1436,6 +1440,7 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 		create_new_const_rule_instances(intval, intsig, table, 0);
 		create_new_const_query_instances(intval, intsig, table, 0);
 	}
+	atom_buffer_release(&samp_atom_buffer);
 	return result;
 }
 

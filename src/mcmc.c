@@ -66,8 +66,6 @@ static inline int random(void) {
  * pick an unsat clause and, selectively, a variable and flip and scan.
  */
 
-atom_buffer_t rule_atom_buffer = { 0, NULL };
-
 /*
  * Randomly select live clauses from a list:
  * - link = start of the list and *link_ptr == link

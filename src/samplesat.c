@@ -104,7 +104,7 @@ static int32_t set_atom_tval(int32_t var, samp_truth_value_t tval, samp_table_t 
 
 	/* If the atom is inactive AND the value is non-default, activate the atom. */
 	if (lazy_mcsat() && !atom_table->active[var]
-			&& assigned_true(tval) != pred_default_value(pred_entry)) {
+			&& assigned_false(tval) == pred_default_value(pred_entry)) {
 		activate_atom(table, var);
 	}
 	return 0;
@@ -502,12 +502,12 @@ static int32_t choose_random_atom(samp_table_t *table) {
 		add_and_activate_atom(table, atom);
 		atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
 				(int32_t *) atom);
-		if (atom_map == NULL) {
-			printf("Something is wrong in choose_random_atom\n");
-			return 0;
-		} else {
-			return atom_map->val;
-		}
+	}
+	atom_buffer_release(&samp_atom_buffer);
+
+	if (atom_map == NULL) {
+		printf("Something is wrong in choose_random_atom\n");
+		return 0;
 	} else {
 		return atom_map->val;
 	}
