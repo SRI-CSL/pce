@@ -514,37 +514,33 @@ static int32_t choose_random_atom(samp_table_t *table) {
 }
 
 /*
- * A temperary stack that store the unfixed variables in a clause;
- * used in choose_clause_var.
- */
-static integer_stack_t clause_var_stack = { 0, 0, NULL };
-
-/*
  * computes the cost of flipping an unfixed variable without the actual flip
  */
 static void cost_flip_unfixed_variable(samp_table_t *table, int32_t *dcost,
 		int32_t var) {
 	*dcost = 0;
-	samp_literal_t lit, nlit;
+	samp_literal_t plit, nlit;
 	uint32_t i;
 	atom_table_t *atom_table = &(table->atom_table);
 	samp_truth_value_t *assignment = atom_table->current_assignment;
 
 	if (assigned_true(assignment[var])) {
 		nlit = neg_lit(var);
-		lit = pos_lit(var);
+		plit = pos_lit(var);
 	} else {
 		nlit = pos_lit(var);
-		lit = neg_lit(var);
+		plit = neg_lit(var);
 	}
-	samp_clause_t *link = table->clause_table.watched[lit];
+	*dcost = 0;
+	samp_clause_t *link = table->clause_table.watched[plit];
 	while (link != NULL) {
-		i = 1;
-		while (i < link->numlits && assigned_false_lit(assignment,
-					link->disjunct[i])) {
+		i = 0;
+		while (i < link->numlits 
+				&& (link->disjunct[i] == plit
+				|| assigned_false_lit(assignment, link->disjunct[i]))) {
 			i++;
 		}
-		if (i >= link->numlits) {
+		if (i == link->numlits) {
 			*dcost += 1;
 		}
 		link = link->link;
@@ -554,6 +550,7 @@ static void cost_flip_unfixed_variable(samp_table_t *table, int32_t *dcost,
 	while (link != NULL) {
 		i = 0;
 		while (i < link->numlits && link->disjunct[i] != nlit) {
+			assert(link->disjunct[i] != plit);
 			i++;
 		}
 		if (i < link->numlits) {
@@ -564,14 +561,20 @@ static void cost_flip_unfixed_variable(samp_table_t *table, int32_t *dcost,
 }
 
 /*
+ * A temperary stack that store the unfixed variables in a clause;
+ * used in choose_clause_var.
+ */
+static integer_stack_t clause_var_stack = { 0, 0, NULL };
+
+/*
  * Chooses a literal from an unsat clause as a candidate to flip next;
  * makes a random choice with rvar_probability, and otherwise a greedy
- * strategy is used (i.e., choose the literal that minimizes the delta
- * cost).
+ * strategy is used (i.e., choose the literal that minimizes the increase
+ * of cost).
  */
-static int32_t choose_clause_var(samp_table_t *table, samp_clause_t *link,
-		samp_truth_value_t *assignment, double rvar_probability) {
-	uint32_t i, var;
+static int32_t choose_clause_var(samp_table_t *table, samp_clause_t *clause,
+		samp_truth_value_t *assignment, double rvar_probability, int32_t *dcost) {
+	uint32_t i, varidx;
 
 	if (clause_var_stack.size == 0) {
 		init_integer_stack(&(clause_var_stack), 0);
@@ -579,33 +582,34 @@ static int32_t choose_clause_var(samp_table_t *table, samp_clause_t *link,
 		clear_integer_stack(&clause_var_stack);
 	}
 
-	for (i = 0; i < link->numlits; i++) {
-		if (!link->frozen[i] && !fixed_tval(assignment[var_of(link->disjunct[i])]))
-			push_integer_stack(i, &clause_var_stack);
-	} //all unfrozen, unfixed vars are now in clause_var_stack
-
 	double choice = choose();
+	int32_t vcost = 0;
 	if (choice < rvar_probability) {//flip a random unfixed variable
-		// var = random_uint(length_integer_stack(&clause_var_stack));
-		var = genrand_uint(length_integer_stack(&clause_var_stack));
+		for (i = 0; i < clause->numlits; i++) {
+			if (!clause->frozen[i] && !fixed_tval(assignment[var_of(clause->disjunct[i])]))
+				push_integer_stack(i, &clause_var_stack);
+		} //all unfrozen, unfixed vars are now in clause_var_stack
 	} else {
-		int32_t dcost = INT32_MAX;
-		int32_t vcost = 0;
-		var = length_integer_stack(&clause_var_stack);
-		for (i = 0; i < length_integer_stack(&clause_var_stack); i++) {
-			cost_flip_unfixed_variable(
-					table,
-					&vcost,
-					var_of(link->disjunct[nth_integer_stack(i, &clause_var_stack)]));
-			if (vcost < dcost) {
-				dcost = vcost;
-				vcost = 0;
-				var = i;
+		*dcost = INT32_MAX;
+		for (i = 0; i < clause->numlits; i++) {
+			if (!clause->frozen[i] && !fixed_tval(assignment[var_of(clause->disjunct[i])])) {
+				cost_flip_unfixed_variable(table, &vcost, var_of(clause->disjunct[i]));
+				if (*dcost >= vcost) {
+					if (*dcost > vcost) {
+						*dcost = vcost;
+						clear_integer_stack(&clause_var_stack);
+					}
+					push_integer_stack(i, &clause_var_stack);
+				}
 			}
 		}
 	}
-	assert(var < length_integer_stack(&clause_var_stack));
-	return var_of(link->disjunct[nth_integer_stack(var, &clause_var_stack)]);
+	// var = random_uint(length_integer_stack(&clause_var_stack));
+	varidx = genrand_uint(length_integer_stack(&clause_var_stack));
+	cost_flip_unfixed_variable(table, dcost, var_of(clause->disjunct[varidx]));
+
+	assert(varidx < length_integer_stack(&clause_var_stack));
+	return var_of(clause->disjunct[nth_integer_stack(varidx, &clause_var_stack)]);
 }
 
 /*
@@ -708,7 +712,18 @@ static int32_t init_first_sample_sat(samp_table_t *table) {
 	if (scan_unsat_clauses(table) == -1) {
 		return -1;
 	}
-	return process_fixable_stack(table);
+	if (process_fixable_stack(table) == -1) {
+		return -1;
+	}
+	
+	if (get_verbosity_level() >= 3) {
+		printf("[init_first_sample_sat] After randomization, unsat = %d:\n",
+				clause_table->num_unsat_clauses);
+		print_assignment(table);
+		print_clause_table(table);
+	}
+
+	return 0;
 }
 
 /*
@@ -860,11 +875,11 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
 			clause_position--;
 		}
 
-		var = choose_clause_var(table, link, assignment, rvar_probability);
+		var = choose_clause_var(table, link, assignment, rvar_probability, &dcost);
 		if (get_verbosity_level() >= 3) {
-			printf("[sample_sat_body] WalkSAT chose variable ");
-			print_atom(atom_table->atom[var], table);
-			printf(" from unsat clause ");
+			printf("[sample_sat_body] WalkSAT num_unsat = %d, var = %d, dcost = %d\n",
+					clause_table->num_unsat_clauses, var, dcost);
+			printf("from unsat clause ");
 			print_clause(link, table);
 			printf("\n");
 		}

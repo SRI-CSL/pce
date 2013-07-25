@@ -300,13 +300,19 @@ void print_atoms(samp_table_t *table){
 	int i;
 
 	output("-------------------------------------------------------------------------------\n");
-	output("| %*s | probability | %-*s |\n", nwdth, "i", 59-nwdth, "atom");
+	output("| %*s | #occurs | #samples |  prob  | %-*s |\n", nwdth, "i", 59-nwdth, "atom");
 	output("-------------------------------------------------------------------------------\n");
 	for (i = 0; i < nvars; i++){
 		if (get_print_exp_p()) {
-			output("| %-*u | % .4e | ", nwdth, i, atom_probability(i, table));
+			output("| %-*u | %7d | %8d | %.4e | ", nwdth, i, 
+					atom_table->pmodel[i],
+					atom_table->num_samples - atom_table->sampling_nums[i],
+					atom_probability(i, table));
 		} else {
-			output("| %-*u | % 11.4f | ", nwdth, i, atom_probability(i, table));
+			output("| %-*u | %7d | %8d | %6.4f | ", nwdth, i, 
+					atom_table->pmodel[i],
+					atom_table->num_samples - atom_table->sampling_nums[i],
+					atom_probability(i, table));
 		}
 		print_atom(atom_table->atom[i], table);
 		output("\n");

@@ -371,7 +371,8 @@ static void update_pmodel(samp_table_t *table) {
 	table->atom_table.num_samples++;
 	for (i = 0; i < num_vars; i++) {
 		if (assigned_true(assignment[i])) {
-			if (get_verbosity_level() >= 3 && i > 0) {
+			if (get_verbosity_level() >= 3 
+					&& i > 0) { // FIXME why i > 0?
 				printf("Atom %d was assigned true\n", i);
 				fflush(stdout);
 			}
@@ -496,6 +497,10 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 			printf("Timeout after %"PRIu32" samples\n", i);
 			break;
 		}
+	}
+
+	if (get_verbosity_level() >= 1) {
+		print_atoms(table);
 	}
 }
 
