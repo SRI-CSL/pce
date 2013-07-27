@@ -16,8 +16,6 @@ extern void output(const char *fmt, ...);
 extern void mcsat_err(const char *fmt, ...);
 extern void mcsat_warn(const char *fmt, ...);
 
-inline char *string_of_tval(samp_truth_value_t tval);
-
 extern char *literal_string(samp_literal_t lit, samp_table_t *table);
 extern char *atom_string(samp_atom_t *atom, samp_table_t *table);
 extern char *var_string(int32_t var, samp_table_t *table);
@@ -27,6 +25,7 @@ extern void dump_pred_table (samp_table_t *table);
 extern void dump_atom_table (samp_table_t *table);
 extern void dump_clause_table (samp_table_t *table);
 extern void dump_rule_table (samp_table_t *samp_table);
+extern void dump_query_instance_table (samp_table_t *samp_table);
 
 extern void summarize_sort_table (samp_table_t *table);
 extern void summarize_pred_table (samp_table_t *table);

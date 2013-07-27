@@ -3,26 +3,16 @@
 #include <string.h>
 #include <float.h>
 #include <stdarg.h>
+#include <ctype.h>
+
 #include "memalloc.h"
 #include "prng.h"
 #include "int_array_sort.h"
 #include "array_hash_map.h"
 #include "utils.h"
-#include "SFMT.h"
 #include "buffer.h"
-
-int32_t imax(int32_t i, int32_t j) {return i<j ? j : i;}
-int32_t imin(int32_t i, int32_t j) {return i>j ? j : i;}
-
-/*
- * Random number generator:
- * - returns a floating point number in the interval [0.0, 1.0)
- */
-inline double choose() {
-	//return ((double) random()) / ((double) RAND_MAX + 1.0);
-	//return ((double) gen_rand64()) / ((double) UINT64_MAX + 1.0);
-	return genrand_real2();
-}
+#include "print.h"
+#include "yacc.tab.h"
 
 /*  
  * These copy operations assume that size input to safe_malloc can't 
@@ -50,7 +40,19 @@ int32_t *intarray_copy(int32_t *signature, int32_t length){
 	return new_signature;
 }
 
-/* converts string to integer */
+/* Frees an array of strings */
+void free_strings (char **string) {
+	int32_t i = 0;
+	if (string != NULL) {
+		while (string[i] != NULL) {
+			if (strcmp(string[i], "") != 0) {
+				safe_free(string[i]);
+			}
+			i++;
+		}
+	}
+}
+
 int32_t str2int(char *cnst) {
 	int32_t i;
 	long int lcnst;
@@ -124,28 +126,7 @@ bool assigned_fixed_false_lit(samp_truth_value_t *assignment,
 	}
 }
 
-/*
- * Evaluates a clause to false (-1) or to the literal index evaluating to true.
- */
-int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
-	int32_t i;
-	for (i = 0; i < clause->numlits; i++){
-		if (assigned_true_lit(assignment, clause->disjunct[i]))
-			return i;
-	}
-	return -1;
-}
-
-/* retrieves a predicate structure by the index */
-pred_entry_t *get_pred_entry(pred_table_t *pred_table, int32_t predicate){
-	if (predicate <= 0){
-		return &(pred_table->evpred_tbl.entries[-predicate]);
-	} else {
-		return &(pred_table->pred_tbl.entries[predicate]); 
-	}
-}
-
-/* returns the sort name of a constant */
+/* Returns the sort name of a constant */
 char *const_sort_name(int32_t const_idx, samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	const_table_t *const_table = &table->const_table;
@@ -153,21 +134,6 @@ char *const_sort_name(int32_t const_idx, samp_table_t *table) {
 
 	const_sig = const_table->entries[const_idx].sort_index;
 	return sort_table->entries[const_sig].name;
-}
-
-/* frees an array of strings */
-void free_strings (char **string) {
-	int32_t i;
-
-	i = 0;
-	if (string != NULL) {
-		while (string[i] != NULL) {
-			if (strcmp(string[i], "") != 0) {
-				safe_free(string[i]);
-			}
-			i++;
-		}
-	}
 }
 
 bool subsort_p(int32_t sig1, int32_t sig2, sort_table_t *sort_table) {
@@ -255,7 +221,20 @@ int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_t
 	}
 }
 
-extern substit_buffer_t substit_buffer;
+/* Retrieves a predicate structure by the index */
+pred_entry_t *get_pred_entry(pred_table_t *pred_table, int32_t predicate){
+	if (predicate <= 0){
+		return &(pred_table->evpred_tbl.entries[-predicate]);
+	} else {
+		return &(pred_table->pred_tbl.entries[predicate]); 
+	}
+}
+
+int32_t rule_atom_arity(rule_atom_t *atom, pred_table_t *pred_table) {
+	return atom->builtinop == 0
+		? pred_arity(atom->pred, pred_table)
+		: builtin_arity(atom->builtinop);
+}
 
 /* 
  * Converts a rule_atom to a samp_atom. If ratom is a builtinop, return NULL.
@@ -283,11 +262,13 @@ samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, substit_entry_t *substs,
 int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
 	atom_table_t *atom_table = &table->atom_table;
-	int32_t arity = atom_arity(atom, pred_table);
+	int32_t arity = pred_arity(atom->pred, pred_table);
 	array_hmap_pair_t *atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
 			arity + 1, (int32_t *) atom);
 	if (atom_map == NULL) {
 		return -1;
+	} else {
+		return atom_map->val;
 	}
 }
 
@@ -295,7 +276,6 @@ int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table) {
 samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, substit_entry_t *substs,
 		samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
-	atom_table_t *atom_table = &table->atom_table;
 	bool neg = rlit->neg;
 	rule_atom_t *ratom = rlit->atom;
 	samp_atom_t *satom = rule_atom_to_samp_atom(ratom, substs, pred_table);
@@ -391,5 +371,174 @@ void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
 	sort_query_atoms_and_probs(a, p, j);
 	j++;
 	sort_query_atoms_and_probs(a + j, p + j, n - j);
+}
+
+int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
+	int32_t i;
+	for (i = 0; i < clause->numlits; i++){
+		if (assigned_true_lit(assignment, clause->disjunct[i]))
+			return i;
+	}
+	return -1;
+}
+
+/* TODO A very slow function to calculate the length of a linked list */
+static int32_t length_clause_list(samp_clause_t *link) {
+	int32_t length = 0;
+	while (link != NULL) {
+		link = link->link;
+		length++;
+	}
+	return length;
+}
+
+void move_sat_to_unsat_clauses(clause_table_t *clause_table) {
+	int32_t length = length_clause_list(clause_table->sat_clauses);
+	samp_clause_t **link_ptr = &(clause_table->unsat_clauses);
+	samp_clause_t *link = clause_table->unsat_clauses;
+	while (link != NULL) {
+		link_ptr = &(link->link);
+		link = link->link;
+	}
+	*link_ptr = clause_table->sat_clauses;
+	clause_table->sat_clauses = NULL;
+	clause_table->num_unsat_clauses += length;
+}
+
+/* FIXME: This function is not used?? */
+//void move_unsat_to_dead_clauses(clause_table_t *clause_table) {
+//	samp_clause_t **link_ptr = &(clause_table->dead_clauses);
+//	samp_clause_t *link = clause_table->dead_clauses;
+//	while (link != NULL) {
+//		link_ptr = &(link->link);
+//		link = link->link;
+//	}
+//	*link_ptr = clause_table->unsat_clauses;
+//	clause_table->unsat_clauses = NULL;
+//	clause_table->num_unsat_clauses = 0;
+//}
+
+bool eq (int32_t i, int32_t j) {
+	return i == j;
+}
+
+bool neq (int32_t i, int32_t j) {
+	return i != j;
+}
+
+bool lt (int32_t i, int32_t j) {
+	return i < j;
+}
+
+bool le (int32_t i, int32_t j) {
+	return i <= j;
+}
+
+bool gt (int32_t i, int32_t j) {
+	return i > j;
+}
+
+bool ge (int32_t i, int32_t j) {
+	return i >= j;
+}
+
+bool plusp (int32_t i, int32_t j, int32_t k) {
+	if ((i > 0 && j > 0 && j > INT32_MAX - i)
+			|| (i < 0 && j < 0 && j < INT32_MIN - i)) {
+		// Overflow
+		return false;
+	} else {
+		return i + j == k;
+	}
+}
+
+bool minusp (int32_t i, int32_t j, int32_t k) {
+	return plusp(i, -j, k);
+}
+
+bool timesp (int32_t i, int32_t j, int32_t k) {
+	if ((i > 0 && j > 0 && (i > INT32_MAX / j || j > INT32_MAX / i))
+			|| (i < 0 && j < 0 && (-i > INT32_MAX / -j || -j > INT32_MAX / -i))) {
+		// Overflow
+		return false;
+	} else {
+		return i * j == k;
+	}
+}
+
+bool divp (int32_t i, int32_t j, int32_t k) {
+	return j != 0 && i / j == k;
+}
+
+bool remp (int32_t i, int32_t j, int32_t k) {
+	return j != 0 && i % j == k;
+}
+
+bool (*builtin2[]) (int32_t x, int32_t y) = {eq, neq, lt, le, gt, ge};
+
+bool (*builtin3[]) (int32_t x, int32_t y, int32_t z) = {plusp, minusp, timesp, divp, remp};
+
+extern int32_t builtin_arity (int32_t op) {
+	switch (op) {
+	case EQ:
+	case NEQ:
+	case LT:
+	case LE:
+	case GT:
+	case GE:
+		return 2;
+	case PLUS:
+	case MINUS:
+	case TIMES:
+	case DIV:
+	case REM:
+		return 3;
+	default:
+		mcsat_err("Bad operator"); return 0;
+	}
+}
+
+extern bool call_builtin (int32_t op, int32_t arity, int32_t *args) {
+	switch (arity) {
+	case 2:
+		switch (op) {
+		case EQ: return (builtin2[0])(args[0], args[1]);
+		case NEQ: return (builtin2[1])(args[0], args[1]);
+		case LT: return (builtin2[2])(args[0], args[1]);
+		case LE: return (builtin2[3])(args[0], args[1]);
+		case GT: return (builtin2[4])(args[0], args[1]);
+		case GE: return (builtin2[5])(args[0], args[1]);
+		default: mcsat_err("Bad binary operator"); return true;
+		}
+	case 3:
+		switch (op) {
+		case PLUS: return (builtin3[0])(args[0], args[1], args[2]);
+		case MINUS: return (builtin3[1])(args[0], args[1], args[2]);
+		case TIMES: return (builtin3[2])(args[0], args[1], args[2]);
+		case DIV: return (builtin3[3])(args[0], args[1], args[2]);
+		case REM: return (builtin3[4])(args[0], args[1], args[2]);
+		default: mcsat_err("Bad operator"); return true;
+		}
+	default:
+		mcsat_err("Wrong number of args to builtin");
+		return true;
+	}
+}
+
+extern char* builtinop_string (int32_t op) {
+	switch (op) {
+	case EQ: return "=";
+	case NEQ: return "~=";
+	case LT: return "<";
+	case LE: return "<=";
+	case GT: return ">";
+	case GE: return ">=";
+	case PLUS: return "+";
+	case MINUS: return "-";
+	case TIMES: return "*";
+	case DIV: return "/";
+	case REM: return "%";
+	default: mcsat_err("Bad operator"); return "???";
+	}
 }
 

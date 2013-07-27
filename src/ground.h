@@ -31,7 +31,6 @@ extern void create_new_const_rule_instances(int32_t constidx, int32_t csort,
 extern void create_new_const_query_instances(int32_t constidx, int32_t csort,
 		samp_table_t *table, int32_t atom_index);
 
-extern int32_t add_and_activate_atom(samp_table_t *table, samp_atom_t *atom);
 extern int32_t activate_atom(samp_table_t *table, int32_t atom_index);
 extern void activate_rules(int32_t atom_index, samp_table_t *table);
 

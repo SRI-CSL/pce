@@ -16,14 +16,11 @@
 #include "print.h"
 #include "input.h"
 #include "vectors.h"
-#include "SFMT.h"
 #include "buffer.h"
 
 #include "yacc.tab.h"
 #include "ground.h"
 #include "samplesat.h"
-
-extern atom_buffer_t samp_atom_buffer;
 
 /*
  * Returns a literal index corresponding to a fixed true literal or a
@@ -472,9 +469,9 @@ static int32_t choose_random_atom(samp_table_t *table) {
 	pred_entry = &pred_tbl->entries[predicate];
 	int32_t *signature = pred_entry->signature;
 	int32_t arity = pred_entry->arity;
-	atom_buffer_resize(&samp_atom_buffer, arity);
+	atom_buffer_resize(arity);
 	int32_t constant;
-	samp_atom_t *atom = (samp_atom_t *) samp_atom_buffer.data;
+	samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
 	//Build atom from atom_num by successive division
 	atom->pred = predicate;
 	for (i = 0; i < arity; i++) {
@@ -498,19 +495,20 @@ static int32_t choose_random_atom(samp_table_t *table) {
 			(int32_t *) atom);
 	//assert(valid_table(table));
 
+	int32_t atom_index;
+
 	if (atom_map == NULL) { //need to activate atom
-		add_and_activate_atom(table, atom);
+		atom_index = add_internal_atom(table, atom, false);
 		atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
 				(int32_t *) atom);
+		assert(atom_map != NULL);
+		activate_atom(table, atom_index);
 	}
-	atom_buffer_release(&samp_atom_buffer);
+	else {
+		atom_index = atom_map->val;
+	}
 
-	if (atom_map == NULL) {
-		printf("Something is wrong in choose_random_atom\n");
-		return 0;
-	} else {
-		return atom_map->val;
-	}
+	return atom_index;
 }
 
 /*
@@ -604,8 +602,8 @@ static int32_t choose_clause_var(samp_table_t *table, samp_clause_t *clause,
 			}
 		}
 	}
-	// var = random_uint(length_integer_stack(&clause_var_stack));
-	varidx = genrand_uint(length_integer_stack(&clause_var_stack));
+	varidx = random_uint(length_integer_stack(&clause_var_stack));
+	//varidx = genrand_uint(length_integer_stack(&clause_var_stack));
 	cost_flip_unfixed_variable(table, dcost, var_of(clause->disjunct[varidx]));
 
 	assert(varidx < length_integer_stack(&clause_var_stack));
@@ -645,7 +643,7 @@ static int32_t flip_unfixed_variable(samp_table_t *table, int32_t var) {
 static void init_random_assignment(samp_table_t *table, int32_t *num_unfixed_vars) {
 	atom_table_t *atom_table = &table->atom_table;
 	samp_truth_value_t *assignment = atom_table->current_assignment;
-	uint32_t i, num;
+	uint32_t i;
 	*num_unfixed_vars = 0;
 	char *atom_str;
 
@@ -737,7 +735,6 @@ static int32_t init_first_sample_sat(samp_table_t *table) {
 static int32_t init_sample_sat(samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	pred_table_t *pred_table = &table->pred_table;
 	samp_truth_value_t *assignment = atom_table->current_assignment;
 
 	samp_truth_value_t *new_assignment;
@@ -894,7 +891,7 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
  * TODO: To be replaced by other SAT solvers. It should just give a
  * solution but not necessarily uniformly drawn.
  */
-void first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
+int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips) {
 	clause_table_t *clause_table = &table->clause_table;
 	int32_t conflict;
@@ -954,7 +951,6 @@ void first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double samp_temperature, double rvar_probability, 
 		uint32_t max_flips, uint32_t max_extra_flips) {
-	atom_table_t *atom_table = &table->atom_table;
 	clause_table_t *clause_table = &table->clause_table;
 	int32_t conflict;
 
@@ -996,7 +992,7 @@ void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
  * If it is satisfied, push to the corresponding watched list
  * If it is unsatisified, push to unsat_clauses
  */
-static int32_t push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
+static void push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
 	samp_truth_value_t *assignment = atom_table->current_assignment;
@@ -1009,7 +1005,7 @@ static int32_t push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
 			clause->numlits);
 	if (fixable >= clause->numlits) {
 		mcsat_err("No model exists.\n");
-		return -1;
+		return;
 	}
 	if (fixable == -1) { // if not propagating
 		i = get_true_lit(assignment, clause->disjunct,
@@ -1069,9 +1065,7 @@ extern bool hard_only;
  */
 void push_newly_activated_clause(int32_t clsidx, samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
-	atom_table_t *atom_table = &table->atom_table;
 	samp_clause_t *clause = clause_table->samp_clauses[clsidx];
-	samp_truth_value_t *assignment = atom_table->current_assignment;
 
 	double abs_weight = fabs(clause->weight);
 	if (clause->weight == DBL_MAX

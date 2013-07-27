@@ -491,12 +491,6 @@ extern void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_t
 extern void init_clause_table(clause_table_t *table);
 extern void clause_table_resize(clause_table_t *clause_table, int32_t num_lits);
 
-extern void inline push_clause(samp_clause_t *clause, samp_clause_t **list);
-extern void inline push_negative_or_unit_clause(clause_table_t *clause_table, uint32_t i);
-extern void inline push_unsat_clause(clause_table_t *clause_table, uint32_t i);
-extern void inline push_sat_clause(clause_table_t *clause_table, uint32_t i);
-extern void move_sat_to_unsat_clauses(clause_table_t *clause_table);
-
 // functions for rule_table
 extern void init_rule_table(rule_table_t *table);
 extern void rule_table_resize(rule_table_t *rule_table);
@@ -524,11 +518,5 @@ extern void retract_source(char *source, samp_table_t *table);
 // functions for samp_table (the struct of all table)
 extern void init_samp_table(samp_table_t *table);
 extern bool valid_table(samp_table_t *table);
-
-// The builtin binary predicates
-extern char* builtinop_string (int32_t bop);
-extern int32_t builtin_arity (int32_t op);
-extern bool call_builtin (int32_t bop, int32_t arity, int32_t *args);
-extern int32_t atom_arity(rule_atom_t *atom, pred_table_t *pred_table);
 
 #endif /* __TABLES_H */

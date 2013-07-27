@@ -516,6 +516,7 @@ void yy_mcsat_params_decl (char **params) {
   free_strings(params);
 };
   void yy_dumptables (int32_t table) {
+    input_command.kind = DUMPTABLE;
     input_command.decl.dumptable_decl.table = table;
   };
   void yy_reset (int32_t what) {

@@ -37,7 +37,7 @@ rule_atom_t *copy_rule_atom(rule_atom_t *atom, samp_table_t *table) {
 	rule_atom_t *catom;
 	int32_t i, arity;
 
-	arity = atom_arity(atom, pred_table);
+	arity = rule_atom_arity(atom, pred_table);
 	catom = (rule_atom_t *) safe_malloc(sizeof(rule_atom_t));
 	catom->pred = atom->pred;
 	catom->builtinop = atom->builtinop;
@@ -453,7 +453,7 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
 	// Now go through the literals, untagging the found variables
 	for (i = 0; i < clause->num_lits; i++) {
 		atom = clause->literals[i]->atom;
-		arity = atom_arity(atom, pred_table);
+		arity = rule_atom_arity(atom, pred_table);
 		// Loop through the args of the atom
 		for (j = 0; j < arity; j++) {
 			if (atom->args[j].kind == variable) {
@@ -536,7 +536,7 @@ bool rule_atoms_equal(rule_atom_t *a1, rule_atom_t *a2) {
 	int32_t i, arity;
 
 	if (a1->builtinop == a2->builtinop && a1->pred == a2->pred) {
-		arity = atom_arity(a1, &samp_table.pred_table);
+		arity = rule_atom_arity(a1, &samp_table.pred_table);
 		for (i = 0; i < arity; i++) {
 			if ((a1->args[i].kind != a2->args[i].kind)
 					|| (a1->args[i].value != a2->args[i].value)) {

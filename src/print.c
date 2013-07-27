@@ -35,11 +35,11 @@ static string_buffer_t warning_buffer = {0, 0, NULL};
  */
 static int32_t verbosity_level = 0;
 
-extern void set_verbosity_level(int32_t v) {
+void set_verbosity_level(int32_t v) {
 	verbosity_level = v;
 }
 
-extern int32_t get_verbosity_level() {
+int32_t get_verbosity_level() {
 	return verbosity_level;
 }
 
@@ -59,7 +59,7 @@ void cprintf(int32_t level, const char *fmt, ...){
  * when output_to_string is true, print to output_buffer,
  * otherwise print to stdout
  */
-extern void output(const char *fmt, ...) {
+void output(const char *fmt, ...) {
 	int32_t out_size, index;
 	va_list argp;
 
@@ -161,25 +161,6 @@ void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
 			output("%s", sort_table->entries[pred_table->pred_tbl.entries[i].signature[j]].name);
 		}
 		output(")\n");
-	}
-}
-
-inline char *string_of_tval(samp_truth_value_t tval) {
-	switch (tval) {
-	case v_undef:
-		return "undef";
-	case v_false:
-		return "false";
-	case v_true:
-		return "true";
-	case v_fixed_false:
-		return "fixed false";
-	case v_fixed_true:
-		return "fixed true";
-	case v_db_false:
-		return "db false";
-	case v_db_true:
-		return "db true";
 	}
 }
 
@@ -300,7 +281,7 @@ void print_atoms(samp_table_t *table){
 	int i;
 
 	output("-------------------------------------------------------------------------------\n");
-	output("| %*s | #occurs | #samples |  prob  | %-*s |\n", nwdth, "i", 59-nwdth, "atom");
+	output("| %*s | #occurs | #samples |  prob  | %-*s |\n", nwdth, "i", 42-nwdth, "atom");
 	output("-------------------------------------------------------------------------------\n");
 	for (i = 0; i < nvars; i++){
 		if (get_print_exp_p()) {
@@ -386,7 +367,7 @@ void print_watched_clause(samp_literal_t lit, samp_table_t *table) {
 void print_live_clauses(samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	int32_t i, lit;
+	int32_t i;
 
 	output("Sat clauses:\n");
 	print_clause_list(clause_table->sat_clauses, table);
@@ -434,7 +415,6 @@ void print_clause_table(samp_table_t *table) {
 }
 
 void print_state(samp_table_t *table, uint32_t round){
-	atom_table_t *atom_table = &(table->atom_table);
 	if (verbosity_level > 2) {
 		output("==============================================================\n");
 		print_atoms(table);
@@ -459,7 +439,7 @@ void print_assignment(samp_table_t *table){
 	}
 }
 
-extern void dump_sort_table (samp_table_t *table) {
+void dump_sort_table (samp_table_t *table) {
 	sort_table_t *sort_table = &(table->sort_table);
 	const_table_t *const_table = &(table->const_table);
 	// First get the sort length
@@ -519,7 +499,7 @@ static void dump_pred_tbl (pred_tbl_t * pred_tbl, sort_table_t * sort_table) {
 	}
 }
 
-extern void dump_pred_table (samp_table_t *table) {
+void dump_pred_table (samp_table_t *table) {
 	sort_table_t *sort_table = &(table->sort_table);
 	pred_table_t *pred_table = &(table->pred_table);
 	output("-------------------------------\n");
@@ -553,12 +533,12 @@ void dump_var_table (var_table_t * var_table, sort_table_t * sort_table) {
 	}
 }
 
-extern void dump_atom_table (samp_table_t *table) {
+void dump_atom_table (samp_table_t *table) {
 	output("Atom Table:\n");
 	print_atoms(table);
 }
 
-extern void dump_clause_table (samp_table_t *table) {
+void dump_clause_table (samp_table_t *table) {
 	output("Clause Table:\n");
 	print_clauses(table);
 }
@@ -592,13 +572,13 @@ void print_rule_atom_arg (rule_atom_arg_t *arg, var_entry_t **vars, const_table_
 	}
 }
 
-extern void print_rule_atom (rule_atom_t *ratom, bool neg, var_entry_t **vars,
+void print_rule_atom (rule_atom_t *ratom, bool neg, var_entry_t **vars,
 		samp_table_t *table, int indent) {
 	pred_table_t *pred_table = &table->pred_table;
 	const_table_t *const_table = &table->const_table;
 	int32_t arity, k;
 
-	arity = atom_arity(ratom, pred_table);
+	arity = rule_atom_arity(ratom, pred_table);
 	if (ratom->builtinop != 0 && arity == 2) {
 		// Infix
 		if (neg) output("(");
@@ -660,7 +640,7 @@ void print_rule_clause (rule_literal_t **lit, var_entry_t **vars,
 	}
 }
 
-extern void dump_rule_table (samp_table_t *samp_table) {
+void dump_rule_table (samp_table_t *samp_table) {
 	rule_table_t *rule_table = &(samp_table->rule_table);
 	uint32_t nrules = rule_table->num_rules;
 	char d[10];
@@ -684,7 +664,7 @@ extern void dump_rule_table (samp_table_t *samp_table) {
 	output("-------------------------------------------------------------------------------\n");
 }
 
-extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,
+void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,
 		int32_t indent, bool newlinesp) {
 	atom_table_t *atom_table;
 	samp_literal_t **lit;
@@ -716,7 +696,7 @@ extern void print_query_instance(samp_query_instance_t *qinst, samp_table_t *tab
 	output(")");
 }
 
-extern void dump_query_instance_table (samp_table_t *samp_table) {
+void dump_query_instance_table (samp_table_t *samp_table) {
 	query_instance_table_t *query_instance_table = &samp_table->query_instance_table;
 	samp_query_instance_t *qinst;
 	uint32_t nqueries = query_instance_table->num_queries;
@@ -726,22 +706,30 @@ extern void dump_query_instance_table (samp_table_t *samp_table) {
 
 	output("Query Instance Table:\n");
 	output("--------------------------------------------------------------------------------\n");
-	output("| %-*s | weight    | %-*s |\n", nwdth, "i", 61-nwdth, "Rule");
+	output("| %-*s |  prob  | %-*s |\n", nwdth, "i", 64-nwdth, "Rule");
 	output("--------------------------------------------------------------------------------\n");
 	for(i=0; i<nqueries; i++) {
 		qinst = query_instance_table->query_inst[i];
-		print_query_instance(qinst, samp_table, nwdth+17, true);
 		if (get_print_exp_p()) {
-			output(" : % .4e\n", query_probability(qinst, samp_table));
+			output("| %-*u | %.4e | ", nwdth, i, query_probability(qinst, samp_table));
 		} else {
-			output(" : % 11.4f\n", query_probability(qinst, samp_table));
+			output("| %-*u | %6.4f |", nwdth, i, query_probability(qinst, samp_table));
 		}
-		output("\n");
+		print_query_instance(qinst, samp_table, 0, false);
+		printf("\n");
+
+		//print_query_instance(qinst, samp_table, nwdth+17, false);
+		//if (get_print_exp_p()) {
+		//	output(" : % .4e\n", query_probability(qinst, samp_table));
+		//} else {
+		//	output(" : % 11.4f\n", query_probability(qinst, samp_table));
+		//}
+		//output("\n");
 	}
 	output("-------------------------------------------------------------------------------\n");
 }
 
-extern void summarize_sort_table (samp_table_t *table) {
+void summarize_sort_table (samp_table_t *table) {
 	sort_table_t *sort_table = &(table->sort_table);
 	sort_entry_t *entry;
 	int32_t i, total;
@@ -757,7 +745,7 @@ extern void summarize_sort_table (samp_table_t *table) {
 	output("  Total: %"PRId32"\n", total);
 }
 
-extern void summarize_pred_table (samp_table_t *table) {
+void summarize_pred_table (samp_table_t *table) {
 	uint32_t obsnum, hidnum;
 
 	obsnum = table->pred_table.evpred_tbl.num_preds;
@@ -766,17 +754,17 @@ extern void summarize_pred_table (samp_table_t *table) {
 	output("  %"PRId32" observable and %"PRId32" hidden\n", obsnum, hidnum);
 }
 
-extern void summarize_atom_table (samp_table_t *table) {
+void summarize_atom_table (samp_table_t *table) {
 	output("Atom table has %"PRId32" entries\n",
 			table->atom_table.num_vars);
 }
 
-extern void summarize_clause_table (samp_table_t *table) {
+void summarize_clause_table (samp_table_t *table) {
 	output("Clause table has %"PRId32" entries\n",
 			table->clause_table.num_clauses);
 }
 
-extern void summarize_rule_table (samp_table_t *table) {
+void summarize_rule_table (samp_table_t *table) {
 	output("Rule table has %"PRId32" entries\n",
 			table->rule_table.num_rules);
 }

@@ -27,16 +27,6 @@
 // #include <wincrypt.h>
 #endif
 
-#ifdef MINGW
-/*
- * Need some version of random()
- * rand() exists on mingw but random() does not
- */
-static inline int random(void) {
-	return rand();
-}
-#endif
-
 /* 
  * The next step is to define the main samplesat procedure.  Here we have placed
  * some clauses among the dead clauses, and are trying to satisfy the live ones.
@@ -433,7 +423,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	empty_clause_lists(table);
 	init_clause_lists(clause_table);
 
-	first_sample_sat(table, lazy, sa_probability, samp_temperature,
+	conflict = first_sample_sat(table, lazy, sa_probability, samp_temperature,
 			rvar_probability, max_flips);
 
 	hard_only = false;
@@ -497,8 +487,6 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 		}
 	}
 
-	if (get_verbosity_level() >= 1) {
-		print_atoms(table);
-	}
+	dump_query_instance_table(table);
 }
 

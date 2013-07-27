@@ -934,15 +934,11 @@ void print_ask_results(input_formula_t *fmla, samp_table_t *table) {
 		}
 		printf("]");
 		if (get_print_exp_p()) {
-			output("% .4e:",
-					query_probability(
-							(samp_query_instance_t *) ask_buffer.data[i],
-							table));
+			output("% .4e:", query_probability(
+						(samp_query_instance_t *) ask_buffer.data[i], table));
 		} else {
-			output("% 11.4f:",
-					query_probability(
-							(samp_query_instance_t *) ask_buffer.data[i],
-							table));
+			output("% 11.4f:", query_probability(
+						(samp_query_instance_t *) ask_buffer.data[i], table));
 		}
 		print_query_instance(qinst, table, 0, false);
 		printf("\n");
@@ -1111,14 +1107,14 @@ extern bool read_eval(samp_table_t *table) {
 			}
 			
 			/* TODO: add all queries and run mcsat in the end */
-			//add_cnf_query(decl.formula);
+			add_cnf_query(decl.formula);
 
-			/* the following call will run mcsat once for each query */
-			ask_cnf(decl.formula, decl.threshold, decl.numresults);
-			// Results are in ask_buffer - print them out
-			print_ask_results(decl.formula, table);
-			// Now clear out the query_instance table for the next query
-			reset_query_instance_table(&table->query_instance_table);
+			///* the following call will run mcsat once for each query */
+			//ask_cnf(decl.formula, decl.threshold, decl.numresults);
+			///* Results are in ask_buffer - print them out */
+			//print_ask_results(decl.formula, table);
+			///* Now clear out the query_instance table for the next query */
+			//reset_query_instance_table(&table->query_instance_table);
 			break;
 		}
 
@@ -1333,3 +1329,4 @@ extern void read_eval_print_loop(char *file, samp_table_t *table) {
 extern void load_mcsat_file(char *file, samp_table_t *table) {
 	read_eval_print_loop(file, table);
 }
+

@@ -53,6 +53,7 @@ typedef struct {
  */
 extern char *clone_string(const char *str);
 
+extern void *clone_memory(void *memory, size_t size);
 
 /*
  * header of string s

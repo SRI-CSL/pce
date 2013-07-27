@@ -13,15 +13,9 @@
 #include "print.h"
 #include "buffer.h"
 #include "input.h"
-
+#include "int_array_sort.h"
 #include "yacc.tab.h"
 #include "ground.h"
-
-static atom_buffer_t rule_atom_buffer = {0, NULL, 0};
-
-extern atom_buffer_t samp_atom_buffer;
-extern clause_buffer_t clause_buffer;
-extern substit_buffer_t substit_buffer;
 
 static ivector_t new_intidx = {0, 0, NULL};
 
@@ -211,11 +205,10 @@ void all_pred_instances(char *pred, samp_table_t *table) {
 	predval = pred_val_to_index(predidx);
 	arity = pred_arity(predval, pred_table);
 	psig = pred_signature(predval, pred_table);
-	atom_buffer_resize(&samp_atom_buffer, arity);
-	atom = (samp_atom_t *) samp_atom_buffer.data;
+	atom_buffer_resize(arity);
+	atom = (samp_atom_t *) atom_buffer.data;
 	atom->pred = predval;
 	all_pred_instances_rec(0, psig, arity, atom, table);
-	atom_buffer_release(&samp_atom_buffer);
 }
 
 /*
@@ -263,7 +256,7 @@ static bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs, samp_ta
 	bool builtin_result, retval;
 
 	assert(lit->atom->builtinop != 0);
-	arity = atom_arity(lit->atom, pred_table);
+	arity = rule_atom_arity(lit->atom, pred_table);
 	nargs = (int32_t *) safe_malloc(arity * sizeof(int32_t));
 	for (j = 0; j < arity; j++) {
 		argidx = lit->atom->args[j].value;
@@ -287,11 +280,11 @@ static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, sa
 	rule_atom_t *atom = lit->atom;
 	bool neg = lit->neg;
 	int32_t predicate = atom->pred;
-	int32_t arity = atom_arity(atom, pred_table);
+	int32_t arity = rule_atom_arity(atom, pred_table);
 	int32_t i;
 
-	atom_buffer_resize(&rule_atom_buffer, arity);
-	samp_atom_t *rule_inst_atom = (samp_atom_t *) rule_atom_buffer.data;
+	atom_buffer_resize(arity);
+	samp_atom_t *rule_inst_atom = (samp_atom_t *) atom_buffer.data;
 	rule_inst_atom->pred = predicate;
 	for (i = 0; i < arity; i++) { //copy each instantiated argument
 		if (atom->args[i].kind == variable) {
@@ -318,7 +311,6 @@ static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, sa
 			value = -1; // neither true nor false
 		}
 	}
-	atom_buffer_release(&rule_atom_buffer);
 	return (neg == value); // if the literal is unsat
 }
 
@@ -373,7 +365,7 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 	sort_entry_t *sort_entry;
 	int32_t vsort, csort, csubst;
 	// array_hmap_pair_t *atom_map;
-	int32_t i, j, litidx;
+	int32_t i, litidx;
 	bool found_indirect;
 
 	/* check if the constants are compatible with the sorts */
@@ -426,7 +418,6 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 	found_indirect = false;
 	for (i = 0; i < rule->num_lits; i++) {
 		rule_literal_t *lit = rule->literals[i];
-		int32_t arity = atom_arity(lit->atom, pred_table);
 		if (lit->atom->builtinop != 0) {
 			// Have a builtin - just test. If false, keep going, else done with this rule
 			if (builtin_inst_p(lit, substs, table)) {
@@ -553,7 +544,7 @@ static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_
 	rule_atom_t *rule_atom = rule->literals[litidx]->atom;
 	int32_t i, j, var_index;
 
-	int arity = atom_arity(rule_atom, pred_table);
+	int arity = rule_atom_arity(rule_atom, pred_table);
 
 	/*
 	 * The atom arguments that are consistent with the current substitution.
@@ -624,17 +615,18 @@ static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_
 				continue; // move to the next active atom;
 			}
 			for (j = 0; j < arity; j++) {
-				if (atom_arg_value[j] != INT32_MIN) // value already set
-					continue;
-				// index of the variable in the rule's quantifier list
-				var_index = rule_atom->args[j].value;
-				substit_buffer.entries[var_index] = atom->args[j]; // for free variable
+				if (atom_arg_value[j] == INT32_MIN) { // value already set
+					// index of the variable in the rule's quantifier list
+					var_index = rule_atom->args[j].value;
+					substit_buffer.entries[var_index] = atom->args[j]; // for free variable
+				}
 			}
 			smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
 			for (j = 0; j < arity; j++) { // backtracking, reset values
-				if (atom_arg_value[j] != INT32_MIN)
-					continue;
-				substit_buffer.entries[var_index] = INT32_MIN;
+				if (atom_arg_value[j] == INT32_MIN) {
+					var_index = rule_atom->args[j].value;
+					substit_buffer.entries[var_index] = INT32_MIN;
+				}
 			}
 		}
 	}
@@ -886,8 +878,8 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 			atom = query->literals[i][j]->atom;
 			predicate = atom->pred;
 			arity = pred_arity(predicate, pred_table);
-			atom_buffer_resize(&samp_atom_buffer, arity);
-			rule_inst_atom = (samp_atom_t *) samp_atom_buffer.data;
+			atom_buffer_resize(arity);
+			rule_inst_atom = (samp_atom_t *) atom_buffer.data;
 			rule_inst_atom->pred = predicate;
 			for (k = 0; k < arity; k++) {//copy each instantiated argument
 				if (atom->args[k].kind == variable) {
@@ -908,16 +900,15 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 					printf("\n");
 					fflush(stdout);
 				}
-				add_and_activate_atom(table, rule_inst_atom);
+				int32_t atom_index = add_internal_atom(table, rule_inst_atom, false);
+
 				// check for witness predicate - fixed false if NULL atom_map
 				atom_map = array_size_hmap_find(&(atom_table->atom_var_hash),
 						arity + 1, (int32_t *) rule_inst_atom);
-			}
-			atom_buffer_release(&samp_atom_buffer);
+				assert(atom_map != NULL);
 
-			assert(atom_map != NULL);
-			// check for witness predicate - fixed false if NULL atom_map
-			//      if (atom_map == NULL) return false;//atom is inactive
+				activate_atom(table, atom_index);
+			}
 
 			if (query->literals[i][j]->neg &&
 					atom_table->current_assignment[atom_map->val] == v_fixed_false) {
@@ -939,7 +930,8 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 static int32_t samp_query_to_query_instance(samp_query_t *query, samp_table_t *table) {
 	pred_table_t *pred_table = &(table->pred_table);
 	samp_atom_t *new_atom;
-	int32_t i, j, k, arity, argidx, added_atom;
+	int32_t i, j, k, arity, added_atom;
+	//int32_t argidx;
 	rule_literal_t ***lit;
 	samp_literal_t **litinst;
 
@@ -955,7 +947,7 @@ static int32_t samp_query_to_query_instance(samp_query_t *query, samp_table_t *t
 			arity = pred_arity(lit[i][j]->atom->pred, pred_table);
 			new_atom = rule_atom_to_samp_atom(lit[i][j]->atom, NULL, pred_table);
 			for (k = 0; k < arity; k++) {
-				argidx = new_atom->args[k];
+				//argidx = new_atom->args[k];
 			}
 			if (get_verbosity_level() > 1) {
 				printf("[samp_query_to_query_instance] Adding internal atom ");
@@ -1015,6 +1007,7 @@ static void all_query_instances_rec(int32_t vidx, samp_query_t *query,
 				substit_buffer.entries[vidx] = entry.constants[i];
 			}
 			all_query_instances_rec(vidx + 1, query, table, atom_index);
+			substit_buffer.entries[vidx] = INT32_MIN;
 		}
 	}
 }
@@ -1063,8 +1056,8 @@ void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
 		pentry = &pred_table->evpred_tbl.entries[i];
 		pval = 2 * i;
 		arity = pentry->arity;
-		atom_buffer_resize(&samp_atom_buffer, arity);
-		atom = (samp_atom_t *) samp_atom_buffer.data;
+		atom_buffer_resize(arity);
+		atom = (samp_atom_t *) atom_buffer.data;
 		atom->pred = pred_val_to_index(pval);
 		for (j = 0; j < arity; j++) {
 			if (subsort_p(csort, pentry->signature[j], sort_table)) {
@@ -1072,14 +1065,13 @@ void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
 				new_const_atoms_at(0, j, arity, pentry->signature, atom, table);
 			}
 		}
-		atom_buffer_release(&samp_atom_buffer);
 	}
 	for (i = 0; i < pred_table->pred_tbl.num_preds; i++) {
 		pentry = &pred_table->pred_tbl.entries[i];
 		pval = (2 * i) + 1;
 		arity = pentry->arity;
-		atom_buffer_resize(&samp_atom_buffer, arity);
-		atom = (samp_atom_t *) samp_atom_buffer.data;
+		atom_buffer_resize(arity);
+		atom = (samp_atom_t *) atom_buffer.data;
 		atom->pred = pred_val_to_index(pval);
 		for (j = 0; j < arity; j++) {
 			if (subsort_p(csort, pentry->signature[j], sort_table)) {
@@ -1087,7 +1079,6 @@ void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
 				new_const_atoms_at(0, j, arity, pentry->signature, atom, table);
 			}
 		}
-		atom_buffer_release(&samp_atom_buffer);
 	}
 }
 
@@ -1192,12 +1183,6 @@ static bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
 	return true;
 }
 
-/* Adds an atom to internal atom list and then activates it */
-int32_t add_and_activate_atom(samp_table_t *table, samp_atom_t *atom) {
-	int32_t atom_index = add_internal_atom(table, atom, false);
-	activate_atom(table, atom_index);
-}
-
 /* 
  * Activates an atom, i.e., sets the active flag and activates the relevant
  * clauses.
@@ -1207,6 +1192,7 @@ int32_t activate_atom(samp_table_t *table, int32_t atom_index) {
 	atom_table->active[atom_index] = true;
 
 	activate_rules(atom_index, table);
+	return 0;
 }
 
 /*
@@ -1252,24 +1238,16 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 	samp_atom_t *atom;
 	samp_rule_t *rule_entry;
 	int32_t i, j, predicate, arity, num_rules, *rules;
-	bool rule_inst_true;
-	pred_entry_t *pred_entry;
 
 	atom = atom_table->atom[atom_index];
 	predicate = atom->pred;
-	pred_entry = get_pred_entry(pred_table, predicate);
+	//pred_entry_t *pred_entry = get_pred_entry(pred_table, predicate);
 	arity = pred_arity(predicate, pred_table);
 	num_rules = pred_tbl->entries[predicate].num_rules;
 	rules = pred_tbl->entries[predicate].rules;
 
-	/**
-	 * TODO: for each ground clause related to the atom, if it is activated
-	 * already, we do nothing.  Otherwise we activate it, and calculate whether
-	 * it belongs to the subset of clauses for sample SAT in this round.
-	 */
 	for (i = 0; i < num_rules; i++) {
 		rule_entry = rule_table->samp_rules[rules[i]];
-		rule_inst_true = false;
 		substit_buffer_resize(rule_entry->num_vars);
 		for (j = 0; j < rule_entry->num_lits; j++) {
 //			cprintf(6, "Checking whether to activate rule %"PRId32", literal %"PRId32"\n",
@@ -1394,8 +1372,8 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 	int32_t *psig, intval, intsig;
 	int32_t arity = pred_arity(predicate, pred_table);
 
-	atom_buffer_resize(&samp_atom_buffer, arity);
-	samp_atom_t *atom = (samp_atom_t *) samp_atom_buffer.data;
+	atom_buffer_resize(arity);
+	samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
 	atom->pred = predicate;
 	assert(atom->pred == predicate);
 	psig = pred_signature(predicate, pred_table);
@@ -1440,7 +1418,6 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 		create_new_const_rule_instances(intval, intsig, table, 0);
 		create_new_const_query_instances(intval, intsig, table, 0);
 	}
-	atom_buffer_release(&samp_atom_buffer);
 	return result;
 }
 

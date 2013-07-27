@@ -11,6 +11,40 @@ add [c] born_on(c, Mo) or born_on(c, Tu) or born_on(c, We)
 add [c, d1, d2] (born_on(c, d1) and born_on(c, d2)) implies d1 = d2;
 add (born_on(A, Tu) and boy(A)) or (born_on(B, Tu) and boy(B));
 
-mcsat_params 100, .5, 5, .05, 100, 5,,100,;
 ask (boy(A) and boy(B));
 
+ask (boy(A) and boy(B) and born_on(A, Tu) and born_on(B, Tu));
+
+ask (boy(A) and boy(B) and born_on(A, Tu) and born_on(B, Mo));
+ask (boy(A) and boy(B) and born_on(A, Tu) and born_on(B, We));
+ask (boy(A) and boy(B) and born_on(A, Tu) and born_on(B, Th));
+ask (boy(A) and boy(B) and born_on(A, Tu) and born_on(B, Fr));
+ask (boy(A) and boy(B) and born_on(A, Tu) and born_on(B, Sa));
+ask (boy(A) and boy(B) and born_on(A, Tu) and born_on(B, Su));
+
+ask (boy(A) and boy(B) and born_on(A, Mo) and born_on(B, Tu));
+ask (boy(A) and boy(B) and born_on(A, We) and born_on(B, Tu));
+ask (boy(A) and boy(B) and born_on(A, Th) and born_on(B, Tu));
+ask (boy(A) and boy(B) and born_on(A, Fr) and born_on(B, Tu));
+ask (boy(A) and boy(B) and born_on(A, Sa) and born_on(B, Tu));
+ask (boy(A) and boy(B) and born_on(A, Su) and born_on(B, Tu));
+
+ask (boy(A) and ~boy(B) and born_on(A, Tu) and born_on(B, Mo));
+ask (boy(A) and ~boy(B) and born_on(A, Tu) and born_on(B, Tu));
+ask (boy(A) and ~boy(B) and born_on(A, Tu) and born_on(B, We));
+ask (boy(A) and ~boy(B) and born_on(A, Tu) and born_on(B, Th));
+ask (boy(A) and ~boy(B) and born_on(A, Tu) and born_on(B, Fr));
+ask (boy(A) and ~boy(B) and born_on(A, Tu) and born_on(B, Sa));
+ask (boy(A) and ~boy(B) and born_on(A, Tu) and born_on(B, Su));
+
+ask (~boy(A) and boy(B) and born_on(A, Mo) and born_on(B, Tu));
+ask (~boy(A) and boy(B) and born_on(A, Tu) and born_on(B, Tu));
+ask (~boy(A) and boy(B) and born_on(A, We) and born_on(B, Tu));
+ask (~boy(A) and boy(B) and born_on(A, Th) and born_on(B, Tu));
+ask (~boy(A) and boy(B) and born_on(A, Fr) and born_on(B, Tu));
+ask (~boy(A) and boy(B) and born_on(A, Sa) and born_on(B, Tu));
+ask (~boy(A) and boy(B) and born_on(A, Su) and born_on(B, Tu));
+
+mcsat_params 10000, .5, 5, .05, 1000, 5,,100,;
+mcsat;
+dumptables atom;

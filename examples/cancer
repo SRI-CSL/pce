@@ -28,4 +28,4 @@ add Fr(Dee, Earl);
 
 mcsat_params 100;
 mcsat;
-#dumptable atom;
+dumptable atom;

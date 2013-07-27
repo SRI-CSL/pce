@@ -4,13 +4,14 @@
 #include <string.h>
 #include <time.h>
 
+#include "memalloc.h"
 #include "tables.h"
 #include "buffer.h"
 #include "print.h"
 #include "utils.h"
 
 /* Global buffers */
-atom_buffer_t samp_atom_buffer = { 0, NULL, 0};
+atom_buffer_t atom_buffer = { 0, NULL};
 clause_buffer_t clause_buffer = {0, NULL};
 substit_buffer_t substit_buffer = {0, NULL};
 
@@ -18,27 +19,10 @@ input_clause_buffer_t input_clause_buffer = { 0, 0, NULL };
 input_literal_buffer_t input_literal_buffer = { 0, 0, NULL };
 input_atom_buffer_t input_atom_buffer = { 0, 0, NULL };
 
-input_clause_t *new_input_clause() {
-	input_clause_buffer_resize();
-	return input_clause_buffer.clauses[input_clause_buffer.size++];
-}
-
-input_literal_t *new_input_literal() {
-	input_literal_buffer_resize();
-	return &input_literal_buffer.literals[input_literal_buffer.size++];
-}
-
-input_atom_t *new_input_atom() {
-	input_atom_buffer_resize();
-	return &input_atom_buffer.atoms[input_atom_buffer.size++];
-}
-
 /* Allocates enough space for an atom_buffer */
-void atom_buffer_resize(atom_buffer_t *atom_buffer, int32_t arity) {
-	assert(atom_buffer->lock == 0);
-	atom_buffer->lock = 1;
+void atom_buffer_resize(int32_t arity) {
 
-	int32_t size = atom_buffer->size;
+	int32_t size = atom_buffer.size;
 
 	if (size < arity + 1) {
 		if (size == 0) {
@@ -54,16 +38,10 @@ void atom_buffer_resize(atom_buffer_t *atom_buffer, int32_t arity) {
 				out_of_memory();
 			size = arity + 1;
 		}
-		atom_buffer->data = (int32_t *) safe_realloc(atom_buffer->data,
+		atom_buffer.data = (int32_t *) safe_realloc(atom_buffer.data,
 				size * sizeof(int32_t));
-		atom_buffer->size = size;
+		atom_buffer.size = size;
 	}
-}
-
-/* used with atom_buffer_resize to check if there is a conflict */
-void atom_buffer_release(atom_buffer_t *atom_buffer) {
-	assert(atom_buffer->lock == 1);
-	atom_buffer->lock = 0;
 }
 
 void clause_buffer_resize (int32_t length){
@@ -101,7 +79,7 @@ void substit_buffer_resize(int32_t length) {
 	}
 }
 
-void input_clause_buffer_resize() {
+static void input_clause_buffer_resize() {
 	if (input_clause_buffer.capacity == 0) {
 		input_clause_buffer.clauses = (input_clause_t **) safe_malloc(
 				INIT_INPUT_CLAUSE_BUFFER_SIZE * sizeof(input_clause_t *));
@@ -124,7 +102,7 @@ void input_clause_buffer_resize() {
 	}
 }
 
-void input_literal_buffer_resize() {
+static void input_literal_buffer_resize() {
 	if (input_literal_buffer.capacity == 0) {
 		input_literal_buffer.literals = (input_literal_t *) safe_malloc(
 				INIT_INPUT_LITERAL_BUFFER_SIZE * sizeof(input_literal_t));
@@ -147,7 +125,7 @@ void input_literal_buffer_resize() {
 	}
 }
 
-void input_atom_buffer_resize() {
+static void input_atom_buffer_resize() {
 	if (input_atom_buffer.capacity == 0) {
 		input_atom_buffer.atoms = (input_atom_t *) safe_malloc(
 				INIT_INPUT_ATOM_BUFFER_SIZE * sizeof(input_atom_t));
@@ -168,17 +146,19 @@ void input_atom_buffer_resize() {
 	}
 }
 
-/* get a copy of the buffer */
-char *get_string_from_buffer (string_buffer_t *strbuf) {
-	char *new_str;
-	if (strbuf->size == 0) {
-		return "";
-	} else {
-		new_str = (char *) safe_malloc((strbuf->size+1) * sizeof(char));
-		strcpy(new_str, strbuf->string);
-		strbuf->size = 0;
-		return new_str;
-	}
+input_clause_t *new_input_clause() {
+	input_clause_buffer_resize();
+	return input_clause_buffer.clauses[input_clause_buffer.size++];
+}
+
+input_literal_t *new_input_literal() {
+	input_literal_buffer_resize();
+	return &input_literal_buffer.literals[input_literal_buffer.size++];
+}
+
+input_atom_t *new_input_atom() {
+	input_atom_buffer_resize();
+	return &input_atom_buffer.atoms[input_atom_buffer.size++];
 }
 
 void string_buffer_resize (string_buffer_t *strbuf, int32_t delta) {
@@ -197,6 +177,19 @@ void string_buffer_resize (string_buffer_t *strbuf, int32_t delta) {
 		strbuf->string = (char *)
 			safe_realloc(strbuf->string, capacity * sizeof(char));
 		strbuf->capacity = capacity;
+	}
+}
+
+/* get a copy of the buffer */
+char *get_string_from_buffer (string_buffer_t *strbuf) {
+	char *new_str;
+	if (strbuf->size == 0) {
+		return "";
+	} else {
+		new_str = (char *) safe_malloc((strbuf->size+1) * sizeof(char));
+		strcpy(new_str, strbuf->string);
+		strbuf->size = 0;
+		return new_str;
 	}
 }
 

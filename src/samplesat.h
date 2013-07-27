@@ -6,7 +6,7 @@
 
 #include "tables.h"
 
-extern void first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
+extern int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double samp_temperature, double rvar_probability, uint32_t max_flips);
 
 extern void sample_sat(samp_table_t *table, bool lazy, double sa_probability,

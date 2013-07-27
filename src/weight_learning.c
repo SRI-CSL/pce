@@ -4,16 +4,17 @@
  *  Created on: Jul 29, 2011
  *      Author: papai
  */
+#include <string.h>
+#include <math.h>
 #include "input.h"
 #include "print.h"
 #include "weight_learning.h"
 #include "memalloc.h"
 #include "tables.h"
 #include "lbfgs.h"
-#include <string.h>
 #include "cnf.h"
-#include <math.h>
 #include "prng.h"
+#include "mcmc.h"
 
 static weighted_formula_t* last_weighted_formula = NULL;
 static weighted_formula_t* first_weighted_formula = NULL;
@@ -33,14 +34,14 @@ static bool subjective_probabilities_available;
 // belonging to it.
 extern double get_probability_of_quantified_formula(pvector_t ask_buffer,
 		input_formula_t *fmla, samp_table_t *table) {
-	samp_query_instance_t *qinst;
+	//samp_query_instance_t *qinst;
 	int32_t i;
 
 	double probability = 0.0;
 
 	double num_instances = (double) ask_buffer.size;
 	for (i = 0; i < ask_buffer.size; i++) {
-		qinst = (samp_query_instance_t *) ask_buffer.data[i];
+	//	qinst = (samp_query_instance_t *) ask_buffer.data[i];
 		probability += query_probability(
 				(samp_query_instance_t *) ask_buffer.data[i], table);
 	}
@@ -742,11 +743,10 @@ void init_covariance_matrix() {
 
 extern void update_covariance_matrix_statistics(samp_table_t *table) {
 	atom_table_t *atom_table;
-	query_instance_table_t *qinst_table;
 	samp_query_instance_t *qinst;
 	samp_truth_value_t *assignment;
-	int32_t *apmodel, i, j, k, l;
-	bool fval;
+	int32_t i, j, k, l;
+	//bool fval;
 
 	// We only need the covariance matrix when do weight learning with subjective probabilities
 	if (!subjective_probabilities_available)
@@ -755,10 +755,8 @@ extern void update_covariance_matrix_statistics(samp_table_t *table) {
 	if (covariance_matrix == NULL)
 		return;
 
-	qinst_table = &table->query_instance_table;
 	atom_table = &table->atom_table;
 	assignment = atom_table->current_assignment;
-	apmodel = table->atom_table.pmodel;
 
 	double normalized_true_groundings[covariance_matrix->N];
 	l = 0;
@@ -771,7 +769,7 @@ extern void update_covariance_matrix_statistics(samp_table_t *table) {
 				= ground_query->next) {
 			// Each query instance is an array of array of literals
 			qinst = ground_query->qinst;
-			fval = false;
+			//fval = false;
 			// First loop through the conjuncts
 			for (j = 0; qinst->lit[j] != NULL; j++) {
 				// Now the disjuncts

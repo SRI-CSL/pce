@@ -32,7 +32,6 @@
 #define SFMT_H
 
 #include <stdio.h>
-#include <math.h>
 
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
   #include <inttypes.h>
@@ -155,9 +154,4 @@ inline static double genrand_res53_mix(void)
     y = gen_rand32();
     return to_res53_mix(x, y);
 } 
-
-inline static uint32_t genrand_uint(uint32_t n) {
-	return (uint32_t) floor(genrand_real2() * n);
-}
-
 #endif
