@@ -576,6 +576,7 @@ void yy_mcsat_params_decl (char **params) {
 %token RETRACT
 %token DUMPTABLE
 %token SUMMARY
+%token QINST
 %token LOAD
 %token VERBOSITY
 %token HELP
@@ -711,6 +712,7 @@ interval: '[' NUM DDOT NUM ']' {$$ = yy_sortdef($2, $4);} ;
 table: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
        | SORT {$$ = SORT;} | PREDICATE {$$ = PREDICATE;} | ATOMD {$$ = ATOMD;}
        | CLAUSE {$$ = CLAUSE;} | RULE {$$ = RULE;} | SUMMARY {$$ = SUMMARY;}
+	   | QINST {$$ = QINST;}
        ;
 
 witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;}
@@ -991,6 +993,8 @@ int yylex (void) {
       return CLAUSE;
     else if (strcasecmp(yylval.str, "RULE") == 0)
       return RULE;
+    else if (strcasecmp(yylval.str, "QINST") == 0)
+	  return QINST;
     else if (strcasecmp(yylval.str, "INTEGER") == 0)
       return INTEGER;
     else if (strcasecmp(yylval.str, "SUMMARY") == 0)

@@ -696,8 +696,7 @@ void init_atom_table(atom_table_t *table) {
 		safe_malloc(table->size * sizeof(samp_truth_value_t));
 	table->assignment[1] = (samp_truth_value_t *)
 		safe_malloc(table->size * sizeof(samp_truth_value_t));
-	table->current_assignment_index = 0;
-	table->current_assignment = table->assignment[table->current_assignment_index];
+	table->current_assignment = 0;
 	table->pmodel = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
 	table->sampling_nums = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
 
@@ -785,7 +784,6 @@ void clause_table_resize(clause_table_t *clause_table, int32_t num_lits){
 	clause_table->samp_clauses = 
 		(samp_clause_t **) safe_realloc(clause_table->samp_clauses, size * sizeof(samp_clause_t *));
 	clause_table->size = size; 
-	// TODO what does this mean
 	if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < num_lits) {
 		out_of_memory();
 	}
@@ -1173,10 +1171,9 @@ bool valid_pred_table(pred_table_t *pred_table,
 
 /* Checks that each atom is well-formed. 
 */
-bool valid_atom_table(atom_table_t *atom_table,
-		pred_table_t *pred_table,
-		const_table_t *const_table,
-		sort_table_t *sort_table){
+bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
+		const_table_t *const_table, sort_table_t *sort_table){
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	if (atom_table->size < 0 ||
 			atom_table->num_vars > atom_table->size) {
 		printf("Invalid atom table size\n");
@@ -1189,9 +1186,9 @@ bool valid_atom_table(atom_table_t *atom_table,
 	int32_t *sig;
 	while (i < atom_table->num_vars){
 		pred = atom_table->atom[i]->pred;
-		arity  = pred_arity(pred, pred_table);
+		arity = pred_arity(pred, pred_table);
 		sig = pred_signature(pred, pred_table);
-		if (!fixed_tval(atom_table->current_assignment[i])){
+		if (!fixed_tval(assignment[i])){
 			num_unfixed++;
 		}
 		for (j = 0; j < arity; j++){

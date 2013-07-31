@@ -949,14 +949,7 @@ void print_ask_results(input_formula_t *fmla, samp_table_t *table) {
 extern void dumptable(int32_t tbl, samp_table_t *table) {
 	switch (tbl) {
 	case ALL: {
-		cprintf(1, "Dumping tables...\n");
-		dump_sort_table(table);
-		dump_pred_table(table);
-		//dump_const_table(const_table, sort_table);
-		//dump_var_table(var_table, sort_table);
-		dump_atom_table(table);
-		dump_clause_table(table);
-		dump_rule_table(table);
+		dump_all_tables(table);
 		break;
 	}
 	case SORT: {
@@ -979,14 +972,11 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
 		dump_rule_table(table);
 		break;
 	}
+	case QINST:
+		dump_query_instance_table(table);
+		break;
 	case SUMMARY: {
-		summarize_sort_table(table);
-		summarize_pred_table(table);
-		//summarize_const_table(const_table, sort_table);
-		//summarize_var_table(var_table, sort_table);
-		summarize_atom_table(table);
-		summarize_clause_table(table);
-		summarize_rule_table(table);
+		summarize_tables(table);
 		break;
 	}
 	}
@@ -1106,7 +1096,7 @@ extern bool read_eval(samp_table_t *table) {
 				set_dump_samples_path(NULL);
 			}
 			
-			/* TODO: add all queries and run mcsat in the end */
+			/* add all queries and run mcsat in the end */
 			add_cnf_query(decl.formula);
 
 			///* the following call will run mcsat once for each query */

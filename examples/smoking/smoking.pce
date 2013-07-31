@@ -1,0 +1,42 @@
+sort Person;
+
+const Ivan,John,Katherine,Lars,Michael,Nick: Person;
+
+#predicate declarations
+predicate cancer(Person) hidden;
+predicate friends(Person,Person) direct;
+predicate smokes(Person) hidden;
+
+# 0.892755  Smokes(x) => Cancer(x)
+add [x] smokes(x) implies cancer(x) 0.892755;
+
+# 0.883091  friends(x,y) => (Smokes(x) <=> Smokes(y))
+add [x,y] friends(x,y) implies (smokes(x) iff smokes(y)) 0.883091;
+
+# 0       friends(a1,a2)
+
+# 0.537004  Smokes(a1)
+add [x] smokes(x) 0.537004;
+
+# -1.33406  Cancer(a1)
+add [x] cancer(x) -1.33406;
+
+assert friends(Ivan, John);
+assert friends(John, Ivan);
+assert friends(Katherine, Lars);
+assert friends(Lars, Katherine);
+assert friends(Michael, Nick);
+assert friends(Nick, Michael);
+assert friends(Ivan, Michael);
+assert friends(Michael, Ivan);
+
+assert smokes(Ivan);
+assert smokes(Nick);
+
+ask [x] smoke(x);
+ask [x] cancer(x);
+
+mcsat_params 10000;
+mcsat;
+dumptables qinst;
+

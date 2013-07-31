@@ -26,12 +26,14 @@ extern void dump_atom_table (samp_table_t *table);
 extern void dump_clause_table (samp_table_t *table);
 extern void dump_rule_table (samp_table_t *samp_table);
 extern void dump_query_instance_table (samp_table_t *samp_table);
+extern void dump_all_tables(samp_table_t *samp_table);
 
 extern void summarize_sort_table (samp_table_t *table);
 extern void summarize_pred_table (samp_table_t *table);
 extern void summarize_atom_table (samp_table_t *table);
 extern void summarize_clause_table (samp_table_t *table);
 extern void summarize_rule_table (samp_table_t *samp_table);
+extern void summarize_tables(samp_table_t *samp_table);
 
 extern void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table);
 extern void print_atoms(samp_table_t *samp_table);

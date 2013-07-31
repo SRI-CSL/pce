@@ -1,0 +1,31 @@
+sort Throw = [1..20];
+sort Face = [1..6];
+
+predicate outcome(Throw, Face) hidden;
+
+add [x] outcome(x, 1) or outcome(x, 2) or outcome(x, 3) 
+     or outcome(x, 4) or outcome(x, 5) or outcome(x, 6);
+add [x, f1, f2] (outcome(x, f1) and outcome(x, f2)) implies (f1 = f2);
+
+# 2.1443  Outcome(t,C@face@1)
+add [x] outcome(x,1) 2.1443;
+
+# -1.27783  Outcome(t,C@face@2)
+add [x] outcome(x,2) -1.27783;
+
+# -1.27028  Outcome(t,C@face@3)
+add [x] outcome(x,3) -1.27028;
+
+# -1.28943  Outcome(t,C@face@4)
+add [x] outcome(x,4) -1.28943;
+
+# -1.27971  Outcome(t,C@face@5)
+add [x] outcome(x,5) -1.27971;
+
+# 2.17771  Outcome(t,C@face@6)
+add [x] outcome(x,6) 2.17771;
+
+mcsat_params 10000, 0.5, 5.0, 0.05, 1000;
+mcsat;
+dumptables atom;
+

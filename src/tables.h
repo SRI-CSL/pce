@@ -6,6 +6,24 @@
 #include "vectors.h"
 #include "array_hash_map.h"
 
+#define INIT_SORT_TABLE_SIZE 64
+#define INIT_CONST_TABLE_SIZE 64
+#define INIT_VAR_TABLE_SIZE 64
+#define INIT_PRED_TABLE_SIZE 64
+#define INIT_ATOM_PRED_SIZE 16
+#define INIT_RULE_PRED_SIZE 16
+#define INIT_ATOM_TABLE_SIZE 64
+#define INIT_QUERY_TABLE_SIZE 16
+#define INIT_QUERY_INSTANCE_TABLE_SIZE 64
+#define INIT_SOURCE_TABLE_SIZE 16
+#define INIT_CLAUSE_TABLE_SIZE 64
+#define INIT_RULE_TABLE_SIZE 64
+#define INIT_SORT_CONST_SIZE 16
+#define INIT_CLAUSE_SIZE 16
+#define INIT_ATOM_SIZE 16
+#define INIT_MODEL_TABLE_SIZE 64
+#define INIT_SUBSTIT_TABLE_SIZE 8 // number of vars in rules - likely to be small
+
 /*
  * MCSAT MAIN DATA STRUCTURES
  */
@@ -36,14 +54,10 @@ enum {
 	null_literal = -1,
 };
 
-/*
- * Maximal number of boolean variables
- */
+/* Maximal number of boolean variables */
 #define MAX_VARIABLES (INT32_MAX >> 1)
 
-/*
- * Conversions from variables to literals
- */
+/* Conversions from variables to literals */
 static inline samp_literal_t pos_lit(samp_bvar_t x) {
 	return x<<1;
 }
@@ -53,7 +67,7 @@ static inline samp_literal_t neg_lit(samp_bvar_t x) {
 }
 
 /*
- * makes a positive or negative literal from an atom
+ * Makes a positive or negative literal from an atom
  *
  * mk_lit(x, 0) = pos_lit(x)
  * mk_lit(x, 1) = neg_lit(x)
@@ -63,9 +77,19 @@ static inline samp_literal_t mk_lit(samp_bvar_t x, uint32_t sign) {
 	return (x<<1)|sign;
 }
 
-/* returns the atom of a literal */
+/* Returns the atom of a literal */
 static inline samp_bvar_t var_of(samp_literal_t l) {
 	return l>>1;
+}
+
+/* true if l has positive polarity (i.e., l = pos_lit(x)) */
+static inline bool is_pos(samp_literal_t l) {
+	return !(l & 1);
+}
+
+/* true if l has negative polarity (i.e., l = neg_lit(x)) */
+static inline bool is_neg(samp_literal_t l) {
+	return (l & 1);
 }
 
 /* the same as is_neg, 0: pos; 1: neg */
@@ -86,38 +110,6 @@ static inline bool opposite(samp_literal_t l1, samp_literal_t l2) {
 	return (l1 ^ l2) == 1;
 }
 
-/* can be replaced by sign_of_lit */
-// true if l has positive polarity (i.e., l = pos_lit(x))
-static inline bool is_pos(samp_literal_t l) {
-	return !(l & 1);
-}
-
-static inline bool is_neg(samp_literal_t l) {
-	return (l & 1);
-}
-
-/* 
- * A clause has weight/status and a -1-terminated array of literals
- * disjunct[0] is watched and should have assignment true, when
- * such a literal exists. The low-bit for link is one if the clause is dead.
- */
-typedef struct samp_clause_s {
-	double weight;//weight of the clause: 0 for hard clause FIXME or DBL_MAX?
-	struct samp_clause_s *link; //link to next clause for a given watched literal
-	int32_t numlits;
-	bool *frozen; // array indicating whether associated literal is frozen
-	samp_literal_t disjunct[0];//array of literals
-} samp_clause_t;
-
-
-// An atom has a predicate symbol and an array of the corresponding arity.
-// Note that to get the arity, the pred_table must be available unless the
-// predicate is builtin.
-typedef struct samp_atom_s {
-	int32_t pred; // <= 0: direct pred; > 0: indirect pred
-	int32_t args[0];
-} samp_atom_t;
-
 typedef struct input_sortdef_s {
 	int32_t lower_bound;
 	int32_t upper_bound;
@@ -134,7 +126,7 @@ typedef struct input_literal_s {
 	input_atom_t *atom;
 } input_literal_t;
 
-// This is used for both clauses (no vars) and rules.
+/* This is used for both clauses (no vars) and rules. */
 typedef struct input_clause_s {
 	int32_t varlen;
 	char **variables; //Input variables
@@ -142,31 +134,33 @@ typedef struct input_clause_s {
 	input_literal_t **literals;
 } input_clause_t;
 
-// This is used for formulas
+/* Composition of two formulas */
 typedef struct input_comp_fmla_s {
 	int32_t op;
 	struct input_fmla_s *arg1;
 	struct input_fmla_s *arg2;
 } input_comp_fmla_t;
 
+/* FIXME what is this */
 typedef union input_ufmla_s {
 	input_atom_t *atom;
 	input_comp_fmla_t *cfmla;
 } input_ufmla_t;
 
+/* Input FOL formula */
 typedef struct input_fmla_s {
 	bool atomic;
 	input_ufmla_t *ufmla;
 } input_fmla_t;
 
+/* Quantified variables */
 typedef struct var_entry_s {
 	char *name;
 	int32_t sort_index; 
 } var_entry_t;
 
 /* 
- * Original formula that is recursively defined,
- * will be converted to CNF later
+ * Original formula that is recursively defined, will be converted to CNF later
  */
 typedef struct input_formula_s {
 	var_entry_t **vars; // NULL terminated list of vars
@@ -181,8 +175,9 @@ typedef struct sort_entry_s {
 	int32_t size;
 	int32_t cardinality; //number of elements in sort i
 	char *name; //print name of the sort
-	int32_t *constants; // array of constants in the given sort, NULL when
+	// array of constants in the given sort, NULL when
 	// it is a integer sort
+	int32_t *constants; 
 	int32_t *ints; // array of integers for sparse integer sorts
 	int32_t lower_bound; // lower and upper bounds for integer sorts
 	int32_t upper_bound; // (could be a union type)
@@ -190,30 +185,13 @@ typedef struct sort_entry_s {
 	int32_t *supersorts; // array of supersort indices
 } sort_entry_t;
 
+/* List of sorts */
 typedef struct sort_table_s {
 	int32_t size;
 	int32_t num_sorts; //number of sorts
 	stbl_t sort_name_index;//table giving index for sort name
 	sort_entry_t *entries;//maps sort index to cardinality and name
 } sort_table_t;
-
-#define INIT_SORT_TABLE_SIZE 64
-#define INIT_CONST_TABLE_SIZE 64
-#define INIT_VAR_TABLE_SIZE 64
-#define INIT_PRED_TABLE_SIZE 64
-#define INIT_ATOM_PRED_SIZE 16
-#define INIT_RULE_PRED_SIZE 16
-#define INIT_ATOM_TABLE_SIZE 64
-#define INIT_QUERY_TABLE_SIZE 16
-#define INIT_QUERY_INSTANCE_TABLE_SIZE 64
-#define INIT_SOURCE_TABLE_SIZE 16
-#define INIT_CLAUSE_TABLE_SIZE 64
-#define INIT_RULE_TABLE_SIZE 64
-#define INIT_SORT_CONST_SIZE 16
-#define INIT_CLAUSE_SIZE 16
-#define INIT_ATOM_SIZE 16
-#define INIT_MODEL_TABLE_SIZE 64
-#define INIT_SUBSTIT_TABLE_SIZE 8 // number of vars in rules - likely to be small
 
 typedef struct pred_entry_s {
 	int32_t arity;//number of arguments; negative for evidence predicate
@@ -264,25 +242,49 @@ typedef struct var_table_s {
 //   samp_truth_value_t assignment; 
 // } atom_entry_t;
 
+/*
+ * An atom has a predicate symbol and an array of the corresponding arity.
+ * Note that to get the arity, the pred_table must be available unless the
+ * predicate is builtin.
+ */
+typedef struct samp_atom_s {
+	int32_t pred; // <= 0: direct pred; > 0: indirect pred
+	int32_t args[0];
+} samp_atom_t;
+
 typedef struct atom_table_s {
 	int32_t size; //size of the var_atom array (double for watched)
 	int32_t num_vars;  //number of bvars
 	int32_t num_unfixed_vars;
 	samp_atom_t **atom; // atom_entry_t *entries;
 	bool *active; // if an atom is active
-	int32_t *sampling_nums; // Keeps track of number of samplings when atom was
-	// introduced - used for more accurate probs.
+	// Keeps track of number of samplings when atom was introduced - used for
+	// more accurate probs.
+	int32_t *sampling_nums; 
 	samp_truth_value_t *assignment[2];// maps atom ids to samp_truth_value_t
-	uint32_t current_assignment_index; //which of two assignment arrays is current
-	samp_truth_value_t *current_assignment; // the current assignment
+	uint32_t current_assignment; // which of two assignment arrays is current
 	int32_t num_samples;
-	int32_t *pmodel; // TODO what is this
-	// Maps atoms to variables. Uses the predicate index + indices of the arguments,
-	// an array with total length of arity + 1, as the key
+	int32_t *pmodel; // model count of each atom
+	// Maps atoms to indices in the table. Uses the predicate index + indices
+	// of the arguments, an array with total length of arity + 1, as the key
 	array_hmap_t atom_var_hash; 
 } atom_table_t;
 
+/* 
+ * A clause has weight/status and a -1-terminated array of literals. The
+ * low-bit for link is one if the clause is dead.
+ *
+ * TODO: for a FOL formula with weight w, it is decomposed into (by cnf)
+ */
+typedef struct samp_clause_s {
+	double weight; // weight of the clause: DBL_MAX for hard clause
+	struct samp_clause_s *link; // link to next clause for a given watched literal
+	int32_t numlits;
+	bool *frozen; // array indicating whether associated literal is frozen
+	samp_literal_t disjunct[0]; // array of literals
+} samp_clause_t;
 
+/* Clauses stored in an array and also organized in several linked lists */
 typedef struct clause_table_s {
 	int32_t size;   //size of the samp_clauses array
 	int32_t num_clauses; //number of clause entries
@@ -290,6 +292,12 @@ typedef struct clause_table_s {
 	array_hmap_t clause_hash; //maps clauses to index in clause table
 	samp_clause_t **watched; //maps literals to samp_clause pointers
 	samp_clause_t *sat_clauses; //list of fixed satisfied clauses
+	/* TODO linked list is very inefficient for randomly selecting a unsat
+	 * clause in sample SAT. Should be changed to a data structure supporting
+	 * fast insert/delete and (uniformly) random selection. Also, a watch
+	 * list similar to the one used for sat clauses can be used to fast
+	 * access the all the clauses containing a specific atom. In this way we
+	 * do not need to inspect the whole unsat list every time we flip an atom. */
 	int32_t num_unsat_clauses; //number of unsat clauses
 	samp_clause_t *unsat_clauses;//list of unsat clauses, threaded through link
 	samp_clause_t *dead_clauses;//list of unselected clauses
@@ -298,20 +306,24 @@ typedef struct clause_table_s {
 	samp_clause_t *dead_negative_or_unit_clauses; //killed clauses
 } clause_table_t;
 
-// A rule is a clause with variables.  Instantiated forms of the rules are
-// added to the clause table.  The variables list is kept with each rule,
-// and the literal list is a list of actual literals, in order to reference
-// the variables.
+/*
+ * A rule is a clause with variables.  Instantiated forms of the rules are
+ * added to the clause table.  The variables list is kept with each rule,
+ * and the literal list is a list of actual literals, in order to reference
+ * the variables.
+ */
 typedef enum {constant, variable, integer} arg_kind_t;
 
-// In a rule, an argument may be:
-//  a constant (value is an index into the const_table)
-//  a variable (value is an index into the variable array of the associated rule)
-//  an integer (value is the integer)
-// When the rule is instantiated, a samp_atom_t is created, which only has constants
-// and integers - these are determined by the sorts.
-// We can't do this for rules, as this would not allow a distinction between
-// integers and variables.
+/*
+ * In a rule, an argument may be:
+ *  a constant (value is an index into the const_table)
+ *  a variable (value is an index into the variable array of the associated rule)
+ *  an integer (value is the integer)
+ * When the rule is instantiated, a samp_atom_t is created, which only has constants
+ * and integers - these are determined by the sorts.
+ * We can't do this for rules, as this would not allow a distinction between
+ * integers and variables.
+ */
 typedef struct rule_atom_arg_s {
 	arg_kind_t kind;
 	int32_t value;
@@ -328,14 +340,17 @@ typedef struct rule_literal_s {
 	rule_atom_t *atom;
 } rule_literal_t;
 
-// Use INT32_MIN to represent unfixed
+/*
+ * Substitution of all variables for a quantified clause.  INT32_MIN is used
+ * to represent an unfixed variable.
+ */
 typedef int32_t substit_entry_t;
 //typedef struct substit_entry_s {
 //  int32_t const_index;
 //  bool fixed;
 //} substit_entry_t;
 
-/* A quantified clause */
+/* Quantified clause */
 typedef struct samp_rule_s {
 	int32_t num_lits; //number of literal entries
 	int32_t num_vars; //number of variables
@@ -354,19 +369,16 @@ typedef struct rule_table_s {
 	samp_rule_t **samp_rules; //array of pointers to samp_rules
 } rule_table_t;
 
-
-// Queries involve two tables; the query_table_t keeps the uninstantiated
-// form of the query, to be instantiated as new constants come in.  The
-// query_instance_table_t keeps the instantiated form, along with the
-// sampling numbers and pmodels as for the atom_table_t.
-
-// Similar to rules, but we can't separate the clauses, so the literals
-// array is one level deeper.
-/* TODO: Does not have to cnf-lize the query formulas, because we only
- * need to evaluate the formulas given an assignment. It could also
- * support lazy option, in which we examine the quantified formula w.r.t.
- * an assignment and only instantiate the ground formulas that have a
- * non-default value (Normally the default value is false).
+/* 
+ * Keeps the uninstantiated form of the query, to be instantiated as new
+ * constants come in. Similar to rules, but we can't separate the clauses, so
+ * the literals array is one level deeper.
+ *
+ * TODO: Do not have to cnf-ize the query formulas, because we only need to
+ * evaluate the formulas given an assignment. It could also support lazy
+ * option, in which we examine the quantified formula w.r.t.  an assignment and
+ * only instantiate the ground formulas that have a non-default value (Normally
+ * the default value is false).
  */
 typedef struct samp_query_s {
 	int32_t *source_index; // The source of this query, e.g., formula, learner id
@@ -382,6 +394,10 @@ typedef struct query_table_s {
 	samp_query_t **query;
 } query_table_t;
 
+/*
+ * Keeps the instantiated form, along with the sampling numbers and pmodels as
+ * for the atom_table_t.
+ */
 typedef struct samp_query_instance_s {
 	//int32_t query_index; // Index to the query from which this was generated
 	ivector_t query_indices; // Indices to the queries from which this was generated
@@ -398,11 +414,13 @@ typedef struct query_instance_table_s {
 	samp_query_instance_t **query_inst;
 } query_instance_table_t;
 
-// Sources indicate the source of the assertion, rule, etc.
-// and is used to reset, untell, etc.  For each explicitly
-// provided source, we keep track of the formula and assertion
-// So we can undo the effects.  For weighted formulas, we keep
-// track of the weight so we can subtract it later.
+/*
+ * Sources indicate the source of the assertion, rule, etc.
+ * and is used to reset, untell, etc.  For each explicitly
+ * provided source, we keep track of the formula and assertion
+ * So we can undo the effects.  For weighted formulas, we keep
+ * track of the weight so we can subtract it later.
+ */
 typedef struct source_entry_s {
 	char *name;
 	int32_t *assertion; // indices to atom_table, -1 terminated
@@ -416,6 +434,7 @@ typedef struct source_table_s {
 	source_entry_t **entry;
 } source_table_t;
 
+/* All the tables */
 typedef struct samp_table_s {
 	sort_table_t sort_table;
 	const_table_t const_table;

@@ -78,7 +78,7 @@ static int32_t set_atom_tval(int32_t var, samp_truth_value_t tval, samp_table_t 
 	atom_table_t *atom_table = &table->atom_table;
 	samp_atom_t *atom = atom_table->atom[var];
 	pred_entry_t *pred_entry = get_pred_entry(pred_table, atom->pred);
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	
 	/* if it has been fixed, check if consistent */
 	if (fixed_tval(assignment[var])) {
@@ -104,6 +104,11 @@ static int32_t set_atom_tval(int32_t var, samp_truth_value_t tval, samp_table_t 
 			&& assigned_false(tval) == pred_default_value(pred_entry)) {
 		activate_atom(table, var);
 	}
+	samp_truth_value_t new_tval = atom_table->assignment[atom_table->current_assignment][var];
+	assert(new_tval == tval || (fixed_tval(new_tval)
+				&& tval == unfix_tval(negate_tval(new_tval))));
+	if (new_tval != tval)
+		return -1;
 	return 0;
 }
 
@@ -120,7 +125,7 @@ static int32_t set_atom_tval(int32_t var, samp_truth_value_t tval, samp_table_t 
 static void link_propagate(samp_table_t *table, samp_literal_t lit) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t numlits, i;
 	samp_literal_t new_watched;
 	samp_clause_t *next_link;
@@ -185,7 +190,7 @@ static void link_propagate(samp_table_t *table, samp_literal_t lit) {
 static int32_t scan_unsat_clauses(samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	samp_clause_t *unsat_clause;
 	samp_clause_t **unsat_clause_ptr;
 	unsat_clause_ptr = &clause_table->unsat_clauses;
@@ -244,9 +249,8 @@ static int32_t scan_unsat_clauses(samp_table_t *table) {
 				atom_table->num_unfixed_vars--;
 			}
 			assert(assigned_true_lit(assignment, lit));
-			//if (assigned_true_lit(assignment, lit)) { //push clause into fixed sat list
 			push_integer_stack(lit, &(table->fixable_stack));
-			//}
+			//push clause into fixed sat list
 			*unsat_clause_ptr = unsat_clause->link;
 			push_clause(unsat_clause, &clause_table->sat_clauses);
 			assert(assigned_fixed_true_lit(assignment,
@@ -478,11 +482,16 @@ static int32_t choose_random_atom(samp_table_t *table) {
 		card = sort_table->entries[signature[i]].cardinality;
 		constant = anum % card; //card can't be zero
 		anum = anum / card;
-		if (sort_table->entries[signature[i]].constants == NULL) {
+		sort_entry_t *sort_entry = &sort_table->entries[signature[i]];
+		if (sort_entry->constants == NULL) {
 			// Must be an integer
-			atom->args[i] = constant;
+			if (sort_entry->ints == NULL) {
+				atom->args[i] = sort_entry->lower_bound + constant;
+			} else {
+				atom->args[i] = sort_entry->ints[constant];
+			}
 		} else {
-			atom->args[i] = sort_table->entries[signature[i]].constants[constant];
+			atom->args[i] = sort_entry->constants[constant];
 			// Quick typecheck
 			assert(const_sort_index(atom->args[i], &table->const_table) == signature[i]);
 		}
@@ -520,7 +529,7 @@ static void cost_flip_unfixed_variable(samp_table_t *table, int32_t *dcost,
 	samp_literal_t plit, nlit;
 	uint32_t i;
 	atom_table_t *atom_table = &(table->atom_table);
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 
 	if (assigned_true(assignment[var])) {
 		nlit = neg_lit(var);
@@ -618,17 +627,17 @@ static int32_t choose_clause_var(samp_table_t *table, samp_clause_t *clause,
 static int32_t flip_unfixed_variable(samp_table_t *table, int32_t var) {
 	//  double dcost = 0;   //dcost seems unnecessary
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	cprintf(4, "[flip_unfixed_variable] Flipping variable %"PRId32" to %s\n", var,
 			assigned_true(assignment[var]) ? "false" : "true");
 	if (assigned_true(assignment[var])) {
-		set_atom_tval(var, v_false, table);
-		//assignment[var] = v_false;
-		link_propagate(table, pos_lit(var));
+		if (set_atom_tval(var, v_false, table) >= 0) {
+			link_propagate(table, pos_lit(var));
+		}
 	} else {
-		set_atom_tval(var, v_true, table);
-		//assignment[var] = v_true;
-		link_propagate(table, neg_lit(var));
+		if (set_atom_tval(var, v_true, table) >= 0) {
+			link_propagate(table, neg_lit(var));
+		}
 	}
 	if (scan_unsat_clauses(table) == -1) {
 		return -1;
@@ -642,7 +651,7 @@ static int32_t flip_unfixed_variable(samp_table_t *table, int32_t var) {
  */
 static void init_random_assignment(samp_table_t *table, int32_t *num_unfixed_vars) {
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	uint32_t i;
 	*num_unfixed_vars = 0;
 	char *atom_str;
@@ -735,17 +744,14 @@ static int32_t init_first_sample_sat(samp_table_t *table) {
 static int32_t init_sample_sat(samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
-
-	samp_truth_value_t *new_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 
 	/*
 	 * Flip the assignment vectors:
 	 * - the current assignment is kept as a backup in case sample_sat fails
 	 */
-	atom_table->current_assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
-	atom_table->current_assignment = atom_table->assignment[atom_table->current_assignment_index];
-	new_assignment = atom_table->current_assignment;
+	atom_table->current_assignment ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
+	samp_truth_value_t *new_assignment = atom_table->assignment[atom_table->current_assignment];
 
 	uint32_t i, choice;
 
@@ -813,7 +819,7 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
 	// We first decide on simulated annealing vs. walksat.
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &(table->atom_table);
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t dcost;
 	double choice;
 	int32_t var;
@@ -995,7 +1001,7 @@ void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 static void push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t i;
 	int32_t fixable;
 	samp_literal_t lit;
@@ -1042,9 +1048,7 @@ static void push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
 			atom_table->num_unfixed_vars--;
 		}
 		assert(assigned_true_lit(assignment, lit));
-		//if (assigned_true_lit(assignment, lit)) { //push clause into fixed sat list
 		push_integer_stack(lit, &(table->fixable_stack));
-		//}
 		push_clause(clause, &clause_table->sat_clauses);
 		assert(assigned_fixed_true_lit(assignment,
 					clause_table->sat_clauses->disjunct[fixable]));

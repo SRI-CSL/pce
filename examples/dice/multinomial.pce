@@ -1,0 +1,13 @@
+sort Throw = [1..20];
+sort Face = [1..6];
+
+predicate outcome(Throw, Face) hidden;
+
+add [x] outcome(x, 1) or outcome(x, 2) or outcome(x, 3) 
+     or outcome(x, 4) or outcome(x, 5) or outcome(x, 6);
+add [x, f1, f2] (outcome(x, f1) and outcome(x, f2)) implies (f1 = f2);
+
+mcsat_params 10000, 0.5, 5.0, 0.05, 1000;
+mcsat;
+dumptables atom;
+

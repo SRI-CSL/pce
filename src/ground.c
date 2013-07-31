@@ -276,7 +276,7 @@ static bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs, samp_ta
 static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	rule_atom_t *atom = lit->atom;
 	bool neg = lit->neg;
 	int32_t predicate = atom->pred;
@@ -371,35 +371,22 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 	/* check if the constants are compatible with the sorts */
 	for (i = 0; i < rule->num_vars; i++) {
 		csubst = substs[i];
+		// Not enough constants, i given, rule->num_vars required
 		assert(csubst != INT32_MIN);
-		//if (csubst == INT32_MIN) {
-		//	mcsat_err("substit: Not enough constants - %"PRId32" given, %"PRId32" required\n",
-		//			i, rule->num_vars);
-		//	return -1;
-		//}
 		vsort = rule->vars[i]->sort_index;
 		sort_entry = &sort_table->entries[vsort];
-		if (sort_entry->constants == NULL) {
+		if (sort_entry->constants == NULL) { 
 			// It's an integer; check that its value is within the sort
-			if (!(sort_entry->lower_bound <= csubst
-						&& csubst <= sort_entry->upper_bound)) {
-				mcsat_err("substit: integer is out of bounds %"PRId32"\n", i);
-				return -1;
-			}
+			assert(sort_entry->lower_bound <= csubst
+					&& csubst <= sort_entry->upper_bound);
 		} else {
 			csort = const_sort_index(substs[i], const_table);
-			if (!subsort_p(csort, vsort, sort_table)) {
-				mcsat_err("substit: Constant/variable sorts do not match at %"PRId32"\n", i);
-				return -1;
-			}
+			// Constant/variable sorts do not match
+			assert(subsort_p(csort, vsort, sort_table));
 		}
 	}
+	// Too many constants, i given, rule->num_vars required
 	assert(substs == NULL || substs[i] == INT32_MIN);
-	//if (substs != NULL && substs[i] != INT32_MIN) {
-	//	mcsat_err("substit: Too many constants - %"PRId32" given, %"PRId32" required\n",
-	//			i, rule->num_vars);
-	//	return -1;
-	//}
 
 	/* check if the value is fixed to be true, if so discard it */
 	if (lazy_mcsat() && !check_clause_falsifiable(rule, substs, table)) {
@@ -429,19 +416,10 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 
 			int32_t added_atom = add_internal_atom(table, new_atom, false);
 			assert(added_atom != -1);
-			//if (added_atom == -1) {
-			//	// This shouldn't happen, but if it does, we need to free up space
-			//	safe_free(new_atom);
-			//	mcsat_err("substit: Bad atom\n");
-			//	return -1;
-			//}
 			if (new_atom->pred > 0) {
 				found_indirect = true;
 			}
-			//if (atom_map != NULL) {
-			// already had the atom - free it
 			safe_free(new_atom);
-			//}
 			clause_buffer.data[litidx++] = lit->neg ? neg_lit(added_atom)
 				: pos_lit(added_atom);
 		}
@@ -462,6 +440,8 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
  */
 static void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t *table, 
 		int32_t atom_index) {
+	atom_table_t *atom_table = &table->atom_table;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 
 	/* termination of the recursion */
 	if (vidx == rule->num_vars) {
@@ -471,7 +451,9 @@ static void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t
 			print_rule_substit(rule, substit_buffer.entries, table);
 			printf(" is being instantiated ...\n");
 		}
+		samp_truth_value_t tval = assignment[atom_index];
 		int32_t success = substit_rule(rule, substit_buffer.entries, table);
+		//assert(atom_table->assignment[atom_table->current_assignment][atom_index] == tval);
 		if (get_verbosity_level() >= 5) {
 			if (success < 0) {
 				printf("[all_rule_instances_rec] Failed.\n");
@@ -479,7 +461,6 @@ static void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t
 				printf("[all_rule_instances_rec] Succeeded.\n");
 			}
 		}
-
 		return;
 	}
 
@@ -591,7 +572,7 @@ static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_
 			else {
 				var_index = rule_atom->args[0].value;
 				// TODO: enumerate the sort
-//				int32_t vsort = rule->vars[var_index]->sort_index;
+				//int32_t vsort = rule->vars[var_index]->sort_index;
 			}
 			break;
 		default:
@@ -866,8 +847,8 @@ static int32_t substit_query(samp_query_t *query, substit_entry_t *substs, samp_
  */
 static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 	pred_table_t *pred_table = &(table->pred_table);
-	//pred_tbl_t *pred_tbl = &(pred_table->pred_tbl);
 	atom_table_t *atom_table = &(table->atom_table);
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t predicate, arity, i, j, k;
 	rule_atom_t *atom;
 	samp_atom_t *rule_inst_atom;
@@ -911,11 +892,11 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 			}
 
 			if (query->literals[i][j]->neg &&
-					atom_table->current_assignment[atom_map->val] == v_fixed_false) {
+					assignment[atom_map->val] == v_fixed_false) {
 				return false;//literal is fixed true
 			}
 			if (!query->literals[i][j]->neg &&
-					atom_table->current_assignment[atom_map->val] == v_fixed_true) {
+					assignment[atom_map->val] == v_fixed_true) {
 				return false;//literal is fixed true
 			}
 		}
@@ -1452,6 +1433,7 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 		bool add_weights) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	uint32_t i, posidx;
 	samp_clause_t **samp_clauses, *entry;
 	samp_literal_t lit;
@@ -1482,11 +1464,7 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 			clause_map->val = index;
 			//cprintf(5, "Added clause %"PRId32"\n", index);
 
-			/*
-			 * TODO: For lazy MC-SAT: The clause is always satisfied for the
-			 * previous assignment.  Calculate if it belongs to the subset of
-			 * clauses for the current round of sample SAT
-			 */
+			/* FIXME only for lazy? */
 			push_newly_activated_clause(index, table);
 
 			return index;
@@ -1509,7 +1487,7 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 	} else {
 		// Clause only involves direct predicates - just set positive literal to true
 		// TODO what is this scenario?
-		samp_truth_value_t *assignment = atom_table->current_assignment;
+		assert(false);
 		negs_all_true = true;
 		posidx = -1;
 		for (i = 0; i < num_lits; i++) {

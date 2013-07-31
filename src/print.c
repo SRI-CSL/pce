@@ -429,7 +429,7 @@ void print_state(samp_table_t *table, uint32_t round){
 
 void print_assignment(samp_table_t *table){
 	atom_table_t *atom_table = &(table->atom_table);
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t i;
 
 	for (i = 0; i < atom_table->num_vars; i++) {
@@ -502,7 +502,7 @@ static void dump_pred_tbl (pred_tbl_t * pred_tbl, sort_table_t * sort_table) {
 void dump_pred_table (samp_table_t *table) {
 	sort_table_t *sort_table = &(table->sort_table);
 	pred_table_t *pred_table = &(table->pred_table);
-	output("-------------------------------\n");
+	output("\n-------------------------------\n");
 	output("| Evidence predicates:\n");
 	output("-------------------------------\n");
 	dump_pred_tbl(&(pred_table->evpred_tbl), sort_table);
@@ -514,7 +514,7 @@ void dump_pred_table (samp_table_t *table) {
 }
 
 void dump_const_table (const_table_t * const_table, sort_table_t * sort_table) {
-	output("Printing constants:\n");
+	output("\nPrinting constants:\n");
 	int i;
 	for (i = 0; i < const_table->num_consts; i++) {
 		output(" %s: ", const_table->entries[i].name);
@@ -524,7 +524,7 @@ void dump_const_table (const_table_t * const_table, sort_table_t * sort_table) {
 }
 
 void dump_var_table (var_table_t * var_table, sort_table_t * sort_table) {
-	output("Printing variables:\n");
+	output("\nPrinting variables:\n");
 	int i;
 	for (i = 0; i < var_table->num_vars; i++) {
 		output(" %s: ", var_table->entries[i].name);
@@ -534,12 +534,12 @@ void dump_var_table (var_table_t * var_table, sort_table_t * sort_table) {
 }
 
 void dump_atom_table (samp_table_t *table) {
-	output("Atom Table:\n");
+	output("\nAtom Table:\n");
 	print_atoms(table);
 }
 
 void dump_clause_table (samp_table_t *table) {
-	output("Clause Table:\n");
+	output("\nClause Table:\n");
 	print_clauses(table);
 }
 
@@ -646,7 +646,7 @@ void dump_rule_table (samp_table_t *samp_table) {
 	char d[10];
 	int nwdth = sprintf(d, "%"PRIu32, nrules);
 	int32_t i;
-	output("Rule Table:\n");
+	output("\nRule Table:\n");
 	output("--------------------------------------------------------------------------------\n");
 	output("| %-*s | weight    | %-*s |\n", nwdth, "i", 61-nwdth, "Rule");
 	output("--------------------------------------------------------------------------------\n");
@@ -704,7 +704,7 @@ void dump_query_instance_table (samp_table_t *samp_table) {
 	int nwdth = sprintf(d, "%"PRIu32, nqueries);
 	int32_t i;
 
-	output("Query Instance Table:\n");
+	output("\nQuery Instance Table:\n");
 	output("--------------------------------------------------------------------------------\n");
 	output("| %-*s |  prob  | %-*s |\n", nwdth, "i", 64-nwdth, "Rule");
 	output("--------------------------------------------------------------------------------\n");
@@ -727,6 +727,17 @@ void dump_query_instance_table (samp_table_t *samp_table) {
 		//output("\n");
 	}
 	output("-------------------------------------------------------------------------------\n");
+}
+
+void dump_all_tables(samp_table_t *table) {
+	cprintf(1, "Dumping tables...\n");
+	dump_sort_table(table);
+	dump_pred_table(table);
+	//dump_const_table(const_table, sort_table);
+	//dump_var_table(var_table, sort_table);
+	dump_atom_table(table);
+	dump_clause_table(table);
+	dump_rule_table(table);
 }
 
 void summarize_sort_table (samp_table_t *table) {
@@ -769,6 +780,16 @@ void summarize_rule_table (samp_table_t *table) {
 			table->rule_table.num_rules);
 }
 
+void summarize_tables(samp_table_t *table) {
+	output("\n");
+	summarize_sort_table(table);
+	summarize_pred_table(table);
+	//summarize_const_table(const_table, sort_table);
+	//summarize_var_table(var_table, sort_table);
+	summarize_atom_table(table);
+	summarize_clause_table(table);
+	summarize_rule_table(table);
+}
 
 double atom_probability(int32_t atom_index, samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;

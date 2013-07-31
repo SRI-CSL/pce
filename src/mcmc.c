@@ -124,6 +124,7 @@ static void kill_clauses(samp_table_t *table) {
 static void empty_clause_lists(samp_table_t *table) {
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &(table->atom_table);
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 
 	clause_table->sat_clauses = NULL;
 	clause_table->unsat_clauses = NULL;
@@ -134,7 +135,7 @@ static void empty_clause_lists(samp_table_t *table) {
 	uint32_t i;
 	int32_t num_unfixed = 0;
 	for (i = 0; i < atom_table->num_vars; i++) {
-		if (!fixed_tval(atom_table->current_assignment[i])) {
+		if (!fixed_tval(assignment[i])) {
 			num_unfixed++;
 		}
 		atom_table->num_unfixed_vars = num_unfixed;
@@ -259,7 +260,7 @@ static void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
 static int32_t reset_sample_sat(samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 
 	cprintf(3, "[reset_sample_sat] started ...\n");
 
@@ -298,7 +299,7 @@ static void update_query_pmodel(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	query_instance_table_t *qinst_table = &table->query_instance_table;
 	samp_query_instance_t *qinst;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t num_queries, i, j, k;
 //	int32_t *apmodel;
 //	bool fval;
@@ -351,7 +352,7 @@ done: continue;
  */
 static void update_pmodel(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
+	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t num_vars = table->atom_table.num_vars;
 	int32_t *pmodel = table->atom_table.pmodel;
 	int32_t i;
@@ -418,6 +419,9 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 
 	cprintf(1, "[mc_sat] MC-SAT started ...\n");
 
+	// FIXME for eager inference, the clauses are instantiated before running
+	// mcsat, but they should be put into the lists following the same criteria
+	// as initial sample SAT.
 	hard_only = true;
 
 	empty_clause_lists(table);
@@ -463,8 +467,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 			}
 
 			// Flip current_assignment (restore the saved assignment)
-			atom_table->current_assignment_index ^= 1;
-			atom_table->current_assignment = atom_table->assignment[atom_table->current_assignment_index];
+			atom_table->current_assignment ^= 1;
 
 			empty_clause_lists(table);
 			init_clause_lists(&table->clause_table);
@@ -486,7 +489,5 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 			break;
 		}
 	}
-
-	dump_query_instance_table(table);
 }
 

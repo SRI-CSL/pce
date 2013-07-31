@@ -1,0 +1,23 @@
+throw = {1,...,20}
+
+//predicate declarations
+Outcome(throw,face!)
+
+// 2.1443  Outcome(t,C@face@1)
+2.1443  Outcome(a1,1)
+
+// -1.27783  Outcome(t,C@face@2)
+-1.27783  Outcome(a1,2)
+
+// -1.27028  Outcome(t,C@face@3)
+-1.27028  Outcome(a1,3)
+
+// -1.28943  Outcome(t,C@face@4)
+-1.28943  Outcome(a1,4)
+
+// -1.27971  Outcome(t,C@face@5)
+-1.27971  Outcome(a1,5)
+
+// 2.17771  Outcome(t,C@face@6)
+2.17771  Outcome(a1,6)
+
