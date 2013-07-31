@@ -744,7 +744,6 @@ void init_covariance_matrix() {
 extern void update_covariance_matrix_statistics(samp_table_t *table) {
 	atom_table_t *atom_table;
 	samp_query_instance_t *qinst;
-	samp_truth_value_t *assignment;
 	int32_t i, j, k, l;
 	//bool fval;
 
@@ -756,7 +755,6 @@ extern void update_covariance_matrix_statistics(samp_table_t *table) {
 		return;
 
 	atom_table = &table->atom_table;
-	assignment = atom_table->current_assignment;
 
 	double normalized_true_groundings[covariance_matrix->N];
 	l = 0;
@@ -775,7 +773,7 @@ extern void update_covariance_matrix_statistics(samp_table_t *table) {
 				// Now the disjuncts
 				for (k = 0; qinst->lit[j][k] != -1; k++) {
 					// If any literal is true, skip the rest
-					if (assigned_true_lit(assignment, qinst->lit[j][k])) {
+					if (assigned_true_lit(atom_table->assignment, qinst->lit[j][k])) {
 						goto cont;
 					}
 				}

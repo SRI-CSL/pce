@@ -113,8 +113,8 @@ static void kill_clauses(samp_table_t *table) {
 				clause_table->watched[lit], clause_table);
 	}
 
-	//TEMPERORY
-	//print_live_clauses(table);
+	// all the unsat clauses are already dead
+	assert(clause_table->unsat_clauses == NULL);
 }
 
 /*
@@ -124,7 +124,6 @@ static void kill_clauses(samp_table_t *table) {
 static void empty_clause_lists(samp_table_t *table) {
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &(table->atom_table);
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 
 	clause_table->sat_clauses = NULL;
 	clause_table->unsat_clauses = NULL;
@@ -135,7 +134,7 @@ static void empty_clause_lists(samp_table_t *table) {
 	uint32_t i;
 	int32_t num_unfixed = 0;
 	for (i = 0; i < atom_table->num_vars; i++) {
-		if (!fixed_tval(assignment[i])) {
+		if (!fixed_tval(atom_table->assignment[i])) {
 			num_unfixed++;
 		}
 		atom_table->num_unfixed_vars = num_unfixed;
@@ -195,14 +194,9 @@ static void restore_sat_dead_clauses(clause_table_t *clause_table,
 		if (val != -1) {
 			cprintf(2, "---> restoring dead clause %p (val = %"PRId32")\n",
 					link, val); //BD
-			// swap disjunct[0] and disjunct[val]
 			lit = link->disjunct[val];
-			//link->disjunct[val] = link->disjunct[0];
-			//link->disjunct[0] = lit;
 			next = link->link;
 			push_clause(link, &clause_table->watched[lit]);
-			//link->link = clause_table->watched[lit];
-			//clause_table->watched[lit] = link;
 			link = next;
 			assert(assigned_true_lit(assignment, clause_table->watched[lit]->disjunct[val]));
 		} else {
@@ -260,7 +254,6 @@ static void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
 static int32_t reset_sample_sat(samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 
 	cprintf(3, "[reset_sample_sat] started ...\n");
 
@@ -270,8 +263,8 @@ static int32_t reset_sample_sat(samp_table_t *table) {
 	 * move dead clauses that are satisfied into appropriate lists
 	 * so that they can be selected as live clauses in this round.
 	 */
-	restore_sat_dead_negative_unit_clauses(clause_table, assignment);
-	restore_sat_dead_clauses(clause_table, assignment);
+	restore_sat_dead_negative_unit_clauses(clause_table, atom_table->assignment);
+	restore_sat_dead_clauses(clause_table, atom_table->assignment);
 
 	/*
 	 * kill selected satisfied clauses: select which clauses will
@@ -299,7 +292,6 @@ static void update_query_pmodel(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	query_instance_table_t *qinst_table = &table->query_instance_table;
 	samp_query_instance_t *qinst;
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t num_queries, i, j, k;
 //	int32_t *apmodel;
 //	bool fval;
@@ -330,7 +322,7 @@ static void update_query_pmodel(samp_table_t *table) {
 			// Now the disjuncts
 			for (k = 0; qinst->lit[j][k] != -1; k++) {
 				// If any literal is true, skip the rest
-				if (assigned_true_lit(assignment, qinst->lit[j][k])) {
+				if (assigned_true_lit(atom_table->assignment, qinst->lit[j][k])) {
 					goto cont;
 				}
 			}
@@ -352,14 +344,13 @@ done: continue;
  */
 static void update_pmodel(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t num_vars = table->atom_table.num_vars;
 	int32_t *pmodel = table->atom_table.pmodel;
 	int32_t i;
 
 	table->atom_table.num_samples++;
 	for (i = 0; i < num_vars; i++) {
-		if (assigned_true(assignment[i])) {
+		if (assigned_true(atom_table->assignment[i])) {
 			if (get_verbosity_level() >= 3 
 					&& i > 0) { // FIXME why i > 0?
 				printf("Atom %d was assigned true\n", i);
@@ -467,7 +458,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 			}
 
 			// Flip current_assignment (restore the saved assignment)
-			atom_table->current_assignment ^= 1;
+			switch_assignment_array(atom_table);
 
 			empty_clause_lists(table);
 			init_clause_lists(&table->clause_table);

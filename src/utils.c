@@ -72,22 +72,6 @@ int32_t str2int(char *cnst) {
 	return (int32_t) lcnst;
 }
 
-bool assigned_undef(samp_truth_value_t value){
-	return (value == v_undef);
-}
-
-bool assigned_true(samp_truth_value_t value){
-	return (value == v_true ||
-			value == v_db_true ||
-			value == v_fixed_true);
-}
-
-bool assigned_false(samp_truth_value_t value){
-	return (value == v_false ||
-			value == v_db_false ||
-			value == v_fixed_false);
-}
-
 bool assigned_true_lit(samp_truth_value_t *assignment,
 		samp_literal_t lit){
 	if (is_pos(lit)){

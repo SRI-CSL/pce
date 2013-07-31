@@ -160,7 +160,6 @@ extern void append_assignment_to_file(char *path, samp_table_t *table) {
 	const_table_t *const_table = &table->const_table;
 	sort_table_t *sort_table = &table->sort_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->current_assignment;
 	int32_t i, j, num_vars;
 	sort_entry_t *entry;
 	int32_t *psig;
@@ -175,7 +174,7 @@ extern void append_assignment_to_file(char *path, samp_table_t *table) {
 
 	num_vars = atom_table->num_vars;
 	for (i = 0; i < num_vars; i++) {
-		if (assigned_false(assignment[i])) {
+		if (assigned_false(atom_table->assignment[i])) {
 			fprintf(fp, "~");
 		}
 		atom = atom_table->atom[i];

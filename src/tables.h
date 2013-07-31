@@ -258,12 +258,11 @@ typedef struct atom_table_s {
 	int32_t num_unfixed_vars;
 	samp_atom_t **atom; // atom_entry_t *entries;
 	bool *active; // if an atom is active
-	// Keeps track of number of samplings when atom was introduced - used for
-	// more accurate probs.
-	int32_t *sampling_nums; 
-	samp_truth_value_t *assignment[2];// maps atom ids to samp_truth_value_t
-	uint32_t current_assignment; // which of two assignment arrays is current
-	int32_t num_samples;
+	int32_t *sampling_nums; // number of samples BEFORE an atom is activated
+	samp_truth_value_t *assignments[2];// maps atom ids to samp_truth_value_t
+	uint32_t assignment_index; // which of two assignment arrays is current
+	samp_truth_value_t *assignment; // the current assignment
+	int32_t num_samples; // current number of samples
 	int32_t *pmodel; // model count of each atom
 	// Maps atoms to indices in the table. Uses the predicate index + indices
 	// of the arguments, an array with total length of arity + 1, as the key

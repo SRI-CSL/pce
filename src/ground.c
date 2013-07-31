@@ -276,7 +276,6 @@ static bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs, samp_ta
 static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	rule_atom_t *atom = lit->atom;
 	bool neg = lit->neg;
 	int32_t predicate = atom->pred;
@@ -306,7 +305,7 @@ static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, sa
 			value = rule_atom_default_value(atom, pred_table);
 		}
 		else if (predicate <= 0) { // for evidence predicate
-			value = assigned_true(assignment[atom_map->val]);
+			value = assigned_true(atom_table->assignment[atom_map->val]);
 		} else { // non-evidence predicate has unfixed value;
 			value = -1; // neither true nor false
 		}
@@ -441,7 +440,6 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 static void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t *table, 
 		int32_t atom_index) {
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 
 	/* termination of the recursion */
 	if (vidx == rule->num_vars) {
@@ -451,9 +449,9 @@ static void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t
 			print_rule_substit(rule, substit_buffer.entries, table);
 			printf(" is being instantiated ...\n");
 		}
-		samp_truth_value_t tval = assignment[atom_index];
+
 		int32_t success = substit_rule(rule, substit_buffer.entries, table);
-		//assert(atom_table->assignment[atom_table->current_assignment][atom_index] == tval);
+
 		if (get_verbosity_level() >= 5) {
 			if (success < 0) {
 				printf("[all_rule_instances_rec] Failed.\n");
@@ -848,7 +846,6 @@ static int32_t substit_query(samp_query_t *query, substit_entry_t *substs, samp_
 static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 	pred_table_t *pred_table = &(table->pred_table);
 	atom_table_t *atom_table = &(table->atom_table);
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t predicate, arity, i, j, k;
 	rule_atom_t *atom;
 	samp_atom_t *rule_inst_atom;
@@ -892,11 +889,11 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 			}
 
 			if (query->literals[i][j]->neg &&
-					assignment[atom_map->val] == v_fixed_false) {
+					atom_table->assignment[atom_map->val] == v_fixed_false) {
 				return false;//literal is fixed true
 			}
 			if (!query->literals[i][j]->neg &&
-					assignment[atom_map->val] == v_fixed_true) {
+					atom_table->assignment[atom_map->val] == v_fixed_true) {
 				return false;//literal is fixed true
 			}
 		}
@@ -1294,13 +1291,13 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 			(int32_t *) current_atom);
 	atom_map->val = current_atom_index;
 
-	if (pred_epred(predicate)) { //closed world assumption
-		atom_table->assignment[0][current_atom_index] = v_fixed_false;
-		atom_table->assignment[1][current_atom_index] = v_fixed_false;
-	} else {//set pmodel to 0
+	if (pred_epred(predicate)) { // closed world assumption
+		atom_table->assignments[0][current_atom_index] = v_db_false;
+		atom_table->assignments[1][current_atom_index] = v_db_false;
+	} else { // set pmodel to 0
 		atom_table->pmodel[current_atom_index] = 0; //atom_table->num_samples/2;
-		atom_table->assignment[0][current_atom_index] = v_false;
-		atom_table->assignment[1][current_atom_index] = v_false;
+		atom_table->assignments[0][current_atom_index] = v_false;
+		atom_table->assignments[1][current_atom_index] = v_false;
 		atom_table->num_unfixed_vars++;
 	}
 	add_atom_to_pred(pred_table, predicate, current_atom_index);
@@ -1433,7 +1430,6 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 		bool add_weights) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	uint32_t i, posidx;
 	samp_clause_t **samp_clauses, *entry;
 	samp_literal_t lit;
@@ -1494,12 +1490,12 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 			lit = clause[i];
 			if (is_neg(lit)) {
 				// Check that atom is true
-				if (!assigned_true(assignment[var_of(lit)])) {
+				if (!assigned_true(atom_table->assignment[var_of(lit)])) {
 					negs_all_true = false;
 					break;
 				}
 			} else {
-				if (assigned_true(assignment[var_of(lit)])) {
+				if (assigned_true(atom_table->assignment[var_of(lit)])) {
 					// Already true - exit
 					break;
 				} else {
@@ -1509,8 +1505,8 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 		}
 		if (negs_all_true && posidx != -1) {
 			// Set assignment to fixed_true
-			atom_table->assignment[0][var_of(clause[posidx])] = v_fixed_true;
-			atom_table->assignment[1][var_of(clause[posidx])] = v_fixed_true;
+			atom_table->assignments[0][var_of(clause[posidx])] = v_fixed_true;
+			atom_table->assignments[1][var_of(clause[posidx])] = v_fixed_true;
 		}
 		return -1;
 	}

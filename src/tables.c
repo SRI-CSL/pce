@@ -693,11 +693,12 @@ void init_atom_table(atom_table_t *table) {
 	}
 	table->atom = (samp_atom_t **) safe_malloc(table->size * sizeof(samp_atom_t *));
 	table->active = (bool *) safe_malloc(table->size * sizeof(bool));
-	table->assignment[0] = (samp_truth_value_t *)
+	table->assignments[0] = (samp_truth_value_t *)
 		safe_malloc(table->size * sizeof(samp_truth_value_t));
-	table->assignment[1] = (samp_truth_value_t *)
+	table->assignments[1] = (samp_truth_value_t *)
 		safe_malloc(table->size * sizeof(samp_truth_value_t));
-	table->current_assignment = 0;
+	table->assignment_index = 0;
+	table->assignment = table->assignments[table->assignment_index];
 	table->pmodel = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
 	table->sampling_nums = (int32_t *) safe_malloc(table->size * sizeof(int32_t));
 
@@ -710,9 +711,10 @@ void init_atom_table(atom_table_t *table) {
 	//  table->entries[0].atom->pred = 0;
 }
 
-
 /*
- * When atom_table is resized, the watched literals must also be resized. 
+ * Resizes the atom table to fit the current atom_table->num_vars. When
+ * atom_table is resized, the assignments and the watched literals must also be
+ * resized. 
  */
 void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table) {
 	int32_t size, num_vars, i;
@@ -731,10 +733,12 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table) {
 		safe_realloc(atom_table->active, size * sizeof(bool));
 	atom_table->sampling_nums = (int32_t *)
 		safe_realloc(atom_table->sampling_nums, size * sizeof(int32_t));
-	atom_table->assignment[0] = (samp_truth_value_t *) 
-		safe_realloc(atom_table->assignment[0], size * sizeof(samp_truth_value_t));
-	atom_table->assignment[1] = (samp_truth_value_t *) 
-		safe_realloc(atom_table->assignment[1], size * sizeof(samp_truth_value_t));
+	atom_table->assignments[0] = (samp_truth_value_t *) 
+		safe_realloc(atom_table->assignments[0], size * sizeof(samp_truth_value_t));
+	atom_table->assignments[1] = (samp_truth_value_t *) 
+		safe_realloc(atom_table->assignments[1], size * sizeof(samp_truth_value_t));
+	atom_table->assignment_index = 0;
+	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
 	atom_table->pmodel = (int32_t *)
 		safe_realloc(atom_table->pmodel, size * sizeof(int32_t));
 
@@ -1174,7 +1178,6 @@ bool valid_pred_table(pred_table_t *pred_table,
 */
 bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 		const_table_t *const_table, sort_table_t *sort_table){
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	if (atom_table->size < 0 ||
 			atom_table->num_vars > atom_table->size) {
 		printf("Invalid atom table size\n");
@@ -1189,7 +1192,7 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 		pred = atom_table->atom[i]->pred;
 		arity = pred_arity(pred, pred_table);
 		sig = pred_signature(pred, pred_table);
-		if (!fixed_tval(assignment[i])){
+		if (!fixed_tval(atom_table->assignment[i])){
 			num_unfixed++;
 		}
 		for (j = 0; j < arity; j++){
@@ -1218,7 +1221,6 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 }
 
 bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
-	samp_truth_value_t *assignment = atom_table->current_assignment;
 	//check that every clause in the unsat list is unsat
 	samp_clause_t *link;
 	int32_t lit;
@@ -1229,7 +1231,7 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 	link = clause_table->unsat_clauses;
 	i = 0;
 	while (link !=NULL){
-		if (eval_clause(assignment, link) != -1)
+		if (eval_clause(atom_table->assignment, link) != -1)
 			return false;
 		i++;
 		link = link->link;
@@ -1258,7 +1260,7 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 	for (i = 0; i < atom_table->num_vars; i++){
 		lit = pos_lit(i);
 		link = clause_table->watched[lit];
-		if (link != NULL && !assigned_true(assignment[i]))
+		if (link != NULL && !assigned_true(atom_table->assignment[i]))
 			return false;
 		while (link != NULL){
 			if (link->disjunct[0] != lit) return false;
@@ -1266,7 +1268,7 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 		}
 		lit = neg_lit(i);
 		link = clause_table->watched[lit];
-		if (link != NULL && !assigned_false(assignment[i]))
+		if (link != NULL && !assigned_false(atom_table->assignment[i]))
 			return false;
 		while (link != NULL){
 			if (link->disjunct[0] != lit) return false;
@@ -1277,7 +1279,7 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 	//check the sat_clauses to see if the first disjunct is fixed true
 	link = clause_table->sat_clauses;
 	while (link != NULL){
-		if (!assigned_fixed_true_lit(assignment, link->disjunct[0]))
+		if (!assigned_fixed_true_lit(atom_table->assignment, link->disjunct[0]))
 			return false;
 		link = link->link;
 	}

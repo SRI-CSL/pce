@@ -429,13 +429,12 @@ void print_state(samp_table_t *table, uint32_t round){
 
 void print_assignment(samp_table_t *table){
 	atom_table_t *atom_table = &(table->atom_table);
-	samp_truth_value_t *assignment = atom_table->assignment[atom_table->current_assignment];
 	int32_t i;
 
 	for (i = 0; i < atom_table->num_vars; i++) {
 		atom_table->active[i] ? output("* ") : output ("  ");
 		print_atom(atom_table->atom[i], table);
-		output(": %s\n", string_of_tval(assignment[i]));
+		output(": %s\n", string_of_tval(atom_table->assignment[i]));
 	}
 }
 
@@ -807,7 +806,7 @@ double atom_probability(int32_t atom_index, samp_table_t *table) {
 			return .5;
 		}
 	} else {
-		return atom_table->assignment[0][atom_index] == v_fixed_true ? 1.0 : 0.0;
+		return atom_table->assignment[atom_index] == v_fixed_true ? 1.0 : 0.0;
 	}
 }
 

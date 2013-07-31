@@ -691,8 +691,8 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *sourc
 	if (atom_index == -1) {
 		return -1;
 	} else {
-		table->atom_table.assignment[0][atom_index] = v_db_true;
-		table->atom_table.assignment[1][atom_index] = v_db_true;
+		table->atom_table.assignments[0][atom_index] = v_db_true;
+		table->atom_table.assignments[1][atom_index] = v_db_true;
 		if (source != NULL) {
 			add_source_to_assertion(source, atom_index, table);
 		}
