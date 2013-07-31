@@ -390,7 +390,7 @@ bool hard_only;
  *
  * Parameters for sample sat:
  * - sa_probability = probability of a simulated annealing step
- * - samp_temperature = temperature for simulated annealing
+ * - sa_temperature = temperature for simulated annealing
  * - rvar_probability = probability used by a Walksat step:
  *   a Walksat step selects an unsat clause and flips one of its variables
  *   - with probability rvar_probability, that variable is chosen randomly
@@ -407,7 +407,7 @@ bool hard_only;
  * - samp_interval = sampling interval
  */
 void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_probability,
-		double samp_temperature, double rvar_probability, uint32_t max_flips,
+		double sa_temperature, double rvar_probability, uint32_t max_flips,
 		uint32_t max_extra_flips, uint32_t timeout,
 		uint32_t burn_in_steps, uint32_t samp_interval) {
 	clause_table_t *clause_table = &table->clause_table;
@@ -427,7 +427,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	empty_clause_lists(table);
 	init_clause_lists(clause_table);
 
-	conflict = first_sample_sat(table, lazy, sa_probability, samp_temperature,
+	conflict = first_sample_sat(table, lazy, sa_probability, sa_temperature,
 			rvar_probability, max_flips);
 
 	hard_only = false;
@@ -451,7 +451,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 		//assert(valid_table(table));
 		conflict = reset_sample_sat(table);
 
-		sample_sat(table, lazy, sa_probability, samp_temperature,
+		sample_sat(table, lazy, sa_probability, sa_temperature,
 				rvar_probability, max_flips, max_extra_flips);
 
 		/*

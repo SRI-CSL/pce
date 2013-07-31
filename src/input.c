@@ -27,7 +27,7 @@ extern int yydebug;
 // MCSAT parameters
 #define DEFAULT_MAX_SAMPLES 100
 #define DEFAULT_SA_PROBABILITY .5
-#define DEFAULT_SAMP_TEMPERATURE 5.0
+#define DEFAULT_SA_TEMPERATURE 5.0
 #define DEFAULT_RVAR_PROBABILITY .05
 #define DEFAULT_MAX_FLIPS 100
 #define DEFAULT_MAX_EXTRA_FLIPS 5
@@ -37,7 +37,7 @@ extern int yydebug;
 
 static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 static double sa_probability = DEFAULT_SA_PROBABILITY;
-static double samp_temperature = DEFAULT_SAMP_TEMPERATURE;
+static double sa_temperature = DEFAULT_SA_TEMPERATURE;
 static double rvar_probability = DEFAULT_RVAR_PROBABILITY;
 static int32_t max_flips = DEFAULT_MAX_FLIPS;
 static int32_t max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
@@ -76,8 +76,8 @@ int32_t get_max_samples() {
 double get_sa_probability() {
 	return sa_probability;
 }
-double get_samp_temperature() {
-	return samp_temperature;
+double get_sa_temperature() {
+	return sa_temperature;
 }
 double get_rvar_probability() {
 	return rvar_probability;
@@ -104,8 +104,8 @@ void set_max_samples(int32_t m) {
 void set_sa_probability(double d) {
 	sa_probability = d;
 }
-void set_samp_temperature(double d) {
-	samp_temperature = d;
+void set_sa_temperature(double d) {
+	sa_temperature = d;
 }
 void set_rvar_probability(double d) {
 	rvar_probability = d;
@@ -455,7 +455,7 @@ mcsat_params [NUM++','];\n\
 mcsat NUMs are optional, and represent, in order:\n\
   max_samples (int): Number of samples to take\n\
   sa_probability (double): Prob of taking simulated annealing step\n\
-  samp_temperature (double): Simulated annealing temperature\n\
+  sa_temperature (double): Simulated annealing temperature\n\
   rvar_probability (double): Prob of flipping a random variable\n\
                              in non-simulated annealing step\n\
   max_flips (int): Max number of variable flips to find a model\n\
@@ -691,8 +691,8 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *sourc
 	if (atom_index == -1) {
 		return -1;
 	} else {
-		table->atom_table.assignment[0][atom_index] = v_fixed_true;
-		table->atom_table.assignment[1][atom_index] = v_fixed_true;
+		table->atom_table.assignment[0][atom_index] = v_db_true;
+		table->atom_table.assignment[1][atom_index] = v_db_true;
 		if (source != NULL) {
 			add_source_to_assertion(source, atom_index, table);
 		}
@@ -1148,7 +1148,7 @@ extern bool read_eval(samp_table_t *table) {
 					lazy_mcsat() ? "LAZY_" : "");
 			output(" max_samples = %"PRId32"\n", get_max_samples());
 			output(" sa_probability = %f\n", get_sa_probability());
-			output(" samp_temperature = %f\n", get_samp_temperature());
+			output(" sa_temperature = %f\n", get_sa_temperature());
 			output(" rvar_probability = %f\n", get_rvar_probability());
 			output(" max_flips = %"PRId32"\n", get_max_flips());
 			output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
@@ -1163,7 +1163,7 @@ extern bool read_eval(samp_table_t *table) {
 			}
 
 			mc_sat(table, lazy_mcsat(), get_max_samples(),
-					get_sa_probability(), get_samp_temperature(),
+					get_sa_probability(), get_sa_temperature(),
 					get_rvar_probability(), get_max_flips(),
 					get_max_extra_flips(), get_mcsat_timeout(),
 					get_burn_in_steps(), get_samp_interval());
@@ -1181,7 +1181,7 @@ extern bool read_eval(samp_table_t *table) {
 				output("MCSAT param values:\n");
 				output(" max_samples = %"PRId32"\n", get_max_samples());
 				output(" sa_probability = %f\n", get_sa_probability());
-				output(" samp_temperature = %f\n", get_samp_temperature());
+				output(" sa_temperature = %f\n", get_sa_temperature());
 				output(" rvar_probability = %f\n", get_rvar_probability());
 				output(" max_flips = %"PRId32"\n", get_max_flips());
 				output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
@@ -1200,10 +1200,10 @@ extern bool read_eval(samp_table_t *table) {
 							get_sa_probability(), decl.sa_probability);
 					set_sa_probability(decl.sa_probability);
 				}
-				if (decl.samp_temperature >= 0) {
-					output(" samp_temperature was %f, now %f\n",
-							get_samp_temperature(), decl.samp_temperature);
-					set_samp_temperature(decl.samp_temperature);
+				if (decl.sa_temperature >= 0) {
+					output(" sa_temperature was %f, now %f\n",
+							get_sa_temperature(), decl.sa_temperature);
+					set_sa_temperature(decl.sa_temperature);
 				}
 				if (decl.rvar_probability >= 0) {
 					output(" rvar_probability was %f, now %f\n",

@@ -405,7 +405,7 @@ void yy_train_decl (char *file) {
   input_command.decl.train_decl.file = file;
 }
   
-/* The params map to sa_probability, samp_temperature, rvar_probability,
+/* The params map to sa_probability, sa_temperature, rvar_probability,
  * max_flips, max_extra_flips, and max_samples, in that order.  Missing
  * args get default values.
  */
@@ -449,18 +449,18 @@ void yy_mcsat_params_decl (char **params) {
   } else {
     input_command.decl.mcsat_params_decl.sa_probability = -1;
   }
-  // samp_temperature
+  // sa_temperature
   if (arglen > 2 && strcmp(params[2], "") != 0) {
     if (yy_check_float(params[2])) {
       double temp = atof(params[2]);
       if (temp > 0.0) {
-	input_command.decl.mcsat_params_decl.samp_temperature = temp;
+	input_command.decl.mcsat_params_decl.sa_temperature = temp;
       } else {
-	yyerror("samp_temperature should be greater than 0.0");
+	yyerror("sa_temperature should be greater than 0.0");
       }
     }
   } else {
-    input_command.decl.mcsat_params_decl.samp_temperature = -1;
+    input_command.decl.mcsat_params_decl.sa_temperature = -1;
   }
   // rvar_probability
   if (arglen > 3 && strcmp(params[3], "") != 0) {

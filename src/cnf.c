@@ -865,7 +865,7 @@ void ask_cnf(input_formula_t *formula, double threshold, int32_t maxresults) {
 
 	// Run the specified number of samples
 	mc_sat(&samp_table, lazy_mcsat(), get_max_samples(), get_sa_probability(),
-			get_samp_temperature(), get_rvar_probability(), get_max_flips(),
+			get_sa_temperature(), get_rvar_probability(), get_max_flips(),
 			get_max_extra_flips(), get_mcsat_timeout(), get_burn_in_steps(),
 			get_samp_interval());
 

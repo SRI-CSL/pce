@@ -457,7 +457,8 @@ char *var_name(int32_t var_index,
 	return var_table->entries[var_index].name;
 }
 
-static char *truepred = "true"; //the true evidence predicate occupies the 0 slot
+// FIXME why? the true evidence predicate occupies the 0 slot
+static char *truepred = "true"; 
 
 void init_pred_table(pred_table_t *pred_table){
 	int32_t size = INIT_PRED_TABLE_SIZE;

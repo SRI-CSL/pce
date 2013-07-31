@@ -7,10 +7,10 @@
 #include "tables.h"
 
 extern int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
-		double samp_temperature, double rvar_probability, uint32_t max_flips);
+		double sa_temperature, double rvar_probability, uint32_t max_flips);
 
 extern void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
-		double samp_temperature, double rvar_probability,
+		double sa_temperature, double rvar_probability,
 		uint32_t max_flips, uint32_t max_extra_flips);
 
 /* Put the new clauses into the corresponding list based on their values */

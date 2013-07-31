@@ -40,7 +40,7 @@ enum {
   DUMP_SAMPLES_OPTION,
   MAX_SAMPLES_OPTION,
   SA_PROBABILITY_OPTION,
-  SAMP_TEMPERATURE_OPTION,
+  SA_TEMPERATURE_OPTION,
   RVAR_PROBABILITY_OPTION,
   MAX_FLIPS_OPTION,
   MAX_EXTRA_FLIPS_OPTION,
@@ -66,7 +66,7 @@ static struct option long_options[] = {
   {"version", no_argument, &show_version, 1},
   {"max_samples", required_argument, 0, MAX_SAMPLES_OPTION},
   {"sa_probability", required_argument, 0, SA_PROBABILITY_OPTION},
-  {"samp_temperature", required_argument, 0, SAMP_TEMPERATURE_OPTION},
+  {"sa_temperature", required_argument, 0, SA_TEMPERATURE_OPTION},
   {"rvar_probability", required_argument, 0, RVAR_PROBABILITY_OPTION},
   {"max_flips", required_argument, 0, MAX_FLIPS_OPTION},
   {"max_extra_flips", required_argument, 0, MAX_EXTRA_FLIPS_OPTION},
@@ -166,16 +166,16 @@ static void decode_options(int argc, char **argv) {
       set_sa_probability(val);
       break;
     }
-    case SAMP_TEMPERATURE_OPTION: {
+    case SA_TEMPERATURE_OPTION: {
       errno = 0;
       val = strtod(optarg, &endptr);
       if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
 	  || (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
 	  || val < 0.0) {
-	mcsat_err("Error: samp_temperature must be a float >= 0.0");
+	mcsat_err("Error: sa_temperature must be a float >= 0.0");
 	exit(1);
 	}
-      set_samp_temperature(val);
+      set_sa_temperature(val);
       break;
     }
     case RVAR_PROBABILITY_OPTION: {

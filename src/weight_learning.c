@@ -369,7 +369,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 		//							query_instance_table->num_queries);
 
 		mc_sat(table, false, get_max_samples(), get_sa_probability(),
-				get_samp_temperature(), get_rvar_probability(),
+				get_sa_temperature(), get_rvar_probability(),
 				get_max_flips(), get_max_extra_flips(), get_mcsat_timeout(),
 				get_burn_in_steps(), get_samp_interval());
 		set_empirical_expectation_of_weighted_formulae(first_weighted_formula,
@@ -517,7 +517,7 @@ static lbfgsfloatval_t lbfgs_evaluate(void *instance, const lbfgsfloatval_t *x,
 	}
 
 	mc_sat(table, false, get_max_samples(), get_sa_probability(),
-			get_samp_temperature(), get_rvar_probability(), get_max_flips(),
+			get_sa_temperature(), get_rvar_probability(), get_max_flips(),
 			get_max_extra_flips(), get_mcsat_timeout(),
 			get_burn_in_steps(), get_samp_interval());
 	set_empirical_expectation_of_weighted_formulae(first_weighted_formula,
