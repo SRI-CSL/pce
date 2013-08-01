@@ -17,6 +17,7 @@
 #include "input.h"
 #include "vectors.h"
 #include "buffer.h"
+#include "samp_clause_list.h"
 
 #include "weight_learning.h"
 #include "samplesat.h"
@@ -371,10 +372,11 @@ static void update_pmodel(samp_table_t *table) {
 }
 
 /*
- * Indicates the first sample sat of the mc_sat, in which only the
- * hard clauses are considered.
+ * False before the first sample sat of the mc_sat finishes, in which only the
+ * hard clauses are considered. Afterwards, the soft clauses are also
+ * considered.
  */
-bool hard_only;
+bool soft_clauses_included = false;
 
 /**
  * Top-level MCSAT call
@@ -413,7 +415,6 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	// FIXME for eager inference, the clauses are instantiated before running
 	// mcsat, but they should be put into the lists following the same criteria
 	// as initial sample SAT.
-	hard_only = true;
 
 	empty_clause_lists(table);
 	init_clause_lists(clause_table);
@@ -421,7 +422,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	conflict = first_sample_sat(table, lazy, sa_probability, sa_temperature,
 			rvar_probability, max_flips);
 
-	hard_only = false;
+	soft_clauses_included = true;
 
 	if (conflict == -1) {
 		mcsat_err("Found conflict in initialization.\n");
@@ -478,6 +479,96 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 		if (timeout != 0 && time(NULL) >= fintime) {
 			printf("Timeout after %"PRIu32" samples\n", i);
 			break;
+		}
+	}
+}
+
+/* 
+ * Pushes a clause to a list depending on its evaluation
+ *
+ * If it is fixed to be satisfied, push to sat_clauses
+ * If it is satisfied, push to the corresponding watched list
+ * If it is unsatisified, push to unsat_clauses
+ */
+static void push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
+	clause_table_t *clause_table = &table->clause_table;
+	atom_table_t *atom_table = &table->atom_table;
+	int32_t i;
+	int32_t fixable;
+	samp_literal_t lit;
+	char *atom_str;
+
+	fixable = get_fixable_literal(atom_table->assignment, clause->disjunct,
+			clause->numlits);
+	if (fixable >= clause->numlits) {
+		mcsat_err("No model exists.\n");
+		return;
+	}
+	if (fixable == -1) { // if not propagating
+		i = get_true_lit(atom_table->assignment, clause->disjunct,
+				clause->numlits);
+		if (i < clause->numlits) { // then lit occurs in the clause
+			lit = clause->disjunct[i]; 
+
+			push_clause(clause, &clause_table->watched[lit]);
+			assert(assigned_true_lit(atom_table->assignment,
+						clause_table->watched[lit]->disjunct[i]));
+		} else {
+			push_clause(clause, &clause_table->unsat_clauses);
+			clause_table->num_unsat_clauses++;
+		}
+	} else { // we need to fix the truth value of disjunct[fixable]
+		lit = clause->disjunct[fixable]; 
+
+		atom_str = var_string(var_of(lit), table);
+		cprintf(2, "[scan_unsat_clauses] Fixing variable %s\n", atom_str);
+		free(atom_str);
+		if (!fixed_tval(atom_table->assignment[var_of(lit)])) {
+			if (is_pos(lit)) {
+				atom_table->assignment[var_of(lit)] = v_fixed_true;
+			} else {
+				atom_table->assignment[var_of(lit)] = v_fixed_false;
+			}
+			atom_table->num_unfixed_vars--;
+		}
+		assert(assigned_true_lit(atom_table->assignment, lit));
+		push_integer_stack(lit, &(table->fixable_stack));
+		push_clause(clause, &clause_table->sat_clauses);
+		assert(assigned_fixed_true_lit(atom_table->assignment,
+					clause_table->sat_clauses->disjunct[fixable]));
+	}
+}
+
+/*
+ * Pushes a newly created clause to the corresponding list
+ * 
+ * In the first round, we only need to find a model for all the HARD clauses.
+ * Therefore, when a new clause is activated, if it is a hard clause, we
+ * put it into the corresoponding live list, otherwise we put it into the
+ * dead lists. In the following rounds, we determine whether to keep the new
+ * clause alive by its weight, more specifically, with probability equal to
+ * 1 - exp(-w).
+ */
+void push_newly_activated_clause(int32_t clsidx, samp_table_t *table) {
+	clause_table_t *clause_table = &table->clause_table;
+	samp_clause_t *clause = clause_table->samp_clauses[clsidx];
+
+	double abs_weight = fabs(clause->weight);
+	if (clause->weight == DBL_MAX
+			|| (soft_clauses_included && choose() < 1 - exp(-abs_weight))) {
+		if (clause->numlits == 1 || clause->weight < 0) {
+			push_negative_or_unit_clause(clause_table, clsidx);
+		}
+		else {
+			push_alive_clause(clause, table);
+		}
+	}
+	else {
+		if (clause->numlits == 1 || clause->weight < 0) {
+			push_clause(clause, &clause_table->dead_negative_or_unit_clauses);
+		}
+		else {
+			push_clause(clause, &clause_table->dead_clauses);
 		}
 	}
 }

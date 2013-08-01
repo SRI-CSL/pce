@@ -47,4 +47,4 @@ ask (~boy(A) and boy(B) and born_on(A, Su) and born_on(B, Tu));
 
 mcsat_params 10000, .5, 5, .05, 1000, 5,,100,;
 mcsat;
-dumptables atom;
+dumptables qinst;

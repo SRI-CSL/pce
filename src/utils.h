@@ -193,29 +193,6 @@ extern void isort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 /* Evaluates a clause to false (-1) or to the literal index evaluating to true. */
 extern int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
 
-/* Pushes a clause to some clause linked list */
-static inline void push_clause(samp_clause_t *clause, samp_clause_t **list) {
-	clause->link = *list;
-	*list = clause;
-}
-
-/* Pushes a clause to the negative unit clause linked list */
-static inline void push_negative_or_unit_clause(clause_table_t *clause_table, uint32_t i) {
-	push_clause(clause_table->samp_clauses[i], &clause_table->negative_or_unit_clauses);
-}
-
-/* Pushes a clause to the unsat clause linked list */
-static inline void push_unsat_clause(clause_table_t *clause_table, uint32_t i) {
-	push_clause(clause_table->samp_clauses[i], &clause_table->unsat_clauses);
-	clause_table->num_unsat_clauses++;
-}
-
-static inline void push_sat_clause(clause_table_t *clause_table, uint32_t i) {
-	push_clause(clause_table->samp_clauses[i], &clause_table->sat_clauses);
-}
-
-extern void move_sat_to_unsat_clauses(clause_table_t *clause_table);
-
 // The builtin binary predicates
 extern char* builtinop_string (int32_t bop);
 extern int32_t builtin_arity (int32_t op);

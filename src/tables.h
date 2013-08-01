@@ -277,9 +277,9 @@ typedef struct atom_table_s {
  */
 typedef struct samp_clause_s {
 	double weight; // weight of the clause: DBL_MAX for hard clause
-	struct samp_clause_s *link; // link to next clause for a given watched literal
 	int32_t numlits;
 	bool *frozen; // array indicating whether associated literal is frozen
+	struct samp_clause_s *link; // link to next clause for a given watched literal
 	samp_literal_t disjunct[0]; // array of literals
 } samp_clause_t;
 

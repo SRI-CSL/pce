@@ -17,6 +17,7 @@
 #include "input.h"
 #include "vectors.h"
 #include "buffer.h"
+#include "samp_clause_list.h"
 
 #include "yacc.tab.h"
 #include "ground.h"
@@ -24,7 +25,11 @@
 
 /*
  * Returns a literal index corresponding to a fixed true literal or a
- * unique non-fixed implied literal
+ * unique non-fixed implied literal. 
+ *
+ * Returns -1 if there are at least two unfixed literals, returns the
+ * total number of literals in the clause when the clause is fixed
+ * unsat.
  */
 static int32_t get_fixable_literal(samp_truth_value_t *assignment,
 		samp_literal_t *disjunct, int32_t numlits) {
@@ -43,12 +48,18 @@ static int32_t get_fixable_literal(samp_truth_value_t *assignment,
 		if (j < numlits) {
 			if (assigned_fixed_true_lit(assignment, disjunct[j]))
 				return j;
-			return -1; // there are two unfixed lits
+			else
+				return -1; // there are two unfixed lits
 		}
 	}
 	return i; // i is fixable
 }
 
+/*
+ * Returns the index of a satisfied literal of a clause.
+ *
+ * Returns the number of literals if none exists.
+ */
 static int32_t get_true_lit(samp_truth_value_t *assignment, samp_literal_t *disjunct,
 		int32_t numlits) {
 	int32_t i;
@@ -152,10 +163,9 @@ static void link_propagate(samp_table_t *table, samp_literal_t lit) {
 		i = get_true_lit(atom_table->assignment, disjunct, numlits);
 
 		if (i < numlits) {
-			/* the clause is still true: make tmp = disjunct[i] the new watched literal */
+			/* the clause is still true, make disjunct[i] the new watched literal */
 			new_watched = disjunct[i];
 
-			// add the clause to the head of watched[tmp]
 			next_link = link->link;
 			*link_ptr = next_link;
 			push_clause(link, &clause_table->watched[new_watched]);
@@ -163,7 +173,6 @@ static void link_propagate(samp_table_t *table, samp_literal_t lit) {
 						clause_table->watched[new_watched]->disjunct[i]));
 		} else {
 			/* move the clause to the unsat_clause list */
-			//cprintf(0, "Adding to usat_clauses\n");
 			next_link = link->link;
 			*link_ptr = next_link;
 			push_clause(link, &clause_table->unsat_clauses);
@@ -171,70 +180,58 @@ static void link_propagate(samp_table_t *table, samp_literal_t lit) {
 		}
 		link = next_link;
 	}
-
-	clause_table->watched[lit] = NULL;//since there are no clauses where it is true
+	/* since there are no clauses where it is true */
+	clause_table->watched[lit] = NULL;
 }
 
 /*
- * Scans the unsat clauses to find those that are sat or to propagate
- * fixed truth values.  The propagating clauses are placed on the sat_clauses
- * list, and the propagated literals are placed in fixable_stack so that they
- * TODO: unfinished comments
+ * Scans the unsat clauses to find those that are sat or to propagate fixed
+ * truth values. The propagating clauses are placed on the sat_clauses list,
+ * and the propagated literals are placed in fixable_stack so that they will
+ * be dealt with by process_fixable_stack later.
  *
  * Returns -1 if a conflict is detected, 0 otherwise.
  */
 static int32_t scan_unsat_clauses(samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
 	atom_table_t *atom_table = &table->atom_table;
-	samp_clause_t *unsat_clause;
-	samp_clause_t **unsat_clause_ptr;
-	unsat_clause_ptr = &clause_table->unsat_clauses;
-	unsat_clause = *unsat_clause_ptr;
-	int32_t i;
-	int32_t fixable;
+	samp_clause_t **unsat_clause_ptr = &clause_table->unsat_clauses;
+	int32_t i, fixable;
 	samp_literal_t lit;
 	char *atom_str;
 
-	while (unsat_clause != NULL) {//see if the clause is fixed-unit propagating
-		//cprintf(0, "Scanning unsat clauses\n");
+	samp_clause_t *unsat_clause = *unsat_clause_ptr;
+	while (unsat_clause != NULL) {
+		/* See if the clause is fixed-unit propagating */
 		fixable = get_fixable_literal(atom_table->assignment, unsat_clause->disjunct,
 				unsat_clause->numlits);
-		if (fixable >= unsat_clause->numlits) {
-			// Conflict detected (a fixed unsat clause)
+		if (fixable >= unsat_clause->numlits) { /* fixed unsat */
+			mcsat_err("There is a fixed unsat clause, no model exists.");
 			return -1;
 		}
-		if (fixable == -1) { // if not propagating
+		else if (fixable == -1) { /* more than one unfixed lits */
 			i = get_true_lit(atom_table->assignment, unsat_clause->disjunct,
 					unsat_clause->numlits);
-			if (i < unsat_clause->numlits) {//then lit occurs in the clause
-				//      *dcost -= unsat_clause->weight;  //subtract weight from dcost
-				//swap literal to watched position
+			if (i < unsat_clause->numlits) { /* currently sat, put to watched list */
 				lit = unsat_clause->disjunct[i]; 
-				//unsat_clause->disjunct[i] = unsat_clause->disjunct[0];
-				//unsat_clause->disjunct[0] = lit;
 
 				*unsat_clause_ptr = unsat_clause->link;
-				//push into watched list
 				push_clause(unsat_clause, &clause_table->watched[lit]);
-				//unsat_clause->link = clause_table->watched[lit]; 
-				//clause_table->watched[lit] = unsat_clause;
 				clause_table->num_unsat_clauses--;
 				unsat_clause = *unsat_clause_ptr;
 				assert(assigned_true_lit(atom_table->assignment,
 							clause_table->watched[lit]->disjunct[i]));
-			} else {
-				unsat_clause_ptr = &(unsat_clause->link); //move to next unsat clause
+			} else { /* currently unsat, remains in unsat list */
+				unsat_clause_ptr = &(unsat_clause->link);
 				unsat_clause = unsat_clause->link;
 			}
-		} else { // we need to fix the truth value of disjunct[fixable]
-			// swap the literal to the front
+		} else { /* we need to fix the truth value of disjunct[fixable] */
 			lit = unsat_clause->disjunct[fixable]; 
-			//unsat_clause->disjunct[fixable] = unsat_clause->disjunct[0];
-			//unsat_clause->disjunct[0] = lit;
 
 			atom_str = var_string(var_of(lit), table);
 			cprintf(2, "[scan_unsat_clauses] Fixing variable %s\n", atom_str);
 			free(atom_str);
+
 			if (!fixed_tval(atom_table->assignment[var_of(lit)])) {
 				if (is_pos(lit)) {
 					atom_table->assignment[var_of(lit)] = v_fixed_true;
@@ -245,11 +242,12 @@ static int32_t scan_unsat_clauses(samp_table_t *table) {
 			}
 			assert(assigned_true_lit(atom_table->assignment, lit));
 			push_integer_stack(lit, &(table->fixable_stack));
-			//push clause into fixed sat list
 			*unsat_clause_ptr = unsat_clause->link;
 			push_clause(unsat_clause, &clause_table->sat_clauses);
+
 			assert(assigned_fixed_true_lit(atom_table->assignment,
 						clause_table->sat_clauses->disjunct[fixable]));
+
 			unsat_clause = *unsat_clause_ptr;
 			clause_table->num_unsat_clauses--;
 		}
@@ -258,7 +256,11 @@ static int32_t scan_unsat_clauses(samp_table_t *table) {
 }
 
 /*
- * TODO
+ * Process link propagation of the fixed variables in a batch. We use a stack
+ * to collect the variables being fixed during the scan of the unsat clauses.
+ * Only after the scan is complete, do we start to process all the variables. 
+ * Otherwise link_propagate may introduce new unsat clauses and cause a
+ * inconsistency.
  */
 static int32_t process_fixable_stack(samp_table_t *table) {
 	samp_literal_t lit;
@@ -281,18 +283,13 @@ static int32_t fix_lit_tval(samp_table_t *table, int32_t lit, bool tval) {
 	int32_t var = var_of(lit);
 	uint32_t sign = sign_of_lit(lit); // 0: pos; 1: neg
 	int32_t ret;
-	//char *atom_str = var_string(var, table);
 
 	if (sign != tval) {
-		//cprintf(4, "[fix_lit_tval] Fixing %s to true\n", atom_str);
-		//free(atom_str);
 		ret = set_atom_tval(var, v_fixed_true, table);
 		if (ret < 0) return ret;
 		table->atom_table.num_unfixed_vars--;
 		link_propagate(table, neg_lit(var));
 	} else {
-		//cprintf(4, "[fix_lit_tval] Fixing %s to false\n", atom_str);
-		//free(atom_str);
 		ret = set_atom_tval(var, v_fixed_false, table);
 		if (ret < 0) return ret;
 		table->atom_table.num_unfixed_vars--;
@@ -302,10 +299,16 @@ static int32_t fix_lit_tval(samp_table_t *table, int32_t lit, bool tval) {
 	return 0;
 }
 
+/*
+ * In unit propagation, fix a literal's value to true
+ */
 static int32_t inline fix_lit_true(samp_table_t *table, int32_t lit) {
 	return fix_lit_tval(table, lit, true);
 }
 
+/*
+ * In unit propagation, fix a literal's value to false
+ */
 static int32_t inline fix_lit_false(samp_table_t *table, int32_t lit) {
 	return fix_lit_tval(table, lit, false);
 }
@@ -324,8 +327,10 @@ static int32_t negative_unit_propagate(samp_table_t *table) {
 	link_ptr = &clause_table->negative_or_unit_clauses;
 	link = *link_ptr;
 
-	/* TODO Guess the list of negative_or_unit_clauses is keep changing while
-	 * `propogating'. How does the linked list work? */
+	/* 
+	 * FIXME set_atom_tval may activate new clauses and put them into the list
+	 * of negative_or_unit_clauses.
+	 */
 	while (link != NULL) {
 		abs_weight = fabs(link->weight);
 		cprintf(3, "[negative_unit_propagate] probability is %.4f\n",
@@ -401,6 +406,9 @@ static int32_t choose_unfixed_variable(samp_truth_value_t *assignment,
 	return y;
 }
 
+/*
+ * Returns the total number of groundings of a predicate
+ */
 static int32_t pred_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table,
 		int32_t predicate) {
 	if (predicate < 0 || predicate >= pred_tbl->num_preds) {
@@ -415,6 +423,9 @@ static int32_t pred_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table,
 	return card;
 }
 
+/*
+ * Returns the total number of groundings of all non-evidence predicate
+ */
 static int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_table) {
 	int32_t i;
 	int32_t card = 0;
@@ -425,11 +436,12 @@ static int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_ta
 }
 
 /*
- * choose a random atom for simulated annealing step in sample SAT. The lazy
- * version of choose_unfixed_variable.  First choose a random atom, regardless
- * whether its value is fixed or not (because we can calculate the total number
- * of atoms and it is convenient to randomly choose one from them). If its
- * value is fixed, we skip this flip using the following statement (return 0).
+ * [lazy only] Choose a random atom for simulated annealing step in sample SAT.
+ * The lazy version of choose_unfixed_variable.  First choose a random atom,
+ * regardless whether its value is fixed or not (because we can calculate the
+ * total number of atoms and it is convenient to randomly choose one from
+ * them). If its value is fixed, we skip this flip using the following
+ * statement (return 0).
  */
 static int32_t choose_random_atom(samp_table_t *table) {
 	uint32_t i, atom_num, anum;
@@ -439,15 +451,14 @@ static int32_t choose_random_atom(samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	pred_entry_t *pred_entry;
 
-	// Get the number of possible indirect atoms
+	/* Get the number of possible indirect atoms */
 	all_card = all_atoms_cardinality(pred_tbl, sort_table);
 
 	atom_num = random_uint(all_card);
-	//assert(valid_table(table));
 
-	predicate = 1; // Skip past true
+	predicate = 1; /* Skip past true */
 	acard = 0;
-	while (true) { //determine the predicate
+	while (true) { /* determine the predicate */
 		assert(predicate <= pred_tbl->num_preds);
 		pcard = pred_cardinality(pred_tbl, sort_table, predicate);
 		if (acard + pcard > atom_num) {
@@ -459,24 +470,27 @@ static int32_t choose_random_atom(samp_table_t *table) {
 	//assert(valid_table(table));
 	assert(pred_cardinality(pred_tbl, sort_table, predicate) != 0);
 
-	anum = atom_num - acard; //gives the position of atom within predicate
-	//Now calculate the arguments.  We represent the arguments in
-	//little-endian form
+	/* gives the position of atom within predicate */
+	anum = atom_num - acard; 	
+	/* 
+	 * Now calculate the arguments.  We represent the arguments in
+	 * little-endian form
+	 */
 	pred_entry = &pred_tbl->entries[predicate];
 	int32_t *signature = pred_entry->signature;
 	int32_t arity = pred_entry->arity;
 	atom_buffer_resize(arity);
 	int32_t constant;
 	samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
-	//Build atom from atom_num by successive division
+	/* Build atom from atom_num by successive division */
 	atom->pred = predicate;
 	for (i = 0; i < arity; i++) {
 		card = sort_table->entries[signature[i]].cardinality;
-		constant = anum % card; //card can't be zero
+		constant = anum % card;
 		anum = anum / card;
 		sort_entry_t *sort_entry = &sort_table->entries[signature[i]];
 		if (sort_entry->constants == NULL) {
-			// Must be an integer
+			/* Must be an integer */
 			if (sort_entry->ints == NULL) {
 				atom->args[i] = sort_entry->lower_bound + constant;
 			} else {
@@ -484,7 +498,7 @@ static int32_t choose_random_atom(samp_table_t *table) {
 			}
 		} else {
 			atom->args[i] = sort_entry->constants[constant];
-			// Quick typecheck
+			/* Quick typecheck */
 			assert(const_sort_index(atom->args[i], &table->const_table) == signature[i]);
 		}
 	}
@@ -498,7 +512,8 @@ static int32_t choose_random_atom(samp_table_t *table) {
 
 	int32_t atom_index;
 
-	if (atom_map == NULL) { //need to activate atom
+	if (atom_map == NULL) {
+		/* need to activate atom */
 		atom_index = add_internal_atom(table, atom, false);
 		atom_map = array_size_hmap_find(&atom_table->atom_var_hash, arity + 1,
 				(int32_t *) atom);
@@ -513,7 +528,10 @@ static int32_t choose_random_atom(samp_table_t *table) {
 }
 
 /*
- * computes the cost of flipping an unfixed variable without the actual flip
+ * Computes the cost of flipping an unfixed variable without the actual flip.
+ *
+ * TODO: in lazy version, do not need to actually activate the atom nor
+ * the related clauses.
  */
 static void cost_flip_unfixed_variable(samp_table_t *table, int32_t *dcost,
 		int32_t var) {
@@ -804,11 +822,11 @@ static int32_t init_sample_sat(samp_table_t *table) {
  * A step of sample sat, in which the value of a random variable is flipped
  *
  * @lazy: true if inference is lazy
- * @sa_probability: the probability of choosing a simulated annealing step,
- *                  otherwise choose a walksat step
+ * @sa_probability: the probability of choosing a simulated annealing step, 
+ * otherwise choose a walksat step
  * @sa_temperature: (fixed) temperature of simulated annealing
- * @rvar_probability: probability of selecting a random variable in a walksat step
- *                    otherwise greedily select a variable
+ * @rvar_probability: probability of selecting a random variable in a walksat 
+ * step, otherwise select a variable that minimizes dcost
  */
 static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probability,
 		double sa_temperature, double rvar_probability) {
@@ -824,6 +842,7 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
 	choice = choose();
 	cprintf(3, "\n[sample_sat_body] num_unsat = %d, choice = % .4f, sa_probability = % .4f\n",
 			clause_table->num_unsat_clauses, choice, sa_probability);
+
 	/* Simulated annlealing vs. walksat */
 	if (clause_table->num_unsat_clauses <= 0 || choice < sa_probability) {
 		/* Simulated annealing step */
@@ -861,7 +880,7 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
 		link = clause_table->unsat_clauses;
 
 		/*
-		 * TODO: This is very inefficient when the number of unsat clauses
+		 * FIXME This is very inefficient when the number of unsat clauses
 		 * is very large. We should consider a different data structure than
 		 * a link to store the unsatisfied clauses. This data structure should
 		 * support random access (for getting a random unsat clause) as well
@@ -981,105 +1000,6 @@ void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 			conflict = sample_sat_body(table, lazy, 1, DBL_MAX, rvar_probability);
 			//assert(valid_table(table));
 			num_flips--;
-		}
-	}
-}
-
-/* 
- * Pushes a clause to a list depending on its evaluation
- *
- * If it is fixed to be satisfied, push to sat_clauses
- * If it is satisfied, push to the corresponding watched list
- * If it is unsatisified, push to unsat_clauses
- */
-static void push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
-	clause_table_t *clause_table = &table->clause_table;
-	atom_table_t *atom_table = &table->atom_table;
-	int32_t i;
-	int32_t fixable;
-	samp_literal_t lit;
-	char *atom_str;
-
-	fixable = get_fixable_literal(atom_table->assignment, clause->disjunct,
-			clause->numlits);
-	if (fixable >= clause->numlits) {
-		mcsat_err("No model exists.\n");
-		return;
-	}
-	if (fixable == -1) { // if not propagating
-		i = get_true_lit(atom_table->assignment, clause->disjunct,
-				clause->numlits);
-		if (i < clause->numlits) {//then lit occurs in the clause
-			//      *dcost -= clause->weight;  //subtract weight from dcost
-			//swap literal to watched position
-			lit = clause->disjunct[i]; 
-			//clause->disjunct[i] = clause->disjunct[0];
-			//clause->disjunct[0] = lit;
-
-			push_clause(clause, &clause_table->watched[lit]);
-			assert(assigned_true_lit(atom_table->assignment,
-						clause_table->watched[lit]->disjunct[i]));
-		} else {
-			push_clause(clause, &clause_table->unsat_clauses);
-			clause_table->num_unsat_clauses++;
-		}
-	} else { // we need to fix the truth value of disjunct[fixable]
-		// swap the literal to the front
-		lit = clause->disjunct[fixable]; 
-		//clause->disjunct[fixable] = clause->disjunct[0];
-		//clause->disjunct[0] = lit;
-
-		atom_str = var_string(var_of(lit), table);
-		cprintf(2, "[scan_unsat_clauses] Fixing variable %s\n", atom_str);
-		free(atom_str);
-		if (!fixed_tval(atom_table->assignment[var_of(lit)])) {
-			if (is_pos(lit)) {
-				atom_table->assignment[var_of(lit)] = v_fixed_true;
-			} else {
-				atom_table->assignment[var_of(lit)] = v_fixed_false;
-			}
-			atom_table->num_unfixed_vars--;
-		}
-		assert(assigned_true_lit(atom_table->assignment, lit));
-		push_integer_stack(lit, &(table->fixable_stack));
-		push_clause(clause, &clause_table->sat_clauses);
-		assert(assigned_fixed_true_lit(atom_table->assignment,
-					clause_table->sat_clauses->disjunct[fixable]));
-	}
-}
-
-extern bool hard_only;
-
-/*
- * Pushes a newly created clause to the corresponding list
- * 
- * In the first round, we only need to find a model for all the HARD clauses.
- * Therefore, when a new clause is activated, if it is a hard clause, we
- * put it into the corresoponding live list, otherwise we put it into the
- * dead lists. In the following rounds, we determine whether to keep the new
- * clause alive by its weight, more specifically, with probability equal to
- * 1 - exp(-w).
- */
-void push_newly_activated_clause(int32_t clsidx, samp_table_t *table) {
-	clause_table_t *clause_table = &table->clause_table;
-	samp_clause_t *clause = clause_table->samp_clauses[clsidx];
-
-	double abs_weight = fabs(clause->weight);
-	if (clause->weight == DBL_MAX
-			|| (!hard_only && choose() < 1 - exp(-abs_weight))) {
-		if (clause->numlits == 1 || clause->weight < 0) {
-			push_negative_or_unit_clause(clause_table, clsidx);
-		} // should be handled immediately
-		else {
-			push_alive_clause(clause, table);
-		}
-	}
-	else {
-		if (clause->numlits == 1 || clause->weight < 0) {
-			push_clause(clause, &clause_table->dead_negative_or_unit_clauses);
-		}
-		else {
-			push_clause(clause, &clause_table->dead_clauses);
 		}
 	}
 }

@@ -366,42 +366,6 @@ int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
 	return -1;
 }
 
-/* TODO A very slow function to calculate the length of a linked list */
-static int32_t length_clause_list(samp_clause_t *link) {
-	int32_t length = 0;
-	while (link != NULL) {
-		link = link->link;
-		length++;
-	}
-	return length;
-}
-
-void move_sat_to_unsat_clauses(clause_table_t *clause_table) {
-	int32_t length = length_clause_list(clause_table->sat_clauses);
-	samp_clause_t **link_ptr = &(clause_table->unsat_clauses);
-	samp_clause_t *link = clause_table->unsat_clauses;
-	while (link != NULL) {
-		link_ptr = &(link->link);
-		link = link->link;
-	}
-	*link_ptr = clause_table->sat_clauses;
-	clause_table->sat_clauses = NULL;
-	clause_table->num_unsat_clauses += length;
-}
-
-/* FIXME: This function is not used?? */
-//void move_unsat_to_dead_clauses(clause_table_t *clause_table) {
-//	samp_clause_t **link_ptr = &(clause_table->dead_clauses);
-//	samp_clause_t *link = clause_table->dead_clauses;
-//	while (link != NULL) {
-//		link_ptr = &(link->link);
-//		link = link->link;
-//	}
-//	*link_ptr = clause_table->unsat_clauses;
-//	clause_table->unsat_clauses = NULL;
-//	clause_table->num_unsat_clauses = 0;
-//}
-
 bool eq (int32_t i, int32_t j) {
 	return i == j;
 }
