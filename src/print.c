@@ -9,7 +9,7 @@
 #include "utils.h"
 #include "tables.h"
 #include "input.h"
-
+#include "clause_list.h"
 #include "buffer.h"
 #include "print.h"
 
@@ -337,26 +337,35 @@ void print_clauses(samp_table_t *table){
 	output("-------------------------------------------------------------------------------\n");
 }
 
-void print_clause_list(samp_clause_t *link, samp_table_t *table){
-	while (link != NULL){
+void print_clause_list(samp_clause_list_t *list, samp_table_t *table){
+	samp_clause_t **link_ptr;
+	samp_clause_t *link;
+
+	for (link_ptr = &list->head; 
+			*link_ptr != NULL; 
+			link_ptr = next_clause(link_ptr)) {
+		link = *link_ptr;
 		print_clause(link, table);
 		output("\n");
-		link = link->link;
 	}
 }
 
 void print_watched_clause(samp_literal_t lit, samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
-	samp_clause_t *link = clause_table->watched[lit];
-	if (link != NULL)  {
+	samp_clause_t **link_ptr;
+	samp_clause_t *link;
+	if (!empty_clause_list(&clause_table->watched[lit])) {
 		output("[");
 		print_literal(lit, table);
 		output("]\n");
-		while (link != NULL) {
+
+		for (link_ptr = &clause_table->watched[lit].head;
+				*link_ptr != NULL;
+				link_ptr = next_clause(link_ptr)) {
+			link = *link_ptr;
 			output("    ");
 			print_clause(link, table);
 			output("\n");
-			link = link->link;
 		}
 	}
 }
@@ -370,7 +379,7 @@ void print_live_clauses(samp_table_t *table) {
 	int32_t i;
 
 	output("Sat clauses:\n");
-	print_clause_list(clause_table->sat_clauses, table);
+	print_clause_list(&clause_table->sat_clauses, table);
 	int32_t num_vars = atom_table->num_vars;
 	output("Watched clauses:\n");
 	for (i = 0; i < num_vars; i++){
@@ -378,7 +387,7 @@ void print_live_clauses(samp_table_t *table) {
 		print_watched_clause(neg_lit(i), table);
 	}
 	output("Unsat clauses:\n");
-	print_clause_list(clause_table->unsat_clauses, table);
+	print_clause_list(&clause_table->unsat_clauses, table);
 	output("\n");
 }
 
@@ -387,13 +396,12 @@ void print_clause_table(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	int32_t i;
 
-	//print_clauses(table);
 	output("Sat clauses:\n");
-	samp_clause_t *link = clause_table->sat_clauses;
-	print_clause_list(link, table);
+	print_clause_list(&clause_table->sat_clauses, table);
+
 	output("Unsat clauses:\n");
-	link = clause_table->unsat_clauses;
-	print_clause_list(link, table);  
+	print_clause_list(&clause_table->unsat_clauses, table);  
+
 	int32_t num_vars = atom_table->num_vars;
 	if (num_vars > 0) {
 		output("Watched clauses:\n");
@@ -402,15 +410,15 @@ void print_clause_table(samp_table_t *table) {
 			print_watched_clause(neg_lit(i), table);
 		}
 	}
-	output("Dead clauses:\n");
-	link = clause_table->dead_clauses;
-	print_clause_list(link, table);
+
 	output("Negative/Unit clauses:\n");
-	link = clause_table->negative_or_unit_clauses;
-	print_clause_list(link, table);
+	print_clause_list(&clause_table->negative_or_unit_clauses, table);
+
+	output("Dead clauses:\n");
+	print_clause_list(&clause_table->dead_clauses, table);
+
 	output("Dead negative/unit clauses:\n");
-	link = clause_table->dead_negative_or_unit_clauses;
-	print_clause_list(link, table);
+	print_clause_list(&clause_table->dead_negative_or_unit_clauses, table);
 	output("\n");
 }
 

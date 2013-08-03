@@ -1,4 +1,4 @@
-#ifndef __TABLES_H
+#ifndef __TABLES_H 
 #define __TABLES_H 1
 
 #include "symbol_tables.h"
@@ -283,26 +283,27 @@ typedef struct samp_clause_s {
 	samp_literal_t disjunct[0]; // array of literals
 } samp_clause_t;
 
+/* Clause list */
+typedef struct samp_clause_list_s {
+	samp_clause_t *head;
+	samp_clause_t *tail; /* pointer to the last element */
+	int32_t length;
+} samp_clause_list_t;
+
 /* Clauses stored in an array and also organized in several linked lists */
 typedef struct clause_table_s {
 	int32_t size;   //size of the samp_clauses array
 	int32_t num_clauses; //number of clause entries
 	samp_clause_t **samp_clauses; //array of pointers to samp_clauses
 	array_hmap_t clause_hash; //maps clauses to index in clause table
-	samp_clause_t **watched; //maps literals to samp_clause pointers
-	samp_clause_t *sat_clauses; //list of fixed satisfied clauses
-	/* TODO linked list is very inefficient for randomly selecting a unsat
-	 * clause in sample SAT. Should be changed to a data structure supporting
-	 * fast insert/delete and (uniformly) random selection. Also, a watch
-	 * list similar to the one used for sat clauses can be used to fast
-	 * access the all the clauses containing a specific atom. In this way we
-	 * do not need to inspect the whole unsat list every time we flip an atom. */
-	int32_t num_unsat_clauses; //number of unsat clauses
-	samp_clause_t *unsat_clauses;//list of unsat clauses, threaded through link
-	samp_clause_t *dead_clauses;//list of unselected clauses
-	samp_clause_t *negative_or_unit_clauses; //list of negative weight or unit 
-	//clauses for fast unit propagation
-	samp_clause_t *dead_negative_or_unit_clauses; //killed clauses
+
+	samp_clause_list_t *watched; //maps literals to samp_clause pointers
+	samp_clause_list_t sat_clauses; //list of fixed satisfied clauses
+	samp_clause_list_t unsat_clauses;//list of unsat clauses, threaded through link
+	samp_clause_list_t live_clauses; // temperory list to store unscaned live clauses
+	samp_clause_list_t negative_or_unit_clauses; //list of negative weight or unit 
+	samp_clause_list_t dead_clauses;//list of unselected clauses
+	samp_clause_list_t dead_negative_or_unit_clauses; //killed clauses
 } clause_table_t;
 
 /*

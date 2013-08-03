@@ -17,7 +17,7 @@
 #include "input.h"
 #include "vectors.h"
 #include "buffer.h"
-#include "samp_clause_list.h"
+#include "clause_list.h"
 
 #include "weight_learning.h"
 #include "samplesat.h"
@@ -59,32 +59,32 @@
 
 /*
  * Randomly select live clauses from a list:
- * - link = start of the list and *link_ptr == link
+ * - link = start of the list and *ptr == link
  * - all clauses in the list must be satisfied in the current assignment
  * - a clause of weight W is killed with probability exp(-|W|)
  *   (if W == DBL_MAX then it's a hard clause and it's not killed).
+ *
+ * @list_src: the list from which clauses are killed
+ * @list_dst: the list to which the killed clauses are moved
  */
-static void kill_clause_list(samp_clause_t **link_ptr, samp_clause_t *link,
-		clause_table_t *clause_table) {
-	samp_clause_t *next;
+static void kill_clause_list(
+		samp_clause_list_t *list_src,
+		samp_clause_list_t *list_dst) {
+	samp_clause_t *ptr;
+	samp_clause_t *clause;
 
-	while (link != NULL) {
-		if (link->weight == DBL_MAX 
-				|| link->weight == DBL_MIN // FIXME this case will not happen
-				                           // should be in negative_unit_clauses list
-				|| choose() < 1 - exp(-fabs(link->weight))) {
-			// keep it
-			*link_ptr = link;
-			link_ptr = &link->link;
-			link = link->link;
+	for (ptr = list_src->head; ptr != NULL;) {
+		clause = ptr->link;
+		if (clause->weight == DBL_MAX || clause->weight == DBL_MIN
+				|| choose() < 1 - exp(-fabs(clause->weight))) {
+			/* keep it */
+			ptr = next_clause(ptr);
 		} else {
-			// move it to the dead_clauses list
-			next = link->link;
-			push_clause(link, &clause_table->dead_clauses);
-			link = next;
+			/* move it to the dead_clauses list */
+			pop_clause(list_src, ptr);
+			insert_head_clause(clause, list_dst);
 		}
 	}
-	*link_ptr = NULL;
 }
 
 /*
@@ -101,21 +101,26 @@ static void kill_clauses(samp_table_t *table) {
 
 	//unsat_clauses is empty; need to only kill satisfied clauses
 	//kill sat_clauses
-	kill_clause_list(&clause_table->sat_clauses, clause_table->sat_clauses,
-			clause_table);
+	kill_clause_list(&clause_table->sat_clauses, &clause_table->dead_clauses);
 
 	//kill watched clauses
 	for (i = 0; i < atom_table->num_vars; i++) {
 		lit = pos_lit(i);
-		kill_clause_list(&clause_table->watched[lit],
-				clause_table->watched[lit], clause_table);
+		kill_clause_list(&clause_table->watched[lit], &clause_table->dead_clauses);
 		lit = neg_lit(i);
-		kill_clause_list(&clause_table->watched[lit],
-				clause_table->watched[lit], clause_table);
+		kill_clause_list(&clause_table->watched[lit], &clause_table->dead_clauses);
 	}
 
 	// all the unsat clauses are already dead
-	assert(clause_table->unsat_clauses == NULL);
+	assert(empty_clause_list(&clause_table->unsat_clauses));
+}
+
+/*
+ * Kill unit and negative clauses
+ */
+static void kill_negative_unit_clauses(clause_table_t *clause_table) {
+	kill_clause_list(&clause_table->negative_or_unit_clauses,
+			&clause_table->dead_negative_or_unit_clauses);
 }
 
 /*
@@ -126,12 +131,6 @@ static void empty_clause_lists(samp_table_t *table) {
 	clause_table_t *clause_table = &(table->clause_table);
 	atom_table_t *atom_table = &(table->atom_table);
 
-	clause_table->sat_clauses = NULL;
-	clause_table->unsat_clauses = NULL;
-	clause_table->num_unsat_clauses = 0;
-	clause_table->negative_or_unit_clauses = NULL;
-	clause_table->dead_negative_or_unit_clauses = NULL;
-	clause_table->dead_clauses = NULL;
 	uint32_t i;
 	int32_t num_unfixed = 0;
 	for (i = 0; i < atom_table->num_vars; i++) {
@@ -139,9 +138,16 @@ static void empty_clause_lists(samp_table_t *table) {
 			num_unfixed++;
 		}
 		atom_table->num_unfixed_vars = num_unfixed;
-		clause_table->watched[pos_lit(i)] = NULL;
-		clause_table->watched[neg_lit(i)] = NULL;
+		init_clause_list(&clause_table->watched[pos_lit(i)]);
+		init_clause_list(&clause_table->watched[neg_lit(i)]);
 	}
+
+	init_clause_list(&clause_table->sat_clauses);
+	init_clause_list(&clause_table->unsat_clauses);
+	init_clause_list(&clause_table->live_clauses);
+	init_clause_list(&clause_table->negative_or_unit_clauses);
+	init_clause_list(&clause_table->dead_clauses);
+	init_clause_list(&clause_table->dead_negative_or_unit_clauses);
 }
 
 /*
@@ -158,20 +164,19 @@ static void init_clause_lists(clause_table_t *clause_table) {
 		clause = clause_table->samp_clauses[i];
 		if (clause->weight == DBL_MIN || clause->weight == DBL_MAX) {
 			if (clause->weight < 0 || clause->numlits == 1) {
-				push_negative_or_unit_clause(clause_table, i);
+				insert_head_clause(clause, &clause_table->negative_or_unit_clauses);
 			}
 			else {
-				push_unsat_clause(clause_table, i);
+				/* Temporarily put into live_clause before evaluating them */
+				insert_head_clause(clause, &clause_table->live_clauses);
 			}
 		}
 		else {
 			if (clause->weight < 0 || clause->numlits == 1) {
-				push_clause(clause_table->samp_clauses[i],
-						&(clause_table->dead_negative_or_unit_clauses));
+				insert_head_clause(clause, &clause_table->dead_negative_or_unit_clauses);
 			}
 			else {
-				push_clause(clause_table->samp_clauses[i],
-						&(clause_table->dead_clauses));
+				insert_head_clause(clause, &clause_table->dead_clauses);
 			}
 		}
 	}
@@ -185,30 +190,27 @@ static void init_clause_lists(clause_table_t *clause_table) {
 static void restore_sat_dead_clauses(clause_table_t *clause_table,
 		samp_truth_value_t *assignment) {
 	int32_t lit, val;
-	samp_clause_t *link, *next;
-	samp_clause_t **link_ptr;
+	samp_clause_t *ptr;
+	samp_clause_t *cls;
 
-	link_ptr = &clause_table->dead_clauses;
-	link = *link_ptr;
-	while (link != NULL) {
-		val = eval_clause(assignment, link);
+	for (ptr = clause_table->dead_clauses.head;
+			ptr != NULL;) {
+		cls = ptr->link;
+		val = eval_clause(assignment, cls);
 		if (val != -1) {
 			cprintf(2, "---> restoring dead clause %p (val = %"PRId32")\n",
-					link, val); //BD
-			lit = link->disjunct[val];
-			next = link->link;
-			push_clause(link, &clause_table->watched[lit]);
-			link = next;
-			assert(assigned_true_lit(assignment, clause_table->watched[lit]->disjunct[val]));
+					cls, val); //BD
+			cls = pop_clause(&clause_table->dead_clauses, ptr);
+			lit = cls->disjunct[val];
+			insert_head_clause(cls, &clause_table->watched[lit]);
+			assert(assigned_true_lit(assignment, 
+						clause_table->watched[lit].head->link->disjunct[val]));
 		} else {
 			cprintf(2, "---> dead clause %p stays dead (val = %"PRId32")\n",
-					link, val); //BD
-			*link_ptr = link;
-			link_ptr = &(link->link);
-			link = link->link;
+					cls, val); //BD
+			ptr = next_clause(ptr);
 		}
 	}
-	*link_ptr = NULL;
 }
 
 /*
@@ -219,30 +221,25 @@ static void restore_sat_dead_clauses(clause_table_t *clause_table,
 static void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
 		samp_truth_value_t *assignment) {
 	bool restore;
-	samp_clause_t *link, *next;
-	samp_clause_t **link_ptr;
-
-	link_ptr = &clause_table->dead_negative_or_unit_clauses;
-	link = *link_ptr;
-	while (link != NULL) {
-		if (link->weight < 0) {
-			restore = (eval_clause(assignment, link) == -1);
-		} else { //unit clause
-			restore = (eval_clause(assignment, link) != -1);
+	samp_clause_t *ptr;
+	samp_clause_t *cls;
+	for (ptr = clause_table->dead_negative_or_unit_clauses.head;
+			ptr != NULL;) {
+		cls = ptr->link;
+		if (cls->weight < 0) { /* negative weight clause */
+			restore = (eval_clause(assignment, cls) == -1);
+		} else { /* unit clause */
+			restore = (eval_clause(assignment, cls) != -1);
 		}
 		if (restore) {
-			// push to negative_or_unit_clauses
-			next = link->link;
-			push_clause(link, &clause_table->negative_or_unit_clauses);
-			link = next;
+			/* push to negative_or_unit_clauses */
+			cls = pop_clause(&clause_table->dead_negative_or_unit_clauses, ptr);
+			insert_head_clause(cls, &clause_table->negative_or_unit_clauses);
 		} else {
-			// remains in the current list, move to next
-			*link_ptr = link;
-			link_ptr = &(link->link);
-			link = link->link;
+			/* remains in the current list, move to next */
+			ptr = next_clause(ptr);
 		}
 	}
-	*link_ptr = NULL;
 }
 
 /*
@@ -270,15 +267,13 @@ static int32_t reset_sample_sat(samp_table_t *table) {
 	/*
 	 * kill selected satisfied clauses: select which clauses will
 	 * be live in this round.
-	 *
-	 * This is partial: live unit or negative weight clauses are
-	 * selected within negative_unit_propagate
 	 */
+	kill_negative_unit_clauses(clause_table);
 	kill_clauses(table);
 
 	if (get_verbosity_level() >= 3) {
 		printf("[reset_sample_sat] done. %d unsat_clauses\n",
-				table->clause_table.num_unsat_clauses);
+				clause_table->unsat_clauses.length);
 		print_assignment(table);
 		print_clause_table(table);
 	}
@@ -450,7 +445,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 		 * If Sample sat did not find a model (within max_flips)
 		 * restore the earlier assignment
 		 */
-		if (conflict == -1 || clause_table->num_unsat_clauses > 0) {
+		if (conflict == -1 || clause_table->unsat_clauses.length > 0) {
 			if (conflict == -1) {
 				cprintf(2, "Hit a conflict.\n");
 			} else {
@@ -483,64 +478,11 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	}
 }
 
-/* 
- * Pushes a clause to a list depending on its evaluation
- *
- * If it is fixed to be satisfied, push to sat_clauses
- * If it is satisfied, push to the corresponding watched list
- * If it is unsatisified, push to unsat_clauses
- */
-static void push_alive_clause(samp_clause_t *clause, samp_table_t *table) {
-	clause_table_t *clause_table = &table->clause_table;
-	atom_table_t *atom_table = &table->atom_table;
-	int32_t i;
-	int32_t fixable;
-	samp_literal_t lit;
-	char *atom_str;
-
-	fixable = get_fixable_literal(atom_table->assignment, clause->disjunct,
-			clause->numlits);
-	if (fixable >= clause->numlits) {
-		mcsat_err("No model exists.\n");
-		return;
-	}
-	if (fixable == -1) { // if not propagating
-		i = get_true_lit(atom_table->assignment, clause->disjunct,
-				clause->numlits);
-		if (i < clause->numlits) { // then lit occurs in the clause
-			lit = clause->disjunct[i]; 
-
-			push_clause(clause, &clause_table->watched[lit]);
-			assert(assigned_true_lit(atom_table->assignment,
-						clause_table->watched[lit]->disjunct[i]));
-		} else {
-			push_clause(clause, &clause_table->unsat_clauses);
-			clause_table->num_unsat_clauses++;
-		}
-	} else { // we need to fix the truth value of disjunct[fixable]
-		lit = clause->disjunct[fixable]; 
-
-		atom_str = var_string(var_of(lit), table);
-		cprintf(2, "[scan_unsat_clauses] Fixing variable %s\n", atom_str);
-		free(atom_str);
-		if (!fixed_tval(atom_table->assignment[var_of(lit)])) {
-			if (is_pos(lit)) {
-				atom_table->assignment[var_of(lit)] = v_fixed_true;
-			} else {
-				atom_table->assignment[var_of(lit)] = v_fixed_false;
-			}
-			atom_table->num_unfixed_vars--;
-		}
-		assert(assigned_true_lit(atom_table->assignment, lit));
-		push_integer_stack(lit, &(table->fixable_stack));
-		push_clause(clause, &clause_table->sat_clauses);
-		assert(assigned_fixed_true_lit(atom_table->assignment,
-					clause_table->sat_clauses->disjunct[fixable]));
-	}
-}
-
 /*
- * Pushes a newly created clause to the corresponding list
+ * Pushes a newly created clause to the corresponding list. We first decide
+ * whether the clause is alive or dead, by running a test based on its weight
+ * (choose() < 1 - exp(-w)). If it is alive, we then call push_alive_clause
+ * to put it into sat, watched, or unsat list.
  * 
  * In the first round, we only need to find a model for all the HARD clauses.
  * Therefore, when a new clause is activated, if it is a hard clause, we
@@ -557,18 +499,18 @@ void push_newly_activated_clause(int32_t clsidx, samp_table_t *table) {
 	if (clause->weight == DBL_MAX
 			|| (soft_clauses_included && choose() < 1 - exp(-abs_weight))) {
 		if (clause->numlits == 1 || clause->weight < 0) {
-			push_negative_or_unit_clause(clause_table, clsidx);
+			insert_head_clause(clause, &clause_table->negative_or_unit_clauses);
 		}
 		else {
-			push_alive_clause(clause, table);
+			insert_live_clause(clause, table);
 		}
 	}
 	else {
 		if (clause->numlits == 1 || clause->weight < 0) {
-			push_clause(clause, &clause_table->dead_negative_or_unit_clauses);
+			insert_head_clause(clause, &clause_table->dead_negative_or_unit_clauses);
 		}
 		else {
-			push_clause(clause, &clause_table->dead_clauses);
+			insert_head_clause(clause, &clause_table->dead_clauses);
 		}
 	}
 }

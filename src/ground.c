@@ -15,6 +15,8 @@
 #include "input.h"
 #include "int_array_sort.h"
 #include "yacc.tab.h"
+#include "clause_list.h"
+#include "mcmc.h"
 #include "ground.h"
 
 static ivector_t new_intidx = {0, 0, NULL};
@@ -439,7 +441,6 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
  */
 static void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t *table, 
 		int32_t atom_index) {
-	atom_table_t *atom_table = &table->atom_table;
 
 	/* termination of the recursion */
 	if (vidx == rule->num_vars) {
@@ -1301,9 +1302,10 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 		atom_table->num_unfixed_vars++;
 	}
 	add_atom_to_pred(pred_table, predicate, current_atom_index);
-	clause_table->watched[pos_lit(current_atom_index)] = NULL;
-	clause_table->watched[neg_lit(current_atom_index)] = NULL;
-	//assert(valid_table(table));
+	init_clause_list(&clause_table->watched[pos_lit(current_atom_index)]);
+	init_clause_list(&clause_table->watched[neg_lit(current_atom_index)]);
+	assert(valid_table(table));
+	//assert(valid_clause_table(clause_table, atom_table));
 
 	if (top_p) {
 		pred_entry_t *entry = get_pred_entry(pred_table, predicate);
