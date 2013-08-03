@@ -369,6 +369,8 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 	int32_t i, litidx;
 	bool found_indirect;
 
+	assert(valid_table(table));
+
 	/* check if the constants are compatible with the sorts */
 	for (i = 0; i < rule->num_vars; i++) {
 		csubst = substs[i];
@@ -398,6 +400,8 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 	if (lazy_mcsat() && !check_clause_duplicate(rule, substs, table)) {
 		return -1;
 	}
+
+	assert(valid_table(table));
 
 	// Everything is OK, do the substitution
 	// We just use the clause_buffer - first make sure it's big enough
@@ -1225,6 +1229,8 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 	num_rules = pred_tbl->entries[predicate].num_rules;
 	rules = pred_tbl->entries[predicate].rules;
 
+	assert(valid_table(table));
+
 	for (i = 0; i < num_rules; i++) {
 		rule_entry = rule_table->samp_rules[rules[i]];
 		substit_buffer_resize(rule_entry->num_vars);
@@ -1258,6 +1264,8 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 	samp_bvar_t current_atom_index;
 	array_hmap_pair_t *atom_map;
 	samp_rule_t *rule;
+
+	assert(valid_table(table));
 
 	atom_map = array_size_hmap_find(&(atom_table->atom_var_hash), arity + 1, //+1 for pred
 			(int32_t *) atom);
@@ -1305,7 +1313,6 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 	init_clause_list(&clause_table->watched[pos_lit(current_atom_index)]);
 	init_clause_list(&clause_table->watched[neg_lit(current_atom_index)]);
 	assert(valid_table(table));
-	//assert(valid_clause_table(clause_table, atom_table));
 
 	if (top_p) {
 		pred_entry_t *entry = get_pred_entry(pred_table, predicate);
@@ -1390,7 +1397,8 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 		printf("\n");
 	}
 	int32_t result = add_internal_atom(table, atom, true);
-	// Now we need to deal with the newly introduced integer constants
+
+	/* Now we need to deal with the newly introduced integer constants */
 	for (i = 0; i < new_intidx.size; i++) {
 		intval = atom->args[new_intidx.data[i]];
 		intsig = psig[new_intidx.data[i]];

@@ -1297,17 +1297,19 @@ static bool clause_contains_lit(samp_clause_t *clause, samp_literal_t lit) {
 
 static bool valid_watched_lit(clause_table_t *clause_table, samp_literal_t lit,
 		atom_table_t *atom_table) {
+	valid_clause_list(&clause_table->watched[lit]);
+	//if (!is_empty_clause_list(&clause_table->watched[lit])
+	//		&& ((is_pos(lit) && !assigned_true(atom_table->assignment[var_of(lit)]))
+	//		|| (is_neg(lit) && !assigned_false(atom_table->assignment[var_of(lit)]))))
+	//	return false;
+	assert(is_empty_clause_list(&clause_table->watched[lit])
+			|| ((is_pos(lit) && assigned_true(atom_table->assignment[var_of(lit)]))
+			|| (is_neg(lit) && assigned_false(atom_table->assignment[var_of(lit)]))));
+
 	samp_clause_t *ptr;
 	samp_clause_t *cls;
-
-	valid_clause_list(&clause_table->watched[lit]);
-	//if (!empty_clause_list(&clause_table->watched[lit])
-	//		&& !assigned_true(atom_table->assignment[var_of(lit)]))
-	//	return false;
-	assert(empty_clause_list(&clause_table->watched[lit])
-			|| assigned_true(atom_table->assignment[var_of(lit)]));
 	for (ptr = clause_table->watched[lit].head;
-			ptr != NULL;
+			ptr != clause_table->watched[lit].tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
 		//if (!clause_contains_lit(cls, lit))
@@ -1348,34 +1350,34 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 	/* check that every clause in the unsat list is unsat */
 	valid_clause_list(&clause_table->unsat_clauses);
 	for (ptr = clause_table->unsat_clauses.head;
-			ptr != NULL;
+			ptr != clause_table->unsat_clauses.tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
-		//if (eval_clause(atom_table->assignment, link) != -1)
+		//if (eval_clause(atom_table->assignment, cls) != -1)
 		//	return false;
 		assert(eval_clause(atom_table->assignment, cls) == -1);
 	}
 
 	/* check negative_or_unit_clauses */
 	valid_clause_list(&clause_table->negative_or_unit_clauses);
-	for (ptr = &clause_table->negative_or_unit_clauses.head;
-			*ptr != NULL;
+	for (ptr = clause_table->negative_or_unit_clauses.head;
+			ptr != clause_table->negative_or_unit_clauses.tail;
 			ptr = next_clause(ptr)) {
-		link = *ptr;
-		//if (link->weight >= 0 && link->numlits != 1) 
+		cls = ptr->link;
+		//if (cls->weight >= 0 && cls->numlits != 1) 
 		//	return false;
-		assert(link->weight < 0 || link->numlits == 1);
+		assert(cls->weight < 0 || cls->numlits == 1);
 	}
 
 	/* check dead_negative_or_unit_clauses */
 	valid_clause_list(&clause_table->dead_negative_or_unit_clauses);
-	for (ptr = &clause_table->dead_negative_or_unit_clauses.head;
-			*ptr != NULL;
+	for (ptr = clause_table->dead_negative_or_unit_clauses.head;
+			ptr != clause_table->dead_negative_or_unit_clauses.tail;
 			ptr = next_clause(ptr)) {
-		link = *ptr;
-		//if (link->weight >= 0 && link->numlits != 1) 
+		cls = ptr->link;
+		//if (cls->weight >= 0 && cls->numlits != 1) 
 		//	return false;
-		assert(link->weight < 0 || link->numlits == 1);
+		assert(cls->weight < 0 || cls->numlits == 1);
 	}
 
 	/* check that every watched clause is satisfied */
@@ -1389,13 +1391,13 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 
 	/* check the sat_clauses to see if the first disjunct is fixed true */
 	valid_clause_list(&clause_table->sat_clauses);
-	for (ptr = &clause_table->sat_clauses.head;
-			*ptr != NULL;
+	for (ptr = clause_table->sat_clauses.head;
+			ptr != clause_table->sat_clauses.tail;
 			ptr = next_clause(ptr)) {
-		link = *ptr;
-		//if (!clause_contains_fixed_true_lit(link, atom_table->assignment))
+		cls = ptr->link;
+		//if (!clause_contains_fixed_true_lit(cls, atom_table->assignment))
 		//	return false;
-		assert(clause_contains_fixed_true_lit(link, atom_table->assignment));
+		assert(clause_contains_fixed_true_lit(cls, atom_table->assignment));
 	}
 	
 	/* check the live_clauses */

@@ -1,6 +1,7 @@
 #ifndef __UTILS_H
 #define __UTILS_H 1
 
+#include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -90,11 +91,17 @@ static inline bool db_tval(samp_truth_value_t v){
 }
 
 /* Returns if the value is fixed by unit propagation */
+static inline bool up_fixed_tval(samp_truth_value_t v) {
+	return (v == v_fixed_true ||
+			v == v_fixed_false);
+}
+
+/* Returns if the value is fixed by input or unit propagation */
 static inline bool fixed_tval(samp_truth_value_t v){
-	return (v == v_fixed_true 
-			|| v == v_fixed_false
-			|| v == v_db_true 
-			|| v == v_db_false);
+	return (v == v_fixed_true ||
+			v == v_fixed_false ||
+			v == v_db_true ||
+			v == v_db_false);
 }
 
 /* Returns if the value is unfixed during walksat */
@@ -178,8 +185,11 @@ extern samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, substit_entry_t
 		samp_table_t *table);
 
 static inline void switch_assignment_array(atom_table_t *atom_table) {
+	samp_truth_value_t *old_assignment = atom_table->assignment;
 	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
 	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
+	memcpy(atom_table->assignment, old_assignment,
+			sizeof(samp_truth_value_t) * atom_table->num_vars);
 }
 
 extern inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);

@@ -73,7 +73,7 @@ static void kill_clause_list(
 	samp_clause_t *ptr;
 	samp_clause_t *clause;
 
-	for (ptr = list_src->head; ptr != NULL;) {
+	for (ptr = list_src->head; ptr != list_src->tail;) {
 		clause = ptr->link;
 		if (clause->weight == DBL_MAX || clause->weight == DBL_MIN
 				|| choose() < 1 - exp(-fabs(clause->weight))) {
@@ -112,7 +112,7 @@ static void kill_clauses(samp_table_t *table) {
 	}
 
 	// all the unsat clauses are already dead
-	assert(empty_clause_list(&clause_table->unsat_clauses));
+	assert(is_empty_clause_list(&clause_table->unsat_clauses));
 }
 
 /*
@@ -194,7 +194,7 @@ static void restore_sat_dead_clauses(clause_table_t *clause_table,
 	samp_clause_t *cls;
 
 	for (ptr = clause_table->dead_clauses.head;
-			ptr != NULL;) {
+			ptr != clause_table->dead_clauses.tail;) {
 		cls = ptr->link;
 		val = eval_clause(assignment, cls);
 		if (val != -1) {
@@ -224,7 +224,7 @@ static void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
 	samp_clause_t *ptr;
 	samp_clause_t *cls;
 	for (ptr = clause_table->dead_negative_or_unit_clauses.head;
-			ptr != NULL;) {
+			ptr != clause_table->dead_negative_or_unit_clauses.tail;) {
 		cls = ptr->link;
 		if (cls->weight < 0) { /* negative weight clause */
 			restore = (eval_clause(assignment, cls) == -1);

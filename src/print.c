@@ -24,14 +24,14 @@ static string_buffer_t warning_buffer = {0, 0, NULL};
 /*
  * verbosity of the output information
  *
- * 0: only the final results
- * 1: info of every sample
- * 2: info of every step of MCMC
- * 3: info of every step of sample SAT
- * 4: detailed info of sample SAT, such as unit_propagate
- * 5: info of activating atoms and clauses for lazy MC-SAT
- * 6: detailed info of lazy MC-SAT
- * 7: useless info
+ * 0: only the final results;
+ * 1: info of every sample;
+ * 2: info of every step of MCMC;
+ * 3: info of every step of sample SAT;
+ * 4: detailed info of sample SAT, such as unit_propagate;
+ * 5: info of activating atoms and clauses for lazy MC-SAT;
+ * 6: detailed info of lazy MC-SAT;
+ * 7: useless info.
  */
 static int32_t verbosity_level = 0;
 
@@ -197,38 +197,38 @@ char *var_string(int32_t var, samp_table_t *table) {
 	return atom_string(atom, table);
 }
 
-// Returns a newly allocated string
-// char *atom_string(samp_atom_t *atom, samp_table_t *table) {
-//   pred_table_t *pred_table = &table->pred_table;
-//   const_table_t *const_table = &table->const_table;
-//   char *pred, *result;
-//   uint32_t i, strsize;
-
-//   pred = pred_name(atom->pred, pred_table);
-//   strsize = strlen(pred) + 1;
-//   for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
-//     // Assume no more than 99 vars in list
-//     if (atom->args[i] < 0) {
-//       strsize += -(atom->args[i]+1) > 9 ? 3 : 2;
-//     } else {
-//       strsize += strlen(const_name(atom->args[i], const_table));
-//     }
-//     strsize += 2; // include ", " or ")\0"
-//   }
-//   result = (char *) safe_malloc(strsize * sizeof(char));
-//   strcpy(result, pred);
-//   for (i = 0; i < pred_arity(atom->pred, pred_table); i++){
-//     i == 0 ? strcat(result, "(") : strcat(result, ", ");
-//     if (atom->args[i] < 0) {
-//       // A variable - print X followed by index
-//       sprintf(result, "X%d", -(atom->args[i]+1));
-//     } else {
-//       sprintf(result, "%s", const_name(atom->args[i], const_table));
-//     }
-//   }
-//   strcat(result, ")");
-//   return result;
-// }
+///* Returns a newly allocated string */
+//char *atom_string(samp_atom_t *atom, samp_table_t *table) {
+//	pred_table_t *pred_table = &table->pred_table;
+//	const_table_t *const_table = &table->const_table;
+//	char *pred, *result;
+//	uint32_t i, strsize;
+//
+//	pred = pred_name(atom->pred, pred_table);
+//	strsize = strlen(pred) + 1;
+//	for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
+//		/* Assume no more than 99 vars in list */
+//		if (atom->args[i] < 0) {
+//			strsize += -(atom->args[i]+1) > 9 ? 3 : 2;
+//		} else {
+//			strsize += strlen(const_name(atom->args[i], const_table));
+//		}
+//		strsize += 2; // include ", " or ")\0"
+//	}
+//	result = (char *) safe_malloc(strsize * sizeof(char));
+//	strcpy(result, pred);
+//	for (i = 0; i < pred_arity(atom->pred, pred_table); i++){
+//		i == 0 ? strcat(result, "(") : strcat(result, ", ");
+//		if (atom->args[i] < 0) {
+//			/* A variable - print X followed by index */
+//			sprintf(result, "X%d", -(atom->args[i]+1));
+//		} else {
+//			sprintf(result, "%s", const_name(atom->args[i], const_table));
+//		}
+//	}
+//	strcat(result, ")");
+//	return result;
+//}
 
 void print_atom(samp_atom_t *atom, samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
@@ -338,33 +338,31 @@ void print_clauses(samp_table_t *table){
 }
 
 void print_clause_list(samp_clause_list_t *list, samp_table_t *table){
-	samp_clause_t **link_ptr;
-	samp_clause_t *link;
+	samp_clause_t *ptr;
+	samp_clause_t *cls;
 
-	for (link_ptr = &list->head; 
-			*link_ptr != NULL; 
-			link_ptr = next_clause(link_ptr)) {
-		link = *link_ptr;
-		print_clause(link, table);
+	for (ptr = list->head; ptr != list->tail; ptr = next_clause(ptr)) {
+		cls = ptr->link;
+		print_clause(cls, table);
 		output("\n");
 	}
 }
 
 void print_watched_clause(samp_literal_t lit, samp_table_t *table) {
 	clause_table_t *clause_table = &table->clause_table;
-	samp_clause_t **link_ptr;
-	samp_clause_t *link;
-	if (!empty_clause_list(&clause_table->watched[lit])) {
+	samp_clause_t *ptr;
+	samp_clause_t *cls;
+	if (!is_empty_clause_list(&clause_table->watched[lit])) {
 		output("[");
 		print_literal(lit, table);
 		output("]\n");
 
-		for (link_ptr = &clause_table->watched[lit].head;
-				*link_ptr != NULL;
-				link_ptr = next_clause(link_ptr)) {
-			link = *link_ptr;
+		for (ptr = clause_table->watched[lit].head;
+				ptr != clause_table->watched[lit].tail;
+				ptr = next_clause(ptr)) {
+			cls = ptr->link;
 			output("    ");
-			print_clause(link, table);
+			print_clause(cls, table);
 			output("\n");
 		}
 	}

@@ -673,6 +673,7 @@ int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
 
 int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source) {
 	pred_table_t *pred_table = &table->pred_table;
+	atom_table_t *atom_table = &table->atom_table;
 	char *in_predicate = current_atom->pred;
 	int32_t pred_id = pred_index(in_predicate, pred_table);
 
@@ -691,8 +692,11 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *sourc
 	if (atom_index == -1) {
 		return -1;
 	} else {
-		table->atom_table.assignments[0][atom_index] = v_db_true;
-		table->atom_table.assignments[1][atom_index] = v_db_true;
+		/* The value has been set in add_internal_atom */
+		assert(atom_table->assignments[0][atom_index] == v_db_true);
+		assert(atom_table->assignments[1][atom_index] == v_db_true);
+		//atom_table->assignments[0][atom_index] = v_db_true;
+		//atom_table->assignments[1][atom_index] = v_db_true;
 		if (source != NULL) {
 			add_source_to_assertion(source, atom_index, table);
 		}
