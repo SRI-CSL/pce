@@ -7,18 +7,6 @@ predicate cancer(Person) hidden;
 predicate friends(Person,Person) direct;
 predicate smokes(Person) hidden;
 
-# 0.892755  smokes(x) => cancer(x)
-add [x] smokes(x) implies cancer(x) 0.892755;
-
-# 0.883091  friends(x,y) => (smokes(x) <=> smokes(y))
-add [x,y] friends(x,y) implies (smoke(x) iff smokes(y)) 0.883091;
-
-# 0.537004  smokes(a1)
-add [x] smokes(x) 0.537004;
-
-# -1.33406  cancer(a1)
-add [x] cancer(x) -1.33406;
-
 assert friends(Ivan, John);
 assert friends(John, Ivan);
 assert friends(Katherine, Lars);
@@ -28,10 +16,25 @@ assert friends(Nick, Michael);
 assert friends(Ivan, Michael);
 assert friends(Michael, Ivan);
 
+# 0.892755  smokes(x) => cancer(x)
+add [x] smokes(x) implies cancer(x) 0.892755;
+
+# 0.883091  friends(x,y) => (smokes(x) <=> smokes(y))
+add [x,y] friends(x,y) implies (smokes(x) iff smokes(y)) 0.883091;
+
+# 0.537004  smokes(a1)
+add [x] smokes(x) 0.537004;
+
+# -1.33406  cancer(a1)
+add [x] cancer(x) -1.33406;
+
 add smokes(Ivan);
 add smokes(Nick);
 
+ask [x] smokes(x);
+ask [x] cancer(x);
+
 mcsat_params 10000;
 mcsat;
-dumptable atom;
+dumptable qinst;
 

@@ -91,17 +91,8 @@ static inline bool db_tval(samp_truth_value_t v){
 }
 
 /* Returns if the value is fixed by unit propagation */
-static inline bool up_fixed_tval(samp_truth_value_t v) {
-	return (v == v_fixed_true ||
-			v == v_fixed_false);
-}
-
-/* Returns if the value is fixed by input or unit propagation */
 static inline bool fixed_tval(samp_truth_value_t v){
-	return (v == v_fixed_true ||
-			v == v_fixed_false ||
-			v == v_db_true ||
-			v == v_db_false);
+	return (v == v_fixed_true || v == v_fixed_false);
 }
 
 /* Returns if the value is unfixed during walksat */
@@ -185,6 +176,11 @@ extern samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, substit_entry_t
 		samp_table_t *table);
 
 static inline void switch_assignment_array(atom_table_t *atom_table) {
+	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
+	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
+}
+
+static inline void switch_and_copy_assignment_array(atom_table_t *atom_table) {
 	samp_truth_value_t *old_assignment = atom_table->assignment;
 	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
 	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];

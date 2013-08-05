@@ -134,7 +134,7 @@ static void empty_clause_lists(samp_table_t *table) {
 	uint32_t i;
 	int32_t num_unfixed = 0;
 	for (i = 0; i < atom_table->num_vars; i++) {
-		if (!fixed_tval(atom_table->assignment[i])) {
+		if (unfixed_tval(atom_table->assignment[i])) {
 			num_unfixed++;
 		}
 		atom_table->num_unfixed_vars = num_unfixed;
@@ -457,7 +457,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 			switch_assignment_array(atom_table);
 
 			empty_clause_lists(table);
-			init_clause_lists(&table->clause_table);
+			init_clause_lists(clause_table);
 		}
 
 		if (draw_sample) {
@@ -499,7 +499,8 @@ void push_newly_activated_clause(int32_t clsidx, samp_table_t *table) {
 	if (clause->weight == DBL_MAX
 			|| (soft_clauses_included && choose() < 1 - exp(-abs_weight))) {
 		if (clause->numlits == 1 || clause->weight < 0) {
-			insert_head_clause(clause, &clause_table->negative_or_unit_clauses);
+			insert_negative_unit_clause(clause, table);
+			//insert_head_clause(clause, &clause_table->negative_or_unit_clauses);
 		}
 		else {
 			insert_live_clause(clause, table);

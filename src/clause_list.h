@@ -20,10 +20,8 @@ static inline samp_clause_t *next_clause(samp_clause_t *ptr) {
 /* validates a clause list */
 static inline bool valid_clause_list(samp_clause_list_t *list) {
 	samp_clause_t *ptr;
-	samp_clause_t *cls;
 	int32_t length = 0;
 	for (ptr = list->head; ptr != list->tail; ptr = next_clause(ptr)) {
-		cls = ptr->link;
 		length++;
 	}
 	assert(length == list->length);

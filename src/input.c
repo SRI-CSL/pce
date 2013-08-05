@@ -693,10 +693,11 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *sourc
 		return -1;
 	} else {
 		/* The value has been set in add_internal_atom */
-		assert(atom_table->assignments[0][atom_index] == v_db_true);
-		assert(atom_table->assignments[1][atom_index] == v_db_true);
-		//atom_table->assignments[0][atom_index] = v_db_true;
-		//atom_table->assignments[1][atom_index] = v_db_true;
+		//assert(atom_table->assignments[0][atom_index] == v_db_true);
+		//assert(atom_table->assignments[1][atom_index] == v_db_true);
+		atom_table->assignments[0][atom_index] = v_db_true;
+		atom_table->assignments[1][atom_index] = v_db_true;
+		atom_table->active[atom_index] = true;
 		if (source != NULL) {
 			add_source_to_assertion(source, atom_index, table);
 		}

@@ -1230,7 +1230,7 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 		pred = atom_table->atom[i]->pred;
 		arity = pred_arity(pred, pred_table);
 		sig = pred_signature(pred, pred_table);
-		if (!fixed_tval(atom_table->assignment[i])){
+		if (unfixed_tval(atom_table->assignment[i])){
 			num_unfixed++;
 		}
 		for (j = 0; j < arity; j++){

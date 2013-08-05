@@ -30,7 +30,7 @@ static pvector_t yyargs;
 static pvector_t yylits;
 parse_input_t *parse_input;
 
-void yyerror (char *str);
+void yyerror (const char *str);
 
 void yystrbuf_add(char c, uint32_t i) {
   uint32_t n;
@@ -1341,7 +1341,7 @@ void free_parse_data () {
   }
 }
 
-void yyerror (char *str) {
+void yyerror (const char *str) {
   if (parse_input->kind == INFILE) {
     printf("%s:%d:%d: %s: %s\n", parse_input->input.in_file.file,
 	   yylloc.last_line, yylloc.last_column, str, yylval.str);

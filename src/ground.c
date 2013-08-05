@@ -295,7 +295,8 @@ static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, sa
 		}
 	}
 
-	bool value;
+	/* 0: fixed false; 1: fixed true; -1: unfixed */
+	int32_t value;
 	if (atom->builtinop > 0) {
 		value = call_builtin(atom->builtinop, builtin_arity(atom->builtinop),
 				rule_inst_atom->args);
@@ -303,16 +304,16 @@ static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, sa
 	else {
 		array_hmap_pair_t *atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
 				arity + 1, (int32_t *) rule_inst_atom);
-		if (atom_map == NULL || !atom_table->active[atom_map->val]) { // if inactive
+		if (atom_map == NULL || !atom_table->active[atom_map->val]) { /* if inactive */
 			value = rule_atom_default_value(atom, pred_table);
 		}
-		else if (predicate <= 0) { // for evidence predicate
+		else if (predicate <= 0) { /* for evidence predicate */
 			value = assigned_true(atom_table->assignment[atom_map->val]);
-		} else { // non-evidence predicate has unfixed value;
-			value = -1; // neither true nor false
+		} else { /* non-evidence predicate has unfixed value */
+			value = -1; /* neither true nor false */
 		}
 	}
-	return (neg == value); // if the literal is unsat
+	return (neg ? (value != 0) : (value != 1));
 }
 
 /* Tests whether a clause is falsifiable, i.e., is not fixed to be satisfied */
@@ -1470,8 +1471,9 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 			clause_map->val = index;
 			//cprintf(5, "Added clause %"PRId32"\n", index);
 
-			/* FIXME only for lazy? */
-			push_newly_activated_clause(index, table);
+			if (lazy_mcsat()) {
+				push_newly_activated_clause(index, table);
+			}
 
 			return index;
 		} else {
