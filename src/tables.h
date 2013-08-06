@@ -22,7 +22,7 @@
 #define INIT_CLAUSE_SIZE 16
 #define INIT_ATOM_SIZE 16
 #define INIT_MODEL_TABLE_SIZE 64
-#define INIT_SUBSTIT_TABLE_SIZE 8 // number of vars in rules - likely to be small
+#define INIT_SUBSTIT_TABLE_SIZE 8 /* number of vars in rules - likely to be small */
 
 /*
  * MCSAT MAIN DATA STRUCTURES
@@ -30,13 +30,13 @@
 
 /* Truth values */
 typedef enum {
-	v_undef = -1, // undefined
-	v_false = 0, // false
-	v_true = 1, // true
-	v_fixed_false = 2, // false fixed by unit propagation
-	v_fixed_true = 3, // true fixed by unit propagation
-	v_db_false = 4, // false fixed by input db
-	v_db_true = 5 // true fixed by input db
+	v_undef = -1, /* undefined */
+	v_false = 0, /* false */
+	v_true = 1, /* true */
+	v_fixed_false = 2, /* false fixed by unit propagation */
+	v_fixed_true = 3, /* true fixed by unit propagation */
+	v_db_false = 4, /* false fixed by input db */
+	v_db_true = 5 /* true fixed by input db */
 } samp_truth_value_t;
 
 /*
@@ -117,31 +117,31 @@ typedef struct input_sortdef_s {
 
 typedef struct input_atom_s {
 	char *pred;
-	int32_t builtinop; // = 0: not a built-in-op, > 0: built-in-op
+	int32_t builtinop; /* = 0: not a built-in-op, > 0: built-in-op */
 	char **args;
 } input_atom_t;
 
 typedef struct input_literal_s {
-	bool neg; // true: with negation; false: without negation
+	bool neg; /* true: with negation; false: without negation */
 	input_atom_t *atom;
 } input_literal_t;
 
 /* This is used for both clauses (no vars) and rules. */
 typedef struct input_clause_s {
 	int32_t varlen;
-	char **variables; //Input variables
+	char **variables; /* Input variables */
 	int32_t litlen;
 	input_literal_t **literals;
 } input_clause_t;
 
 /* Composition of two formulas */
 typedef struct input_comp_fmla_s {
-	int32_t op;
+	int32_t op; /* binary operators such as and, or, implies, iff etc. */
 	struct input_fmla_s *arg1;
 	struct input_fmla_s *arg2;
 } input_comp_fmla_t;
 
-/* FIXME what is this */
+/* A unit is either an atom or a composed formula */
 typedef union input_ufmla_s {
 	input_atom_t *atom;
 	input_comp_fmla_t *cfmla;
@@ -163,7 +163,7 @@ typedef struct var_entry_s {
  * Original formula that is recursively defined, will be converted to CNF later
  */
 typedef struct input_formula_s {
-	var_entry_t **vars; // NULL terminated list of vars
+	var_entry_t **vars; /* NULL terminated list of vars */
 	input_fmla_t *fmla;
 } input_formula_t;
 
@@ -173,34 +173,39 @@ typedef struct input_formula_s {
  */
 typedef struct sort_entry_s {
 	int32_t size;
-	int32_t cardinality; //number of elements in sort i
-	char *name; //print name of the sort
-	// array of constants in the given sort, NULL when
-	// it is a integer sort
-	int32_t *constants; 
-	int32_t *ints; // array of integers for sparse integer sorts
-	int32_t lower_bound; // lower and upper bounds for integer sorts
-	int32_t upper_bound; // (could be a union type)
-	int32_t *subsorts; // array of subsort indices
-	int32_t *supersorts; // array of supersort indices
+	int32_t cardinality; /* number of elements in sort i */
+	char *name; /* print name of the sort */
+
+	/* array of constants in the given sort, NULL when
+	 * it is a integer sort */
+	int32_t *constants;	
+	/* array of integers for sparse integer sorts */
+	int32_t *ints; 
+	/* lower and upper bounds for integer sorts
+	 * (could be a union type) */
+	int32_t lower_bound; 
+	int32_t upper_bound; 
+
+	int32_t *subsorts; /* array of subsort indices */
+	int32_t *supersorts; /* array of supersort indices */
 } sort_entry_t;
 
 /* List of sorts */
 typedef struct sort_table_s {
 	int32_t size;
-	int32_t num_sorts; //number of sorts
-	stbl_t sort_name_index;//table giving index for sort name
-	sort_entry_t *entries;//maps sort index to cardinality and name
+	int32_t num_sorts; /* number of sorts */
+	stbl_t sort_name_index; /* table giving index for sort name */
+	sort_entry_t *entries; /* maps sort index to cardinality and name */
 } sort_table_t;
 
 typedef struct pred_entry_s {
-	int32_t arity;//number of arguments; negative for evidence predicate
-	int32_t *signature;//pointer to an array of sort indices
-	char *name;//print name
+	int32_t arity; /* number of arguments; negative for evidence predicate */
+	int32_t *signature; /* pointer to an array of sort indices */
+	char *name; /* print name */
 	int32_t size_atoms;
 	int32_t num_atoms;
-	int32_t *atoms; // This is atom indices, not atoms
-	// Keep track of the rules that mention this predicate
+	int32_t *atoms; /* This is atom indices, not atoms */
+	/* Keep track of the rules that mention this predicate */
 	int32_t size_rules;
 	int32_t num_rules;
 	int32_t *rules;
@@ -213,9 +218,9 @@ typedef struct pred_tbl_s {
 } pred_tbl_t;
 
 typedef struct pred_table_s  {
-	pred_tbl_t evpred_tbl; //signature map for evidence predicates
-	pred_tbl_t pred_tbl;//signature map for non-evidence predicates
-	stbl_t pred_name_index;//symbol table for all predicates
+	pred_tbl_t evpred_tbl; /* signature map for evidence predicates */
+	pred_tbl_t pred_tbl; /* signature map for non-evidence predicates */
+	stbl_t pred_name_index; /* symbol table for all predicates */
 } pred_table_t;
 
 typedef  struct const_entry_s {
@@ -227,20 +232,15 @@ typedef struct const_table_s {
 	int32_t size;
 	int32_t num_consts;
 	const_entry_t *entries; 
-	stbl_t const_name_index; //table mapping const name to index
+	stbl_t const_name_index; /* table mapping const name to index */
 } const_table_t;
 
 typedef struct var_table_s {
 	int32_t size;
 	int32_t num_vars;
 	var_entry_t *entries; 
-	stbl_t var_name_index; //table mapping var name to index
+	stbl_t var_name_index; /* table mapping var name to index */
 } var_table_t;
-
-// typedef struct atom_entry_s {
-//   samp_atom_t *atom;
-//   samp_truth_value_t assignment; 
-// } atom_entry_t;
 
 /*
  * An atom has a predicate symbol and an array of the corresponding arity.
@@ -248,24 +248,25 @@ typedef struct var_table_s {
  * predicate is builtin.
  */
 typedef struct samp_atom_s {
-	int32_t pred; // <= 0: direct pred; > 0: indirect pred
+	int32_t pred; /* <= 0: direct pred; > 0: indirect pred */
 	int32_t args[0];
 } samp_atom_t;
 
 typedef struct atom_table_s {
-	int32_t size; //size of the var_atom array (double for watched)
-	int32_t num_vars;  //number of bvars
-	int32_t num_unfixed_vars;
-	samp_atom_t **atom; // atom_entry_t *entries;
-	bool *active; // if an atom is active
-	int32_t *sampling_nums; // number of samples BEFORE an atom is activated
-	samp_truth_value_t *assignments[2];// maps atom ids to samp_truth_value_t
-	uint32_t assignment_index; // which of two assignment arrays is current
-	samp_truth_value_t *assignment; // the current assignment
-	int32_t num_samples; // current number of samples
-	int32_t *pmodel; // model count of each atom
-	// Maps atoms to indices in the table. Uses the predicate index + indices
-	// of the arguments, an array with total length of arity + 1, as the key
+	int32_t size; /* size of the var_atom array (double for watched) */
+	int32_t num_vars;  /* number of bvars */
+	int32_t num_unfixed_vars; /* number of unfixed vars */
+	samp_atom_t **atom;
+	bool *active; /* if an atom is active */
+	int32_t *sampling_nums; /* number of samples BEFORE an atom is activated */
+	samp_truth_value_t *assignments[2]; /* maps atom ids to samp_truth_value_t */
+	uint32_t assignment_index; /* which of two assignment arrays is current */
+	samp_truth_value_t *assignment; /* the current assignment */
+	int32_t num_samples; /* current number of samples */
+	int32_t *pmodel; /* model count of each atom */
+
+	/* Maps atoms to indices in the table. Uses the predicate index + indices
+	 * of the arguments, an array with total length of arity + 1, as the key */
 	array_hmap_t atom_var_hash; 
 } atom_table_t;
 
@@ -276,11 +277,11 @@ typedef struct atom_table_s {
  * TODO: for a FOL formula with weight w, it is decomposed into (by cnf)
  */
 typedef struct samp_clause_s {
-	double weight; // weight of the clause: DBL_MAX for hard clause
+	double weight; /* weight of the clause: DBL_MAX for hard clause */
 	int32_t numlits;
-	bool *frozen; // array indicating whether associated literal is frozen
-	struct samp_clause_s *link; // link to next clause for a given watched literal
-	samp_literal_t disjunct[0]; // array of literals
+	bool *frozen; /* array indicating whether associated literal is frozen */
+	struct samp_clause_s *link; /* link to next clause for a given watched literal */
+	samp_literal_t disjunct[0]; /* array of literals */
 } samp_clause_t;
 
 /* Clause list */
@@ -292,18 +293,18 @@ typedef struct samp_clause_list_s {
 
 /* Clauses stored in an array and also organized in several linked lists */
 typedef struct clause_table_s {
-	int32_t size;   //size of the samp_clauses array
-	int32_t num_clauses; //number of clause entries
-	samp_clause_t **samp_clauses; //array of pointers to samp_clauses
-	array_hmap_t clause_hash; //maps clauses to index in clause table
+	int32_t size;   /* size of the samp_clauses array */
+	int32_t num_clauses; /* number of clause entries */
+	samp_clause_t **samp_clauses; /* array of pointers to samp_clauses */
+	array_hmap_t clause_hash; /* maps clauses to index in clause table */
 
-	samp_clause_list_t *watched; //maps literals to samp_clause pointers
-	samp_clause_list_t sat_clauses; //list of fixed satisfied clauses
-	samp_clause_list_t unsat_clauses;//list of unsat clauses, threaded through link
-	samp_clause_list_t live_clauses; // temperory list to store unscaned live clauses
-	samp_clause_list_t negative_or_unit_clauses; //list of negative weight or unit 
-	samp_clause_list_t dead_clauses;//list of unselected clauses
-	samp_clause_list_t dead_negative_or_unit_clauses; //killed clauses
+	samp_clause_list_t *watched; /* maps literals to samp_clause pointers */
+	samp_clause_list_t sat_clauses; /* list of fixed satisfied clauses */
+	samp_clause_list_t unsat_clauses; /* list of unsat clauses, threaded through link */
+	samp_clause_list_t live_clauses; /* temperory list to store unscaned live clauses */
+	samp_clause_list_t negative_or_unit_clauses; /* list of negative weight or unit  */
+	samp_clause_list_t dead_clauses; /* list of unselected clauses */
+	samp_clause_list_t dead_negative_or_unit_clauses; /* killed clauses */
 } clause_table_t;
 
 /*
@@ -331,12 +332,12 @@ typedef struct rule_atom_arg_s {
 
 typedef struct rule_atom_s {
 	int32_t pred;
-	int32_t builtinop; // = 0: not a built-in-op, > 0: built-in-op
+	int32_t builtinop; /* = 0: not a built-in-op, > 0: built-in-op */
 	rule_atom_arg_t *args;
 } rule_atom_t;
 
 typedef struct rule_literal_s {
-	bool neg; // true: with negation; false: without negation
+	bool neg; /* true: with negation; false: without negation */
 	rule_atom_t *atom;
 } rule_literal_t;
 
@@ -346,27 +347,27 @@ typedef struct rule_literal_s {
  */
 typedef int32_t substit_entry_t;
 //typedef struct substit_entry_s {
-//  int32_t const_index;
-//  bool fixed;
+//	int32_t const_index;
+//	bool fixed;
 //} substit_entry_t;
 
 /* Quantified clause */
 typedef struct samp_rule_s {
-	int32_t num_lits; //number of literal entries
-	int32_t num_vars; //number of variables
-	int32_t num_frozen; //number of frozen predicates
-	var_entry_t **vars; //The (quantified) variables
-	rule_literal_t **literals; //array of pointers to rule_literals
-	int32_t *frozen_preds; //array of frozen predicates
-	int32_t *clause_indices; //array of indices into clause_table
+	int32_t num_lits; /* number of literal entries */
+	int32_t num_vars; /* number of variables */
+	int32_t num_frozen; /* number of frozen predicates */
+	var_entry_t **vars; /* The (quantified) variables */
+	rule_literal_t **literals; /* array of pointers to rule_literals */
+	int32_t *frozen_preds; /* array of frozen predicates */
+	int32_t *clause_indices; /* array of indices into clause_table */
 	double weight;
-	array_hmap_t subst_hash; // a hashset used to check duplicate
+	array_hmap_t subst_hash; /* a hashset used to check duplicate */
 } samp_rule_t;
 
 typedef struct rule_table_s {
-	int32_t size;   //size of the samp_rule array
-	int32_t num_rules; //number of rule entries
-	samp_rule_t **samp_rules; //array of pointers to samp_rules
+	int32_t size;   /* size of the samp_rule array */
+	int32_t num_rules; /* number of rule entries */
+	samp_rule_t **samp_rules; /* array of pointers to samp_rules */
 } rule_table_t;
 
 /* 
@@ -381,7 +382,7 @@ typedef struct rule_table_s {
  * the default value is false).
  */
 typedef struct samp_query_s {
-	int32_t *source_index; // The source of this query, e.g., formula, learner id
+	int32_t *source_index; /* The source of this query, e.g., formula, learner id */
 	int32_t num_clauses;
 	int32_t num_vars;
 	var_entry_t **vars;
@@ -389,7 +390,7 @@ typedef struct samp_query_s {
 } samp_query_t;
 
 typedef struct query_table_s {
-	int32_t size; //size of the query array
+	int32_t size; /* size of the query array */
 	int32_t num_queries;
 	samp_query_t **query;
 } query_table_t;
@@ -399,17 +400,17 @@ typedef struct query_table_s {
  * for the atom_table_t.
  */
 typedef struct samp_query_instance_s {
-	//int32_t query_index; // Index to the query from which this was generated
-	ivector_t query_indices; // Indices to the queries from which this was generated
-	int32_t sampling_num; // The num_samples when this instance was created
-	int32_t pmodel; // The nimber of samples for which this instance was true
-	int32_t *subst; // Holds the mapping from vars to consts
-	bool *constp; // Whether given var is a constant or integer
-	samp_literal_t **lit; // The instance - a conjunction of disjunctions of lits
+	// int32_t query_index; /* Index to the query from which this was generated */
+	ivector_t query_indices; /* Indices to the queries from which this was generated */
+	int32_t sampling_num; /* The num_samples when this instance was created */
+	int32_t pmodel; /* The nimber of samples for which this instance was true */
+	int32_t *subst; /* Holds the mapping from vars to consts */
+	bool *constp; /* Whether given var is a constant or integer */
+	samp_literal_t **lit; /* The instance - a conjunction of disjunctions of lits */
 } samp_query_instance_t;
 
 typedef struct query_instance_table_s {
-	int32_t size; //size of the lit array
+	int32_t size;
 	int32_t num_queries;
 	samp_query_instance_t **query_inst;
 } query_instance_table_t;
@@ -423,9 +424,9 @@ typedef struct query_instance_table_s {
  */
 typedef struct source_entry_s {
 	char *name;
-	int32_t *assertion; // indices to atom_table, -1 terminated
-	int32_t *clause; // indices to clause_table; -1 terminated
-	double *weight; // weights corresponding to clause list
+	int32_t *assertion; /* indices to atom_table, -1 terminated */
+	int32_t *clause; /* indices to clause_table; -1 terminated */
+	double *weight; /* weights corresponding to clause list */
 } source_entry_t;
 
 typedef struct source_table_s {
@@ -441,8 +442,8 @@ typedef struct samp_table_s {
 	var_table_t var_table;
 	pred_table_t pred_table;
 	atom_table_t atom_table;
-	clause_table_t clause_table; // ground formulas (without variables)
-	rule_table_t rule_table; // formulas with variables
+	clause_table_t clause_table; /* ground formulas (without variables) */
+	rule_table_t rule_table; /* formulas with variables */
 	query_table_t query_table;
 	query_instance_table_t query_instance_table;
 	source_table_t source_table;
@@ -450,7 +451,7 @@ typedef struct samp_table_s {
 } samp_table_t;
 
 
-// functions for sort_table
+/* functions for sort_table */
 extern void init_sort_table(sort_table_t *sort_table);
 extern void reset_sort_table(sort_table_t *sort_table);
 extern void add_sort(sort_table_t *sort_table, char *name);
@@ -459,7 +460,7 @@ extern void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort
 extern int32_t sort_name_index(char *name, sort_table_t *sort_table);
 extern int32_t *sort_signature(char **in_signature, int32_t arity, sort_table_t *sort_table);
 
-// functions for const_table
+/* functions for const_table */
 extern void init_const_table(const_table_t *const_table);
 extern int32_t const_index(char *name, const_table_t *const_table);
 extern int32_t const_sort_index(int32_t const_index, const_table_t *const_table);
@@ -471,14 +472,14 @@ extern int32_t add_const_internal (char *name, int32_t sort_index,
 extern int32_t add_const(char *name, char * sort_name, samp_table_t *table);
 extern char *const_name(int32_t const_index, const_table_t *const_table);
 
-// functions for var table
+/* functions for var table */
 extern int32_t var_index(char *name, var_table_t *var_table);
 extern int32_t add_var(var_table_t *var_table,
 		char *name,
 		sort_table_t *sort_table,
 		char * sort_name);
 
-// functions for pred_table
+/* functions for pred_table */
 extern void init_pred_table(pred_table_t *pred_table);
 extern int32_t add_pred(pred_table_t *pred_table, char *name, bool evidence,
 		int32_t arity, sort_table_t *sort_table, char **in_signature);
@@ -502,28 +503,28 @@ extern char *pred_name(int32_t pred, pred_table_t *pred_table);
 extern int32_t pred_default_value(pred_entry_t *pred);
 extern int32_t *pred_signature(int32_t predicate, pred_table_t *pred_table);
 
-// functions for atom_table
+/* functions for atom_table */
 extern void init_atom_table(atom_table_t *table);
 extern void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table);
 
-// functions for clause_table
+/* functions for clause_table */
 extern void init_clause_table(clause_table_t *table);
 extern void clause_table_resize(clause_table_t *clause_table, int32_t num_lits);
 
-// functions for rule_table
+/* functions for rule_table */
 extern void init_rule_table(rule_table_t *table);
 extern void rule_table_resize(rule_table_t *rule_table);
 
-// functions for query_table
+/* functions for query_table */
 extern void init_query_table(query_table_t *table);
 extern void query_table_resize(query_table_t *table);
 
-// functions for query_instance_table
+/* functions for query_instance_table */
 extern void init_query_instance_table(query_instance_table_t *table);
 extern void query_instance_table_resize(query_instance_table_t *table);
 extern void reset_query_instance_table(query_instance_table_t *table);
 
-// functions for source_table
+/* functions for source_table */
 extern void init_source_table(source_table_t *table);
 extern void source_table_extend(source_table_t *table);
 extern void reset_source_table(source_table_t *table);
@@ -534,7 +535,7 @@ extern void add_source_to_assertion(char *source, int32_t atom_index,
 		samp_table_t *table);
 extern void retract_source(char *source, samp_table_t *table);
 
-// functions for samp_table (the struct of all table)
+/* functions for samp_table (the struct of all table) */
 extern void init_samp_table(samp_table_t *table);
 extern bool valid_table(samp_table_t *table);
 

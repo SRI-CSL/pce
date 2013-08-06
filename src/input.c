@@ -583,14 +583,7 @@ bool add_int_const(int32_t icnst, sort_entry_t *entry,
 			return false;
 		}
 	}
-	if (entry->size == entry->cardinality) {
-		if (MAXSIZE(sizeof(long int), 0) - entry->size < entry->size / 2) {
-			out_of_memory();
-		}
-		entry->size += entry->size / 2;
-		entry->ints = (int32_t *) safe_realloc(entry->ints,
-				entry->size * sizeof(int32_t));
-	}
+	sort_entry_resize(entry);
 	entry->ints[entry->cardinality++] = icnst;
 	// Added it to this sort, now do its supersorts
 	if (entry->supersorts != NULL) {
@@ -611,6 +604,12 @@ bool add_int_const(int32_t icnst, sort_entry_t *entry,
 	return true;
 }
 
+/*
+ * Adds a constant of a specific sort
+ *
+ * @cnst: the name of the constant
+ * @sort: the name of the sort
+ */
 int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	const_table_t *const_table = &table->const_table;
@@ -671,6 +670,10 @@ int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
 	return 0;
 }
 
+/*
+ * Assert an atom of a witness (direct) predicate. If the predicate is
+ * indirect, pop out an error.
+ */
 int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source) {
 	pred_table_t *pred_table = &table->pred_table;
 	atom_table_t *atom_table = &table->atom_table;
@@ -692,9 +695,6 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *sourc
 	if (atom_index == -1) {
 		return -1;
 	} else {
-		/* The value has been set in add_internal_atom */
-		//assert(atom_table->assignments[0][atom_index] == v_db_true);
-		//assert(atom_table->assignments[1][atom_index] == v_db_true);
 		atom_table->assignments[0][atom_index] = v_db_true;
 		atom_table->assignments[1][atom_index] = v_db_true;
 		atom_table->active[atom_index] = true;
@@ -1054,8 +1054,10 @@ extern bool read_eval(samp_table_t *table) {
 			break;
 		}
 		case ASSERT: {
-			// Need to check that the predicate is a witness predicate,
-			// then invoke assert_atom.
+			/* 
+			 * TODO Need to check that the predicate is a witness predicate,
+			 * then invoke assert_atom.
+			 */
 			input_assert_decl_t decl = input_command.decl.assert_decl;
 			assert_atom(table, decl.atom, decl.source);
 			break;
@@ -1069,12 +1071,12 @@ extern bool read_eval(samp_table_t *table) {
 		case ADD_CLAUSE: {
 			input_add_decl_t decl = input_command.decl.add_decl;
 			if (decl.clause->varlen == 0) {
-				// No variables - adding a clause
+				/* No variables - adding a clause */
 				cprintf(2, "Adding clause\n");
 				add_clause(table, decl.clause->literals, decl.weight,
 						decl.source, true);
 			} else {
-				// Have variables - adding a rule
+				/* Have variables - adding a rule */
 				double wt = decl.weight;
 				if (wt == DBL_MAX) {
 					cprintf(2, "Adding rule with MAX weight\n");

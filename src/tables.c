@@ -281,6 +281,30 @@ static void const_table_resize(const_table_t *const_table, uint32_t n){
 	const_table->size = n; 
 }
 
+/*
+ * Resize the constant array or the int array of a sort to
+ * accommodate a new constant or int.
+ */
+void sort_entry_resize(sort_entry_t *sort_entry) {
+	if (sort_entry->size == sort_entry->cardinality) {
+		if (MAXSIZE(sizeof(int32_t), 0) - sort_entry->size < sort_entry->size/2){
+			out_of_memory();
+		}
+		sort_entry->size += sort_entry->size/2;
+		if (sort_entry->constants != NULL) {
+			sort_entry->constants = (int32_t *) safe_realloc(sort_entry->constants,
+					sort_entry->size * sizeof(int32_t));
+		}
+		if (sort_entry->ints != NULL) {
+			sort_entry->ints = (int32_t *) safe_realloc(sort_entry->ints,
+					sort_entry->size * sizeof(int32_t));
+		}
+	}
+}
+
+/* 
+ * Adds a constant to the corresponding entry in sort_table
+ */
 void add_const_to_sort(int32_t const_index,
 		int32_t sort_index,
 		sort_table_t *sort_table) {
@@ -290,14 +314,7 @@ void add_const_to_sort(int32_t const_index,
 
 	entry = &sort_table->entries[sort_index];
 	assert(entry->constants != NULL);
-	if (entry->size == entry->cardinality){
-		if (MAXSIZE(sizeof(int32_t), 0) - entry->size < entry->size/2){
-			out_of_memory();
-		}
-		entry->size += entry->size/2;
-		entry->constants = (int32_t *) safe_realloc(entry->constants,
-				entry->size * sizeof(int32_t));
-	}
+	sort_entry_resize(entry);
 	entry->constants[entry->cardinality++] = const_index;
 	// Added it to this sort, now do its supersorts
 	if (entry->supersorts != NULL) {    

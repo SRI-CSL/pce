@@ -535,7 +535,6 @@ static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_
 	 * The atom arguments that are consistent with the current substitution.
 	 * Can be used to efficiently retrieve the active atoms
 	 */
-	// could use samp_atom_t *rule_atom_inst;
 	int32_t *atom_arg_value = (int32_t *) safe_malloc(sizeof(int32_t) * arity);
 	for (i = 0; i < arity; i++) {
 		if (rule_atom->args[i].kind == variable) {
@@ -1392,7 +1391,7 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 			}
 		}
 	}
-	if (get_verbosity_level() >= 0) {
+	if (get_verbosity_level() >= 1) {
 		printf("add_atom: Adding internal atom ");
 		print_atom_now(atom, table);
 		printf("\n");
