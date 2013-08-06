@@ -1076,7 +1076,7 @@ int yylex (void) {
     return REM;
   }
   if (c == '\"') {
-    // At the moment, escapes not recognized
+    /* At the moment, escapes not recognized */
     do {
       c = yygetc(parse_input);
       ++yylloc.last_column;
@@ -1093,8 +1093,8 @@ int yylex (void) {
     return STRING;
   }
   if (c == '\'') {
-    // At the moment, escapes not recognized
-    printf("foo");
+    /* At the moment, escapes not recognized */
+    //printf("foo");
     do {
       c = yygetc(parse_input);
       ++yylloc.last_column;
