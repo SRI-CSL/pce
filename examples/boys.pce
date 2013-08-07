@@ -45,6 +45,6 @@ ask (~boy(A) and boy(B) and born_on(A, Fr) and born_on(B, Tu));
 ask (~boy(A) and boy(B) and born_on(A, Sa) and born_on(B, Tu));
 ask (~boy(A) and boy(B) and born_on(A, Su) and born_on(B, Tu));
 
-mcsat_params 1000, .5, 5, .05, 1000, 5,,100,;
+#mcsat_params 1000, .5, 5, .05, 1000, 5,,100,;
 mcsat;
 dumptables qinst;

@@ -225,6 +225,7 @@ static int32_t rule_atom_default_value(rule_atom_t *rule_atom, pred_table_t *pre
 	bool default_value;
 
 	switch (rule_atom->builtinop)  {
+	/* default (majority) value is false */
 	case EQ:
 	case PLUS:
 	case MINUS:
@@ -232,6 +233,7 @@ static int32_t rule_atom_default_value(rule_atom_t *rule_atom, pred_table_t *pre
 	case DIV:
 	case REM:
 		return 0;
+	/* default (majority) value is true */
 	case NEQ:
 		return 1;
 	case 0:
@@ -322,7 +324,7 @@ static bool check_clause_falsifiable(samp_rule_t *rule, substit_entry_t *substs,
 	int32_t i;
 	char *atom_str;
 
-	for (i = 0; i < rule->num_lits; i++) { //for each literal
+	for (i = 0; i < rule->num_lits; i++) {
 		rule_literal_t *lit = rule->literals[i];
 		bool value = literal_falsifiable(lit, substs, table);
 		if (!value) {

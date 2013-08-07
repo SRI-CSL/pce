@@ -92,14 +92,24 @@ Usage: %s [OPTION]... [FILE]...\n\n\
   Interactive If no FILE is provided,\n\
   Otherwise FILEs are read and %s exits without --interactive option\n\
 Options:\n\
-  -h, -?, --help           print this help and exit\n\
-  -i,     --interactive    run interactively\n\
-  -s,     --seed=NUM       use given random seed\n\
-          --lazy=BOOL      whether to use lazy version (true)\n\
-          --strict=BOOL    whether to require declarations for all constants (true)\n\
-  -e,     --prexp          whether to print using 'e' notation\n\
-  -v,     --verbosity=NUM  sets the verbosity level\n\
-  -V,     --version        prints the version number and exits\n\
+  -h, -?, --help                   print this help and exit\n\
+  -i,     --interactive            run interactively\n\
+  -s,     --seed=NUM               use given random seed\n\
+          --lazy=BOOL              whether to use lazy version (true)\n\
+          --dumpsamples=BOOL       whether to dump samples\n\
+          --strict=BOOL            whether to require declarations for all constants (true)\n\
+  -e,     --prexp                  whether to print using 'e' notation\n\
+  -v,     --verbosity=NUM          sets the verbosity level\n\
+  -V,     --version                prints the version number and exits\n\
+          --max_samples=NUM        number of samples\n\
+          --sa_probability=NUM     probability of selecting a SA step\n\
+          --sa_temperature=NUM     temperature of SA\n\
+          --rvar_probability=NUM   probability of random strategy in WalkSAT\n\
+          --max_flips=NUM          maximum number of flips in SampleSAT\n\
+          --max_extra_flips=NUM    maximum number of extra flips after finding a model\n\
+          --timeout=NUM            MCSAT will terminate if exceeds timeout\n\
+          --burn_in_steps=NUM      number of burn_in steps of MCSAT\n\
+          --samp_interval=NUM      number of SampleSAT between two samples\n\
 ", program_name, program_name);
   exit(0);
 }
