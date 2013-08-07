@@ -34,19 +34,19 @@ static int32_t show_help;
 static int32_t interactive;
 
 enum {
-  LAZY_OPTION = CHAR_MAX + 1,
-  STRICT_OPTION,
-  SEED_OPTION,
-  DUMP_SAMPLES_OPTION,
-  MAX_SAMPLES_OPTION,
-  SA_PROBABILITY_OPTION,
-  SA_TEMPERATURE_OPTION,
-  RVAR_PROBABILITY_OPTION,
-  MAX_FLIPS_OPTION,
-  MAX_EXTRA_FLIPS_OPTION,
-  TIMEOUT_OPTION,
-  BURN_IN_STEPS_OPTION,
-  SAMP_INTERVAL_OPTION,
+	LAZY_OPTION = CHAR_MAX + 1,
+	STRICT_OPTION,
+	SEED_OPTION,
+	DUMP_SAMPLES_OPTION,
+	MAX_SAMPLES_OPTION,
+	SA_PROBABILITY_OPTION,
+	SA_TEMPERATURE_OPTION,
+	RVAR_PROBABILITY_OPTION,
+	MAX_FLIPS_OPTION,
+	MAX_EXTRA_FLIPS_OPTION,
+	TIMEOUT_OPTION,
+	BURN_IN_STEPS_OPTION,
+	SAMP_INTERVAL_OPTION,
 };
 
 // enum subcommand {
@@ -55,34 +55,34 @@ enum {
 // };
 
 static struct option long_options[] = {
-  {"help", no_argument, (int *)&show_help, 'h'},
-  {"interactive", no_argument, (int *)&interactive, 'i'},
-  {"seed", required_argument, 0, SEED_OPTION},
-  {"lazy", required_argument, 0, LAZY_OPTION},
-  {"dumpsamples", required_argument, 0, DUMP_SAMPLES_OPTION},
-  {"strict", required_argument, 0, STRICT_OPTION},
-  {"prexp", no_argument, 0, 'e'},
-  {"verbosity", required_argument, 0, 'v'},
-  {"version", no_argument, &show_version, 1},
-  {"max_samples", required_argument, 0, MAX_SAMPLES_OPTION},
-  {"sa_probability", required_argument, 0, SA_PROBABILITY_OPTION},
-  {"sa_temperature", required_argument, 0, SA_TEMPERATURE_OPTION},
-  {"rvar_probability", required_argument, 0, RVAR_PROBABILITY_OPTION},
-  {"max_flips", required_argument, 0, MAX_FLIPS_OPTION},
-  {"max_extra_flips", required_argument, 0, MAX_EXTRA_FLIPS_OPTION},
-  {"timeout", required_argument, 0, TIMEOUT_OPTION},
-  {"burn_in_steps", required_argument, 0, BURN_IN_STEPS_OPTION},
-  {"samp_interval", required_argument, 0, SAMP_INTERVAL_OPTION},
-  {0, 0, 0, 0}
+	{"help", no_argument, (int *)&show_help, 'h'},
+	{"interactive", no_argument, (int *)&interactive, 'i'},
+	{"seed", required_argument, 0, SEED_OPTION},
+	{"lazy", required_argument, 0, LAZY_OPTION},
+	{"dumpsamples", required_argument, 0, DUMP_SAMPLES_OPTION},
+	{"strict", required_argument, 0, STRICT_OPTION},
+	{"prexp", no_argument, 0, 'e'},
+	{"verbosity", required_argument, 0, 'v'},
+	{"version", no_argument, &show_version, 1},
+	{"max_samples", required_argument, 0, MAX_SAMPLES_OPTION},
+	{"sa_probability", required_argument, 0, SA_PROBABILITY_OPTION},
+	{"sa_temperature", required_argument, 0, SA_TEMPERATURE_OPTION},
+	{"rvar_probability", required_argument, 0, RVAR_PROBABILITY_OPTION},
+	{"max_flips", required_argument, 0, MAX_FLIPS_OPTION},
+	{"max_extra_flips", required_argument, 0, MAX_EXTRA_FLIPS_OPTION},
+	{"timeout", required_argument, 0, TIMEOUT_OPTION},
+	{"burn_in_steps", required_argument, 0, BURN_IN_STEPS_OPTION},
+	{"samp_interval", required_argument, 0, SAMP_INTERVAL_OPTION},
+	{0, 0, 0, 0}
 };
 
 // static enum subcommand subcommand_option;
 
 // Print a usage message and exit
 static void usage () {
-  fprintf(stderr, "Try '%s --help' for more information.\n",
-	  program_name);
-  exit(1);
+	fprintf(stderr, "Try '%s --help' for more information.\n",
+			program_name);
+	exit(1);
 }
 
 static void help () {
@@ -125,194 +125,220 @@ Options:\n\
 // }
 
 static void decode_options(int argc, char **argv) {
-  int32_t i, optchar, option_index;
-  char *endptr;
-  double val;
+	int32_t i, optchar, option_index;
+	char *endptr;
+	double val;
 
-  option_index = 0;
-  while ((optchar = getopt_long(argc, argv, OPTION_STRING, long_options, &option_index)) != -1) {
-    switch (optchar) {
-    case '?':
-      usage();
-    case 0:
-      break;
-    case 'i':
-      interactive = true;
-      break;
-    case 'h':
-      show_help = 1;
-      break;
-    case 's':
-    case SEED_OPTION: {
-      for(i=0; optarg[i] != '\0'; i++){
-	if (! isdigit(optarg[i])) {
-	  mcsat_err("Error: seed must be an integer\n");
-	  exit(1);
+	option_index = 0;
+	while ((optchar = getopt_long(argc, argv, OPTION_STRING, long_options, &option_index)) != -1) {
+		switch (optchar) {
+		case '?':
+			usage();
+		case 0:
+			break;
+		case 'i':
+			interactive = true;
+			break;
+		case 'h':
+			show_help = 1;
+			break;
+		case 's':
+		case SEED_OPTION: {
+			for(i=0; optarg[i] != '\0'; i++){
+				if (! isdigit(optarg[i])) {
+					mcsat_err("Error: seed must be an integer\n");
+					exit(1);
+				}
+			}
+			// srand(atoi(optarg));
+			set_pce_rand_seed(atoi(optarg));
+			break;
+		}
+		case MAX_SAMPLES_OPTION: {
+			for(i=0; optarg[i] != '\0'; i++) {
+				if (! isdigit(optarg[i])) {
+					mcsat_err("Error: max_samples must be an integer\n");
+					exit(1);
+				}
+			}
+			set_max_samples(atoi(optarg));
+			break;
+		}
+		case SA_PROBABILITY_OPTION: {
+			errno = 0;
+			val = strtod(optarg, &endptr);
+			if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
+					|| (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
+					|| val < 0.0 || val > 1.0) {
+				mcsat_err("Error: sa_probability must be a float between 0.0 and 1.0");
+				exit(1);
+			}
+			set_sa_probability(val);
+			break;
+		}
+		case SA_TEMPERATURE_OPTION: {
+			errno = 0;
+			val = strtod(optarg, &endptr);
+			if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
+					|| (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
+					|| val < 0.0) {
+				mcsat_err("Error: sa_temperature must be a float >= 0.0");
+				exit(1);
+			}
+			set_sa_temperature(val);
+			break;
+		}
+		case RVAR_PROBABILITY_OPTION: {
+			errno = 0;
+			val = strtod(optarg, &endptr);
+			if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
+					|| (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
+					|| val < 0.0 || val > 1.0) {
+				mcsat_err("Error: rvar_probability must be a float between 0.0 and 1.0");
+				exit(1);
+			}
+			set_rvar_probability(val);
+			break;
+		}
+		case MAX_FLIPS_OPTION: {
+			for(i=0; optarg[i] != '\0'; i++) {
+				if (! isdigit(optarg[i])) {
+					mcsat_err("Error: max_flips must be an integer\n");
+					exit(1);
+				}
+			}
+			set_max_flips(atoi(optarg));
+			break;
+		}
+		case MAX_EXTRA_FLIPS_OPTION: {
+			for(i=0; optarg[i] != '\0'; i++) {
+				if (! isdigit(optarg[i])) {
+					mcsat_err("Error: max_extra_flips must be an integer\n");
+					exit(1);
+				}
+			}
+			set_max_extra_flips(atoi(optarg));
+			break;
+		}
+		case TIMEOUT_OPTION: {
+			for(i=0; optarg[i] != '\0'; i++) {
+				if (! isdigit(optarg[i])) {
+					mcsat_err("Error: timeout must be an integer\n");
+					exit(1);
+				}
+			}
+			set_mcsat_timeout(atoi(optarg));
+			break;
+		}
+		case BURN_IN_STEPS_OPTION:
+			for (i=0; optarg[i] != '\0'; i++) {
+				if (! isdigit(optarg[i])) {
+					mcsat_err("Error: burn_in_steps must be a non-negative integer\n");
+					exit(1);
+				}
+			}
+			set_burn_in_steps(atoi(optarg));
+			break;
+		case SAMP_INTERVAL_OPTION:
+			for (i=0; optarg[i] != '\0'; i++) {
+				if (! isdigit(optarg[i])) {
+					mcsat_err("Error: samp_interval must be a positive integer\n");
+					exit(1);
+				}
+			}
+			set_samp_interval(atoi(optarg));
+			break;
+		case DUMP_SAMPLES_OPTION:
+			set_dump_samples_path(optarg);
+			break;
+		case LAZY_OPTION:
+			if ((strcasecmp(optarg, "true") == 0) 
+					|| (strcasecmp(optarg, "t") == 0) 
+					|| (strcmp(optarg, "1") == 0)) {
+				set_lazy_mcsat(true);
+			} else if ((strcasecmp(optarg, "false") == 0) 
+					|| (strcasecmp(optarg, "f") == 0) 
+					|| (strcmp(optarg, "0") == 0)) {
+				set_lazy_mcsat(false);
+			} else {
+				mcsat_err("Error: lazy must be true, false, t, f, 0, or 1\n");
+				exit(1);
+			}
+			break;
+		case STRICT_OPTION:
+			if ((strcasecmp(optarg, "true") == 0) 
+					|| (strcasecmp(optarg, "t") == 0) 
+					|| (strcmp(optarg, "1") == 0)) {
+				set_strict_constants(true);
+			} else if ((strcasecmp(optarg, "false") == 0) 
+					|| (strcasecmp(optarg, "f") == 0) 
+					|| (strcmp(optarg, "0") == 0)) {
+				set_strict_constants(false);
+			} else {
+				mcsat_err("Error: strict must be true, false, t, f, 0, or 1\n");
+				exit(1);
+			}
+			break;
+		case 'e':
+			set_print_exp_p(true);
+			break;
+		case 'v':
+			if (strlen(optarg) > 0) {
+				for (i = 0; i < strlen(optarg); i++) {
+					if (!isdigit(optarg[i])) {
+						mcsat_err("Verbosity must be a number\n");
+						exit(1);
+					}
+				}
+			} else {
+				mcsat_err("Verbosity must be a number\n");
+				exit(1);
+			}
+			printf("Setting verbosity to %d\n", atoi(optarg));
+			set_verbosity_level(atoi(optarg));
+			break;
+		default:
+			usage();
+		}
+		if (show_version) {
+			output("mcsat %s\nCopyright (C) 2008, SRI International.  All Rights Reserved.\n",
+					VERSION);
+			exit(0);
+		}
+		if (show_help) {
+			help();
+		}
 	}
-      }
-      // srand(atoi(optarg));
-      set_pce_rand_seed(atoi(optarg));
-      break;
-    }
-    case MAX_SAMPLES_OPTION: {
-      for(i=0; optarg[i] != '\0'; i++) {
-	if (! isdigit(optarg[i])) {
-	  mcsat_err("Error: max_samples must be an integer\n");
-	  exit(1);
-	}
-      }
-      set_max_samples(atoi(optarg));
-      break;
-    }
-    case SA_PROBABILITY_OPTION: {
-      errno = 0;
-      val = strtod(optarg, &endptr);
-      if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
-	  || (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
-	  || val < 0.0 || val > 1.0) {
-	mcsat_err("Error: sa_probability must be a float between 0.0 and 1.0");
-	exit(1);
-	}
-      set_sa_probability(val);
-      break;
-    }
-    case SA_TEMPERATURE_OPTION: {
-      errno = 0;
-      val = strtod(optarg, &endptr);
-      if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
-	  || (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
-	  || val < 0.0) {
-	mcsat_err("Error: sa_temperature must be a float >= 0.0");
-	exit(1);
-	}
-      set_sa_temperature(val);
-      break;
-    }
-    case RVAR_PROBABILITY_OPTION: {
-      errno = 0;
-      val = strtod(optarg, &endptr);
-      if ((errno == ERANGE && (val == HUGE_VAL || val == -HUGE_VAL))
-	  || (errno != 0 && val == 0) || endptr == optarg || *endptr != '\0'
-	  || val < 0.0 || val > 1.0) {
-	mcsat_err("Error: rvar_probability must be a float between 0.0 and 1.0");
-	exit(1);
-	}
-      set_rvar_probability(val);
-      break;
-    }
-    case MAX_FLIPS_OPTION: {
-      for(i=0; optarg[i] != '\0'; i++) {
-	if (! isdigit(optarg[i])) {
-	  mcsat_err("Error: max_flips must be an integer\n");
-	  exit(1);
-	}
-      }
-      set_max_flips(atoi(optarg));
-      break;
-    }
-    case MAX_EXTRA_FLIPS_OPTION: {
-      for(i=0; optarg[i] != '\0'; i++) {
-	if (! isdigit(optarg[i])) {
-	  mcsat_err("Error: max_extra_flips must be an integer\n");
-	  exit(1);
-	}
-      }
-      set_max_extra_flips(atoi(optarg));
-      break;
-    }
-    case TIMEOUT_OPTION: {
-      for(i=0; optarg[i] != '\0'; i++) {
-	if (! isdigit(optarg[i])) {
-	  mcsat_err("Error: timeout must be an integer\n");
-	  exit(1);
-	}
-      }
-      set_mcsat_timeout(atoi(optarg));
-      break;
-    }
-    case DUMP_SAMPLES_OPTION:
-      set_dump_samples_path(optarg);
-      break;
-    case LAZY_OPTION:
-      if ((strcasecmp(optarg, "true") == 0) || (strcasecmp(optarg, "t") == 0) || (strcmp(optarg, "1") == 0)) {
-	set_lazy_mcsat(true);
-      } else if ((strcasecmp(optarg, "false") == 0) || (strcasecmp(optarg, "f") == 0) || (strcmp(optarg, "0") == 0)) {
-	set_lazy_mcsat(false);
-      } else {
-	mcsat_err("Error: lazy must be true, false, t, f, 0, or 1\n");
-	exit(1);
-      }
-      break;
-    case STRICT_OPTION:
-      if ((strcasecmp(optarg, "true") == 0) || (strcasecmp(optarg, "t") == 0) || (strcmp(optarg, "1") == 0)) {
-	set_strict_constants(true);
-      } else if ((strcasecmp(optarg, "false") == 0) || (strcasecmp(optarg, "f") == 0) || (strcmp(optarg, "0") == 0)) {
-	set_strict_constants(false);
-      } else {
-	mcsat_err("Error: strict must be true, false, t, f, 0, or 1\n");
-	exit(1);
-      }
-      break;
-    case 'e':
-      set_print_exp_p(true);
-      break;
-    case 'v':
-      if (strlen(optarg) > 0) {
-	for (i = 0; i < strlen(optarg); i++) {
-	  if (!isdigit(optarg[i])) {
-	    mcsat_err("Verbosity must be a number\n");
-	    exit(1);
-	  }
-	}
-      } else {
-	mcsat_err("Verbosity must be a number\n");
-	exit(1);
-      }
-      printf("Setting verbosity to %d\n", atoi(optarg));
-      set_verbosity_level(atoi(optarg));
-      break;
-    default:
-      usage();
-    }
-    if (show_version) {
-      output("mcsat %s\nCopyright (C) 2008, SRI International.  All Rights Reserved.\n",
-	     VERSION);
-      exit(0);
-    }
-    if (show_help) {
-      help();
-    }
-  }
 }
 
 // Main routine for mcsat
 int main(int argc, char *argv[]) {
-  int32_t i;
-  bool file_loaded;
+	int32_t i;
+	bool file_loaded;
 
-  program_name = argv[0];
-  rand_reset(); // May be reset in options
-  decode_options(argc, argv);
-  init_samp_table(&samp_table);
-  file_loaded = false;
-  for (i = optind; i < argc; i++) {
-    if (access(argv[i], R_OK) == 0) {
-      printf("Loading %s\n", argv[i]);
-      load_mcsat_file(argv[i], &samp_table);
-      file_loaded = true;
-    } else {
-      //err(1, "File %s\n", argv[i]);
-      fprintf(stderr, "%s: File %s\n", program_name, argv[i]);
-      exit(1);
-    }
-  }
-  if (interactive || !file_loaded) {
-    // Now go interactive - empty string is for stdin
-    printf("\n\
-%s: type 'help;' for help\n\
-", program_name);
-    read_eval_print_loop("", &samp_table);
-    printf("Exiting MCSAT\n");
-  }
-  return 0;
+	program_name = argv[0];
+	rand_reset(); // May be reset in options
+	decode_options(argc, argv);
+	init_samp_table(&samp_table);
+	file_loaded = false;
+	for (i = optind; i < argc; i++) {
+		if (access(argv[i], R_OK) == 0) {
+			printf("Loading %s\n", argv[i]);
+			load_mcsat_file(argv[i], &samp_table);
+			file_loaded = true;
+		} else {
+			//err(1, "File %s\n", argv[i]);
+			fprintf(stderr, "%s: File %s\n", program_name, argv[i]);
+			exit(1);
+		}
+	}
+	if (interactive || !file_loaded) {
+		// Now go interactive - empty string is for stdin
+		printf("\n\
+				%s: type 'help;' for help\n\
+				", program_name);
+		read_eval_print_loop("", &samp_table);
+		printf("Exiting MCSAT\n");
+	}
+	return 0;
 }
