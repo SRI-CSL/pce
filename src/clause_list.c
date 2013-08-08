@@ -22,7 +22,7 @@ void init_clause_list(samp_clause_list_t *list) {
 	list->length = 0;
 }
 
-void insert_clause(samp_clause_t *clause, samp_clause_list_t *list,
+void clause_list_insert(samp_clause_t *clause, samp_clause_list_t *list,
 		samp_clause_t *ptr) {
 	clause->link = ptr->link;
 	ptr->link = clause;
@@ -32,17 +32,7 @@ void insert_clause(samp_clause_t *clause, samp_clause_list_t *list,
 	list->length++;
 }
 
-void push_clause(samp_clause_t *clause, samp_clause_list_t *list,
-		samp_clause_t *ptr) {
-	insert_clause(clause, list, ptr);
-	ptr = next_clause(ptr);
-}
-
-void insert_head_clause(samp_clause_t *clause, samp_clause_list_t *list) {
-	insert_clause(clause, list, list->head);
-}
-
-samp_clause_t *pop_clause(samp_clause_list_t *list, samp_clause_t *ptr) {
+samp_clause_t *clause_list_pop(samp_clause_list_t *list, samp_clause_t *ptr) {
 	assert(ptr != list->tail); /* pointer cannot be the tail */
 	samp_clause_t *clause = ptr->link;
 	if (list->tail == clause) {
@@ -54,7 +44,7 @@ samp_clause_t *pop_clause(samp_clause_list_t *list, samp_clause_t *ptr) {
 	return clause;
 }
 
-void append_clause_list(samp_clause_list_t *list_src, samp_clause_list_t *list_dst) {
+void clause_list_concat(samp_clause_list_t *list_src, samp_clause_list_t *list_dst) {
 	list_dst->tail->link = list_src->head->link;
 	if (!is_empty_clause_list(list_src)) {
 		list_dst->tail = list_src->tail;
@@ -66,11 +56,11 @@ void append_clause_list(samp_clause_list_t *list_src, samp_clause_list_t *list_d
 }
 
 void move_unsat_to_live_clauses(clause_table_t *clause_table) {
-	append_clause_list(&clause_table->unsat_clauses, &clause_table->live_clauses);
+	clause_list_concat(&clause_table->unsat_clauses, &clause_table->live_clauses);
 }
 
 void move_sat_to_live_clauses(clause_table_t *clause_table) {
-	append_clause_list(&clause_table->sat_clauses, &clause_table->live_clauses);
+	clause_list_concat(&clause_table->sat_clauses, &clause_table->live_clauses);
 }
 
 samp_clause_t *choose_random_clause(samp_clause_list_t *list) {

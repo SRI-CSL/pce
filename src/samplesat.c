@@ -95,7 +95,7 @@ static void link_propagate(samp_table_t *table, samp_literal_t lit) {
 	samp_clause_t *ptr;
 	samp_clause_t *clause;
 	for (ptr = clause_table->watched[lit].head; ptr != clause_table->watched[lit].tail; ) {
-		clause = pop_clause(&clause_table->watched[lit], ptr);
+		clause = clause_list_pop(&clause_table->watched[lit], ptr);
 
 		i = get_true_lit(atom_table->assignment, clause->disjunct,
 				clause->numlits);
@@ -105,12 +105,12 @@ static void link_propagate(samp_table_t *table, samp_literal_t lit) {
 			new_watched = clause->disjunct[i];
 			assert(new_watched != lit);
 
-			insert_head_clause(clause, &clause_table->watched[new_watched]);
+			clause_list_insert_head(clause, &clause_table->watched[new_watched]);
 			assert(assigned_true_lit(atom_table->assignment,
 						clause_table->watched[new_watched].head->link->disjunct[i]));
 		} else {
 			/* move the clause to the unsat_clause list */
-			insert_head_clause(clause, &clause_table->unsat_clauses);
+			clause_list_insert_head(clause, &clause_table->unsat_clauses);
 		}
 	}
 
@@ -258,11 +258,11 @@ void insert_live_clause(samp_clause_t *live_clause, samp_table_t *table) {
 		if (i < live_clause->numlits) { /* currently sat, put to watched list */
 			lit = live_clause->disjunct[i];
 
-			insert_head_clause(live_clause, &clause_table->watched[lit]);
+			clause_list_insert_head(live_clause, &clause_table->watched[lit]);
 			assert(assigned_true_lit(atom_table->assignment,
 						clause_table->watched[lit].head->link->disjunct[i]));
 		} else { /* currently unsat, remains in unsat list */
-			insert_head_clause(live_clause, &clause_table->unsat_clauses);
+			clause_list_insert_head(live_clause, &clause_table->unsat_clauses);
 		}
 	} else { /* we need to fix the truth value of disjunct[fixable] */
 		lit = live_clause->disjunct[fixable];
@@ -282,7 +282,7 @@ void insert_live_clause(samp_clause_t *live_clause, samp_table_t *table) {
 		}
 		assert(assigned_true_lit(atom_table->assignment, lit));
 		//push_integer_stack(lit, &(table->fixable_stack));
-		insert_head_clause(live_clause, &clause_table->sat_clauses);
+		clause_list_insert_head(live_clause, &clause_table->sat_clauses);
 
 		assert(assigned_fixed_true_lit(atom_table->assignment,
 					clause_table->sat_clauses.head->link->disjunct[fixable]));
@@ -316,7 +316,7 @@ void insert_negative_unit_clause(samp_clause_t *clause, samp_table_t *table) {
 		}
 	}
 	
-	insert_head_clause(clause, &clause_table->negative_or_unit_clauses);
+	clause_list_insert_head(clause, &clause_table->negative_or_unit_clauses);
 }
 
 /*
@@ -333,7 +333,7 @@ static int32_t scan_live_clauses(samp_table_t *table) {
 	samp_clause_t *cls; /* the current clause */
 
 	for (ptr = clause_table->live_clauses.head; ptr != clause_table->live_clauses.tail;) {
-		cls = pop_clause(&clause_table->live_clauses, ptr);
+		cls = clause_list_pop(&clause_table->live_clauses, ptr);
 		insert_live_clause(cls, table);
 	}
 	return 0;

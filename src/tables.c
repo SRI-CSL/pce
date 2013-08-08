@@ -18,11 +18,11 @@ void init_sort_table(sort_table_t *sort_table){
 	sort_table->num_sorts = 0;
 	sort_table->entries = (sort_entry_t*)safe_malloc(
 			size*sizeof(sort_entry_t));
-	/*  for (i=0; i<size; i++){//this is not really needed
-		sort_table->entries[i].cardinality = 0;
-		sort_table->entries[i].name = NULL;
-		}
-		*/
+	/* this is not really needed */
+	//for (i=0; i<size; i++){
+	//	sort_table->entries[i].cardinality = 0;
+	//	sort_table->entries[i].name = NULL;
+	//}
 	init_stbl(&(sort_table->sort_name_index), 0);
 }
 
@@ -42,7 +42,7 @@ static void sort_table_resize(sort_table_t *sort_table, uint32_t n){
 
 void add_sort(sort_table_t *sort_table, char *name) {
 	int32_t index = stbl_find(&(sort_table->sort_name_index), name);
-	if (index == -1){//sort is not in the symbol table
+	if (index == -1){ /* sort is not in the symbol table */
 		int32_t n = sort_table->num_sorts;
 		if (n >= sort_table->size){
 			sort_table_resize(sort_table, n + (n/2));
@@ -1082,34 +1082,34 @@ void init_samp_table(samp_table_t *table) {
  * at most size, and each sort name is hashed to the right index.
  */
 bool valid_sort_table(sort_table_t *sort_table){
-	//if (sort_table->size < 0 || sort_table->num_sorts > sort_table->size)
-	//	return false;
 	assert(sort_table->size >= 0);
 	assert(sort_table->num_sorts <= sort_table->size);
+	if (sort_table->size < 0 || sort_table->num_sorts > sort_table->size)
+		return false;
 	uint32_t i = 0;
 	while (i < sort_table->num_sorts &&
 			i == stbl_find(&(sort_table->sort_name_index),
 				sort_table->entries[i].name))
 		i++;
-	//if (i < sort_table->num_sorts) return false;
 	assert(i >= sort_table->num_sorts);
+	if (i < sort_table->num_sorts) return false;
 	return true;
 }
 
 /* Checks that the const names are hashed to the right index. */
 bool valid_const_table(const_table_t *const_table, sort_table_t *sort_table){
-	//if (const_table->size < 0 || const_table->num_consts > const_table->size)
-	//	return false;
 	assert(const_table->size >= 0); 
 	assert(const_table->num_consts <= const_table->size);
+	if (const_table->size < 0 || const_table->num_consts > const_table->size)
+		return false;
 	uint32_t i = 0;
 	while (i < const_table->num_consts &&
 			i == stbl_find(&(const_table->const_name_index),
 				const_table->entries[i].name) &&
 			const_table->entries[i].sort_index < sort_table->num_sorts)
 		i++;
-	//if (i < const_table->num_consts) return false;
 	assert(i >= const_table->num_consts);
+	if (i < const_table->num_consts) return false;
 	return true;
 }
 
@@ -1124,98 +1124,97 @@ bool valid_pred_table(pred_table_t *pred_table,
 	pred_entry_t *entry;
 	uint32_t i, j;
 
-	//if (evpred_tbl->size < 0 || evpred_tbl->num_preds > evpred_tbl->size) {
-	//	printf("Invalid pred size for evpred_tbl\n");
-	//	return false;
-	//}
 	assert(evpred_tbl->size >= 0);
 	assert(evpred_tbl->num_preds <= evpred_tbl->size);
+	if (evpred_tbl->size < 0 || evpred_tbl->num_preds > evpred_tbl->size) {
+		printf("Invalid pred size for evpred_tbl\n");
+		return false;
+	}
 	i = 0;
 	while (i < evpred_tbl->num_preds){
 		entry = &(evpred_tbl->entries[i]);
-		//if (-i != pred_val_to_index(pred_index(entry->name, pred_table))) {
-		//	printf("Invalid pred_val_to_index for evpred_tbl\n");
-		//	return false;
-		//}
-		//if (entry->arity < 0) {
-		//	printf("Invalid arity for evpred_tbl\n");
-		//	return false;
-		//}
 		assert(-i == pred_val_to_index(pred_index(entry->name, pred_table)));
 		assert(entry->arity >= 0);
+		if (-i != pred_val_to_index(pred_index(entry->name, pred_table))) {
+			printf("Invalid pred_val_to_index for evpred_tbl\n");
+			return false;
+		}
+		if (entry->arity < 0) {
+			printf("Invalid arity for evpred_tbl\n");
+			return false;
+		}
 		for (j = 0; j < entry->arity; j ++){
-			//if (entry->signature[j] < 0 ||
-			//		entry->signature[j] >= sort_table->num_sorts) {
-			//	printf("Invalid signature sort for evpred_tbl\n");
-			//	return false;
-			//}
 			assert(entry->signature[j] >= 0);
 			assert(entry->signature[j] < sort_table->num_sorts);
+			if (entry->signature[j] < 0 ||
+					entry->signature[j] >= sort_table->num_sorts) {
+				printf("Invalid signature sort for evpred_tbl\n");
+				return false;
+			}
 		}
-		//if (entry->size_atoms < 0 || entry->num_atoms > entry->size_atoms) {
-		//	printf("Invalid atoms size for evpred_tbl\n");
-		//	return false;
-		//}
 		assert(entry->size_atoms >= 0);
 		assert(entry->num_atoms <= entry->size_atoms);
+		if (entry->size_atoms < 0 || entry->num_atoms > entry->size_atoms) {
+			printf("Invalid atoms size for evpred_tbl\n");
+			return false;
+		}
 		for (j = 0; j < entry->num_atoms; j++){
-			//if (entry->atoms[j] < 0 ||
-			//		entry->atoms[j] >= atom_table->num_vars ||
-			//		atom_table->atom[entry->atoms[j]]->pred != -i) {
-			//	printf("Invalid atom pred for evpred_tbl\n");
-			//	return false;
-			//}
 			assert(entry->atoms[j] >= 0);
 			assert(entry->atoms[j] < atom_table->num_vars);
 			assert(atom_table->atom[entry->atoms[j]]->pred == -i);
+			if (entry->atoms[j] < 0 ||
+					entry->atoms[j] >= atom_table->num_vars ||
+					atom_table->atom[entry->atoms[j]]->pred != -i) {
+				printf("Invalid atom pred for evpred_tbl\n");
+				return false;
+			}
 		}
 		i++;
 	}
 
 	/* check pred_tbl */
 	pred_tbl_t *pred_tbl = &(pred_table->pred_tbl);
-	//if (pred_tbl->size < 0 || pred_tbl->num_preds > pred_tbl->size) {
-	//	printf("Invalid pred_tbl size\n");
-	//	return false;
-	//}
 	assert(pred_tbl->size >= 0);
 	assert(pred_tbl->num_preds <= pred_tbl->size);
+	if (pred_tbl->size < 0 || pred_tbl->num_preds > pred_tbl->size) {
+		printf("Invalid pred_tbl size\n");
+		return false;
+	}
 	i = 0;
 	while (i < pred_tbl->num_preds){
 		entry = &(pred_tbl->entries[i]);
-		//if (i != pred_val_to_index(pred_index(entry->name, pred_table))) {
-		//	printf("Invalid pred_val_to_index for pred_tbl\n");
-		//	return false;
-		//}
-		//if (entry->arity < 0) return false;
 		assert(i == pred_val_to_index(pred_index(entry->name, pred_table)));
 		assert(entry->arity >= 0);
+		if (i != pred_val_to_index(pred_index(entry->name, pred_table))) {
+			printf("Invalid pred_val_to_index for pred_tbl\n");
+			return false;
+		}
+		if (entry->arity < 0) return false;
 		for (j = 0; j < entry->arity; j ++){
-			//if (entry->signature[j] < 0 ||
-			//		entry->signature[j] >= sort_table->num_sorts) {
-			//	printf("Invalid signature for pred_tbl\n");
-			//	return false;
-			//}
 			assert(entry->signature[j] >= 0);
 			assert(entry->signature[j] < sort_table->num_sorts);
-
+			if (entry->signature[j] < 0 ||
+					entry->signature[j] >= sort_table->num_sorts) {
+				printf("Invalid signature for pred_tbl\n");
+				return false;
+			}
 		}
-		//if (entry->size_atoms < 0 || entry->num_atoms > entry->size_atoms) {
-		//	printf("Invalid atom for pred_tbl\n");
-		//	return false;
-		//}
 		assert(entry->size_atoms >= 0);
 		assert(entry->num_atoms <= entry->size_atoms);
+		if (entry->size_atoms < 0 || entry->num_atoms > entry->size_atoms) {
+			printf("Invalid atom for pred_tbl\n");
+			return false;
+		}
 		for (j = 0; j < entry->num_atoms; j++){
-			//if (entry->atoms[j] < 0 ||
-			//		entry->atoms[j] >= atom_table->num_vars ||
-			//		atom_table->atom[entry->atoms[j]]->pred != i) {
-			//	printf("Invalid atom for pred_tbl\n");
-			//	return false;
-			//}
 			assert(entry->atoms[j] >= 0);
 			assert(entry->atoms[j] < atom_table->num_vars);
 			assert(atom_table->atom[entry->atoms[j]]->pred == i);
+			if (entry->atoms[j] < 0 ||
+					entry->atoms[j] >= atom_table->num_vars ||
+					atom_table->atom[entry->atoms[j]]->pred != i) {
+				printf("Invalid atom for pred_tbl\n");
+				return false;
+			}
 		}
 		i++;
 	}
@@ -1227,13 +1226,13 @@ bool valid_pred_table(pred_table_t *pred_table,
  */
 bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 		const_table_t *const_table, sort_table_t *sort_table){
-	//if (atom_table->size < 0 ||
-	//		atom_table->num_vars > atom_table->size) {
-	//	printf("Invalid atom table size\n");
-	//	return false;
-	//}
 	assert(atom_table->size >= 0);
 	assert(atom_table->num_vars <= atom_table->size);
+	if (atom_table->size < 0 ||
+			atom_table->num_vars > atom_table->size) {
+		printf("Invalid atom table size\n");
+		return false;
+	}
 
 	uint32_t i, j, k;
 	int32_t pred, arity;
@@ -1251,17 +1250,16 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 			num_unfixed++;
 		}
 		for (j = 0; j < arity; j++){
-			//if (const_table->entries[atom_table->atom[i]->args[j]].sort_index !=
-			//		sig[j]) {
-			//	printf("Invalid atom sort\n");
-			//	return false;
-			//}
 			sort_entry = &sort_table->entries[sig[j]];
 			arg = atom_table->atom[i]->args[j];
 			if (sort_entry->constants == NULL) {
 				if (sort_entry->ints == NULL) {
 					assert(arg >= sort_entry->lower_bound);
 					assert(arg <= sort_entry->upper_bound);
+					if (arg > sort_entry->lower_bound
+							|| arg > sort_entry->upper_bound) {
+						printf("Integer out of boundary\n");
+					}
 				} else {
 					/* Enumerate integers, check if in the set */
 					int_exists = false;
@@ -1270,30 +1268,36 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 							int_exists = true;
 					}
 					assert(int_exists);
+					if (!int_exists) {
+						printf("Enumerate integer not in set\n");
+					}
 				}
 			} else {
 				/* constants have unique sorts, lookup directly */
-				assert(const_table->entries[arg].sort_index 
-						== sig[j]);
+				assert(const_table->entries[arg].sort_index == sig[j]);
+				if (const_table->entries[arg].sort_index != sig[j]) {
+					printf("Invalid atom sort\n");
+					return false;
+				}
 			}
 		}
 		array_hmap_pair_t *hmap_pair;
 		hmap_pair = array_size_hmap_find(&(atom_table->atom_var_hash),
 				arity+1,
 				(int32_t *) atom_table->atom[i]);
-		//if (hmap_pair == NULL ||
-		//		hmap_pair->val != i) {
-		//	printf("Invalid atom hmap_pair\n");
-		//	return false;
-		//}
 		assert(hmap_pair != NULL);
 		assert(hmap_pair->val == i);
+		if (hmap_pair == NULL ||
+				hmap_pair->val != i) {
+			printf("Invalid atom hmap_pair\n");
+			return false;
+		}
 	}
-	//if (num_unfixed != atom_table->num_unfixed_vars) {
-	//	printf("Invalid atom num unfixed vars\n");
-	//	return false;
-	//}
 	assert(num_unfixed == atom_table->num_unfixed_vars);
+	if (num_unfixed != atom_table->num_unfixed_vars) {
+		printf("Invalid atom num unfixed vars\n");
+		return false;
+	}
 	return true;
 }
 
@@ -1315,13 +1319,13 @@ static bool clause_contains_lit(samp_clause_t *clause, samp_literal_t lit) {
 static bool valid_watched_lit(clause_table_t *clause_table, samp_literal_t lit,
 		atom_table_t *atom_table) {
 	valid_clause_list(&clause_table->watched[lit]);
-	//if (!is_empty_clause_list(&clause_table->watched[lit])
-	//		&& ((is_pos(lit) && !assigned_true(atom_table->assignment[var_of(lit)]))
-	//		|| (is_neg(lit) && !assigned_false(atom_table->assignment[var_of(lit)]))))
-	//	return false;
-	assert(is_empty_clause_list(&clause_table->watched[lit])
-			|| ((is_pos(lit) && assigned_true(atom_table->assignment[var_of(lit)]))
-			|| (is_neg(lit) && assigned_false(atom_table->assignment[var_of(lit)]))));
+
+	bool lit_true = (is_pos(lit) && assigned_true(atom_table->assignment[var_of(lit)]))
+	             || (is_neg(lit) && assigned_false(atom_table->assignment[var_of(lit)]));
+	assert(is_empty_clause_list(&clause_table->watched[lit]) || lit_true);
+	if (!is_empty_clause_list(&clause_table->watched[lit]) && !lit_true) {
+		return false;
+	}
 
 	samp_clause_t *ptr;
 	samp_clause_t *cls;
@@ -1329,9 +1333,9 @@ static bool valid_watched_lit(clause_table_t *clause_table, samp_literal_t lit,
 			ptr != clause_table->watched[lit].tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
-		//if (!clause_contains_lit(cls, lit))
-		//	return false;
 		assert(clause_contains_lit(cls, lit));
+		if (!clause_contains_lit(cls, lit))
+			return false;
 	}
 	return true;
 }
@@ -1357,12 +1361,12 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 	samp_clause_t *cls;
 	int32_t lit;
 	uint32_t i, j;
-	//if (clause_table->size < 0) return false;
-	//if (clause_table->num_clauses < 0 || clause_table->num_clauses > clause_table->size)
-	//	return false;
 	assert(clause_table->size >= 0);
 	assert(clause_table->num_clauses >= 0);
 	assert(clause_table->num_clauses <= clause_table->size);
+	if (clause_table->size < 0) return false;
+	if (clause_table->num_clauses < 0 || clause_table->num_clauses > clause_table->size)
+		return false;
 
 	/* check that every clause in the unsat list is unsat */
 	valid_clause_list(&clause_table->unsat_clauses);
@@ -1370,9 +1374,9 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 			ptr != clause_table->unsat_clauses.tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
-		//if (eval_clause(atom_table->assignment, cls) != -1)
-		//	return false;
 		assert(eval_clause(atom_table->assignment, cls) == -1);
+		if (eval_clause(atom_table->assignment, cls) != -1)
+			return false;
 	}
 
 	/* check negative_or_unit_clauses */
@@ -1381,9 +1385,9 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 			ptr != clause_table->negative_or_unit_clauses.tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
-		//if (cls->weight >= 0 && cls->numlits != 1) 
-		//	return false;
 		assert(cls->weight < 0 || cls->numlits == 1);
+		if (cls->weight >= 0 && cls->numlits != 1) 
+			return false;
 	}
 
 	/* check dead_negative_or_unit_clauses */
@@ -1392,9 +1396,9 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 			ptr != clause_table->dead_negative_or_unit_clauses.tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
-		//if (cls->weight >= 0 && cls->numlits != 1) 
-		//	return false;
 		assert(cls->weight < 0 || cls->numlits == 1);
+		if (cls->weight >= 0 && cls->numlits != 1) 
+			return false;
 	}
 
 	/* check that every watched clause is satisfied */
@@ -1412,9 +1416,9 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 			ptr != clause_table->sat_clauses.tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
-		//if (!clause_contains_fixed_true_lit(cls, atom_table->assignment))
-		//	return false;
 		assert(clause_contains_fixed_true_lit(cls, atom_table->assignment));
+		if (!clause_contains_fixed_true_lit(cls, atom_table->assignment))
+			return false;
 	}
 	
 	/* check the live_clauses */
@@ -1424,15 +1428,15 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 	samp_clause_t *clause;
 	for (i = 0; i < clause_table->num_clauses; i++){
 		clause = clause_table->samp_clauses[i];
-		//if (clause->numlits < 0) 
-		//	return false;
 		assert(clause->numlits >= 0);
+		if (clause->numlits < 0) 
+			return false;
 		for (j = 0; j < clause->numlits; j++){
-			//if (var_of(clause->disjunct[j]) < 0 ||
-			//		var_of(clause->disjunct[j]) >= atom_table->num_vars)
-			//	return false;
 			assert(var_of(clause->disjunct[j]) >= 0);
 			assert(var_of(clause->disjunct[j]) < atom_table->num_vars);
+			if (var_of(clause->disjunct[j]) < 0 ||
+					var_of(clause->disjunct[j]) >= atom_table->num_vars)
+				return false;
 		}
 	}
 	return true;

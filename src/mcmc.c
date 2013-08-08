@@ -81,8 +81,8 @@ static void kill_clause_list(
 			ptr = next_clause(ptr);
 		} else {
 			/* move it to the dead_clauses list */
-			pop_clause(list_src, ptr);
-			insert_head_clause(clause, list_dst);
+			clause_list_pop(list_src, ptr);
+			clause_list_insert_head(clause, list_dst);
 		}
 	}
 }
@@ -164,19 +164,19 @@ static void init_clause_lists(clause_table_t *clause_table) {
 		clause = clause_table->samp_clauses[i];
 		if (clause->weight == DBL_MIN || clause->weight == DBL_MAX) {
 			if (clause->weight < 0 || clause->numlits == 1) {
-				insert_head_clause(clause, &clause_table->negative_or_unit_clauses);
+				clause_list_insert_head(clause, &clause_table->negative_or_unit_clauses);
 			}
 			else {
 				/* Temporarily put into live_clause before evaluating them */
-				insert_head_clause(clause, &clause_table->live_clauses);
+				clause_list_insert_head(clause, &clause_table->live_clauses);
 			}
 		}
 		else {
 			if (clause->weight < 0 || clause->numlits == 1) {
-				insert_head_clause(clause, &clause_table->dead_negative_or_unit_clauses);
+				clause_list_insert_head(clause, &clause_table->dead_negative_or_unit_clauses);
 			}
 			else {
-				insert_head_clause(clause, &clause_table->dead_clauses);
+				clause_list_insert_head(clause, &clause_table->dead_clauses);
 			}
 		}
 	}
@@ -200,9 +200,9 @@ static void restore_sat_dead_clauses(clause_table_t *clause_table,
 		if (val != -1) {
 			cprintf(2, "---> restoring dead clause %p (val = %"PRId32")\n",
 					cls, val); //BD
-			cls = pop_clause(&clause_table->dead_clauses, ptr);
+			cls = clause_list_pop(&clause_table->dead_clauses, ptr);
 			lit = cls->disjunct[val];
-			insert_head_clause(cls, &clause_table->watched[lit]);
+			clause_list_insert_head(cls, &clause_table->watched[lit]);
 			assert(assigned_true_lit(assignment, 
 						clause_table->watched[lit].head->link->disjunct[val]));
 		} else {
@@ -233,8 +233,8 @@ static void restore_sat_dead_negative_unit_clauses(clause_table_t *clause_table,
 		}
 		if (restore) {
 			/* push to negative_or_unit_clauses */
-			cls = pop_clause(&clause_table->dead_negative_or_unit_clauses, ptr);
-			insert_head_clause(cls, &clause_table->negative_or_unit_clauses);
+			cls = clause_list_pop(&clause_table->dead_negative_or_unit_clauses, ptr);
+			clause_list_insert_head(cls, &clause_table->negative_or_unit_clauses);
 		} else {
 			/* remains in the current list, move to next */
 			ptr = next_clause(ptr);
@@ -403,17 +403,18 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	int32_t conflict;
 	uint32_t i;
 	time_t fintime = 0;
-	bool draw_sample; // whether we use the current round of MCMC as a sample
+	bool draw_sample; /* whether we use the current round of MCMC as a sample */
 
 	cprintf(1, "[mc_sat] MC-SAT started ...\n");
-
-	// FIXME for eager inference, the clauses are instantiated before running
-	// mcsat, but they should be put into the lists following the same criteria
-	// as initial sample SAT.
 
 	empty_clause_lists(table);
 	init_clause_lists(clause_table);
 
+	/*
+	 * FIXME for eager inference, the clauses are instantiated before running
+	 * mcsat, but they should be put into the lists following the same criteria
+	 * as lazy mcsat.
+	 */
 	conflict = first_sample_sat(table, lazy, sa_probability, sa_temperature,
 			rvar_probability, max_flips);
 
@@ -500,7 +501,7 @@ void push_newly_activated_clause(int32_t clsidx, samp_table_t *table) {
 			|| (soft_clauses_included && choose() < 1 - exp(-abs_weight))) {
 		if (clause->numlits == 1 || clause->weight < 0) {
 			insert_negative_unit_clause(clause, table);
-			//insert_head_clause(clause, &clause_table->negative_or_unit_clauses);
+			//clause_list_insert_head(clause, &clause_table->negative_or_unit_clauses);
 		}
 		else {
 			insert_live_clause(clause, table);
@@ -508,10 +509,10 @@ void push_newly_activated_clause(int32_t clsidx, samp_table_t *table) {
 	}
 	else {
 		if (clause->numlits == 1 || clause->weight < 0) {
-			insert_head_clause(clause, &clause_table->dead_negative_or_unit_clauses);
+			clause_list_insert_head(clause, &clause_table->dead_negative_or_unit_clauses);
 		}
 		else {
-			insert_head_clause(clause, &clause_table->dead_clauses);
+			clause_list_insert_head(clause, &clause_table->dead_clauses);
 		}
 	}
 }

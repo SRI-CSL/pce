@@ -25,21 +25,26 @@ static inline bool is_empty_clause_list(samp_clause_list_t *list) {
 }
 
 /* Inserts a clause after the ptr */
-extern void insert_clause(samp_clause_t *clause, samp_clause_list_t *list,
+extern void clause_list_insert(samp_clause_t *clause, samp_clause_list_t *list,
 		samp_clause_t *ptr);
 
 /* Insert a clause before the ptr */
-extern void push_clause(samp_clause_t *clause, samp_clause_list_t *list,
-		samp_clause_t *ptr);
+static inline void clause_list_push(samp_clause_t *clause, samp_clause_list_t *list,
+		samp_clause_t *ptr) {
+	clause_list_insert(clause, list, ptr);
+	ptr = next_clause(ptr);
+}
 
 /* Insert a clause at the head of a list */
-extern void insert_head_clause(samp_clause_t *clause, samp_clause_list_t *list);
+static inline void clause_list_insert_head(samp_clause_t *clause, samp_clause_list_t *list) {
+	clause_list_insert(clause, list, list->head);
+}
 
 /* Remove the current clause from the list and return it */
-extern samp_clause_t *pop_clause(samp_clause_list_t *list, samp_clause_t *ptr);
+extern samp_clause_t *clause_list_pop(samp_clause_list_t *list, samp_clause_t *ptr);
 
 /* Concatinate two clause lists together */
-extern void append_clause_list(samp_clause_list_t *list_src, samp_clause_list_t *list_dst);
+extern void clause_list_concat(samp_clause_list_t *list_src, samp_clause_list_t *list_dst);
 
 /* Move all unsat clauses to the live clause list */
 extern void move_unsat_to_live_clauses(clause_table_t *clause_table);

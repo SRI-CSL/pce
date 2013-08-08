@@ -535,7 +535,7 @@ static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_
 
 	/*
 	 * The atom arguments that are consistent with the current substitution.
-	 * Can be used to efficiently retrieve the active atoms
+	 * TODO the consistent active atoms could be efficiently retrieved
 	 */
 	int32_t *atom_arg_value = (int32_t *) safe_malloc(sizeof(int32_t) * arity);
 	for (i = 0; i < arity; i++) {
@@ -563,13 +563,13 @@ static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_
 				}
 			}
 			else if (atom_arg_value[0] != INT32_MIN) {
-				var_index = rule_atom->args[1].value; // arg[1] is unfixed
+				var_index = rule_atom->args[1].value; /* arg[1] is unfixed */
 				substit_buffer.entries[var_index] = atom_arg_value[0];
 				smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
 				substit_buffer.entries[var_index] = INT32_MIN;
 			}
 			else if (atom_arg_value[1] != INT32_MIN) {
-				var_index = rule_atom->args[0].value; // arg[0] is unfixed
+				var_index = rule_atom->args[0].value; /* arg[0] is unfixed */
 				substit_buffer.entries[var_index] = atom_arg_value[1];
 				smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
 				substit_buffer.entries[var_index] = INT32_MIN;
@@ -585,36 +585,39 @@ static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_
 		}
 	} else {
 		pred_entry_t *pred_entry = get_pred_entry(pred_table, rule_atom->pred);
-		bool compatible; // if compatible with the current substitution
+		bool compatible; /* if compatible with the current substitution */
+		
+		printf("depth = %d, #atoms = %d start ...\n", order, pred_entry->num_atoms);
 		for (i = 0; i < pred_entry->num_atoms; i++) {
-			// TODO only consider active atoms, maybe we can keep only
-			// the active atoms in pred_entry->atoms
+			/* TODO only consider active atoms, maybe we can keep only
+			 * the active atoms in pred_entry->atoms */
 			samp_atom_t *atom = atom_table->atom[pred_entry->atoms[i]];
 			compatible = true;
 			for (j = 0; j < arity; j++) {
 				if (atom_arg_value[j] != INT32_MIN &&
 						atom_arg_value[j] != atom->args[j]) {
-					compatible = false; // incompatible
+					compatible = false;
 				}
 			}
 			if (!compatible) {
-				continue; // move to the next active atom;
+				continue; /* move to the next active atom */
 			}
 			for (j = 0; j < arity; j++) {
-				if (atom_arg_value[j] == INT32_MIN) { // value already set
-					// index of the variable in the rule's quantifier list
+				if (atom_arg_value[j] == INT32_MIN) { /* values not yet fixed */
+					/* index of the variable in the rule's quantifier list */
 					var_index = rule_atom->args[j].value;
-					substit_buffer.entries[var_index] = atom->args[j]; // for free variable
+					substit_buffer.entries[var_index] = atom->args[j]; /* for free variable */
 				}
 			}
 			smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
-			for (j = 0; j < arity; j++) { // backtracking, reset values
+			for (j = 0; j < arity; j++) { /* backtracking, reset values */
 				if (atom_arg_value[j] == INT32_MIN) {
 					var_index = rule_atom->args[j].value;
 					substit_buffer.entries[var_index] = INT32_MIN;
 				}
 			}
 		}
+		printf("depth = %d done!\n", order);
 	}
 
 	safe_free(atom_arg_value);
@@ -632,7 +635,7 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 	pred_table_t *pred_table = &table->pred_table;
 //	int prev_num_clauses;
 	int32_t i, order;
-	int32_t *ordered_lits; // the order of the lits in which they are checked
+	int32_t *ordered_lits; /* the order of the lits in which they are checked */
 
 	if (get_verbosity_level() >= 5) {
 		printf("[fixed_const_rule_instances] Instantiating ");
@@ -657,6 +660,14 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 
 	/* termination symbol */
 	ordered_lits[order] = -1;
+
+	/* TODO need to skip the literal that match atom_index */
+	/* TODO a better strategy to decide the order by which each literal
+	 * is grounded is to greedily choose a literal each round. At the
+	 * begining only the literal that matches atom_index is set to
+	 * visited. Each round we instantiate a literal that has the minimum
+	 * number of groundings and set the visit flag. When all the literals
+	 * has been visited, we proceed to the brute force grounding. */
 	smart_rule_instances_rec(0, ordered_lits, rule, table, atom_index);
 
 	safe_free(ordered_lits);
@@ -1174,6 +1185,7 @@ static bool match_atom_in_rule_atom(samp_atom_t *atom, rule_literal_t *lit,
  */
 int32_t activate_atom(samp_table_t *table, int32_t atom_index) {
 	atom_table_t *atom_table = &table->atom_table;
+	assert(!atom_table->active[atom_index]);
 	atom_table->active[atom_index] = true;
 
 	activate_rules(atom_index, table);
@@ -1244,7 +1256,7 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 					/* TODO this condition is not right when looking for initial unsat clauses */
 					//&& is_neg(rule_entry->literals[j]) != pred_default_value(pred_entry)
 					) {
-				//then substit_buffer contains the matching substitution
+				/* then substit_buffer contains the matching substitution */
 				fixed_const_rule_instances(rule_entry, table, atom_index);
 			}
 		}

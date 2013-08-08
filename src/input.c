@@ -1024,7 +1024,7 @@ extern bool read_eval(samp_table_t *table) {
 			int32_t i;
 			input_const_decl_t decl = input_command.decl.const_decl;
 			for (i = 0; i < decl.num_names; i++) {
-				cprintf(2, "Adding const %s\n", decl.name[i]);
+				//cprintf(2, "Adding const %s\n", decl.name[i]);
 				add_constant(decl.name[i], decl.sort, table);
 			}
 			break;
