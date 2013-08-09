@@ -7,14 +7,12 @@
 #include <float.h>
 #include <time.h>
 
+#include "tables.h"
 #include "memalloc.h"
-#include "prng.h"
 #include "int_array_sort.h"
 #include "array_hash_map.h"
-#include "gcd.h"
 #include "utils.h"
 #include "print.h"
-#include "input.h"
 #include "vectors.h"
 #include "buffer.h"
 #include "clause_list.h"
@@ -145,7 +143,7 @@ static int32_t set_atom_tval(int32_t var, samp_truth_value_t tval, samp_table_t 
 	 * the opposite value, return inconsistency; otherwise do nothing;
 	 */
 	samp_truth_value_t old_tval = atom_table->assignment[var];
-	if (fixed_tval(old_tval)) {
+	if (!unfixed_tval(old_tval)) {
 		if ((assigned_true(old_tval) && assigned_false(tval))
 				|| (assigned_false(old_tval) && assigned_true(tval))) {
 			mcsat_err("[set_atom_tval] Assigning a conflict truth value. No model exists.\n");
@@ -199,7 +197,7 @@ static int32_t set_atom_tval(int32_t var, samp_truth_value_t tval, samp_table_t 
 /*
  * In unit propagation, fix a literal's value to true
  */
-static int32_t inline fix_lit_true(samp_table_t *table, int32_t lit) {
+static int32_t fix_lit_true(samp_table_t *table, int32_t lit) {
 	int32_t conflict;
 	samp_truth_value_t tval;
 
@@ -473,7 +471,8 @@ static int32_t choose_random_atom(samp_table_t *table) {
 	/* Get the number of possible indirect atoms */
 	all_card = all_atoms_cardinality(pred_tbl, sort_table);
 
-	atom_num = random_uint(all_card);
+	//atom_num = random_uint(all_card);
+	atom_num = genrand_uint(all_card);
 
 	predicate = 1; /* Skip past true */
 	acard = 0;
@@ -646,8 +645,8 @@ static int32_t choose_clause_var(samp_table_t *table, samp_clause_t *clause,
 			}
 		}
 	}
-	varidx = random_uint(length_integer_stack(&clause_var_stack));
-	//varidx = genrand_uint(length_integer_stack(&clause_var_stack));
+	//varidx = random_uint(length_integer_stack(&clause_var_stack));
+	varidx = genrand_uint(length_integer_stack(&clause_var_stack));
 	cost_flip_unfixed_variable(table, dcost, var_of(clause->disjunct[varidx]));
 
 	assert(varidx < length_integer_stack(&clause_var_stack));

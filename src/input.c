@@ -13,12 +13,11 @@
 #include "SFMT.h"
 #include "cnf.h"
 #include "samplesat.h"
-#include "weight_learning.h"
-#include "training_data.h"
-
 #include "ground.h"
 #include "mcmc.h"
 #include "input.h"
+#include "weight_learning.h"
+#include "training_data.h"
 
 extern int yyparse();
 extern void free_parse_data();
@@ -530,6 +529,28 @@ help [command];\n\
 ");
 		break;
 	}
+}
+
+void add_sortdef(sort_table_t *sort_table, char *sort,
+		input_sortdef_t *sortdef) {
+	int32_t sidx;
+	sort_entry_t *sentry;
+
+	sidx = stbl_find(&sort_table->sort_name_index, sort);
+	sentry = &sort_table->entries[sidx];
+	// Free up the constants array - it's not needed here
+	safe_free(sentry->constants);
+	sentry->constants = NULL;
+	if (sortdef->lower_bound == INT32_MIN) {
+		sentry->ints = (int32_t *)
+			safe_malloc(INIT_SORT_CONST_SIZE * sizeof(int32_t));
+		sentry->cardinality = 0;
+	} else {
+		sentry->ints = NULL;
+		sentry->cardinality = sortdef->upper_bound - sortdef->lower_bound + 1;
+	}
+	sentry->lower_bound = sortdef->lower_bound;
+	sentry->upper_bound = sortdef->upper_bound;
 }
 
 int32_t add_predicate(char *pred, char **sort, bool directp,

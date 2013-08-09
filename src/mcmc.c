@@ -8,18 +8,12 @@
 #include <time.h>
 
 #include "memalloc.h"
-#include "prng.h"
-#include "int_array_sort.h"
-#include "array_hash_map.h"
-#include "gcd.h"
 #include "utils.h"
 #include "print.h"
 #include "input.h"
 #include "vectors.h"
 #include "buffer.h"
 #include "clause_list.h"
-
-#include "weight_learning.h"
 #include "samplesat.h"
 #include "mcmc.h"
 

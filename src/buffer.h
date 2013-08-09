@@ -2,6 +2,7 @@
 #define __BUFFER_H 1
 
 #include "tables.h"
+#include "input.h"
 
 #define INIT_INPUT_CLAUSE_BUFFER_SIZE 8
 #define INIT_INPUT_LITERAL_BUFFER_SIZE 8

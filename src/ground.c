@@ -651,6 +651,33 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 	order = 0;
 	for (i = 0; i < rule->num_lits; i++) {
 		int32_t default_value = rule_atom_default_value(rule->literals[i]->atom, pred_table);
+
+		/* 
+		 * FIXME There are several cases:
+		 *
+		 * 1) The literal is an indirect predicate. 
+		 *
+		 * 1.1) weight is positive: If the literal is true when the predicate
+		 * takes the default value, we will ground all the non-default
+		 * (activated) atoms of the predicate; if the literal is false when the
+		 * predicate takes the default value, there will be TOO MANY groundings
+		 * to consider so we skip it and consider it later.
+		 * 
+		 * 1.2) weight is negative: If the literal is true when the predicate
+		 * takes the default value, we ground all non-default atoms of the
+		 * predicate, and all the other free variables can take any feasible
+		 * value. If the literal is false by default, we basically need to
+		 * ground EVERYTHING for this rule.
+		 *
+		 * 2) The literal is a direct predicate (or built-in operator). If the
+		 * literal is false when the predicate takes the default value, ground
+		 * the non-default valued atoms and continue on the next literal. If
+		 * the literal is true, most formulas are FIXED satisfied so we still
+		 * ground the non-default valued atoms and continue.
+		 *
+		 * 3) If the formula is a general cnf, it would be similar to case 1.2)
+		 */
+
 		if ((rule->literals[i]->neg && default_value == 0)
 				|| (!rule->literals[i]->neg && default_value == 1)) {
 			ordered_lits[order] = i;

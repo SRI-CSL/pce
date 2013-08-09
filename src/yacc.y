@@ -611,13 +611,13 @@ void yy_mcsat_params_decl (char **params) {
   bool bval;
   char *str;
   char **strs;
-  input_sortdef_t *sortdef;
-  input_fmla_t *fmla;
-  input_formula_t *formula;
-  input_clause_t *clause;
-  input_literal_t *lit;
-  input_literal_t **lits;
-  input_atom_t *atom;
+  struct input_sortdef_s *sortdef;
+  struct input_fmla_s *fmla;
+  struct input_formula_s *formula;
+  struct input_clause_s *clause;
+  struct input_literal_s *lit;
+  struct input_literal_s **lits;
+  struct input_atom_s *atom;
   int32_t ival;
 }
 

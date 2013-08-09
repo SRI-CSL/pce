@@ -110,63 +110,6 @@ static inline bool opposite(samp_literal_t l1, samp_literal_t l2) {
 	return (l1 ^ l2) == 1;
 }
 
-typedef struct input_sortdef_s {
-	int32_t lower_bound;
-	int32_t upper_bound;
-} input_sortdef_t;
-
-typedef struct input_atom_s {
-	char *pred;
-	int32_t builtinop; /* = 0: not a built-in-op, > 0: built-in-op */
-	char **args;
-} input_atom_t;
-
-typedef struct input_literal_s {
-	bool neg; /* true: with negation; false: without negation */
-	input_atom_t *atom;
-} input_literal_t;
-
-/* This is used for both clauses (no vars) and rules. */
-typedef struct input_clause_s {
-	int32_t varlen;
-	char **variables; /* Input variables */
-	int32_t litlen;
-	input_literal_t **literals;
-} input_clause_t;
-
-/* Composition of two formulas */
-typedef struct input_comp_fmla_s {
-	int32_t op; /* binary operators such as and, or, implies, iff etc. */
-	struct input_fmla_s *arg1;
-	struct input_fmla_s *arg2;
-} input_comp_fmla_t;
-
-/* A unit is either an atom or a composed formula */
-typedef union input_ufmla_s {
-	input_atom_t *atom;
-	input_comp_fmla_t *cfmla;
-} input_ufmla_t;
-
-/* Input FOL formula */
-typedef struct input_fmla_s {
-	bool atomic;
-	input_ufmla_t *ufmla;
-} input_fmla_t;
-
-/* Quantified variables */
-typedef struct var_entry_s {
-	char *name;
-	int32_t sort_index; 
-} var_entry_t;
-
-/* 
- * Original formula that is recursively defined, will be converted to CNF later
- */
-typedef struct input_formula_s {
-	var_entry_t **vars; /* NULL terminated list of vars */
-	input_fmla_t *fmla;
-} input_formula_t;
-
 /*
  * Each sort has a name (string), and a cardinality. Each element is also assigned
  * a number; the elements are prefixed with the sort.
@@ -235,6 +178,13 @@ typedef struct const_table_s {
 	stbl_t const_name_index; /* table mapping const name to index */
 } const_table_t;
 
+/* Quantified variables */
+typedef struct var_entry_s {
+	char *name;
+	int32_t sort_index; 
+} var_entry_t;
+
+/* FIXME why do we keep them in a table? */
 typedef struct var_table_s {
 	int32_t size;
 	int32_t num_vars;
@@ -455,7 +405,6 @@ typedef struct samp_table_s {
 extern void init_sort_table(sort_table_t *sort_table);
 extern void reset_sort_table(sort_table_t *sort_table);
 extern void add_sort(sort_table_t *sort_table, char *name);
-void add_sortdef(sort_table_t *sort_table, char *sort, input_sortdef_t *sortdef);
 extern void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort);
 extern int32_t sort_name_index(char *name, sort_table_t *sort_table);
 extern int32_t *sort_signature(char **in_signature, int32_t arity, sort_table_t *sort_table);
@@ -464,6 +413,7 @@ extern int32_t *sort_signature(char **in_signature, int32_t arity, sort_table_t 
 extern void init_const_table(const_table_t *const_table);
 extern int32_t const_index(char *name, const_table_t *const_table);
 extern int32_t const_sort_index(int32_t const_index, const_table_t *const_table);
+extern void sort_entry_resize(sort_entry_t *sort_entry);
 extern void add_const_to_sort(int32_t const_index,
 		int32_t sort_index,
 		sort_table_t *sort_table);

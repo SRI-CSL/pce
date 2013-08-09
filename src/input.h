@@ -3,14 +3,63 @@
 #ifndef __INPUT_H
 #define __INPUT_H 1
 
-#include "utils.h"
+#include "tables.h"
 
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "samplesat.h"
-
 extern FILE *mcsat_input;
+
+typedef struct input_sortdef_s {
+	int32_t lower_bound;
+	int32_t upper_bound;
+} input_sortdef_t;
+
+typedef struct input_atom_s {
+	char *pred;
+	int32_t builtinop; /* = 0: not a built-in-op, > 0: built-in-op */
+	char **args;
+} input_atom_t;
+
+typedef struct input_literal_s {
+	bool neg; /* true: with negation; false: without negation */
+	input_atom_t *atom;
+} input_literal_t;
+
+/* This is used for both clauses (no vars) and rules. */
+typedef struct input_clause_s {
+	int32_t varlen;
+	char **variables; /* Input variables */
+	int32_t litlen;
+	input_literal_t **literals;
+} input_clause_t;
+
+/* Composition of two formulas */
+typedef struct input_comp_fmla_s {
+	int32_t op; /* binary operators such as and, or, implies, iff etc. */
+	struct input_fmla_s *arg1;
+	struct input_fmla_s *arg2;
+} input_comp_fmla_t;
+
+/* A unit is either an atom or a composed formula */
+typedef union input_ufmla_s {
+	input_atom_t *atom;
+	input_comp_fmla_t *cfmla;
+} input_ufmla_t;
+
+/* Input FOL formula */
+typedef struct input_fmla_s {
+	bool atomic;
+	input_ufmla_t *ufmla;
+} input_fmla_t;
+
+/* 
+ * Original formula that is recursively defined, will be converted to CNF later
+ */
+typedef struct input_formula_s {
+	struct var_entry_s **vars; /* NULL terminated list of vars */
+	input_fmla_t *fmla;
+} input_formula_t;
 
 /*
  * Abstract syntax tree
@@ -162,6 +211,7 @@ extern bool read_eval(samp_table_t *table);
 extern void read_eval_print_loop(char *input, samp_table_t *table);
 extern void load_mcsat_file(char *file, samp_table_t *table);
 
+extern void add_sortdef(sort_table_t *sort_table, char *sort, input_sortdef_t *sortdef);
 extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t *table);
 extern bool add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table);
 extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
@@ -207,10 +257,6 @@ extern void set_lazy_mcsat(bool val);
 extern char* get_dump_samples_path();
 extern void set_dump_samples_path(char *path);
   
-extern void input_clause_buffer_resize ();
-extern void input_literal_buffer_resize ();
-extern void input_atom_buffer_resize ();
-
 extern void free_atom(input_atom_t *atom);
 extern void free_clause(input_clause_t *clause);
 
@@ -230,4 +276,4 @@ extern input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
 
 void set_training_data_file(char *path);
 
-#endif /* __INPUT_H */     
+#endif /* __INPUT_H */

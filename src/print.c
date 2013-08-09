@@ -8,7 +8,6 @@
 #include "memalloc.h"
 #include "utils.h"
 #include "tables.h"
-#include "input.h"
 #include "clause_list.h"
 #include "buffer.h"
 #include "print.h"
