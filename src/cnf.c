@@ -760,7 +760,7 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 				if (!lazy_mcsat()) {
 					all_rule_instances(current_rule, &samp_table);
 				} else {
-					smart_rule_instances(current_rule, &samp_table);
+					smart_all_rule_instances(current_rule, &samp_table);
 				}
 			} else {
 				if (found->weight != DBL_MAX) {

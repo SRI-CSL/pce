@@ -408,6 +408,7 @@ extern void add_sort(sort_table_t *sort_table, char *name);
 extern void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort);
 extern int32_t sort_name_index(char *name, sort_table_t *sort_table);
 extern int32_t *sort_signature(char **in_signature, int32_t arity, sort_table_t *sort_table);
+extern int32_t get_sort_const(sort_entry_t *sort_entry, int32_t index);
 
 /* functions for const_table */
 extern void init_const_table(const_table_t *const_table);

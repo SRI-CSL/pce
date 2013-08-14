@@ -385,6 +385,13 @@ void print_live_clauses(samp_table_t *table) {
 	}
 	output("Unsat clauses:\n");
 	print_clause_list(&clause_table->unsat_clauses, table);
+
+	output("Negative/Unit clauses:\n");
+	print_clause_list(&clause_table->negative_or_unit_clauses, table);
+
+	output("Other live clauses:\n");
+	print_clause_list(&clause_table->live_clauses, table);
+
 	output("\n");
 }
 
@@ -410,6 +417,9 @@ void print_clause_table(samp_table_t *table) {
 
 	output("Negative/Unit clauses:\n");
 	print_clause_list(&clause_table->negative_or_unit_clauses, table);
+
+	output("Other live clauses:\n");
+	print_clause_list(&clause_table->live_clauses, table);
 
 	output("Dead clauses:\n");
 	print_clause_list(&clause_table->dead_clauses, table);

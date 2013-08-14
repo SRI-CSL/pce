@@ -13,10 +13,7 @@ extern void all_pred_instances(char *pred, samp_table_t *table);
 
 extern void all_rule_instances(int32_t rule, samp_table_t *table);
 
-extern void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
-		int32_t atom_index);
-
-extern void smart_rule_instances(int32_t rule_index, samp_table_t *table);
+extern void smart_all_rule_instances(int32_t rule_index, samp_table_t *table);
 
 extern void all_query_instances(samp_query_t *query, samp_table_t *table);
 

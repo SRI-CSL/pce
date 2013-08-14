@@ -238,6 +238,20 @@ void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort) {
 	add_subsort_consts_to_supersort(subidx, supidx, sort_table);
 }
 
+int32_t get_sort_const(sort_entry_t *sort_entry, int32_t index) {
+	if (sort_entry->constants == NULL) {
+		if (sort_entry->ints == NULL) {
+			return sort_entry->lower_bound + index;
+		}
+		else {
+			return sort_entry->ints[index];
+		}
+	}
+	else {
+		return sort_entry->constants[index];
+	}
+}
+
 void init_const_table(const_table_t *const_table){
 	int32_t size = INIT_CONST_TABLE_SIZE;
 	if (size >= MAXSIZE(sizeof(const_entry_t), 0)){
@@ -1234,7 +1248,7 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 				if (sort_entry->ints == NULL) {
 					assert(arg >= sort_entry->lower_bound);
 					assert(arg <= sort_entry->upper_bound);
-					if (arg > sort_entry->lower_bound
+					if (arg < sort_entry->lower_bound
 							|| arg > sort_entry->upper_bound) {
 						printf("Integer out of boundary\n");
 					}

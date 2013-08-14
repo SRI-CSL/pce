@@ -16,6 +16,8 @@
 #include "clause_list.h"
 #include "samplesat.h"
 #include "mcmc.h"
+#include "weight_learning.h"
+#include "training_data.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -265,11 +267,10 @@ static int32_t reset_sample_sat(samp_table_t *table) {
 	kill_negative_unit_clauses(clause_table);
 	kill_clauses(table);
 
-	if (get_verbosity_level() >= 3) {
+	if (get_verbosity_level() >= 2) {
 		printf("[reset_sample_sat] done. %d unsat_clauses\n",
 				clause_table->unsat_clauses.length);
-		print_assignment(table);
-		print_clause_table(table);
+		print_live_clauses(table);
 	}
 
 	return 0;
@@ -341,8 +342,7 @@ static void update_pmodel(samp_table_t *table) {
 	table->atom_table.num_samples++;
 	for (i = 0; i < num_vars; i++) {
 		if (assigned_true(atom_table->assignment[i])) {
-			if (get_verbosity_level() >= 3 
-					&& i > 0) { // FIXME why i > 0?
+			if (get_verbosity_level() >= 3 && i > 0) { // FIXME why i > 0?
 				printf("Atom %d was assigned true\n", i);
 				fflush(stdout);
 			}
@@ -404,6 +404,13 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	empty_clause_lists(table);
 	init_clause_lists(clause_table);
 
+	if (get_verbosity_level() >= 2) {
+		printf("[mc_sat] Init clause list done. %"PRIu32" unsat_clauses\n",
+				clause_table->unsat_clauses.length);
+		//print_live_clauses(table);
+		print_clause_table(table);
+	}
+
 	/*
 	 * FIXME for eager inference, the clauses are instantiated before running
 	 * mcsat, but they should be put into the lists following the same criteria
@@ -425,10 +432,8 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	}
 	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
 		draw_sample = (i >= burn_in_steps && i % samp_interval == 0);
-		if (draw_sample) {
-			cprintf(1, "\n---- Sample[%"PRIu32"] ---\n",
-					(i - burn_in_steps) / samp_interval);
-		}
+
+		cprintf(2, "\n[mc_sat] MC-SAT round %"PRIu32" started:\n", i);
 
 		//assert(valid_table(table));
 		conflict = reset_sample_sat(table);
@@ -459,9 +464,13 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 			update_pmodel(table);
 		}
 
+		cprintf(2, "\n[mc_sat] MC-SAT after round %"PRIu32":\n", i);
 		if (get_verbosity_level() >= 2 ||
 				(get_verbosity_level() >= 1 && draw_sample)) {
-			printf("\n[mc_sat] MC-SAT after round %d:\n", i);
+			if (draw_sample) {
+				cprintf(1, "\n---- Sample[%"PRIu32"] ---\n",
+						(i - burn_in_steps) / samp_interval);
+			}
 			print_assignment(table);
 		}
 		//assert(valid_table(table));

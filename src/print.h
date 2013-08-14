@@ -39,6 +39,7 @@ extern void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table)
 extern void print_atoms(samp_table_t *samp_table);
 extern void print_atom(samp_atom_t *atom, samp_table_t *table);
 extern void print_clauses(samp_table_t *samp_table);
+extern void print_live_clauses(samp_table_t *table);
 extern void print_clause_table(samp_table_t *table);
 extern void print_rules(rule_table_t *rule_table);
 extern void print_state(samp_table_t *table, uint32_t round);
