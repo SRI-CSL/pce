@@ -168,7 +168,13 @@ extern bool subsort_p(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
 extern int32_t least_common_supersort(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
 extern int32_t greatest_common_subsort(int32_t sig1, int32_t sig2, sort_table_t *sort_table);
 
+
 extern int32_t rule_atom_arity(rule_atom_t *atom, pred_table_t *pred_table);
+
+/* the rule atom is a direct predicate or builtinop */
+static inline bool rule_atom_is_direct(rule_atom_t *rule_atom) {
+	return (rule_atom->builtinop > 0 || rule_atom->pred <= 0);
+}
 extern int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table);
 extern samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, substit_entry_t *substs,
 		pred_table_t *pred_table);

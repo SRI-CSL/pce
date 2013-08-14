@@ -1117,7 +1117,7 @@ extern bool read_eval(samp_table_t *table) {
 		}
 		case ASK: {
 			input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
-			cprintf(1, "Ask: clausifying formula\n");
+			cprintf(1, "\nAsk: clausifying formula\n");
 
 			if (get_dump_samples_path() != NULL) {
 				output(" samples are not going to be dumped after the first ASK");
@@ -1172,7 +1172,7 @@ extern bool read_eval(samp_table_t *table) {
 			clock_t start, end;
 
 			start = clock();
-			output("Calling %sMCSAT with parameters (set using mcsat_params):\n",
+			output("\nCalling %sMCSAT with parameters (set using mcsat_params):\n",
 					lazy_mcsat() ? "LAZY_" : "");
 			output(" max_samples = %"PRId32"\n", get_max_samples());
 			output(" sa_probability = %f\n", get_sa_probability());

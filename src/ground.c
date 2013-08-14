@@ -135,24 +135,9 @@ static void new_const_atoms_at(int32_t idx, int32_t newcidx, int32_t arity,
 		new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
 	} else {
 		entry = sort_table->entries[psig[idx]];
-		if (entry.constants == NULL) {
-			// An integer
-			if (entry.ints == NULL) {
-				for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
-					atom->args[idx] = i;
-					new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
-				}
-			} else {
-				for (i = 0; i < entry.cardinality; i++) {
-					atom->args[idx] = entry.ints[i];
-					new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
-				}
-			}
-		} else {
-			for (i = 0; i < entry.cardinality; i++) {
-				atom->args[idx] = entry.constants[i];
-				new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
-			}
+		for (i = 0; i < entry.cardinality; i++) {
+			atom->args[idx] = get_sort_const(&entry, i);
+			new_const_atoms_at(idx + 1, newcidx, arity, psig, atom, table);
 		}
 	}
 }
@@ -175,24 +160,9 @@ static void all_pred_instances_rec(int32_t vidx, int32_t *psig, int32_t arity,
 		add_internal_atom(table, atom, false);
 	} else {
 		entry = sort_table->entries[psig[vidx]];
-		if (entry.constants == NULL) {
-			// Have an integer
-			if (entry.ints == NULL) {
-				for (i = entry.lower_bound; i <= entry.upper_bound; i++) {
-					atom->args[vidx] = i;
-					all_pred_instances_rec(vidx + 1, psig, arity, atom, table);
-				}
-			} else {
-				for (i = 0; i < entry.cardinality; i++) {
-					atom->args[vidx] = entry.ints[i];
-					all_pred_instances_rec(vidx + 1, psig, arity, atom, table);
-				}
-			}
-		} else {
-			for (i = 0; i < entry.cardinality; i++) {
-				atom->args[vidx] = entry.constants[i];
-				all_pred_instances_rec(vidx + 1, psig, arity, atom, table);
-			}
+		for (i = 0; i < entry.cardinality; i++) {
+			atom->args[vidx] = get_sort_const(&entry, i);
+			all_pred_instances_rec(vidx + 1, psig, arity, atom, table);
 		}
 	}
 }
@@ -249,6 +219,25 @@ static int32_t rule_atom_default_value(rule_atom_t *rule_atom, pred_table_t *pre
 	}
 }
 
+/* 
+ * [lazy only] Returns the default value of a rule literal
+ *
+ * 0: false; 1: true; -1: neither 
+ */
+static int32_t rule_literal_default_value(rule_literal_t *rule_literal,
+		pred_table_t *pred_table) {
+	int32_t default_value = rule_atom_default_value(rule_literal->atom, pred_table);
+	if (rule_literal->neg && default_value == 0) {
+		return 1;
+	}
+	else if (rule_literal->neg && default_value == 1) {
+		return 0;
+	}
+	else {
+		return default_value;
+	}
+}
+
 /*
  * Evaluates a builtin literal (a builtin operation with an optional negation)
  *
@@ -276,7 +265,9 @@ static bool builtin_inst_p(rule_literal_t *lit, substit_entry_t *substs, samp_ta
 	return retval;
 }
 
-/* Tests whether a literal is falsifiable, i.e., is not fixed to be satisfied */
+/* 
+ * Tests whether a literal is falsifiable, i.e., is not fixed to be satisfied 
+ */
 static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
 	atom_table_t *atom_table = &table->atom_table;
@@ -301,7 +292,7 @@ static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, sa
 	int32_t value;
 	if (atom->builtinop > 0) {
 		value = call_builtin(atom->builtinop, builtin_arity(atom->builtinop),
-				rule_inst_atom->args);
+				rule_inst_atom->args) ? 1 : 0;
 	}
 	else {
 		array_hmap_pair_t *atom_map = array_size_hmap_find(&atom_table->atom_var_hash,
@@ -309,9 +300,9 @@ static bool literal_falsifiable(rule_literal_t *lit, substit_entry_t *substs, sa
 		if (atom_map == NULL || !atom_table->active[atom_map->val]) { /* if inactive */
 			value = rule_atom_default_value(atom, pred_table);
 		}
-		else if (predicate <= 0) { /* for evidence predicate */
+		else if (predicate <= 0) { /* for direct predicate */
 			value = assigned_true(atom_table->assignment[atom_map->val]);
-		} else { /* non-evidence predicate has unfixed value */
+		} else { /* indirect predicate has unfixed value */
 			value = -1; /* neither true nor false */
 		}
 	}
@@ -341,11 +332,16 @@ static bool check_clause_falsifiable(samp_rule_t *rule, substit_entry_t *substs,
 	return true;
 }
 
-/* Checks whether a clause has been instantiated already */
+/* 
+ * Checks whether a clause has been instantiated already.
+ *
+ * If it does not exist, add it into the hash set.
+ */
 static bool check_clause_duplicate(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *table) {
 	array_hmap_pair_t *rule_subst_map = array_size_hmap_find(&rule->subst_hash,
 			rule->num_vars, (int32_t *) substs);
 	if (rule_subst_map != NULL) {
+		cprintf(5, "clause that has been checked or already exists!\n");
 		return false;
 	}
 
@@ -394,13 +390,13 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 	// Too many constants, i given, rule->num_vars required
 	assert(substs == NULL || substs[i] == INT32_MIN);
 
-	/* check if the value is fixed to be true, if so discard it */
-	if (lazy_mcsat() && !check_clause_falsifiable(rule, substs, table)) {
+	/* check duplicates and insert to hashset */
+	if (lazy_mcsat() && !check_clause_duplicate(rule, substs, table)) {
 		return -1;
 	}
 
-	/* check duplicates and insert to hashset */
-	if (lazy_mcsat() && !check_clause_duplicate(rule, substs, table)) {
+	/* check if the value is fixed to be true, if so discard it */
+	if (lazy_mcsat() && !check_clause_falsifiable(rule, substs, table)) {
 		return -1;
 	}
 
@@ -494,7 +490,6 @@ static void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t
 	}
 }
 
-// Eager - called by MCSAT when a new rule is added.
 void all_rule_instances(int32_t rule_index, samp_table_t *table) {
 	rule_table_t *rule_table = &table->rule_table;
 	samp_rule_t *rule = rule_table->samp_rules[rule_index];
@@ -507,20 +502,105 @@ void all_rule_instances(int32_t rule_index, samp_table_t *table) {
 }
 
 /*
- * [lazy only] Recursively enumerate the rule instances
+ * Returns an estimate of the number of active atoms for an rule_atom. For an
+ * direct predicate or builtinop, check all non-default valued atoms; for
+ * a indirect predicate, check all active atoms.
  */
-static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_rule_t *rule,
-		samp_table_t *table, int32_t atom_index) {
+static int32_t get_num_active_atoms(samp_rule_t *rule, int32_t litidx,
+		samp_table_t *table) {
+	pred_table_t *pred_table = &table->pred_table;
+	sort_table_t *sort_table = &table->sort_table;
+
+	rule_atom_t *rule_atom = rule->literals[litidx]->atom;
+	int32_t arity = rule_atom_arity(rule_atom, pred_table);
+	int32_t *atom_arg_values = (int32_t *) safe_malloc(sizeof(int32_t) * arity);
+	int32_t natoms = INT32_MAX; /* the number of active atoms */
+
+	int32_t i, sortidx;
+	for (i = 0; i < arity; i++) {
+		if (rule_atom->args[i].kind == variable) {
+			/* make the value consistent with the substitution */
+			atom_arg_values[i] = substit_buffer.entries[rule_atom->args[i].value];
+		} else {
+			atom_arg_values[i] = rule_atom->args[i].value;
+		}
+	}
+
+	if (rule_atom->builtinop > 0) {
+		switch (rule_atom->builtinop) {
+		case EQ:
+		case NEQ:
+			if (atom_arg_values[0] != INT32_MIN || atom_arg_values[1] != INT32_MIN) {
+				natoms = 1;
+			}
+			else {
+				sortidx = rule->vars[rule_atom->args[0].value]->sort_index;
+				natoms = sort_table->entries[sortidx].cardinality;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	else {
+		pred_entry_t *pred_entry = get_pred_entry(pred_table, rule_atom->pred);
+		natoms = pred_entry->num_atoms;
+	}
+	return natoms;
+}
+
+/*
+ * Select a literal of the rule to ground. We select a literal that has the
+ * minimum number of groundings (greedy strategy). For literals whose default
+ * value is true, the number of groundings is equal to the number of active
+ * atoms. For literals whose default value is false, the number of groundings
+ * is (approximately) equal to the number of ALL instances.
+ */
+static int32_t select_literal_to_ground(samp_rule_t *rule, samp_table_t *table,
+		bool *lits_grounded) {
+	pred_table_t *pred_table = &table->pred_table;
+	int32_t litidx = -1, min_nsubsts = INT32_MAX;
+
+	int32_t i, nsubsts;
+	for (i = 0; i < rule->num_lits; i++) {
+		if (lits_grounded[i]) continue;
+
+		if (rule_literal_default_value(rule->literals[i], pred_table) == 1) {
+			/* default value is true */
+			nsubsts = get_num_active_atoms(rule, i, table);
+		}
+		else {
+			/* all default value atoms need to be grounded */
+			continue;
+		}
+
+		if (min_nsubsts > nsubsts) {
+			min_nsubsts = nsubsts;
+			litidx = i;
+		}
+	}
+	return litidx;
+}
+
+/*
+ * [lazy only] Recursively enumerate the rule instances
+ *
+ * TODO: change to non-recursive
+ */
+static void smart_disjunct_instances_rec(samp_rule_t *rule, samp_table_t *table,
+		int32_t atom_index, bool *lits_grounded) {
 	pred_table_t *pred_table = &table->pred_table;
 	atom_table_t *atom_table = &table->atom_table;
-	int32_t litidx = ordered_lits[order];
+	sort_table_t *sort_table = &table->sort_table;
+
+	int32_t litidx = select_literal_to_ground(rule, table, lits_grounded);
 
 	/* when all non-default predicates have been considered,
 	 * recursively enumerate the rest variables that haven't been
 	 * assigned a constant */
 	if (litidx < 0) {
 		if (get_verbosity_level() >= 5) {
-			printf("[smart_rule_instances_rec] Partially instantiated rule ");
+			printf("[smart_disjunct_instances_rec] partially instantiated rule ");
 			print_rule_substit(rule, substit_buffer.entries, table);
 			printf(" ...\n");
 		}
@@ -533,109 +613,368 @@ static void smart_rule_instances_rec(int32_t order, int32_t *ordered_lits, samp_
 
 	int arity = rule_atom_arity(rule_atom, pred_table);
 
-	/*
-	 * The atom arguments that are consistent with the current substitution.
-	 * TODO the consistent active atoms could be efficiently retrieved
-	 */
-	int32_t *atom_arg_value = (int32_t *) safe_malloc(sizeof(int32_t) * arity);
+	/* The atom arguments that are consistent with the current substitution.
+	 * TODO the consistent active atoms could be efficiently retrieved */
+	int32_t *atom_arg_values = (int32_t *) safe_malloc(sizeof(int32_t) * arity);
 	for (i = 0; i < arity; i++) {
 		if (rule_atom->args[i].kind == variable) {
 			/* make the value consistent with the substitution */
-			atom_arg_value[i] = substit_buffer.entries[rule_atom->args[i].value];
+			atom_arg_values[i] = substit_buffer.entries[rule_atom->args[i].value];
 		} else {
-			atom_arg_value[i] = rule_atom->args[i].value;
+			atom_arg_values[i] = rule_atom->args[i].value;
 		}
 	}
 
-	/*
-	 * for an evidential predicate and builtinop, check all non-default valued atoms;
-	 * for a non-evidential predicate, check all active atoms.
-	 */
+	lits_grounded[litidx] = true;
+
+	/* for a direct predicate or builtinop, check all non-default value atoms;
+	 * for a indirect predicate, check all active atoms. */
 	if (rule_atom->builtinop > 0) {
 		switch (rule_atom->builtinop) {
 		case EQ:
 		case NEQ:
-			if (atom_arg_value[0] != INT32_MIN && atom_arg_value[1] != INT32_MIN) {
-				if (atom_arg_value[0] == atom_arg_value[1]) {
-					smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
+			if (atom_arg_values[0] != INT32_MIN && atom_arg_values[1] != INT32_MIN) {
+				if (atom_arg_values[0] == atom_arg_values[1]) {
+					smart_disjunct_instances_rec(rule, table, atom_index, lits_grounded);
 				} else {
 					return;
 				}
 			}
-			else if (atom_arg_value[0] != INT32_MIN) {
+			else if (atom_arg_values[0] != INT32_MIN) {
 				var_index = rule_atom->args[1].value; /* arg[1] is unfixed */
-				substit_buffer.entries[var_index] = atom_arg_value[0];
-				smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
+				substit_buffer.entries[var_index] = atom_arg_values[0];
+				smart_disjunct_instances_rec(rule, table, atom_index, lits_grounded);
 				substit_buffer.entries[var_index] = INT32_MIN;
 			}
-			else if (atom_arg_value[1] != INT32_MIN) {
+			else if (atom_arg_values[1] != INT32_MIN) {
 				var_index = rule_atom->args[0].value; /* arg[0] is unfixed */
-				substit_buffer.entries[var_index] = atom_arg_value[1];
-				smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
+				substit_buffer.entries[var_index] = atom_arg_values[1];
+				smart_disjunct_instances_rec(rule, table, atom_index, lits_grounded);
 				substit_buffer.entries[var_index] = INT32_MIN;
 			}
 			else {
-				var_index = rule_atom->args[0].value;
-				// TODO: enumerate the sort
-				//int32_t vsort = rule->vars[var_index]->sort_index;
+				int32_t varidx0 = rule_atom->args[0].value;
+				int32_t varidx1 = rule_atom->args[1].value;
+				int32_t sortidx = rule->vars[varidx0]->sort_index;
+				sort_entry_t *sort_entry = &sort_table->entries[sortidx];
+				for (i = 0; i < sort_entry->cardinality; i++) {
+					int32_t cons = get_sort_const(sort_entry, i);
+					substit_buffer.entries[varidx0] = cons;
+					substit_buffer.entries[varidx1] = cons;
+					smart_disjunct_instances_rec(rule, table, atom_index, lits_grounded);
+					substit_buffer.entries[varidx0] = INT32_MIN;
+					substit_buffer.entries[varidx1] = INT32_MIN;
+				}
 			}
 			break;
 		default:
-			smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
+			smart_disjunct_instances_rec(rule, table, atom_index, lits_grounded);
 		}
 	} else {
 		pred_entry_t *pred_entry = get_pred_entry(pred_table, rule_atom->pred);
-		bool compatible; /* if compatible with the current substitution */
+		bool compatible;
 		
-		printf("depth = %d, #atoms = %d start ...\n", order, pred_entry->num_atoms);
 		for (i = 0; i < pred_entry->num_atoms; i++) {
-			/* TODO only consider active atoms, maybe we can keep only
-			 * the active atoms in pred_entry->atoms */
+			if (!atom_table->active[i]) continue;
 			samp_atom_t *atom = atom_table->atom[pred_entry->atoms[i]];
 			compatible = true;
 			for (j = 0; j < arity; j++) {
-				if (atom_arg_value[j] != INT32_MIN &&
-						atom_arg_value[j] != atom->args[j]) {
+				if (atom_arg_values[j] != INT32_MIN &&
+						atom_arg_values[j] != atom->args[j]) {
 					compatible = false;
 				}
 			}
 			if (!compatible) {
-				continue; /* move to the next active atom */
+				continue;
 			}
 			for (j = 0; j < arity; j++) {
-				if (atom_arg_value[j] == INT32_MIN) { /* values not yet fixed */
-					/* index of the variable in the rule's quantifier list */
+				if (atom_arg_values[j] == INT32_MIN) {
 					var_index = rule_atom->args[j].value;
-					substit_buffer.entries[var_index] = atom->args[j]; /* for free variable */
+					substit_buffer.entries[var_index] = atom->args[j];
 				}
 			}
-			smart_rule_instances_rec(order + 1, ordered_lits, rule, table, atom_index);
-			for (j = 0; j < arity; j++) { /* backtracking, reset values */
-				if (atom_arg_value[j] == INT32_MIN) {
+			smart_disjunct_instances_rec(rule, table, atom_index, lits_grounded);
+			for (j = 0; j < arity; j++) {
+				if (atom_arg_values[j] == INT32_MIN) {
 					var_index = rule_atom->args[j].value;
 					substit_buffer.entries[var_index] = INT32_MIN;
 				}
 			}
 		}
-		printf("depth = %d done!\n", order);
 	}
 
-	safe_free(atom_arg_value);
+	lits_grounded[litidx] = false;
+	safe_free(atom_arg_values);
+}
+
+static int32_t select_clause_to_ground(samp_rule_t *rule, samp_table_t *table,
+		bool *clauses_grounded) {
+	pred_table_t *pred_table = &table->pred_table;
+	rule_atom_t *rule_atom;
+	int32_t clsidx = -1, min_nsubsts = INT32_MAX;
+
+	int32_t i, nsubsts;
+	for (i = 0; i < rule->num_lits; i++) {
+		rule_atom = rule->literals[i]->atom;
+		if (rule_atom->builtinop > 0 || rule_atom->pred <= 0) {
+			if (rule_literal_default_value(rule->literals[i], pred_table) == 0) {
+				/* default is fixed false */
+				nsubsts = get_num_active_atoms(rule, i, table);
+			}
+			else {
+				/* all default value atoms need to be grounded */
+				continue;
+			}
+		}
+		else {
+			/* Still many groundings, taken care of later.
+			 * Basically, for a conjunction like A(x) & B(x), the unsat
+			 * clauses include the groundins where A(x) is false and
+			 * B(x) is any value and where A(x) is any value and B(x)
+			 * is false. */
+			continue;
+		}
+		if (min_nsubsts > nsubsts) {
+			min_nsubsts = nsubsts;
+			clsidx = i;
+		}
+	}
+	return clsidx;
+}
+
+/* 
+ * The clauses that are fixed unsat by default have been grounded. The clauses
+ * that are fixed sat will be considered at last by brute force. Now we
+ * consider the clauses with unfixed values. If there exists an unfixed clauses
+ * whose default value is unsat, we basically need to ground everything by
+ * brute force. If all unfixed clauses have default value of sat, we each time
+ * find the unsat instances of one clause and ground other clauses by brute
+ * force.
+ */
+static void smart_conjunct_clause_instances(samp_rule_t *rule, samp_table_t *table,
+		int32_t atom_index, bool *clauses_grounded) {
+	pred_table_t *pred_table = &table->pred_table;
+	atom_table_t *atom_table = &table->atom_table;
+	rule_literal_t *rule_literal;
+	rule_atom_t *rule_atom;
+	pred_entry_t *pred_entry;
+	int32_t i, j, arity, var_index;
+
+	for (i = 0; i < rule->num_lits; i++) {
+		rule_literal = rule->literals[i];
+		rule_atom = rule_literal->atom;
+
+		/* grounded clauses should have fixed value */
+		assert(!clauses_grounded[i] || rule_atom_is_direct(rule_atom));
+		
+		if (!rule_atom_is_direct(rule_atom) 
+				&& rule_literal_default_value(rule_literal, pred_table) != 0) {
+			break;
+		}
+	}
+	/* There exists a unfixed clause with default value of unsat */
+	if (i < rule->num_lits) {
+		all_rule_instances_rec(0, rule, table, atom_index);
+		return;
+	}
+
+	for (i = 0; i < rule->num_lits; i++) {
+		rule_atom = rule->literals[i]->atom;
+		arity = rule_atom_arity(rule_atom, pred_table);
+
+		/* Skip grounded (fixed unsat by default) clauses and clauses fixed sat
+		 * by default */
+		if (rule_atom_is_direct(rule_atom))
+			continue;
+
+		int32_t *atom_arg_values = (int32_t *) safe_malloc(sizeof(int32_t) * arity);
+		for (i = 0; i < arity; i++) {
+			if (rule_atom->args[i].kind == variable) {
+				/* make the value consistent with the substitution */
+				atom_arg_values[i] = substit_buffer.entries[rule_atom->args[i].value];
+			} else {
+				atom_arg_values[i] = rule_atom->args[i].value;
+			}
+		}
+
+		pred_entry = get_pred_entry(pred_table, rule_atom->pred);
+		bool compatible; /* if compatible with the current substitution */
+
+		for (i = 0; i < pred_entry->num_atoms; i++) {
+			samp_atom_t *atom = atom_table->atom[pred_entry->atoms[i]];
+			compatible = true;
+			for (j = 0; j < arity; j++) {
+				if (atom_arg_values[j] != INT32_MIN &&
+						atom_arg_values[j] != atom->args[j]) {
+					compatible = false;
+				}
+			}
+			if (!compatible) {
+				continue;
+			}
+			for (j = 0; j < arity; j++) {
+				if (atom_arg_values[j] == INT32_MIN) {
+					var_index = rule_atom->args[j].value;
+					substit_buffer.entries[var_index] = atom->args[j];
+				}
+			}
+			all_rule_instances_rec(0, rule, table, atom_index);
+			for (j = 0; j < arity; j++) {
+				if (atom_arg_values[j] == INT32_MIN) {
+					var_index = rule_atom->args[j].value;
+					substit_buffer.entries[var_index] = INT32_MIN;
+				}
+			}
+		}
+		safe_free(atom_arg_values);
+	}
 }
 
 /*
- * [lazy only] Instantiate all rule instances relevant to an atom;
- * similar to all_rule_instances.
+ * Instantiate the clauses that are fixed unsat by default (i.e. ALL literals
+ * are fixed false by default), because most rules are always unsat and don't
+ * need to be considered, so we only need to instantiate the clauses that are
+ * fixed sat (the active clauses).
+ */
+static void smart_conjunct_instances_rec(samp_rule_t *rule, samp_table_t *table,
+		int32_t atom_index, bool *clauses_grounded) {
+	pred_table_t *pred_table = &table->pred_table;
+	atom_table_t *atom_table = &table->atom_table;
+	sort_table_t *sort_table = &table->sort_table;
+
+	int32_t clsidx = select_clause_to_ground(rule, table, clauses_grounded); 
+
+	if (clsidx < 0) {
+		smart_conjunct_clause_instances(rule, table, atom_index, clauses_grounded);
+		return;
+	}
+
+	rule_atom_t *rule_atom;
+	int32_t i, j, var_index, arity;
+
+	rule_atom = rule->literals[clsidx]->atom;
+	arity = rule_atom_arity(rule_atom, pred_table);
+
+	int32_t *atom_arg_values = (int32_t *) safe_malloc(sizeof(int32_t) * arity);
+	for (i = 0; i < arity; i++) {
+		if (rule_atom->args[i].kind == variable) {
+			atom_arg_values[i] = substit_buffer.entries[rule_atom->args[i].value];
+		} else {
+			atom_arg_values[i] = rule_atom->args[i].value;
+		}
+	}
+
+	clauses_grounded[clsidx] = true;
+	if (rule_atom->builtinop > 0) {
+		switch (rule_atom->builtinop) {
+		case EQ:
+		case NEQ:
+			if (atom_arg_values[0] != INT32_MIN && atom_arg_values[1] != INT32_MIN) {
+				if (atom_arg_values[0] == atom_arg_values[1]) {
+					smart_disjunct_instances_rec(rule, table, atom_index, clauses_grounded);
+				} else {
+					return;
+				}
+			}
+			else if (atom_arg_values[0] != INT32_MIN) {
+				var_index = rule_atom->args[1].value;
+				substit_buffer.entries[var_index] = atom_arg_values[0];
+				smart_disjunct_instances_rec(rule, table, atom_index, clauses_grounded);
+				substit_buffer.entries[var_index] = INT32_MIN;
+			}
+			else if (atom_arg_values[1] != INT32_MIN) {
+				var_index = rule_atom->args[0].value;
+				substit_buffer.entries[var_index] = atom_arg_values[1];
+				smart_disjunct_instances_rec(rule, table, atom_index, clauses_grounded);
+				substit_buffer.entries[var_index] = INT32_MIN;
+			}
+			else {
+				int32_t varidx0 = rule_atom->args[0].value;
+				int32_t varidx1 = rule_atom->args[1].value;
+				int32_t sortidx = rule->vars[varidx0]->sort_index;
+				sort_entry_t *sort_entry = &sort_table->entries[sortidx];
+				for (i = 0; i < sort_entry->cardinality; i++) {
+					int32_t cons = get_sort_const(sort_entry, i);
+					substit_buffer.entries[varidx0] = cons;
+					substit_buffer.entries[varidx1] = cons;
+					smart_disjunct_instances_rec(rule, table, atom_index, clauses_grounded);
+					substit_buffer.entries[varidx0] = INT32_MIN;
+					substit_buffer.entries[varidx1] = INT32_MIN;
+				}
+			}
+			break;
+		default:
+			smart_disjunct_instances_rec(rule, table, atom_index, clauses_grounded);
+		}
+	} else {
+		pred_entry_t *pred_entry = get_pred_entry(pred_table, rule_atom->pred);
+		bool compatible;
+		
+		for (i = 0; i < pred_entry->num_atoms; i++) {
+			if (!atom_table->active[i]) continue;
+			samp_atom_t *atom = atom_table->atom[pred_entry->atoms[i]];
+			compatible = true;
+			for (j = 0; j < arity; j++) {
+				if (atom_arg_values[j] != INT32_MIN &&
+						atom_arg_values[j] != atom->args[j]) {
+					compatible = false;
+				}
+			}
+			if (!compatible) {
+				continue;
+			}
+			for (j = 0; j < arity; j++) {
+				if (atom_arg_values[j] == INT32_MIN) {
+					var_index = rule_atom->args[j].value;
+					substit_buffer.entries[var_index] = atom->args[j];
+				}
+			}
+			smart_disjunct_instances_rec(rule, table, atom_index, clauses_grounded);
+			for (j = 0; j < arity; j++) {
+				if (atom_arg_values[j] == INT32_MIN) {
+					var_index = rule_atom->args[j].value;
+					substit_buffer.entries[var_index] = INT32_MIN;
+				}
+			}
+		}
+	}
+
+	clauses_grounded[clsidx] = false;
+	safe_free(atom_arg_values);
+}
+
+/*
+ * [lazy only] Instantiate all rule instances relevant to an atom; similar to
+ * all_rule_instances.
  *
  * Note that substit_buffer.entries has been set up already
+ *
+ * FIXME There are several cases:
+ *
+ * 1) weight is positive: If the literal is true when the predicate takes the
+ * default value, we will ground all the non-default (activated) atoms of the
+ * predicate; if the literal is false when the predicate takes the default
+ * value, there will be TOO MANY groundings to consider so we skip it and
+ * consider it later.
+ * 
+ * 2) weight is negative:
+ * 
+ * 2.1) The literal is a undirect predicate. If the literal is true when the
+ * predicate takes the default value, we ground all non-default atoms of the
+ * predicate, and all the other free variables can take any feasible value. If
+ * the literal is false by default, we basically need to ground EVERYTHING for
+ * this rule.  
+ *
+ * 2.2) The literal is a direct predicate (or built-in operator).  If the
+ * literal is false when the predicate takes the default value, ground the
+ * non-default valued atoms and continue on the next literal. If the literal is
+ * true, most formulas are FIXED satisfied so we still ground the non-default
+ * valued atoms and continue.
+ *
+ * 3) If the formula is a general cnf, it would be similar to case 2)
  */
-void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
+static void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 		int32_t atom_index) {
-//	clause_table_t *clause_table = &table->clause_table;
-	pred_table_t *pred_table = &table->pred_table;
-//	int prev_num_clauses;
-	int32_t i, order;
-	int32_t *ordered_lits; /* the order of the lits in which they are checked */
 
 	if (get_verbosity_level() >= 5) {
 		printf("[fixed_const_rule_instances] Instantiating ");
@@ -647,61 +986,22 @@ void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 		printf(":\n");
 	}
 
-	ordered_lits = (int32_t *) safe_malloc(sizeof(int32_t) * rule->num_lits);
-	order = 0;
-	for (i = 0; i < rule->num_lits; i++) {
-		int32_t default_value = rule_atom_default_value(rule->literals[i]->atom, pred_table);
+	bool *lits_grounded = (bool *) safe_malloc(sizeof(int32_t) * rule->num_lits);
+	memset(lits_grounded, false, rule->num_lits);
 
-		/* 
-		 * FIXME There are several cases:
-		 *
-		 * 1) The literal is an indirect predicate. 
-		 *
-		 * 1.1) weight is positive: If the literal is true when the predicate
-		 * takes the default value, we will ground all the non-default
-		 * (activated) atoms of the predicate; if the literal is false when the
-		 * predicate takes the default value, there will be TOO MANY groundings
-		 * to consider so we skip it and consider it later.
-		 * 
-		 * 1.2) weight is negative: If the literal is true when the predicate
-		 * takes the default value, we ground all non-default atoms of the
-		 * predicate, and all the other free variables can take any feasible
-		 * value. If the literal is false by default, we basically need to
-		 * ground EVERYTHING for this rule.
-		 *
-		 * 2) The literal is a direct predicate (or built-in operator). If the
-		 * literal is false when the predicate takes the default value, ground
-		 * the non-default valued atoms and continue on the next literal. If
-		 * the literal is true, most formulas are FIXED satisfied so we still
-		 * ground the non-default valued atoms and continue.
-		 *
-		 * 3) If the formula is a general cnf, it would be similar to case 1.2)
-		 */
-
-		if ((rule->literals[i]->neg && default_value == 0)
-				|| (!rule->literals[i]->neg && default_value == 1)) {
-			ordered_lits[order] = i;
-			order++;
-		}
+	if (rule->weight < 0) {
+		smart_conjunct_instances_rec(rule, table, atom_index, lits_grounded);
 	}
-
-	/* termination symbol */
-	ordered_lits[order] = -1;
-
-	/* TODO need to skip the literal that match atom_index */
-	/* TODO a better strategy to decide the order by which each literal
-	 * is grounded is to greedily choose a literal each round. At the
-	 * begining only the literal that matches atom_index is set to
-	 * visited. Each round we instantiate a literal that has the minimum
-	 * number of groundings and set the visit flag. When all the literals
-	 * has been visited, we proceed to the brute force grounding. */
-	smart_rule_instances_rec(0, ordered_lits, rule, table, atom_index);
-
-	safe_free(ordered_lits);
+	else {
+		smart_disjunct_instances_rec(rule, table, atom_index, lits_grounded);
+	}
+	safe_free(lits_grounded);
 }
 
-/* Lazy only */
-void smart_rule_instances(int32_t rule_index, samp_table_t *table) {
+/*
+ * [lazy only] Instantiate all rule instances
+ */
+void smart_all_rule_instances(int32_t rule_index, samp_table_t *table) {
 	rule_table_t *rule_table = &table->rule_table;
 	samp_rule_t *rule = rule_table->samp_rules[rule_index];
 	substit_buffer_resize(rule->num_vars);
@@ -930,7 +1230,9 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 						arity + 1, (int32_t *) rule_inst_atom);
 				assert(atom_map != NULL);
 
-				activate_atom(table, atom_index);
+				/* FIXME substit_buffer is being used by query instantiating,
+				 * will cause a conflict */
+				//activate_atom(table, atom_index);
 			}
 
 			if (query->literals[i][j]->neg &&
@@ -972,11 +1274,11 @@ static int32_t samp_query_to_query_instance(samp_query_t *query, samp_table_t *t
 			for (k = 0; k < arity; k++) {
 				//argidx = new_atom->args[k];
 			}
-			if (get_verbosity_level() > 1) {
-				printf("[samp_query_to_query_instance] Adding internal atom ");
-				print_atom_now(new_atom, table);
-				printf("\n");
-			}
+			//if (get_verbosity_level() > 1) {
+			//	printf("[samp_query_to_query_instance] Adding internal atom ");
+			//	print_atom_now(new_atom, table);
+			//	printf("\n");
+			//}
 			added_atom = add_internal_atom(table, new_atom, false);
 			if (added_atom == -1) {
 				// This shouldn't happen, but if it does, we need to free up space
@@ -1019,16 +1321,7 @@ static void all_query_instances_rec(int32_t vidx, samp_query_t *query,
 		vsort = query->vars[vidx]->sort_index;
 		entry = sort_table->entries[vsort];
 		for (i = 0; i < entry.cardinality; i++) {
-			if (entry.constants == NULL) {
-				if (entry.ints == NULL) {
-					// Have a subrange
-					substit_buffer.entries[vidx] = entry.lower_bound + i;
-				} else {
-					substit_buffer.entries[vidx] = entry.ints[i];
-				}
-			} else {
-				substit_buffer.entries[vidx] = entry.constants[i];
-			}
+			substit_buffer.entries[vidx] = get_sort_const(&entry, i);
 			all_query_instances_rec(vidx + 1, query, table, atom_index);
 			substit_buffer.entries[vidx] = INT32_MIN;
 		}
@@ -1111,6 +1404,8 @@ void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
  */
 void create_new_const_rule_instances(int32_t constidx, int32_t csort,
 		samp_table_t *table, int32_t atom_index) {
+	// FIXME atom_index is always 0?
+	assert(atom_index == 0);
 	sort_table_t *sort_table = &(table->sort_table);
 	rule_table_t *rule_table = &(table->rule_table);
 	int32_t i, j, k;
@@ -1321,8 +1616,10 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 		printf("\n");
 	}
 
-	//assert(valid_table(table));
+	assert(valid_table(table));
 	atom_table_resize(atom_table, clause_table);
+	assert(valid_table(table));
+
 	current_atom_index = atom_table->num_vars++;
 	samp_atom_t * current_atom = (samp_atom_t *) safe_malloc((arity + 1) * sizeof(int32_t));
 	current_atom->pred = predicate;
@@ -1432,11 +1729,6 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 			}
 		}
 	}
-	if (get_verbosity_level() >= 1) {
-		printf("add_atom: Adding internal atom ");
-		print_atom_now(atom, table);
-		printf("\n");
-	}
 	int32_t result = add_internal_atom(table, atom, true);
 
 	/* Now we need to deal with the newly introduced integer constants */
@@ -1533,8 +1825,8 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 			return clause_map->val;
 		}
 	} else {
-		// Clause only involves direct predicates - just set positive literal to true
-		// TODO what is this scenario?
+		/* Clause only involves direct predicates - just set positive literal to true
+		 * FIXME what is this scenario? */
 		assert(false);
 		negs_all_true = true;
 		posidx = -1;
