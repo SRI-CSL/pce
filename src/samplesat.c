@@ -708,7 +708,7 @@ static int32_t init_first_sample_sat(samp_table_t *table) {
 	int32_t conflict = 0;
 
 	if (get_verbosity_level() >= 4) {
-		printf("\n[init_first_sample_sat] Started ...\n");
+		printf("\n[init_first_sample_sat] before unit propagation ...\n");
 		print_assignment(table);
 		//print_clause_table(table);
 	}
@@ -718,7 +718,7 @@ static int32_t init_first_sample_sat(samp_table_t *table) {
 		return -1;
 
 	if (get_verbosity_level() >= 4) {
-		printf("\n[init_first_sample_sat] After negative_unit_propagation:\n");
+		printf("\n[init_first_sample_sat] after unit propagation:\n");
 		print_assignment(table);
 		//print_clause_table(table);
 	}
@@ -726,7 +726,7 @@ static int32_t init_first_sample_sat(samp_table_t *table) {
 	init_random_assignment(table);
 
 	if (get_verbosity_level() >= 4) {
-		printf("\n[init_first_sample_sat] After init_random_assignment:\n");
+		printf("\n[init_first_sample_sat] after randomization:\n");
 		print_assignment(table);
 		//print_clause_table(table);
 	}
@@ -736,13 +736,6 @@ static int32_t init_first_sample_sat(samp_table_t *table) {
 	}
 	if (process_fixable_stack(table) == -1) {
 		return -1;
-	}
-	
-	if (get_verbosity_level() >= 3) {
-		printf("[init_first_sample_sat] After randomization, unsat = %d:\n",
-				clause_table->unsat_clauses.length);
-		print_assignment(table);
-		//print_clause_table(table);
 	}
 
 	return 0;
@@ -780,6 +773,12 @@ static int32_t init_sample_sat(samp_table_t *table) {
 	move_sat_to_live_clauses(clause_table);
 	assert(valid_table(table));
 
+	if (get_verbosity_level() >= 4) {
+		printf("\n[init_sample_sat] before unit propagation ...\n");
+		print_assignment(table);
+		//print_clause_table(table);
+	}
+
 	/*
 	 * Fix some variable by unit propagation
 	 */
@@ -787,20 +786,25 @@ static int32_t init_sample_sat(samp_table_t *table) {
 		return -1;
 	assert(valid_table(table));
 
+	if (get_verbosity_level() >= 4) {
+		printf("\n[init_sample_sat] after unit propagation:\n");
+		print_assignment(table);
+		//print_clause_table(table);
+	}
+
 	init_random_assignment(table);
 	assert(valid_table(table));
+
+	if (get_verbosity_level() >= 4) {
+		printf("\n[init_sample_sat] after randomization:\n");
+		print_assignment(table);
+		print_clause_table(table);
+	}
 
 	if (scan_live_clauses(table) == -1)
 		return -1;
 	if (process_fixable_stack(table) == -1)
 		return -1;
-	
-	if (get_verbosity_level() >= 3) {
-		printf("[init_sample_sat] After randomization, unsat = %d:\n",
-				clause_table->unsat_clauses.length);
-		print_assignment(table);
-//		print_clause_table(table);
-	}
 
 	return 0;
 }

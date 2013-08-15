@@ -370,6 +370,12 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 
 	assert(valid_table(table));
 
+	if (get_verbosity_level() >= 5) {
+		printf("[substit_rule] instantiating rule ");
+		print_rule_substit(rule, substit_buffer.entries, table);
+		printf("\n");
+	}
+
 	/* check if the constants are compatible with the sorts */
 	for (i = 0; i < rule->num_vars; i++) {
 		csubst = substs[i];
@@ -432,6 +438,14 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 	int32_t clsidx = add_internal_clause(table, clause_buffer.data, litidx,
 			rule->frozen_preds, rule->weight, found_indirect, true);
 
+	if (get_verbosity_level() >= 5) {
+		if (clsidx >= 0) {
+			printf("[substit_rule] succeeded.\n");
+		} else {
+			printf("[substit_rule] failed.\n");
+		}
+	}
+
 	return clsidx;
 }
 
@@ -448,21 +462,8 @@ static void all_rule_instances_rec(int32_t vidx, samp_rule_t *rule, samp_table_t
 	/* termination of the recursion */
 	if (vidx == rule->num_vars) {
 		substit_buffer.entries[vidx] = INT32_MIN;
-		if (get_verbosity_level() >= 5) {
-			printf("[all_rule_instances_rec] Rule ");
-			print_rule_substit(rule, substit_buffer.entries, table);
-			printf(" is being instantiated ...\n");
-		}
 
 		int32_t success = substit_rule(rule, substit_buffer.entries, table);
-
-		if (get_verbosity_level() >= 5) {
-			if (success < 0) {
-				printf("[all_rule_instances_rec] Failed.\n");
-			} else {
-				printf("[all_rule_instances_rec] Succeeded.\n");
-			}
-		}
 		return;
 	}
 
@@ -675,7 +676,7 @@ static void smart_disjunct_instances_rec(samp_rule_t *rule, samp_table_t *table,
 		bool compatible;
 		
 		for (i = 0; i < pred_entry->num_atoms; i++) {
-			if (!atom_table->active[i]) continue;
+			if (!atom_table->active[pred_entry->atoms[i]]) continue;
 			samp_atom_t *atom = atom_table->atom[pred_entry->atoms[i]];
 			compatible = true;
 			for (j = 0; j < arity; j++) {
@@ -717,7 +718,11 @@ static int32_t select_clause_to_ground(samp_rule_t *rule, samp_table_t *table,
 	for (i = 0; i < rule->num_lits; i++) {
 		rule_atom = rule->literals[i]->atom;
 		if (rule_atom->builtinop > 0 || rule_atom->pred <= 0) {
-			if (rule_literal_default_value(rule->literals[i], pred_table) == 0) {
+			/* TODO currently the conjuction is stored in the clause form, so
+			 * every literal is negative of the actual 'clause' in the cnf.
+			 * Once we implement cnf rules, need to change back. */
+			//if (rule_literal_default_value(rule->literals[i], pred_table) == 0) {
+			if (rule_literal_default_value(rule->literals[i], pred_table) == 1) {
 				/* default is fixed false */
 				nsubsts = get_num_active_atoms(rule, i, table);
 			}
@@ -729,7 +734,7 @@ static int32_t select_clause_to_ground(samp_rule_t *rule, samp_table_t *table,
 		else {
 			/* Still many groundings, taken care of later.
 			 * Basically, for a conjunction like A(x) & B(x), the unsat
-			 * clauses include the groundins where A(x) is false and
+			 * clauses include the groundings where A(x) is false and
 			 * B(x) is any value and where A(x) is any value and B(x)
 			 * is false. */
 			continue;
@@ -758,16 +763,26 @@ static void smart_conjunct_clause_instances(samp_rule_t *rule, samp_table_t *tab
 	rule_literal_t *rule_literal;
 	rule_atom_t *rule_atom;
 	pred_entry_t *pred_entry;
-	int32_t i, j, arity, var_index;
+	int32_t i, j, k, arity, var_index;
+
+	if (get_verbosity_level() >= 5) {
+		printf("[smart_conjunct_clause_instances] partially instantiated rule ");
+		print_rule_substit(rule, substit_buffer.entries, table);
+		printf(" ...\n");
+	}
 
 	for (i = 0; i < rule->num_lits; i++) {
 		rule_literal = rule->literals[i];
 		rule_atom = rule_literal->atom;
 
-		/* grounded clauses should have fixed value */
+		/* clauses having been grounded should have fixed value */
 		assert(!clauses_grounded[i] || rule_atom_is_direct(rule_atom));
 		
 		if (!rule_atom_is_direct(rule_atom) 
+				/* TODO currently the conjuction is stored in the clause form, so
+				 * every literal is negative of the actual 'clause' in the cnf.
+				 * Once we implement cnf rules, need to change back. */
+		//		&& rule_literal_default_value(rule_literal, pred_table) != 1) {
 				&& rule_literal_default_value(rule_literal, pred_table) != 0) {
 			break;
 		}
@@ -778,8 +793,8 @@ static void smart_conjunct_clause_instances(samp_rule_t *rule, samp_table_t *tab
 		return;
 	}
 
-	for (i = 0; i < rule->num_lits; i++) {
-		rule_atom = rule->literals[i]->atom;
+	for (k = 0; k < rule->num_lits; k++) {
+		rule_atom = rule->literals[k]->atom;
 		arity = rule_atom_arity(rule_atom, pred_table);
 
 		/* Skip grounded (fixed unsat by default) clauses and clauses fixed sat
@@ -801,6 +816,7 @@ static void smart_conjunct_clause_instances(samp_rule_t *rule, samp_table_t *tab
 		bool compatible; /* if compatible with the current substitution */
 
 		for (i = 0; i < pred_entry->num_atoms; i++) {
+			if (!atom_table->active[pred_entry->atoms[i]]) continue;
 			samp_atom_t *atom = atom_table->atom[pred_entry->atoms[i]];
 			compatible = true;
 			for (j = 0; j < arity; j++) {
@@ -911,7 +927,7 @@ static void smart_conjunct_instances_rec(samp_rule_t *rule, samp_table_t *table,
 		bool compatible;
 		
 		for (i = 0; i < pred_entry->num_atoms; i++) {
-			if (!atom_table->active[i]) continue;
+			if (!atom_table->active[pred_entry->atoms[i]]) continue;
 			samp_atom_t *atom = atom_table->atom[pred_entry->atoms[i]];
 			compatible = true;
 			for (j = 0; j < arity; j++) {
@@ -1801,7 +1817,7 @@ int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
 			clause_map = array_size_hmap_get(&clause_table->clause_hash,
 					num_lits, (int32_t *) entry->disjunct);
 			clause_map->val = index;
-			//cprintf(5, "Added clause %"PRId32"\n", index);
+			cprintf(5, "Added clause %"PRId32"\n", index);
 
 			if (lazy_mcsat()) {
 				push_newly_activated_clause(index, table);

@@ -253,12 +253,24 @@ static int32_t reset_sample_sat(samp_table_t *table) {
 
 	clear_integer_stack(&(table->fixable_stack)); //clear fixable_stack
 
+	if (get_verbosity_level() >= 4) {
+		printf("[reset_sample_sat] before restoring. %d unsat_clauses\n",
+				clause_table->unsat_clauses.length);
+		print_clause_table(table);
+	}
+
 	/*
 	 * move dead clauses that are satisfied into appropriate lists
 	 * so that they can be selected as live clauses in this round.
 	 */
 	restore_sat_dead_negative_unit_clauses(clause_table, atom_table->assignment);
 	restore_sat_dead_clauses(clause_table, atom_table->assignment);
+
+	if (get_verbosity_level() >= 4) {
+		printf("[reset_sample_sat] restored. %d unsat_clauses\n",
+				clause_table->unsat_clauses.length);
+		print_clause_table(table);
+	}
 
 	/*
 	 * kill selected satisfied clauses: select which clauses will
@@ -268,9 +280,10 @@ static int32_t reset_sample_sat(samp_table_t *table) {
 	kill_clauses(table);
 
 	if (get_verbosity_level() >= 2) {
-		printf("[reset_sample_sat] done. %d unsat_clauses\n",
+		printf("[reset_sample_sat] killed, done. %d unsat_clauses\n",
 				clause_table->unsat_clauses.length);
-		print_live_clauses(table);
+		//print_live_clauses(table);
+		print_clause_table(table);
 	}
 
 	return 0;
