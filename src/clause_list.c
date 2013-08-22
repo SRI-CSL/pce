@@ -22,6 +22,12 @@ void init_clause_list(samp_clause_list_t *list) {
 	list->length = 0;
 }
 
+void empty_clause_list(samp_clause_list_t *list) {
+	list->head->link = NULL;
+	list->tail = list->head;
+	list->length = 0;
+}
+
 void clause_list_insert(samp_clause_t *clause, samp_clause_list_t *list,
 		samp_clause_t *ptr) {
 	clause->link = ptr->link;
@@ -55,12 +61,12 @@ void clause_list_concat(samp_clause_list_t *list_src, samp_clause_list_t *list_d
 	list_src->length = 0;
 }
 
-void move_unsat_to_live_clauses(clause_table_t *clause_table) {
-	clause_list_concat(&clause_table->unsat_clauses, &clause_table->live_clauses);
+void move_unsat_to_live_clauses(rule_inst_table_t *rule_inst_table) {
+	clause_list_concat(&rule_inst_table->unsat_clauses, &rule_inst_table->live_clauses);
 }
 
-void move_sat_to_live_clauses(clause_table_t *clause_table) {
-	clause_list_concat(&clause_table->sat_clauses, &clause_table->live_clauses);
+void move_sat_to_live_clauses(rule_inst_table_t *rule_inst_table) {
+	clause_list_concat(&rule_inst_table->sat_clauses, &rule_inst_table->live_clauses);
 }
 
 samp_clause_t *choose_random_clause(samp_clause_list_t *list) {

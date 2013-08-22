@@ -11,7 +11,7 @@ extern int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probab
 		double sa_temperature, double rvar_probability, uint32_t max_flips);
 
 /* Later run of sample sat, where soft clauses are also considered */
-extern void sample_sat(samp_table_t *table, bool lazy, double sa_probability,
+extern int32_t sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double sa_temperature, double rvar_probability,
 		uint32_t max_flips, uint32_t max_extra_flips);
 

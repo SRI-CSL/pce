@@ -1201,8 +1201,9 @@ void add_training_data(training_data_t *training_data) {
 }
 
 void initialize_pll_stats(training_data_t* training_data,
-		pseudo_log_likelihood_stats_t *pll_stats, clause_table_t *clause_table) {
+		pseudo_log_likelihood_stats_t *pll_stats, rule_inst_table_t *rule_inst_table) {
 	int32_t i, j, k;
+	rule_inst_t *rinst;
 	samp_clause_t *clause;
 	samp_bvar_t var;
 

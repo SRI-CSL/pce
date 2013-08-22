@@ -13,6 +13,7 @@
 #include "buffer.h"
 #include "print.h"
 #include "yacc.tab.h"
+#include "ground.h"
 
 /*  
  * These copy operations assume that size input to safe_malloc can't 
@@ -220,28 +221,6 @@ int32_t rule_atom_arity(rule_atom_t *atom, pred_table_t *pred_table) {
 		: builtin_arity(atom->builtinop);
 }
 
-/* 
- * Converts a rule_atom to a samp_atom. If ratom is a builtinop, return NULL.
- */
-samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, substit_entry_t *substs, 
-		pred_table_t *pred_table) {
-	if (ratom->builtinop > 0) {
-		return NULL;
-	}
-	int32_t i;
-	int32_t arity = pred_arity(ratom->pred, pred_table);
-	samp_atom_t *satom = (samp_atom_t *) safe_malloc((arity+1) * sizeof(int32_t));
-	satom->pred = ratom->pred;
-	for (i = 0; i < arity; i++) {
-		if (ratom->args[i].kind == variable) {
-			satom->args[i] = substit_buffer.entries[ratom->args[i].value];
-		} else {
-			satom->args[i] = ratom->args[i].value;
-		}
-	}
-	return satom;
-}
-
 /* Returns the index of an atom, if not exist, returns -1 */
 int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table) {
 	pred_table_t *pred_table = &table->pred_table;
@@ -256,15 +235,30 @@ int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table) {
 	}
 }
 
-/* Converts a rule_literal to a samp_literal */
-samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, substit_entry_t *substs,
-		samp_table_t *table) {
-	pred_table_t *pred_table = &table->pred_table;
-	bool neg = rlit->neg;
-	rule_atom_t *ratom = rlit->atom;
-	samp_atom_t *satom = rule_atom_to_samp_atom(ratom, substs, pred_table);
-	int32_t atom_index = samp_atom_index(satom, table);
-	return neg? pos_lit(atom_index) : neg_lit(atom_index);
+void restore_assignment_array(atom_table_t *atom_table) {
+	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
+	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
+	int32_t i;
+	atom_table->num_unfixed_vars = 0;
+	for (i = 0; i < atom_table->num_vars; i++) {
+		if (unfixed_tval(atom_table->assignment[i])) {
+			atom_table->num_unfixed_vars++;
+		}
+	}
+}
+
+void copy_assignment_array(atom_table_t *atom_table) {
+	samp_truth_value_t *old_assignment = atom_table->assignment;
+	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
+	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
+	atom_table->num_unfixed_vars = 0;
+	int32_t i;
+	for (i = 0; i < atom_table->num_vars; i++) {
+		atom_table->assignment[i] = unfix_tval(old_assignment[i]);
+		if (unfixed_tval(atom_table->assignment[i])) {
+			atom_table->num_unfixed_vars++;
+		}
+	}
 }
 
 // insertion sort
@@ -359,9 +353,19 @@ void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
 
 int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
 	int32_t i;
-	for (i = 0; i < clause->numlits; i++){
+	for (i = 0; i < clause->num_lits; i++){
 		if (assigned_true_lit(assignment, clause->disjunct[i]))
 			return i;
+	}
+	return -1;
+}
+
+int32_t eval_rule_inst(samp_truth_value_t *assignment, rule_inst_t *rinst) {
+	int32_t i;
+	for (i = 0; i < rinst->num_clauses; i++) {
+		if (eval_clause(assignment, rinst->conjunct[i]) == -1) {
+			return i;
+		}
 	}
 	return -1;
 }

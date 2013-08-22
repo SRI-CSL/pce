@@ -13,13 +13,19 @@
 /* Global buffers */
 atom_buffer_t atom_buffer = { 0, NULL};
 clause_buffer_t clause_buffer = {0, NULL};
+rule_buffer_t rule_buffer = {0, NULL};
 substit_buffer_t substit_buffer = {0, NULL};
 
 input_clause_buffer_t input_clause_buffer = { 0, 0, NULL };
 input_literal_buffer_t input_literal_buffer = { 0, 0, NULL };
 input_atom_buffer_t input_atom_buffer = { 0, 0, NULL };
 
-/* Allocates enough space for an atom_buffer */
+/*
+ * Allocates enough space for an atom_buffer 
+ *
+ * atom_buffer.data will be recast to samp_atom_t, so we need
+ * length of arity + 1 (1 for the predicate index)
+ */
 void atom_buffer_resize(int32_t arity) {
 
 	int32_t size = atom_buffer.size;
@@ -45,8 +51,8 @@ void atom_buffer_resize(int32_t arity) {
 }
 
 void clause_buffer_resize (int32_t length){
-	if (clause_buffer.data == NULL){
-		clause_buffer.data = (int32_t *) safe_malloc(INIT_CLAUSE_SIZE * sizeof(int32_t));
+	if (clause_buffer.literals == NULL){
+		clause_buffer.literals = (int32_t *) safe_malloc(INIT_CLAUSE_SIZE * sizeof(int32_t));
 		clause_buffer.size = INIT_CLAUSE_SIZE;
 	}
 	int32_t size = clause_buffer.size;
@@ -55,9 +61,25 @@ void clause_buffer_resize (int32_t length){
 			out_of_memory();
 		}
 		size += size/2;
-		clause_buffer.data =
-			(int32_t  *) safe_realloc(clause_buffer.data, size * sizeof(int32_t));
+		clause_buffer.literals =
+			(int32_t *) safe_realloc(clause_buffer.literals, size * sizeof(int32_t));
 		clause_buffer.size = size;
+	}
+}
+
+void rule_buffer_resize(int32_t length) {
+	if (rule_buffer.clauses == NULL){
+		rule_buffer.clauses = safe_malloc(INIT_CLAUSE_SIZE * sizeof(samp_clause_t *));
+		rule_buffer.size = INIT_RULE_SIZE;
+	}
+	int32_t size = rule_buffer.size;
+	if (size < length){
+		if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= size/2){
+			out_of_memory();
+		}
+		size += size/2;
+		rule_buffer.clauses = safe_realloc(rule_buffer.clauses, size * sizeof(samp_clause_t *));
+		rule_buffer.size = size;
 	}
 }
 

@@ -16,8 +16,7 @@
 #include "ground.h"
 #include "mcmc.h"
 #include "input.h"
-#include "weight_learning.h"
-#include "training_data.h"
+#include "buffer.h"
 
 extern int yyparse();
 extern void free_parse_data();
@@ -727,36 +726,6 @@ int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *sourc
 }
 
 /*
- * new_samp_rule sets up a samp_rule, initializing what it can, and leaving
- * the rest to typecheck_atom.  In particular, the variable sorts are set to -1,
- * and the literals are uninitialized.
- */
-static samp_rule_t *new_samp_rule(input_clause_t *rule) {
-	int i;
-	samp_rule_t *new_rule = (samp_rule_t *) safe_malloc(sizeof(samp_rule_t));
-	// Allocate the vars
-	new_rule->num_vars = rule->varlen;
-	var_entry_t **vars = (var_entry_t **) safe_malloc(
-			rule->varlen * sizeof(var_entry_t *));
-	for (i = 0; i < rule->varlen; i++) {
-		vars[i] = (var_entry_t *) safe_malloc(sizeof(var_entry_t));
-		vars[i]->name = str_copy(rule->variables[i]);
-		vars[i]->sort_index = -1;
-	}
-	new_rule->vars = vars;
-	// Now the literals
-	new_rule->num_lits = rule->litlen;
-	rule_literal_t **lits = (rule_literal_t **) safe_malloc(
-			rule->litlen * sizeof(rule_literal_t *));
-	for (i = 0; i < rule->litlen; i++) {
-		lits[i] = (rule_literal_t *) safe_malloc(sizeof(rule_literal_t));
-		lits[i]->neg = rule->literals[i]->neg;
-	}
-	new_rule->literals = lits;
-	return new_rule;
-}
-
-/*
  * Given an atom, a pred_table, an array of variables, and a const_table
  * return true if:
  *   atom->pred is in the pred_table
@@ -764,15 +733,18 @@ static samp_rule_t *new_samp_rule(input_clause_t *rule) {
  *   for each arg:
  *     the arg is either in the variable array or the const table
  *     and its sort is the same as for the pred.
+ *
  * Assumes that the variable array has already been checked for:
  *   no duplicates
  *   no clashes with the const_table (this is OK if shadowing is allowed,
  *      and the variables are checked for first, for this possibility).
+ *
  * The var_sorts array is the same length as the variables array, and
  *    initialized to all -1.  As sorts are determined from the pred, the
  *    array is set to the corresponding sort index.  If the sort is already
  *    set, it is checked to see that it is the same.  Thus an error is flagged
  *    if different occurrences of a variable are used with inconsistent sorts.
+ *
  * If all goes well, a samp_atom_t is returned, with the predicate and args
  *    replaced by indexes.  Note that variables are replaced with negative indices,
  *    i.e., for variable number n, the index is -(n + 1)
@@ -806,7 +778,8 @@ static rule_atom_t * typecheck_atom(input_atom_t *atom, samp_rule_t *rule,
 	}
 	int argidx;
 	//  int32_t size = pred_entry.arity * sizeof(int32_t);
-	// Create a new atom - note that we will need to free it if there is an error
+
+	/* Create a new atom - note that we will need to free it if there is an error */
 	rule_atom_t *new_atom = (rule_atom_t *) safe_malloc(sizeof(rule_atom_t));
 	new_atom->args = (rule_atom_arg_t *) safe_malloc(
 			pred_entry.arity * sizeof(rule_atom_arg_t));
@@ -858,46 +831,256 @@ static rule_atom_t * typecheck_atom(input_atom_t *atom, samp_rule_t *rule,
 	return new_atom;
 }
 
-/* Adds an input rule into the samp_table */
-int32_t add_rule(input_clause_t *rule, double weight, char *source,
+/*
+ * Parse an integer
+ * TODO what's the difference with str2int? 
+ */
+static int32_t parse_int(char *str, int32_t *val) {
+	char *p = str;
+	for (p = (p[0] == '+' || p[0] == '-') ? &p[1] : p; isdigit(*p); p++);
+	if (*p == '\0') {
+		*val = str2int(str);
+	} else {
+		mcsat_err("\nInvalid integer %s.", str);
+		return -1;
+	}
+	return 0;
+}
+
+static ivector_t new_intidx = {0, 0, NULL};
+
+/* Adds an input atom to the table */
+int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
+	const_table_t *const_table = &table->const_table;
+	pred_table_t *pred_table = &table->pred_table;
+	sort_table_t *sort_table = &table->sort_table;
+	sort_entry_t entry;
+
+	char * in_predicate = current_atom->pred;
+	int32_t pred_id = pred_index(in_predicate, pred_table);
+	if (pred_id == -1) {
+		mcsat_err("\nPredicate %s is not declared", in_predicate);
+		return -1;
+	}
+	int32_t predicate = pred_val_to_index(pred_id);
+	int32_t i;
+	int32_t *psig, intval, intsig;
+	int32_t arity = pred_arity(predicate, pred_table);
+
+	atom_buffer_resize(arity);
+	samp_atom_t *atom = (samp_atom_t *) atom_buffer.data;
+	atom->pred = predicate;
+	assert(atom->pred == predicate);
+	psig = pred_signature(predicate, pred_table);
+	new_intidx.size = 0;
+	for (i = 0; i < arity; i++) {
+		entry = sort_table->entries[psig[i]];
+		if (entry.constants == NULL) {
+			// Should be an integer
+			if (parse_int(current_atom->args[i], &intval) < 0) {
+				return -1;
+			}
+			if (intval < entry.lower_bound || intval > entry.upper_bound) {
+				mcsat_err("\nInteger %s is out of bounds.", current_atom->args[i]);
+				return -1;
+			}
+			atom->args[i] = intval;
+			if (psig != NULL && entry.ints != NULL) {
+				if (add_int_const(intval, &sort_table->entries[psig[i]], sort_table)) {
+					// Keep track of the newly added int constants
+					ivector_push(&new_intidx, i);
+				}
+			}
+		} else {
+			atom->args[i] = const_index(current_atom->args[i], const_table);
+			if (atom->args[i] == -1) {
+				mcsat_err("\nConstant %s is not declared.", current_atom->args[i]);
+				return -1;
+			}
+		}
+	}
+	int32_t result = add_internal_atom(table, atom, true);
+
+	/* Now we need to deal with the newly introduced integer constants */
+	for (i = 0; i < new_intidx.size; i++) {
+		intval = atom->args[new_intidx.data[i]];
+		intsig = psig[new_intidx.data[i]];
+		create_new_const_atoms(intval, intsig, table);
+		create_new_const_rule_instances(intval, intsig, table, 0);
+		create_new_const_query_instances(intval, intsig, table, 0);
+	}
+	return result;
+}
+
+/*
+ * add_clause is used to add an input clause with named atoms and constants.
+ * the disjunct array is assumed to be NULL terminated; in_clause is non-NULL.
+ */
+static int32_t add_clause_instance(samp_table_t *table, input_literal_t **in_clause,
+		double weight, char *source, bool add_weights) {
+	atom_table_t *atom_table = &table->atom_table;
+	int32_t i, atom, length, num_clauses, clause_index;
+	bool found_indirect;
+
+	length = 0;
+	while (in_clause[length] != NULL) {
+		length++;
+	}
+
+	if (weight > -1e-8 && weight < 1e-8) {
+		return -1;
+	}
+	if (weight > 0)
+		num_clauses = 1;
+	else
+		num_clauses = length;
+	rule_inst_t *rinst = (rule_inst_t *) safe_malloc(sizeof(rule_inst_t)
+			+ num_clauses * sizeof(samp_clause_t *));
+
+	found_indirect = false;
+	rinst->weight = fabs(weight);
+	rinst->num_clauses = num_clauses;
+	if (weight > 0) {
+		rinst->conjunct[0] = (samp_clause_t *) safe_malloc(sizeof(samp_clause_t)
+				+ length * sizeof(samp_literal_t));
+		rinst->conjunct[0]->num_lits = length;
+		for (i = 0; i < length; i++) {
+			atom = add_atom(table, in_clause[i]->atom);
+			if (atom == -1) {
+				mcsat_err("\nBad atom");
+				return -1;
+			}
+			if (in_clause[i]->neg) {
+				rinst->conjunct[0]->disjunct[i] = neg_lit(atom);
+			} else {
+				rinst->conjunct[0]->disjunct[i] = pos_lit(atom);
+			}
+			if (atom_table->atom[atom]->pred > 0) {
+				found_indirect = true;
+			}
+		}
+	} else {
+		for (i = 0; i < length; i++) {
+			rinst->conjunct[i] = (samp_clause_t *) safe_malloc(sizeof(samp_clause_t)
+					+ sizeof(samp_literal_t));
+			atom = add_atom(table, in_clause[i]->atom);
+			if (atom == -1) {
+				mcsat_err("\nBad atom");
+				return -1;
+			}
+			if (in_clause[i]->neg) {
+				rinst->conjunct[i]->disjunct[0] = pos_lit(atom);
+			} else {
+				rinst->conjunct[i]->disjunct[0] = neg_lit(atom);
+			}
+			if (atom_table->atom[atom]->pred > 0) {
+				found_indirect = true;
+			}
+		}
+	}
+	clause_index = add_internal_rule_instance(table, rinst,
+			found_indirect, add_weights);
+	if (clause_index != -1) {
+		add_source_to_clause(source, clause_index, weight, table);
+	}
+	return clause_index;
+}
+
+/* 
+ * Adds a quantified input rule into the samp_table
+ */
+static int32_t add_clause(input_clause_t *rule, double weight, char *source,
 		samp_table_t *samp_table) {
 	rule_table_t *rule_table = &(samp_table->rule_table);
 	pred_table_t *pred_table = &(samp_table->pred_table);
-	int32_t i;
+
 	// Make sure rule has variables - else it is a ground clause
 	assert(rule->varlen > 0);
 	// Might as well make sure it also has literals
 	assert(rule->litlen > 0);
-	// Need to check that variables are all used, and used consistently
-	// Need to check args against predicate signatures.
-	// We will use the new_rule for the variables
-	samp_rule_t *new_rule = new_samp_rule(rule);
-	new_rule->weight = weight;
+
+	/* Need to check that variables are all used, and used consistently
+	 * Need to check args against predicate signatures.
+	 * We will use the new_rule for the variables 
+	 *
+	 * new_samp_rule sets up a samp_rule, initializing what it can, and leaving
+	 * the rest to typecheck_atom.  In particular, the variable sorts are set
+	 * to -1, and the literals are uninitialized.
+	 */
+	int32_t i, j, num_clauses;
+
+	if (weight > -1e-8 && weight < 1e-8) {
+		return -1;
+	}
+
+	if (weight > 0)
+		num_clauses = 1;
+	else
+		num_clauses = rule->litlen;
+	samp_rule_t *new_rule = (samp_rule_t *) safe_malloc(sizeof(samp_rule_t)
+			+ num_clauses * sizeof(rule_clause_t *));
+
+	/* Allocate the vars */
+	new_rule->num_vars = rule->varlen;
+	var_entry_t **vars = (var_entry_t **) safe_malloc(
+			rule->varlen * sizeof(var_entry_t *));
+	for (i = 0; i < rule->varlen; i++) {
+		vars[i] = (var_entry_t *) safe_malloc(sizeof(var_entry_t));
+		vars[i]->name = str_copy(rule->variables[i]);
+		vars[i]->sort_index = -1;
+	}
+	new_rule->vars = vars;
+
+	rule_atom_t **rule_atoms = (rule_atom_t **) safe_malloc(rule->litlen * sizeof(rule_atom_t *));
 	for (i = 0; i < rule->litlen; i++) {
-		input_atom_t *in_atom = rule->literals[i]->atom;
-		rule_atom_t *atom = typecheck_atom(in_atom, new_rule, samp_table);
+		rule_atom_t *atom = typecheck_atom(rule->literals[i]->atom, new_rule, samp_table);
 		if (atom == NULL) {
 			// Free up the earlier atoms
 			int32_t j;
 			for (j = 0; j < i; j++) {
-				safe_free(new_rule->literals[j]->atom);
+				safe_free(rule_atoms[i]);
 			}
-			safe_free(new_rule);
+			safe_free(rule_atoms);
 			return -1;
 		}
-		new_rule->literals[i]->atom = atom;
+		rule_atoms[i] = atom;
 	}
-	// New rule is OK, now add it to the rule_table.  For now, we ignore the
-	// fact that it may already be there - a future optimization is to
-	// recognize duplicate rules and add their weights.
+
+	/* Now the literals */
+	new_rule->weight = fabs(weight);
+	new_rule->num_clauses = num_clauses;
+	if (weight > 0) {
+		new_rule->clauses[0] = (rule_clause_t *) safe_malloc(sizeof(rule_clause_t)
+				+ rule->litlen * sizeof(rule_literal_t *));
+		new_rule->clauses[0]->num_lits = rule->litlen;
+		for (i = 0; i < rule->litlen; i++) {
+			new_rule->clauses[0]->literals[i] = (rule_literal_t *) safe_malloc(sizeof(rule_literal_t));
+			new_rule->clauses[0]->literals[i]->neg = rule->literals[i]->neg;
+			new_rule->clauses[0]->literals[i]->atom = rule_atoms[i];
+		}
+	} else {
+		for (i = 0; i < rule->litlen; i++) {
+			new_rule->clauses[i] = (rule_clause_t *) safe_malloc(sizeof(rule_clause_t)
+					+ sizeof(rule_literal_t *));
+			new_rule->clauses[i]->literals[0] = (rule_literal_t *) safe_malloc(sizeof(rule_literal_t));
+			new_rule->clauses[i]->literals[0]->neg = !rule->literals[i]->neg;
+			new_rule->clauses[i]->literals[0]->atom = rule_atoms[i];
+		}
+	}
+
+	/* New rule is OK, now add it to the rule_table.  For now, we ignore the
+	 * fact that it may already be there - a future optimization is to
+	 * recognize duplicate rules and add their weights. */
 	int32_t current_rule = rule_table->num_rules;
 	rule_table_resize(rule_table);
 	rule_table->samp_rules[current_rule] = new_rule;
 	rule_table->num_rules += 1;
-	// Now loop through the literals, adding the current rule to each pred
-	for (i = 0; i < rule->litlen; i++) {
-		int32_t pred = new_rule->literals[i]->atom->pred;
-		add_rule_to_pred(pred_table, pred, current_rule);
+	/* Now loop through the literals, adding the current rule to each pred */
+	for (i = 0; i < new_rule->num_clauses; i++) {
+		for (j = 0; j < new_rule->clauses[i]->num_lits; j++) {
+			int32_t pred = new_rule->clauses[i]->literals[j]->atom->pred;
+			add_rule_to_pred(pred_table, pred, current_rule);
+		}
 	}
 	return current_rule;
 }
@@ -991,7 +1174,7 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
 		break;
 	}
 	case CLAUSE: {
-		dump_clause_table(table);
+		dump_rule_inst_table(table);
 		break;
 	}
 	case RULE: {
@@ -1094,7 +1277,7 @@ extern bool read_eval(samp_table_t *table) {
 			if (decl.clause->varlen == 0) {
 				/* No variables - adding a clause */
 				cprintf(2, "Adding clause\n");
-				add_clause(table, decl.clause->literals, decl.weight,
+				add_clause_instance(table, decl.clause->literals, decl.weight,
 						decl.source, true);
 			} else {
 				/* Have variables - adding a rule */
@@ -1104,7 +1287,7 @@ extern bool read_eval(samp_table_t *table) {
 				} else {
 					cprintf(2, "Adding rule with weight %f\n", wt);
 				}
-				int32_t ruleidx = add_rule(decl.clause, decl.weight,
+				int32_t ruleidx = add_clause(decl.clause, decl.weight,
 						decl.source, table);
 				/*
 				 * Create instances here rather than add_rule, as this is eager
@@ -1137,37 +1320,39 @@ extern bool read_eval(samp_table_t *table) {
 		}
 
 		case LEARN: {
-			input_add_fdecl_t decl = input_command.decl.add_fdecl;
-			add_weighted_formula(table, &decl);
+			// TODO WEIGHT LEARN
+			//input_add_fdecl_t decl = input_command.decl.add_fdecl;
+			//add_weighted_formula(table, &decl);
 
 			//dump_clause_table(table);
 			//dump_rule_table(table);
 			break;
 		}
 		case TRAIN: {
-			input_train_decl_t decl = input_command.decl.train_decl;
-			training_data_t *training_data = NULL;
+			// TODO WEIGHT LEARN
+			//input_train_decl_t decl = input_command.decl.train_decl;
+			//training_data_t *training_data = NULL;
 
-			if (decl.file != NULL) {
-				printf("Loading training data from: %s\n", decl.file);
-				training_data = parse_data_file(decl.file, table);
-			} else {
-				printf("No training data was provided\n");
-			}
-			if (LBFGS_MODE) {
-				weight_training_lbfgs(training_data, table);
-			} else {
-				gradient_ascent(training_data, table);
-			}
-			break;
+			//if (decl.file != NULL) {
+			//	printf("Loading training data from: %s\n", decl.file);
+			//	training_data = parse_data_file(decl.file, table);
+			//} else {
+			//	printf("No training data was provided\n");
+			//}
+			//if (LBFGS_MODE) {
+			//	weight_training_lbfgs(training_data, table);
+			//} else {
+			//	gradient_ascent(training_data, table);
+			//}
+			//break;
 
 		}
-		//       case ASK_CLAUSE: {
-		// 	input_ask_decl_t decl = input_command.decl.ask_decl;
-		// 	assert(decl.clause->litlen == 1);
-		// 	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
-		// 	break;
-		//       }
+		//case ASK_CLAUSE: {
+		//	input_ask_decl_t decl = input_command.decl.ask_decl;
+		//	assert(decl.clause->litlen == 1);
+		//	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
+		//	break;
+		//}
 		case MCSAT: {
 			clock_t start, end;
 
@@ -1187,7 +1372,8 @@ extern bool read_eval(samp_table_t *table) {
 
 			if (get_dump_samples_path() != NULL) {
 				output(" dumping samples to %s\n", get_dump_samples_path());
-				init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
+				// TODO WEIGHT LEARN
+				//init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
 			}
 
 			mc_sat(table, lazy_mcsat(), get_max_samples(),

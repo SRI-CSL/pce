@@ -216,8 +216,7 @@ extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t
 extern bool add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table);
 extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
 extern int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source);
-extern int32_t add_rule(input_clause_t *in_rule, double weight, char *source,
-			samp_table_t *samp_table);
+extern int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
 extern int32_t add_query(var_entry_t **vars, rule_literal_t ***lits,
 			 samp_table_t *table);
 

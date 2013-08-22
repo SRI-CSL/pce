@@ -688,7 +688,7 @@ char * pred_name(int32_t pred, pred_table_t *pred_table){
 }
 
 /* FIXME 
- * 0: false; 1: true; -1: undef */
+ * 0: false; 1: true; */
 inline int32_t pred_default_value(pred_entry_t *pred) {
 	return 0;
 }
@@ -717,7 +717,7 @@ void init_atom_table(atom_table_t *table) {
 		table->pmodel[i] = 0;//was -1
 	}
 	table->num_samples = 0;
-	init_array_hmap(&(table->atom_var_hash), ARRAY_HMAP_DEFAULT_SIZE);
+	init_array_hmap(&table->atom_var_hash, ARRAY_HMAP_DEFAULT_SIZE);
 	//  table->entries[0].atom = (samp_atom_t *) safe_malloc(sizeof(samp_atom_t));
 	//  table->entries[0].atom->pred = 0;
 }
@@ -727,7 +727,7 @@ void init_atom_table(atom_table_t *table) {
  * atom_table is resized, the assignments and the watched literals must also be
  * resized. 
  */
-void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table) {
+void atom_table_resize(atom_table_t *atom_table, rule_inst_table_t *rule_inst_table) {
 	int32_t size, num_vars, i;
 
 	num_vars = atom_table->num_vars;
@@ -755,8 +755,8 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table) {
 	if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= size){
 		out_of_memory();
 	}
-	clause_table->watched = (samp_clause_list_t *) safe_realloc(
-			clause_table->watched, 2 * size * sizeof(samp_clause_list_t));
+	rule_inst_table->watched = (samp_clause_list_t *) safe_realloc(
+			rule_inst_table->watched, 2 * size * sizeof(samp_clause_list_t));
 
 	for (i = atom_table->size; i < size; i++) {
 		atom_table->pmodel[i] = 0;//was -1
@@ -764,43 +764,41 @@ void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table) {
 	atom_table->size = size;
 }
 
-void init_clause_table(clause_table_t *table){
-	table->size = INIT_CLAUSE_TABLE_SIZE;
-	table->num_clauses = 0;
-	if (table->size >= MAXSIZE(sizeof(samp_clause_t *), 0)){
+void init_rule_inst_table(rule_inst_table_t *table){
+	table->size = INIT_RULE_INST_TABLE_SIZE;
+	table->num_rule_insts = 0;
+	if (table->size >= MAXSIZE(sizeof(rule_inst_t *), 0)){
 		out_of_memory();
 	}
-	table->samp_clauses =
-		(samp_clause_t **) safe_malloc(table->size * sizeof(samp_clause_t *));
-	init_array_hmap(&(table->clause_hash), ARRAY_HMAP_DEFAULT_SIZE);
+	table->rule_insts = (rule_inst_t **) safe_malloc(table->size * sizeof(rule_inst_t *));
+	table->live = (bool *) safe_malloc(table->size * sizeof(bool));
 	table->watched = (samp_clause_list_t *) safe_malloc(
 			2 * INIT_ATOM_TABLE_SIZE * sizeof(samp_clause_list_t));
 	init_clause_list(&table->sat_clauses);
 	init_clause_list(&table->unsat_clauses);
 	init_clause_list(&table->live_clauses);
-	init_clause_list(&table->negative_or_unit_clauses);
-	init_clause_list(&table->dead_clauses);
-	init_clause_list(&table->dead_negative_or_unit_clauses); 
 }
 
 /*
- * Check whether there's room for one more clause in clause_table.
+ * Check whether there's room for one more clause in rule_inst_table.
  * - if not, make the table larger
  */
-void clause_table_resize(clause_table_t *clause_table, int32_t num_lits){
-	int32_t size = clause_table->size;
-	int32_t num_clauses = clause_table->num_clauses;
-	if (num_clauses + 1 < size) return;
-	if (MAXSIZE(sizeof(samp_clause_t *), 0) - size <= (size/2)){
+void rule_inst_table_resize(rule_inst_table_t *rule_inst_table){
+	int32_t size = rule_inst_table->size;
+	int32_t num_rinsts = rule_inst_table->num_rule_insts;
+	if (num_rinsts + 1 < size) return;
+	if (MAXSIZE(sizeof(rule_inst_t *), 0) - size <= (size/2)){
 		out_of_memory();
 	}
 	size += size/2;
-	clause_table->samp_clauses = 
-		(samp_clause_t **) safe_realloc(clause_table->samp_clauses, size * sizeof(samp_clause_t *));
-	clause_table->size = size; 
-	if (MAXSIZE(sizeof(int32_t), sizeof(samp_clause_t)) < num_lits) {
-		out_of_memory();
-	}
+	rule_inst_table->rule_insts = (rule_inst_t **) safe_realloc(
+			rule_inst_table->rule_insts, size * sizeof(rule_inst_t *));
+	rule_inst_table->live = (bool *) safe_realloc(
+			rule_inst_table->live, size * sizeof(bool));
+	rule_inst_table->size = size; 
+	//if (MAXSIZE(sizeof(samp_clause_t *), sizeof(rule_inst_t)) < num_clauses) {
+	//	out_of_memory();
+	//}
 }
 
 void init_rule_table(rule_table_t *table){
@@ -915,11 +913,11 @@ void reset_source_table(source_table_t *table) {
 	table->num_entries = 0;
 }
 
-void add_source_to_clause(char *source, int32_t clause_index, double weight,
+void add_source_to_clause(char *source, int32_t rinst_index, double weight,
 		samp_table_t *table) {
 	source_table_t *source_table = &table->source_table;
 	source_entry_t *source_entry;
-	int32_t numclauses, srcidx;
+	int32_t num_rinsts, srcidx;
 
 	for (srcidx = 0; srcidx < source_table->num_entries; srcidx++) {
 		if (strcmp(source, source_table->entry[srcidx]->name) == 0) {
@@ -932,32 +930,32 @@ void add_source_to_clause(char *source, int32_t clause_index, double weight,
 		source_table->entry[srcidx] = source_entry;
 		source_entry->name = source;
 		source_entry->assertion = NULL;
-		source_entry->clause = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+		source_entry->rule_insts = (int32_t *) safe_malloc(2 * sizeof(int32_t));
 		source_entry->weight = (double *) safe_malloc(2 * sizeof(double));
-		source_entry->clause[0] = clause_index;
-		source_entry->clause[1] = -1;
+		source_entry->rule_insts[0] = rinst_index;
+		source_entry->rule_insts[1] = -1;
 		source_entry->weight[0] = weight;
 		source_entry->weight[1] = -1;
 	} else {
 		source_entry = source_table->entry[srcidx];
-		if (source_entry->clause == NULL) {
-			source_entry->clause = (int32_t *) safe_malloc(2 * sizeof(int32_t));
+		if (source_entry->rule_insts == NULL) {
+			source_entry->rule_insts = (int32_t *) safe_malloc(2 * sizeof(int32_t));
 			source_entry->weight = (double *) safe_malloc(2 * sizeof(double));
-			source_entry->clause[0] = clause_index;
-			source_entry->clause[1] = -1;
-			source_entry->weight[0] = clause_index;
+			source_entry->rule_insts[0] = rinst_index;
+			source_entry->rule_insts[1] = -1;
+			source_entry->weight[0] = rinst_index;
 			source_entry->weight[1] = -1;
 		} else {
-			for (numclauses = 0; source_entry->assertion[numclauses] != -1; numclauses++) {
+			for (num_rinsts = 0; source_entry->assertion[num_rinsts] != -1; num_rinsts++) {
 			}
-			source_entry->clause = (int32_t *) safe_realloc(
-					source_entry->clause, (numclauses + 2) * sizeof(int32_t));
+			source_entry->rule_insts = (int32_t *) safe_realloc(
+					source_entry->rule_insts, (num_rinsts + 2) * sizeof(int32_t));
 			source_entry->weight = (double *) safe_realloc(
-					source_entry->weight, (numclauses + 2) * sizeof(double));
-			source_entry->clause[numclauses] = clause_index;
-			source_entry->clause[numclauses + 1] = -1;
-			source_entry->weight[numclauses] = weight;
-			source_entry->weight[numclauses + 1] = -1;
+					source_entry->weight, (num_rinsts + 2) * sizeof(double));
+			source_entry->rule_insts[num_rinsts] = rinst_index;
+			source_entry->rule_insts[num_rinsts + 1] = -1;
+			source_entry->weight[num_rinsts] = weight;
+			source_entry->weight[num_rinsts + 1] = -1;
 		}
 	}
 }
@@ -981,13 +979,12 @@ void add_source_to_assertion(char *source, int32_t atom_index,
 		source_entry->assertion = (int32_t *) safe_malloc(2 * sizeof(int32_t));
 		source_entry->assertion[0] = atom_index;
 		source_entry->assertion[1] = -1;
-		source_entry->clause = NULL;
+		source_entry->rule_insts = NULL;
 		source_entry->weight = NULL;
 	} else {
 		source_entry = source_table->entry[srcidx];
 		if (source_entry->assertion == NULL) {
-			source_entry->assertion = (int32_t *) safe_malloc(
-					2 * sizeof(int32_t));
+			source_entry->assertion = (int32_t *) safe_malloc(2 * sizeof(int32_t));
 			source_entry->assertion[0] = atom_index;
 			source_entry->assertion[1] = -1;
 		} else {
@@ -1003,11 +1000,11 @@ void add_source_to_assertion(char *source, int32_t atom_index,
 
 /* TODO what does this do */
 void retract_source(char *source, samp_table_t *table) {
+	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
 	source_table_t *source_table = &table->source_table;
-	clause_table_t *clause_table = &table->clause_table;
 	source_entry_t *source_entry;
-	int32_t i, j, srcidx, sidx, clause_idx;
-	samp_clause_t *clause;
+	int32_t i, j, srcidx, sidx, rinst_idx;
+	rule_inst_t *rinst;
 	double wt;
 
 	for (srcidx = 0; srcidx < source_table->num_entries; srcidx++) {
@@ -1023,19 +1020,17 @@ void retract_source(char *source, samp_table_t *table) {
 	if (source_entry->assertion != NULL) {
 		// Not sure what to do here
 	}
-	if (source_entry->clause != NULL) {
-		for (i = 0; source_entry->clause[i] != -1; i++) {
-			clause_idx = source_entry->clause[i];
-			clause = clause_table->samp_clauses[clause_idx];
+	if (source_entry->rule_insts != NULL) {
+		for (i = 0; source_entry->rule_insts[i] != -1; i++) {
+			rinst_idx = source_entry->rule_insts[i];
+			rinst = rule_inst_table->rule_insts[rinst_idx];
 			if (source_entry->weight[i] == DBL_MAX) {
 				// Need to go through all other sources and add them up
 				wt = 0.0;
 				for (sidx = 0; sidx < source_table->num_entries; sidx++) {
-					if (sidx != srcidx && source_table->entry[sidx]->clause
-							!= NULL) {
-						for (j = 0; source_table->entry[sidx]->clause[j] != -1; j++) {
-							if (source_table->entry[sidx]->clause[j]
-									== clause_idx) {
+					if (sidx != srcidx && source_table->entry[sidx]->rule_insts != NULL) {
+						for (j = 0; source_table->entry[sidx]->rule_insts[j] != -1; j++) {
+							if (source_table->entry[sidx]->rule_insts[j] == rinst_idx) {
 								wt += source_table->entry[sidx]->weight[j];
 								// Assume clause occurs only once for given source,
 								// as we can simply sum up all such occurrences.
@@ -1044,10 +1039,10 @@ void retract_source(char *source, samp_table_t *table) {
 						}
 					}
 				}
-				clause->weight = wt;
-			} else if (clause->weight != DBL_MAX) {
+				rinst->weight = wt;
+			} else if (rinst->weight != DBL_MAX) {
 				// Subtract the weight of this source from the clause
-				clause->weight -= source_entry->weight[i];
+				rinst->weight -= source_entry->weight[i];
 			} // Nothing to do if current weight is DBL_MAX
 		}
 	}
@@ -1059,12 +1054,12 @@ void init_samp_table(samp_table_t *table) {
 	init_var_table(&table->var_table);
 	init_pred_table(&table->pred_table);
 	init_atom_table(&table->atom_table);
-	init_clause_table(&table->clause_table);
+	init_rule_inst_table(&table->rule_inst_table);
 	init_rule_table(&table->rule_table);
 	init_query_table(&table->query_table);
 	init_query_instance_table(&table->query_instance_table);
 	init_source_table(&table->source_table);
-	init_integer_stack(&table->fixable_stack, 0);
+	//init_integer_stack(&table->fixable_stack, 0);
 }
 
 /* 
@@ -1298,7 +1293,7 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 static bool clause_contains_lit(samp_clause_t *clause, samp_literal_t lit) {
 	int32_t i;
 	bool lit_exists = false;
-	for (i = 0; i < clause->numlits; i++) {
+	for (i = 0; i < clause->num_lits; i++) {
 		if (clause->disjunct[i] == lit)
 			lit_exists = true;
 	}
@@ -1307,21 +1302,21 @@ static bool clause_contains_lit(samp_clause_t *clause, samp_literal_t lit) {
 	return true;
 }
 
-static bool valid_watched_lit(clause_table_t *clause_table, samp_literal_t lit,
+static bool valid_watched_lit(rule_inst_table_t *rule_inst_table, samp_literal_t lit,
 		atom_table_t *atom_table) {
-	valid_clause_list(&clause_table->watched[lit]);
+	valid_clause_list(&rule_inst_table->watched[lit]);
 
 	bool lit_true = (is_pos(lit) && assigned_true(atom_table->assignment[var_of(lit)]))
 	             || (is_neg(lit) && assigned_false(atom_table->assignment[var_of(lit)]));
-	assert(is_empty_clause_list(&clause_table->watched[lit]) || lit_true);
-	if (!is_empty_clause_list(&clause_table->watched[lit]) && !lit_true) {
+	assert(is_empty_clause_list(&rule_inst_table->watched[lit]) || lit_true);
+	if (!is_empty_clause_list(&rule_inst_table->watched[lit]) && !lit_true) {
 		return false;
 	}
 
 	samp_clause_t *ptr;
 	samp_clause_t *cls;
-	for (ptr = clause_table->watched[lit].head;
-			ptr != clause_table->watched[lit].tail;
+	for (ptr = rule_inst_table->watched[lit].head;
+			ptr != rule_inst_table->watched[lit].tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
 		assert(clause_contains_lit(cls, lit));
@@ -1337,7 +1332,7 @@ static bool valid_watched_lit(clause_table_t *clause_table, samp_literal_t lit,
 static bool clause_contains_fixed_true_lit(samp_clause_t *clause,
 		samp_truth_value_t *assignment) {
 	int32_t i;
-	for (i = 0; i < clause->numlits; i++) {
+	for (i = 0; i < clause->num_lits; i++) {
 		if (assigned_fixed_true_lit(assignment, clause->disjunct[i]))
 			return true;
 	}
@@ -1347,22 +1342,22 @@ static bool clause_contains_fixed_true_lit(samp_clause_t *clause,
 /*
  * Validate all the lists in the clause table
  */
-bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
+bool valid_rule_inst_table(rule_inst_table_t *rule_inst_table, atom_table_t *atom_table){
 	samp_clause_t *ptr;
 	samp_clause_t *cls;
-	int32_t lit;
-	uint32_t i, j;
-	assert(clause_table->size >= 0);
-	assert(clause_table->num_clauses >= 0);
-	assert(clause_table->num_clauses <= clause_table->size);
-	if (clause_table->size < 0) return false;
-	if (clause_table->num_clauses < 0 || clause_table->num_clauses > clause_table->size)
+	int32_t lit, i;
+	assert(rule_inst_table->size >= 0);
+	assert(rule_inst_table->num_rule_insts >= 0);
+	assert(rule_inst_table->num_rule_insts <= rule_inst_table->size);
+	if (rule_inst_table->size < 0) return false;
+	if (rule_inst_table->num_rule_insts < 0 
+			|| rule_inst_table->num_rule_insts > rule_inst_table->size)
 		return false;
 
 	/* check that every clause in the unsat list is unsat */
-	valid_clause_list(&clause_table->unsat_clauses);
-	for (ptr = clause_table->unsat_clauses.head;
-			ptr != clause_table->unsat_clauses.tail;
+	valid_clause_list(&rule_inst_table->unsat_clauses);
+	for (ptr = rule_inst_table->unsat_clauses.head;
+			ptr != rule_inst_table->unsat_clauses.tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
 		assert(eval_clause(atom_table->assignment, cls) == -1);
@@ -1370,41 +1365,41 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 			return false;
 	}
 
-	/* check negative_or_unit_clauses */
-	valid_clause_list(&clause_table->negative_or_unit_clauses);
-	for (ptr = clause_table->negative_or_unit_clauses.head;
-			ptr != clause_table->negative_or_unit_clauses.tail;
-			ptr = next_clause(ptr)) {
-		cls = ptr->link;
-		assert(cls->weight < 0 || cls->numlits == 1);
-		if (cls->weight >= 0 && cls->numlits != 1) 
-			return false;
-	}
+	///* check negative_or_unit_clauses */
+	//valid_clause_list(&rule_inst_table->negative_or_unit_clauses);
+	//for (ptr = rule_inst_table->negative_or_unit_clauses.head;
+	//		ptr != rule_inst_table->negative_or_unit_clauses.tail;
+	//		ptr = next_clause(ptr)) {
+	//	cls = ptr->link;
+	//	assert(cls->weight < 0 || cls->numlits == 1);
+	//	if (cls->weight >= 0 && cls->numlits != 1) 
+	//		return false;
+	//}
 
-	/* check dead_negative_or_unit_clauses */
-	valid_clause_list(&clause_table->dead_negative_or_unit_clauses);
-	for (ptr = clause_table->dead_negative_or_unit_clauses.head;
-			ptr != clause_table->dead_negative_or_unit_clauses.tail;
-			ptr = next_clause(ptr)) {
-		cls = ptr->link;
-		assert(cls->weight < 0 || cls->numlits == 1);
-		if (cls->weight >= 0 && cls->numlits != 1) 
-			return false;
-	}
+	///* check dead_negative_or_unit_clauses */
+	//valid_clause_list(&rule_inst_table->dead_negative_or_unit_clauses);
+	//for (ptr = rule_inst_table->dead_negative_or_unit_clauses.head;
+	//		ptr != rule_inst_table->dead_negative_or_unit_clauses.tail;
+	//		ptr = next_clause(ptr)) {
+	//	cls = ptr->link;
+	//	assert(cls->weight < 0 || cls->numlits == 1);
+	//	if (cls->weight >= 0 && cls->numlits != 1) 
+	//		return false;
+	//}
 
 	/* check that every watched clause is satisfied */
 	for (i = 0; i < atom_table->num_vars; i++) {
 		lit = pos_lit(i);
-		valid_watched_lit(clause_table, lit, atom_table);
+		valid_watched_lit(rule_inst_table, lit, atom_table);
 
 		lit = neg_lit(i);
-		valid_watched_lit(clause_table, lit, atom_table);
+		valid_watched_lit(rule_inst_table, lit, atom_table);
 	}
 
 	/* check the sat_clauses to see if the first disjunct is fixed true */
-	valid_clause_list(&clause_table->sat_clauses);
-	for (ptr = clause_table->sat_clauses.head;
-			ptr != clause_table->sat_clauses.tail;
+	valid_clause_list(&rule_inst_table->sat_clauses);
+	for (ptr = rule_inst_table->sat_clauses.head;
+			ptr != rule_inst_table->sat_clauses.tail;
 			ptr = next_clause(ptr)) {
 		cls = ptr->link;
 		assert(clause_contains_fixed_true_lit(cls, atom_table->assignment));
@@ -1413,22 +1408,22 @@ bool valid_clause_table(clause_table_t *clause_table, atom_table_t *atom_table){
 	}
 	
 	/* check the live_clauses */
-	valid_clause_list(&clause_table->sat_clauses);
+	valid_clause_list(&rule_inst_table->sat_clauses);
 
 	/* check all the clauses to see if they are properly indexed */
-	samp_clause_t *clause;
-	for (i = 0; i < clause_table->num_clauses; i++){
-		clause = clause_table->samp_clauses[i];
-		assert(clause->numlits >= 0);
-		if (clause->numlits < 0) 
+	rule_inst_t *rinst;
+	for (i = 0; i < rule_inst_table->num_rule_insts; i++){
+		rinst = rule_inst_table->rule_insts[i];
+		assert(rinst->num_clauses >= 0);
+		if (rinst->num_clauses < 0) 
 			return false;
-		for (j = 0; j < clause->numlits; j++){
-			assert(var_of(clause->disjunct[j]) >= 0);
-			assert(var_of(clause->disjunct[j]) < atom_table->num_vars);
-			if (var_of(clause->disjunct[j]) < 0 ||
-					var_of(clause->disjunct[j]) >= atom_table->num_vars)
-				return false;
-		}
+		//for (j = 0; j < clause->numlits; j++){
+		//	assert(var_of(clause->disjunct[j]) >= 0);
+		//	assert(var_of(clause->disjunct[j]) < atom_table->num_vars);
+		//	if (var_of(clause->disjunct[j]) < 0 ||
+		//			var_of(clause->disjunct[j]) >= atom_table->num_vars)
+		//		return false;
+		//}
 	}
 	return true;
 }
@@ -1438,7 +1433,7 @@ bool valid_table(samp_table_t *table){
 	const_table_t *const_table = &(table->const_table);
 	atom_table_t *atom_table = &(table->atom_table);
 	pred_table_t *pred_table = &(table->pred_table);
-	clause_table_t *clause_table = &(table->clause_table);
+	rule_inst_table_t *rule_inst_table = &(table->rule_inst_table);
 
 	if (!valid_sort_table(sort_table)) {
 		printf("Invalid sort_table\n");
@@ -1456,8 +1451,8 @@ bool valid_table(samp_table_t *table){
 		printf("Invalid atom table\n");
 		return false;
 	}
-	if (!valid_clause_table(clause_table, atom_table)) {
-		printf("Invalid clause_table\n");
+	if (!valid_rule_inst_table(rule_inst_table, atom_table)) {
+		printf("Invalid rule_inst_table\n");
 		return false;
 	}
 	return true;

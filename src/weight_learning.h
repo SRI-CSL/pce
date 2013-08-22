@@ -187,9 +187,11 @@ void compute_gradient(double *gradient);
 
 void add_training_data(training_data_t *training_data);
 
-void initialize_pll_stats(training_data_t* training_data, pseudo_log_likelihood_stats_t *pll_stats, clause_table_t *clause_table);
+void initialize_pll_stats(training_data_t* training_data, pseudo_log_likelihood_stats_t *pll_stats,
+		rule_inst_table_t *rule_inst_table);
 void free_pll_stats_fields(pseudo_log_likelihood_stats_t *pll_stats);
-void compute_pseudo_log_likelihood_statistics(training_data_t* training_data, pseudo_log_likelihood_stats_t* pll_stats);
+void compute_pseudo_log_likelihood_statistics(training_data_t* training_data, 
+		pseudo_log_likelihood_stats_t* pll_stats);
 
 double objective_expert();
 double objective_data();

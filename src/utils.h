@@ -133,28 +133,6 @@ static inline samp_truth_value_t negate_tval(samp_truth_value_t v){
 	}
 }
 
-/* String of a truth value */
-static inline char *string_of_tval(samp_truth_value_t tval) {
-	switch (tval) {
-	case v_undef:
-		return "undef";
-	case v_false:
-		return "false";
-	case v_true:
-		return "true";
-	case v_fixed_false:
-		return "fixed false";
-	case v_fixed_true:
-		return "fixed true";
-	case v_db_false:
-		return "db false";
-	case v_db_true:
-		return "db true";
-	default:
-		return NULL;
-	}
-}
-
 extern bool assigned_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
 extern bool assigned_false_lit(samp_truth_value_t *assignment, samp_literal_t lit);
 extern bool assigned_fixed_true_lit(samp_truth_value_t *assignment, samp_literal_t lit);
@@ -175,24 +153,22 @@ extern int32_t rule_atom_arity(rule_atom_t *atom, pred_table_t *pred_table);
 static inline bool rule_atom_is_direct(rule_atom_t *rule_atom) {
 	return (rule_atom->builtinop > 0 || rule_atom->pred <= 0);
 }
+
+/* all atoms in the clause are direct predicates */
+static inline bool rule_clause_is_direct(rule_clause_t *rule_clause) {
+	int32_t i;
+	for (i = 0; i < rule_clause->num_lits; i++) {
+		if (!rule_atom_is_direct(rule_clause->literals[i]->atom)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 extern int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table);
-extern samp_atom_t *rule_atom_to_samp_atom(rule_atom_t *ratom, substit_entry_t *substs,
-		pred_table_t *pred_table);
-extern samp_literal_t rule_lit_to_samp_lit(rule_literal_t *rlit, substit_entry_t *substs,
-		samp_table_t *table);
 
-static inline void switch_assignment_array(atom_table_t *atom_table) {
-	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
-	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
-}
-
-static inline void switch_and_copy_assignment_array(atom_table_t *atom_table) {
-	samp_truth_value_t *old_assignment = atom_table->assignment;
-	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
-	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
-	memcpy(atom_table->assignment, old_assignment,
-			sizeof(samp_truth_value_t) * atom_table->num_vars);
-}
+extern void copy_assignment_array(atom_table_t *atom_table);
+extern void restore_assignment_array(atom_table_t *atom_table);
 
 extern inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 
@@ -204,6 +180,9 @@ extern void isort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 
 /* Evaluates a clause to false (-1) or to the literal index evaluating to true. */
 extern int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
+
+/* Evaluates a rule instance to -1 if sat or the index of an unsat clause */
+extern int32_t eval_rule_inst(samp_truth_value_t *assignment, rule_inst_t *rinst);
 
 // The builtin binary predicates
 extern char* builtinop_string (int32_t bop);

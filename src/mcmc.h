@@ -13,7 +13,7 @@ extern void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double 
 	    uint32_t burn_in_steps, uint32_t samp_interval);
 
 /* Put the new clauses into the corresponding list based on their values */
-extern void push_newly_activated_clause(int32_t clsidx, samp_table_t *table);
+extern void push_newly_activated_rule_instance(int32_t ridx, samp_table_t *table);
 
 #endif /* __MCMC_H */
 

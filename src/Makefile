@@ -43,7 +43,7 @@ src_c := array_hash_map.c cnf.c gcd.c hash_functions.c input.c \
          int_array_sort.c integer_stack.c int_stack.c mcsat.c memalloc.c \
          memsize.c mcmc.c samplesat.c ground.c buffer.c string_heap.c tables.c \
          symbol_tables.c utils.c vectors.c parser.c print.c yacc.tab.c SFMT.c \
-         weight_learning.c training_data.c lbfgs.c clause_list.c
+         clause_list.c
 ifneq ($(XMLRPC_SERVER_LIBS),)
 src_c := $(src_c) xpce.c test-xpce.c test-xpce2.c xpce-client.c
 endif

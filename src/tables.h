@@ -16,10 +16,11 @@
 #define INIT_QUERY_TABLE_SIZE 16
 #define INIT_QUERY_INSTANCE_TABLE_SIZE 64
 #define INIT_SOURCE_TABLE_SIZE 16
-#define INIT_CLAUSE_TABLE_SIZE 64
+#define INIT_RULE_INST_TABLE_SIZE 64
 #define INIT_RULE_TABLE_SIZE 64
 #define INIT_SORT_CONST_SIZE 16
 #define INIT_CLAUSE_SIZE 16
+#define INIT_RULE_SIZE 16
 #define INIT_ATOM_SIZE 16
 #define INIT_MODEL_TABLE_SIZE 64
 #define INIT_SUBSTIT_TABLE_SIZE 8 /* number of vars in rules - likely to be small */
@@ -207,55 +208,67 @@ typedef struct atom_table_s {
 	int32_t num_vars;  /* number of bvars */
 	int32_t num_unfixed_vars; /* number of unfixed vars */
 	samp_atom_t **atom;
-	bool *active; /* if an atom is active */
+	bool *active; /* whether an atom is active */
 	int32_t *sampling_nums; /* number of samples BEFORE an atom is activated */
 	samp_truth_value_t *assignments[2]; /* maps atom ids to samp_truth_value_t */
 	uint32_t assignment_index; /* which of two assignment arrays is current */
 	samp_truth_value_t *assignment; /* the current assignment */
 	int32_t num_samples; /* current number of samples */
 	int32_t *pmodel; /* model count of each atom */
-
 	/* Maps atoms to indices in the table. Uses the predicate index + indices
 	 * of the arguments, an array with total length of arity + 1, as the key */
 	array_hmap_t atom_var_hash; 
 } atom_table_t;
 
-/* 
- * A clause has weight/status and a -1-terminated array of literals. The
- * low-bit for link is one if the clause is dead.
- *
- * TODO: for a FOL formula with weight w, it is decomposed into (by cnf)
- */
+/* a clause is an array of literals. */
 typedef struct samp_clause_s {
-	double weight; /* weight of the clause: DBL_MAX for hard clause */
-	int32_t numlits;
-	bool *frozen; /* array indicating whether associated literal is frozen */
+	//bool *frozen; /* array indicating whether associated literal is frozen */
 	struct samp_clause_s *link; /* link to next clause for a given watched literal */
+	int32_t num_lits;
 	samp_literal_t disjunct[0]; /* array of literals */
 } samp_clause_t;
 
-/* Clause list */
+/* clause list */
 typedef struct samp_clause_list_s {
 	samp_clause_t *head;
 	samp_clause_t *tail; /* pointer to the last element */
 	int32_t length;
 } samp_clause_list_t;
 
-/* Clauses stored in an array and also organized in several linked lists */
-typedef struct clause_table_s {
-	int32_t size;   /* size of the samp_clauses array */
-	int32_t num_clauses; /* number of clause entries */
-	samp_clause_t **samp_clauses; /* array of pointers to samp_clauses */
-	array_hmap_t clause_hash; /* maps clauses to index in clause table */
+typedef struct rule_inst_s {
+	double weight; /* weight of the clause: DBL_MAX for hard clause */
+	int32_t num_clauses;
+	samp_clause_t *conjunct[0]; /* array of clauses */
+} rule_inst_t;
+
+typedef struct rule_inst_table_s {
+	int32_t size;   /* size of the rule_insts array */
+	int32_t num_rule_insts; /* number of rule instance entries */
+	rule_inst_t **rule_insts; /* array of rule instances */
+	bool *live; /* whether a rule instance is live or dead */
 
 	samp_clause_list_t *watched; /* maps literals to samp_clause pointers */
 	samp_clause_list_t sat_clauses; /* list of fixed satisfied clauses */
 	samp_clause_list_t unsat_clauses; /* list of unsat clauses, threaded through link */
 	samp_clause_list_t live_clauses; /* temperory list to store unscaned live clauses */
-	samp_clause_list_t negative_or_unit_clauses; /* list of negative weight or unit  */
-	samp_clause_list_t dead_clauses; /* list of unselected clauses */
-	samp_clause_list_t dead_negative_or_unit_clauses; /* killed clauses */
-} clause_table_t;
+} rule_inst_table_t;
+
+/* Clauses stored in an array and also organized in several linked lists */
+//typedef struct clause_table_s {
+//	int32_t size;   /* size of the samp_clauses array */
+//	int32_t num_clauses; /* number of clause entries */
+//	samp_clause_t **samp_clauses; /* array of pointers to samp_clauses */
+//	array_hmap_t clause_hash; /* maps clauses to index in clause table */
+//
+//	samp_clause_list_t *watched; /* maps literals to samp_clause pointers */
+//	samp_clause_list_t sat_clauses; /* list of fixed satisfied clauses */
+//	samp_clause_list_t unsat_clauses; /* list of unsat clauses, threaded through link */
+//	samp_clause_list_t live_clauses; /* temperory list to store unscaned live clauses */
+//	samp_clause_list_t negative_or_unit_clauses; /* list of negative weight or unit  */
+//	samp_clause_list_t dead_clauses; /* list of unselected clauses */
+//	samp_clause_list_t dead_negative_or_unit_clauses; /* killed clauses */
+//} clause_table_t;
+
 
 /*
  * A rule is a clause with variables.  Instantiated forms of the rules are
@@ -288,6 +301,7 @@ typedef struct rule_atom_s {
 
 typedef struct rule_literal_s {
 	bool neg; /* true: with negation; false: without negation */
+	bool grounded;
 	rule_atom_t *atom;
 } rule_literal_t;
 
@@ -301,17 +315,23 @@ typedef int32_t substit_entry_t;
 //	bool fixed;
 //} substit_entry_t;
 
+typedef struct rule_clause_s {
+	int32_t num_lits;
+	bool grounded;
+	rule_literal_t *literals[0];
+} rule_clause_t;
+
 /* Quantified clause */
 typedef struct samp_rule_s {
-	int32_t num_lits; /* number of literal entries */
-	int32_t num_vars; /* number of variables */
-	int32_t num_frozen; /* number of frozen predicates */
-	var_entry_t **vars; /* The (quantified) variables */
-	rule_literal_t **literals; /* array of pointers to rule_literals */
-	int32_t *frozen_preds; /* array of frozen predicates */
-	int32_t *clause_indices; /* array of indices into clause_table */
+	array_hmap_t subst_hash; /* a hashset used to check duplicate of instances */
+	//int32_t *clause_indices; /* array of indices into clause_table */
+	//int32_t num_frozen; /* number of frozen predicates */
+	//int32_t *frozen_preds; /* array of frozen predicates */
 	double weight;
-	array_hmap_t subst_hash; /* a hashset used to check duplicate */
+	int32_t num_vars; /* number of variables */
+	var_entry_t **vars; /* The (quantified) variables */
+	int32_t num_clauses; /* number of literal entries */
+	rule_clause_t *clauses[0]; /* array of pointers to rule_literals */
 } samp_rule_t;
 
 typedef struct rule_table_s {
@@ -375,7 +395,7 @@ typedef struct query_instance_table_s {
 typedef struct source_entry_s {
 	char *name;
 	int32_t *assertion; /* indices to atom_table, -1 terminated */
-	int32_t *clause; /* indices to clause_table; -1 terminated */
+	int32_t *rule_insts; /* indices to rule_inst_table; -1 terminated */
 	double *weight; /* weights corresponding to clause list */
 } source_entry_t;
 
@@ -392,12 +412,11 @@ typedef struct samp_table_s {
 	var_table_t var_table;
 	pred_table_t pred_table;
 	atom_table_t atom_table;
-	clause_table_t clause_table; /* ground formulas (without variables) */
 	rule_table_t rule_table; /* formulas with variables */
+	rule_inst_table_t rule_inst_table;
 	query_table_t query_table;
 	query_instance_table_t query_instance_table;
 	source_table_t source_table;
-	integer_stack_t fixable_stack;
 } samp_table_t;
 
 
@@ -456,15 +475,15 @@ extern int32_t *pred_signature(int32_t predicate, pred_table_t *pred_table);
 
 /* functions for atom_table */
 extern void init_atom_table(atom_table_t *table);
-extern void atom_table_resize(atom_table_t *atom_table, clause_table_t *clause_table);
-
-/* functions for clause_table */
-extern void init_clause_table(clause_table_t *table);
-extern void clause_table_resize(clause_table_t *clause_table, int32_t num_lits);
+extern void atom_table_resize(atom_table_t *atom_table, rule_inst_table_t *rule_inst_table);
 
 /* functions for rule_table */
 extern void init_rule_table(rule_table_t *table);
 extern void rule_table_resize(rule_table_t *rule_table);
+
+/* functions for rule_inst_table */
+extern void init_rule_inst_table(rule_inst_table_t *table);
+extern void rule_inst_table_resize(rule_inst_table_t *rule_inst_table);
 
 /* functions for query_table */
 extern void init_query_table(query_table_t *table);

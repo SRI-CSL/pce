@@ -28,17 +28,15 @@ extern void create_new_const_rule_instances(int32_t constidx, int32_t csort,
 extern void create_new_const_query_instances(int32_t constidx, int32_t csort,
 		samp_table_t *table, int32_t atom_index);
 
+extern samp_atom_t *rule_atom_to_samp_atom(samp_atom_t *satom, rule_atom_t *ratom, 
+		int32_t arity, substit_entry_t *substs);
+
 extern int32_t activate_atom(samp_table_t *table, int32_t atom_index);
 extern void activate_rules(int32_t atom_index, samp_table_t *table);
 
 extern int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p);
-extern int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
-
-extern int32_t add_internal_clause(samp_table_t *table, int32_t *clause,
-		int32_t length, int32_t *fixed_preds, double weight,
+extern int32_t add_internal_rule_instance(samp_table_t *table, rule_inst_t *entry,
 		bool indirect, bool add_weights);
-extern int32_t add_clause(samp_table_t *table, input_literal_t **in_clause,
-		double weight, char *source, bool add_weights);
 
 #endif /* __GROUND_H */
 

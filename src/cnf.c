@@ -11,7 +11,7 @@
 #include "vectors.h"
 #include "weight_learning.h"
 #include "tables.h"
-
+#include "buffer.h"
 #include "mcmc.h"
 #include "ground.h"
 #include "cnf.h"
@@ -433,16 +433,17 @@ var_entry_t **copy_variables(var_entry_t **vars) {
 	return cvars;
 }
 
-// Sets the variables in the clause, removing those not mentioned
-void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
+/* Sets the variables in the rule, removing those not mentioned */
+static void set_fmla_rule_variables(samp_rule_t *rule, var_entry_t **vars) {
 	pred_table_t *pred_table = &samp_table.pred_table;
 	rule_atom_t *atom;
+	rule_clause_t *rclause;
 	var_entry_t **cvars;
-	int32_t i, j, numvars, arity, vidx, delta, *mapping;
+	int32_t i, j, k, numvars, arity, vidx, delta, *mapping;
 	bool usedvar, unusedvar;
 
-	// First copy the vars, then tag all with negated signatures
-	// assumes all sigs are nonnegative.
+	/* First copy the vars, then tag all with negated signatures
+	 * assumes all sigs are nonnegative. */
 	for (numvars = 0; vars[numvars] != NULL; numvars++) {
 	}
 	cvars = copy_variables(vars);
@@ -450,16 +451,19 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
 		assert(cvars[i]->sort_index >= 0);
 		cvars[i]->sort_index = -(cvars[i]->sort_index + 1);
 	}
-	// Now go through the literals, untagging the found variables
-	for (i = 0; i < clause->num_lits; i++) {
-		atom = clause->literals[i]->atom;
-		arity = rule_atom_arity(atom, pred_table);
-		// Loop through the args of the atom
-		for (j = 0; j < arity; j++) {
-			if (atom->args[j].kind == variable) {
-				vidx = atom->args[j].value;
-				if (cvars[vidx]->sort_index < 0) {
-					cvars[vidx]->sort_index = -(cvars[vidx]->sort_index + 1);
+	/* Now go through the literals, untagging the found variables */
+	for (i = 0; i < rule->num_clauses; i++) {
+		rclause = rule->clauses[i];
+		for (j = 0; j < rclause->num_lits; j++) {
+			atom = rclause->literals[j]->atom;
+			arity = rule_atom_arity(atom, pred_table);
+			/* Loop through the args of the atom */
+			for (k = 0; k < arity; k++) {
+				if (atom->args[k].kind == variable) {
+					vidx = atom->args[k].value;
+					if (cvars[vidx]->sort_index < 0) {
+						cvars[vidx]->sort_index = -(cvars[vidx]->sort_index + 1);
+					}
 				}
 			}
 		}
@@ -473,47 +477,50 @@ void set_fmla_clause_variables(samp_rule_t *clause, var_entry_t **vars) {
 			unusedvar = true;
 		}
 	}
-	if (usedvar) {
-		delta = 0;
-		if (unusedvar) {
-			// Some variable was not used - create an int array mapping
-			// old var index to new, remove unused vars from cvars, and
-			// reset the literals using the mapping.
-			mapping = (int32_t *) safe_malloc(numvars * sizeof(int32_t));
-			j = 0;
-			for (i = 0; i < numvars; i++) {
-				if (cvars[i]->sort_index < 0) {
-					delta++;
-					mapping[i] = -1;
-				} else {
-					cvars[i - delta] = cvars[i];
-					mapping[i] = i - delta;
-				}
+
+	if (!usedvar) {
+		rule->num_vars = 0;
+		rule->vars = NULL;
+		free_var_entries(cvars);
+		return;
+	}
+
+	delta = 0;
+	if (unusedvar) {
+		/* Some variable was not used - create an int array mapping
+		 * old var index to new, remove unused vars from cvars, and
+		 * reset the literals using the mapping. */
+		mapping = (int32_t *) safe_malloc(numvars * sizeof(int32_t));
+		j = 0;
+		for (i = 0; i < numvars; i++) {
+			if (cvars[i]->sort_index < 0) {
+				delta++;
+				mapping[i] = -1;
+			} else {
+				cvars[i - delta] = cvars[i];
+				mapping[i] = i - delta;
 			}
-			// This leads to valgrind errors - don't know why
-			//safe_realloc(cvars, (numvars-delta) * sizeof(var_entry_t *));
-			for (i = 0; i < clause->num_lits; i++) {
-				atom = clause->literals[i]->atom;
-				arity = atom->builtinop == 0 ?
-						pred_arity(atom->pred, pred_table) :
-						builtin_arity(atom->builtinop);
-				// Loop through the args of the atom
-				for (j = 0; j < arity; j++) {
-					if (atom->args[j].kind == variable) {
-						// We have a variable - vidx is the index into vars
-						vidx = atom->args[j].value;
-						atom->args[j].value = mapping[vidx];
+		}
+		/* This leads to valgrind errors - don't know why */
+		//safe_realloc(cvars, (numvars-delta) * sizeof(var_entry_t *));
+		for (i = 0; i < rule->num_clauses; i++) {
+			rclause = rule->clauses[i];
+			for (j = 0; j < rclause->num_lits; j++) {
+				atom = rclause->literals[j]->atom;
+				arity = rule_atom_arity(atom, pred_table);
+				/* Loop through the args of the atom */
+				for (k = 0; k < arity; k++) {
+					if (atom->args[k].kind == variable) {
+						/* We have a variable - vidx is the index into vars */
+						vidx = atom->args[k].value;
+						atom->args[k].value = mapping[vidx];
 					}
 				}
 			}
 		}
-		clause->num_vars = numvars - delta;
-		clause->vars = cvars;
-	} else {
-		clause->num_vars = 0;
-		clause->vars = NULL;
-		free_var_entries(cvars);
 	}
+	rule->num_vars = numvars - delta;
+	rule->vars = cvars;
 }
 
 bool vars_equal(var_entry_t *v1, var_entry_t *v2) {
@@ -568,16 +575,22 @@ bool clause_lits_equal(int32_t nlits, rule_literal_t **l1, rule_literal_t **l2) 
 	return true;
 }
 
-bool clauses_equal(samp_rule_t *c1, samp_rule_t *c2) {
-	return (c1->num_vars == c2->num_vars)
-			&& (clause_vars_equal(c1->num_vars, c1->vars, c2->vars))
-			&& (c1->num_lits == c2->num_lits)
-			&& (clause_lits_equal(c1->num_lits, c1->literals, c2->literals));
-}
+//bool clauses_equal(samp_rule_t *c1, samp_rule_t *c2) {
+//	return (c1->num_vars == c2->num_vars)
+//			&& (clause_vars_equal(c1->num_vars, c1->vars, c2->vars))
+//			&& (c1->num_lits == c2->num_lits)
+//			&& (clause_lits_equal(c1->num_lits, c1->literals, c2->literals));
+//}
 
-// Checks clauses to see that they all involve at least one indirect atom
-// or exactly one positive direct atom (head normal form)
-// Will not return if there is an error.
+/* 
+ * Checks clauses to see that they all involve at least one indirect atom or
+ * exactly one positive direct atom (head normal form) Will not return if there
+ * is an error.
+ *
+ * First check if clauses all either involve indirect preds, or are in head
+ * normal form We check here in order to abort the add_cnf before adding some
+ * clauses If there is an error, this function will not return
+ */
 bool all_clauses_involve_indirects_or_hnf(rule_literal_t ***lits, double weight) {
 	int32_t i, j;
 	bool pos;
@@ -592,8 +605,8 @@ bool all_clauses_involve_indirects_or_hnf(rule_literal_t ***lits, double weight)
 		// All preds are direct - check that the weight is DBL_MAX and there
 		// is exactly one positive
 		if (weight != DBL_MAX) {
-			mcsat_err(
-					"cnf error: clause contains only observable predicates, should not be given weight:");
+			mcsat_err("cnf error: clause contains only observable predicates, \
+should not be given weight:");
 			return false;
 		}
 		pos = false;
@@ -601,116 +614,132 @@ bool all_clauses_involve_indirects_or_hnf(rule_literal_t ***lits, double weight)
 			if (!lits[i][j]->neg) {
 				if (pos) {
 					// Have more than one pos, complain
-					mcsat_err(
-							"cnf error: clause contains only observable predicates, with more than one positive:");
+					mcsat_err("cnf error: clause contains only observable predicates, \
+with more than one positive:");
 					return false;
 				}
 				pos = true;
 			}
 		}
 		if (!pos) {
-			mcsat_err(
-					"cnf error: clause contains only observable predicates, with none positive:");
+			mcsat_err("cnf error: clause contains only observable predicates, with none positive:");
 			return false;
 		}
 	}
 	return true;
 }
 
-// Generates the CNF form of a formula, and updates the clause table (if no
-// variables) or the rule table.
+/*
+ * Generates the CNF form of a formula, and updates the clause table (if no
+ * variables) or the rule table.
+ */
 void add_cnf(char **frozen, input_formula_t *formula, double weight,
 		char *source, bool add_weights) {
-	rule_table_t *rule_table = &samp_table.rule_table;
 	pred_table_t *pred_table = &samp_table.pred_table;
-	clause_table_t * clause_table = &samp_table.clause_table;
-	int32_t i, j, num_frozen, fpred_val, fpred_idx, *frozen_preds, current_rule,
-			num_lits, num_vars, atom_idx;
+	rule_table_t *rule_table = &samp_table.rule_table;
+	rule_inst_table_t *rule_inst_table = &samp_table.rule_inst_table;
+	int32_t i, j, current_rule, num_clauses, num_lits, 
+			num_vars, atom_idx, arity;
 	rule_literal_t ***lits, *lit;
-	samp_rule_t *clause, *found;
+	rule_clause_t *rule_clause;
 	bool found_indirect;
 
-	num_frozen = 0;
+	/* Returns the literals, and sets the sort of the variables */
+	if (weight > -1e-8 && weight < 1e-8) {
+		return;
+	}
+	else if (weight < 0) {
+		weight = -weight;
+		lits = cnf_neg(formula->fmla, formula->vars);
+	}
+	else {
+		lits = cnf_pos(formula->fmla, formula->vars);
+	}
 
-	// Returns the literals, and sets the sort of the variables
-	lits = cnf_pos(formula->fmla, formula->vars);
 	if (!lits) {
 		return;
 	}
 
-	// First check if clauses all either involve indirect preds, or are in head normal form
-	// We check here in order to abort the add_cnf before adding some clauses
-	// If there is an error, this function will not return
-	if (!all_clauses_involve_indirects_or_hnf(lits, weight)) {
-		return;
-	}
+	//if (!all_clauses_involve_indirects_or_hnf(lits, weight)) {
+	//	return;
+	//}
 
-	if (frozen != NULL) {
-		for (num_frozen = 0; frozen[num_frozen] != NULL; num_frozen++) {
-		};
-		frozen_preds = (int32_t *) safe_malloc(
-				(num_frozen + 1) * sizeof(int32_t));
-		j = 0;
-		for (i = 0; frozen[i] != NULL; i++) {
-			fpred_val = pred_index(frozen[i], pred_table);
-			if (fpred_val == -1) {
-				mcsat_warn("Predicate %s not declared; will be ignored",
-						frozen[i]);
-			} else {
-				fpred_idx = pred_val_to_index(fpred_val);
-				if (pred_epred(fpred_idx)) {
-					// A direct predicate - no sense in trying to fix it complain, but go on anyway
-					mcsat_warn("Predicate %s is observable, hence already frozen",
-							frozen[i]);
-				} else {
-					frozen_preds[j++] = fpred_idx;
-				}
-			}
-		}
-		num_frozen = j;
-		frozen_preds[j] = -1;
-	} else {
-		frozen_preds = NULL;
-	}
+	//if (frozen != NULL) {
+	//	for (num_frozen = 0; frozen[num_frozen] != NULL; num_frozen++) {
+	//	};
+	//	frozen_preds = (int32_t *) safe_malloc(
+	//			(num_frozen + 1) * sizeof(int32_t));
+	//	j = 0;
+	//	for (i = 0; frozen[i] != NULL; i++) {
+	//		fpred_val = pred_index(frozen[i], pred_table);
+	//		if (fpred_val == -1) {
+	//			mcsat_warn("Predicate %s not declared; will be ignored",
+	//					frozen[i]);
+	//		} else {
+	//			fpred_idx = pred_val_to_index(fpred_val);
+	//			if (pred_epred(fpred_idx)) {
+	//				/* A direct predicate - no sense in trying to fix it
+	//				 * complain, but go on anyway */
+	//				mcsat_warn("Predicate %s is observable, hence already frozen",
+	//						frozen[i]);
+	//			} else {
+	//				frozen_preds[j++] = fpred_idx;
+	//			}
+	//		}
+	//	}
+	//	num_frozen = j;
+	//	frozen_preds[j] = -1;
+	//} else {
+	//	frozen_preds = NULL;
+	//}
 
-	int32_t *clause_lits;
 	if (formula->vars == NULL) {
-		// No variables, just assert the clauses
-
-		for (i = 0; lits[i] != NULL; i++) {
-			for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++) {
-			}
-			clause_lits = (int32_t *) safe_malloc(sizeof(int32_t) * num_lits);
+		/* No free variables, just assert the clauses */
+		for (num_clauses = 0; lits[num_clauses] != NULL; num_clauses++);
+		rule_inst_t *rinst = (rule_inst_t *) safe_malloc(sizeof(rule_inst_t)
+				+ num_clauses * sizeof(samp_clause_t *));
+		rinst->num_clauses = num_clauses;
+		rinst->weight = weight;
+		for (i = 0; i < num_clauses; i++) {
+			for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++);
+			samp_clause_t *clause = (samp_clause_t *) safe_malloc(sizeof(samp_clause_t)
+					+ num_lits * sizeof(samp_literal_t));
+			clause->link = NULL;
+			clause->num_lits = num_lits;
 			found_indirect = false;
 			for (j = 0; j < num_lits; j++) {
 				lit = lits[i][j];
 				if (lit->atom->pred > 0) {
 					found_indirect = true;
 				}
-				samp_atom_t *satom = rule_atom_to_samp_atom(lit->atom, NULL,
-						pred_table);
-				// FIXME what is top_p? should it be true or false?
+
+				arity = rule_atom_arity(lit->atom, pred_table);
+				atom_buffer_resize(arity);
+				samp_atom_t *satom = (samp_atom_t *) atom_buffer.data;
+				rule_atom_to_samp_atom(satom, lit->atom, arity, NULL);
+				/* FIXME what is top_p? should it be true or false? */
 				//atom_idx = add_internal_atom(&samp_table, satom, true);
 				atom_idx = add_internal_atom(&samp_table, satom, false);
-				free_samp_atom(satom);
-				clause_lits[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
-			}
-			int32_t clause_index = add_internal_clause(&samp_table, 
-					clause_lits, num_lits, frozen_preds, weight, 
-					found_indirect, add_weights);
-			safe_free(clause_lits);
 
-			if (get_verbosity_level() >= 1) {
-				print_clause(clause_table->samp_clauses[clause_index], &samp_table);
-				printf("\n");
+				clause->disjunct[j] = lit->neg ? neg_lit(atom_idx) : pos_lit(atom_idx);
+				free_rule_literal(lit);
 			}
+			rinst->conjunct[i] = clause;
+			safe_free(lits[i]);
 		}
-	} else { /* contains universally quantified variables */
+		safe_free(lits);
+		int32_t ridx = add_internal_rule_instance(&samp_table, 
+				rinst, found_indirect, add_weights);
 
-		for (num_vars = 0; formula->vars[num_vars] != NULL; num_vars++) {
+		if (get_verbosity_level() >= 1) {
+			print_rule_instance(rule_inst_table->rule_insts[ridx], &samp_table);
+			printf("\n");
 		}
+	} else { 
+		/* contains universally quantified variables */
+		for (num_vars = 0; formula->vars[num_vars] != NULL; num_vars++);
 		for (i = 0; i < num_vars; i++) {
-			// Check that all variables have been referenced
+			/* Check that all variables have been referenced */
 			if (formula->vars[i]->sort_index == -1) {
 				mcsat_err("cnf error: variable %s not used in formula\n",
 						formula->vars[i]->name);
@@ -718,65 +747,80 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 				return;
 			}
 		}
-		// Now create the samp_rule_t, and add it to the rule_table
-		for (i = 0; lits[i] != NULL; i++) {
-			clause = (samp_rule_t *) safe_malloc(sizeof(samp_rule_t));
-			for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++) {
-			}
-			clause->num_lits = num_lits;
-			clause->literals = lits[i];
-			clause->num_frozen = num_frozen;
-			clause->frozen_preds = frozen_preds;
-			//set_clause_variables(clause);
-			clause->num_vars = num_vars;
-			init_array_hmap(&clause->subst_hash, ARRAY_HMAP_DEFAULT_SIZE);
-			set_fmla_clause_variables(clause, formula->vars);
-			found = NULL;
 
-			if (get_verbosity_level() >= 1) {
-				print_rule(clause, &samp_table, 0);
-				printf("\n");
+		for (num_clauses = 0; lits[num_clauses] != NULL; num_clauses++);
+		samp_rule_t *rule = (samp_rule_t *) safe_malloc(sizeof(samp_rule_t)
+				+ num_clauses * sizeof(rule_clause_t *));
+		rule->num_clauses = num_clauses;
+		rule->weight = weight;
+		/* Now create the samp_rule_t, and add it to the rule_table */
+		for (i = 0; i < num_clauses; i++) {
+			for (num_lits = 0; lits[i][num_lits] != NULL; num_lits++);
+			rule_clause = (rule_clause_t *) safe_malloc(sizeof(rule_clause_t)
+					+ num_lits * sizeof(rule_literal_t *));
+			rule_clause->num_lits = num_lits;
+			for (j = 0; j < num_lits; j++) {
+				rule_clause->literals[j] = lits[i][j];
+				rule_clause->literals[j]->grounded = false;
 			}
+			rule_clause->grounded = false;
+			rule->clauses[i] = rule_clause;
+			safe_free(lits[i]);
+		}
+		safe_free(lits);
 
-			// Now check if clause is in the table
-			for (j = 0; j < rule_table->num_rules; j++) {
-				if (clauses_equal(rule_table->samp_rules[j], clause)) {
-					found = rule_table->samp_rules[j];
-					break;
-				}
-			}
-			if (found == NULL) {
-				clause->weight = weight;
-				rule_table_resize(rule_table);
-				current_rule = rule_table->num_rules;
-				rule_table->samp_rules[current_rule] = clause;
-				rule_table->num_rules++;
-				for (j = 0; j < num_lits; j++) {
-					if (lits[i][j]->atom->builtinop == 0) {
-						int32_t pred = lits[i][j]->atom->pred;
-						add_rule_to_pred(pred_table, pred, current_rule);
-					}
-				}
-				if (!lazy_mcsat()) {
-					all_rule_instances(current_rule, &samp_table);
-				} else {
-					smart_all_rule_instances(current_rule, &samp_table);
-				}
-			} else {
-				if (found->weight != DBL_MAX) {
-					mcsat_warn("Rule was seen before, adding weights\n");
-					if (weight == DBL_MAX) {
-						found->weight = DBL_MAX;
-					} else {
-						found->weight += weight;
-					}
-					// Need to update the clause table
-				} else {
-					mcsat_warn("Rule was seen before with MAX weight: unchanged\n");
+		rule->num_vars = num_vars;
+		init_array_hmap(&rule->subst_hash, ARRAY_HMAP_DEFAULT_SIZE);
+		set_fmla_rule_variables(rule, formula->vars);
+		//rule_clause->num_frozen = num_frozen;
+		//rule_clause->frozen_preds = frozen_preds;
+		//found = NULL;
+
+		if (get_verbosity_level() >= 1) {
+			print_rule(rule, &samp_table, 0);
+			printf("\n");
+		}
+
+		///* Now check if clause is in the table */
+		//for (j = 0; j < rule_table->num_rules; j++) {
+		//	if (clauses_equal(rule_table->samp_rules[j], clause)) {
+		//		found = rule_table->samp_rules[j];
+		//		break;
+		//	}
+		//}
+		//if (found == NULL) {
+		rule_table_resize(rule_table);
+		current_rule = rule_table->num_rules;
+		rule_table->samp_rules[current_rule] = rule;
+		rule_table->num_rules++;
+		for (i = 0; i < rule->num_clauses; i++) {
+			rule_clause = rule->clauses[i];
+			for (j = 0; j < rule_clause->num_lits; j++) {
+				lit = rule_clause->literals[j];
+				if (lit->atom->builtinop == 0) {
+					int32_t pred = lit->atom->pred;
+					add_rule_to_pred(pred_table, pred, current_rule);
 				}
 			}
 		}
-		safe_free(lits);
+		if (!lazy_mcsat()) {
+			all_rule_instances(current_rule, &samp_table);
+		} else {
+			smart_all_rule_instances(current_rule, &samp_table);
+		}
+		//} else {
+		//	if (found->weight != DBL_MAX) {
+		//		mcsat_warn("Rule was seen before, adding weights\n");
+		//		if (weight == DBL_MAX) {
+		//			found->weight = DBL_MAX;
+		//		} else {
+		//			found->weight += weight;
+		//		}
+		//		// Need to update the clause table
+		//	} else {
+		//		mcsat_warn("Rule was seen before with MAX weight: unchanged\n");
+		//	}
+		//}
 	}
 }
 

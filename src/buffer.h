@@ -17,8 +17,13 @@ typedef struct atom_buffer_s {
 
 typedef struct clause_buffer_s {
   int32_t size;
-  int32_t *data;
+  samp_literal_t *literals;
 } clause_buffer_t;
+
+typedef struct rule_buffer_s {
+	int32_t size;
+	samp_clause_t **clauses;
+} rule_buffer_t;
 
 typedef struct substit_buffer_s {
   int32_t size;
@@ -51,15 +56,17 @@ typedef struct string_buffer_s {
 
 extern atom_buffer_t atom_buffer;
 extern clause_buffer_t clause_buffer;
+extern rule_buffer_t rule_buffer;
 extern substit_buffer_t substit_buffer;
 
 extern input_clause_buffer_t input_clause_buffer;
 extern input_literal_buffer_t input_literal_buffer;
 extern input_atom_buffer_t input_atom_buffer;
 
-extern void substit_buffer_resize(int32_t length);
-extern void clause_buffer_resize(int32_t length);
 extern void atom_buffer_resize(int32_t arity);
+extern void clause_buffer_resize(int32_t length);
+extern void rule_buffer_resize(int32_t length);
+extern void substit_buffer_resize(int32_t length);
 
 extern input_clause_t *new_input_clause();
 extern input_literal_t *new_input_literal();
