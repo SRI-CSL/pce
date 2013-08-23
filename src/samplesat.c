@@ -885,8 +885,13 @@ int32_t sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 
 	uint32_t num_flips = max_flips;
 	while (num_flips > 0 && conflict == 0) {
-		if (rule_inst_table->unsat_clauses.length == 0)
-			break;
+		if (rule_inst_table->unsat_clauses.length == 0) {
+			if (max_extra_flips > 0) {
+				max_extra_flips--;
+			} else {
+				break;
+			}
+		}
 		conflict = sample_sat_body(table, lazy, sa_probability, sa_temperature,
 				rvar_probability);
 		//assert(valid_table(table));
