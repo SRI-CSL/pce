@@ -368,7 +368,7 @@ static samp_clause_t *rule_clause_to_samp_clause(rule_clause_t *rclause, substit
 		return NULL;
 	}
 
-	assert(num_lits > 0); /* no direct unsat clause */
+	assert(!lazy_mcsat() || num_lits > 0); /* no direct unsat clause */
 
 	samp_clause_t *sclause = (samp_clause_t *) safe_malloc(sizeof(samp_clause_t)
 			+ num_lits * sizeof(samp_literal_t));
