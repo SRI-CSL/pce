@@ -307,6 +307,10 @@ static int32_t unit_propagate(samp_table_t *table) {
 	return 0;
 }
 
+/*
+ * Decompose the live rule instances into clauses and put them
+ * into the clause list.
+ */
 static void init_live_clauses(samp_table_t *table) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
 	atom_table_t *atom_table = &table->atom_table;
@@ -371,8 +375,11 @@ static int32_t scan_live_clauses(samp_table_t *table) {
  * [eager only] Chooses a random unfixed atom in a simmulated annealing
  * step in sample SAT.
  */
-static int32_t choose_unfixed_variable(samp_truth_value_t *assignment,
-		int32_t num_vars, int32_t num_unfixed_vars) {
+int32_t choose_unfixed_variable(atom_table_t *atom_table) {
+	samp_truth_value_t *assignment = atom_table->assignment;
+	int32_t num_vars = atom_table->num_vars;
+	int32_t num_unfixed_vars = atom_table->num_unfixed_vars;
+
 	uint32_t var, d, y;
 
 	if (num_unfixed_vars == 0)
@@ -393,7 +400,7 @@ static int32_t choose_unfixed_variable(samp_truth_value_t *assignment,
 		if (y >= num_vars)
 			y -= num_vars;
 		assert(var != y);
-	} while (fixed_tval(assignment[y]));
+	} while (!unfixed_tval(assignment[y]));
 	return y;
 }
 
@@ -697,7 +704,7 @@ static void init_random_assignment(samp_table_t *table) {
  * Like init_first_sample_sat, but takes an existing state and sets it up for a
  * second round of sampling
  */
-static int32_t init_sample_sat(samp_table_t *table) {
+static int32_t init_sample_sat(samp_table_t *table, bool randomize) {
 
 	init_live_clauses(table);
 	valid_table(table);
@@ -717,8 +724,10 @@ static int32_t init_sample_sat(samp_table_t *table) {
 		print_assignment(table);
 	}
 
-	init_random_assignment(table);
-	valid_table(table);
+	if (randomize) {
+		init_random_assignment(table);
+		valid_table(table);
+	}
 
 	if (scan_live_clauses(table) == -1)
 		return -1;
@@ -767,8 +776,7 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
 		cprintf(3, "[sample_sat_body] simulated annealing\n");
 
 		if (!lazy) {
-			var = choose_unfixed_variable(atom_table->assignment, atom_table->num_vars,
-					atom_table->num_unfixed_vars);
+			var = choose_unfixed_variable(atom_table);
 		} else {
 			var = choose_random_atom(table);
 		}
@@ -820,9 +828,10 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
 int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double sa_temperature, double rvar_probability, uint32_t max_flips) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
+	atom_table_t *atom_table = &table->atom_table;
 	int32_t conflict;
 
-	conflict = init_sample_sat(table);
+	conflict = init_sample_sat(table, true);
 
 	if (conflict == -1)
 		return -1;
@@ -834,6 +843,8 @@ int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 			return -1;
 		num_flips--;
 	}
+	
+	unfix_assignment_array(atom_table);
 
 	if (rule_inst_table->unsat_clauses.length > 0) {
 		printf("num of unsat clauses = %d\n", rule_inst_table->unsat_clauses.length);
@@ -875,13 +886,14 @@ int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
  */
 int32_t sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double sa_temperature, double rvar_probability,
-		uint32_t max_flips, uint32_t max_extra_flips) {
+		uint32_t max_flips, uint32_t max_extra_flips, bool randomize) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
+	atom_table_t *atom_table = &table->atom_table;
 	int32_t conflict;
 
 	cprintf(2, "[sample_sat] started ...\n");
 
-	conflict = init_sample_sat(table);
+	conflict = init_sample_sat(table, randomize);
 
 	uint32_t num_flips = max_flips;
 	while (num_flips > 0 && conflict == 0) {
@@ -910,6 +922,8 @@ int32_t sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		}
 	}
 	
+	unfix_assignment_array(atom_table);
+
 	return conflict;
 }
 

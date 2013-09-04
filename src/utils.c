@@ -251,10 +251,15 @@ void copy_assignment_array(atom_table_t *atom_table) {
 	samp_truth_value_t *old_assignment = atom_table->assignment;
 	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
 	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
+	memcpy(atom_table->assignment, old_assignment, 
+			atom_table->num_vars * sizeof(samp_truth_value_t));
+}
+
+void unfix_assignment_array(atom_table_t *atom_table) {
 	atom_table->num_unfixed_vars = 0;
 	int32_t i;
 	for (i = 0; i < atom_table->num_vars; i++) {
-		atom_table->assignment[i] = unfix_tval(old_assignment[i]);
+		atom_table->assignment[i] = unfix_tval(atom_table->assignment[i]);
 		if (unfixed_tval(atom_table->assignment[i])) {
 			atom_table->num_unfixed_vars++;
 		}

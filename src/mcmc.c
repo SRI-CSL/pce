@@ -71,10 +71,7 @@ static void kill_rule_instances(samp_table_t *table) {
 }
 
 /*
- * Pushes each of the hard clauses into either negative_or_unit_clauses
- * if weight is negative or numlits is 1, or into unsat_clauses if weight
- * is non-negative.  Non-hard clauses go into dead_negative_or_unit_clauses
- * or dead_clauses, respectively.
+ * Set the hard rule instances live and soft rule instances dead.
  */
 static void init_rule_instances(rule_inst_table_t *rule_inst_table) {
 	uint32_t i;
@@ -97,20 +94,18 @@ static void restore_sat_dead_rule_instances(rule_inst_table_t *rule_inst_table,
 	int32_t i;
 	rule_inst_t *rinst;
 	for (i = 0; i < rule_inst_table->num_rule_insts; i++) {
-		if (rule_inst_table->live[i]) continue;
+		//if (rule_inst_table->live[i]) continue;
 		rinst = rule_inst_table->rule_insts[i];
 		if (eval_rule_inst(assignment, rinst) == -1) {
 			rule_inst_table->live[i] = true;
+		} else {
+			rule_inst_table->live[i] = false;
 		}
 	}
 }
 
 /*
- * Prepare for a new round in mcsat:
- * - select a new set of live clauses
- * - select a random assignment
- * - return -1 if a conflict is detected by unit propagation (in the fixed clauses)
- * - return 0 otherwise
+ * Prepare for a new round in mcsat: select a new set of live rule instances
  */
 static int32_t reset_sample_sat(samp_table_t *table) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
@@ -126,11 +121,11 @@ static int32_t reset_sample_sat(samp_table_t *table) {
 
 	restore_sat_dead_rule_instances(rule_inst_table, atom_table->assignment);
 
-	if (get_verbosity_level() >= 4) {
-		printf("[reset_sample_sat] restored. %d unsat_clauses\n",
-				rule_inst_table->unsat_clauses.length);
-		print_rule_instances(table);
-	}
+	//if (get_verbosity_level() >= 4) {
+	//	printf("[reset_sample_sat] restored. %d unsat_clauses\n",
+	//			rule_inst_table->unsat_clauses.length);
+	//	print_rule_instances(table);
+	//}
 
 	kill_rule_instances(table);
 
@@ -228,11 +223,56 @@ static void update_pmodel(samp_table_t *table) {
 	//}
 }
 
-/*
- * False before the first sample sat of the mc_sat finishes, in which only the
- * hard rules are considered. Afterwards, the soft rules are also considered.
- */
-bool soft_rules_included = false;
+//static double get_weighted_cost(samp_table_t *table) {
+//	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
+//	atom_table_t *atom_table = &table->atom_table;
+//	int32_t i;
+//	rule_inst_t *rinst;
+//	double cost = 0.0;
+//	for (i = 0; i < rule_inst_table->num_rule_insts; i++) {
+//		rinst = rule_inst_table->rule_insts[i];
+//		if (eval_rule_inst(atom_table->assignment, rinst) != -1) {
+//			if (rinst->weight == DBL_MAX) {
+//				cost = DBL_MAX;
+//				break;
+//			} else {
+//				cost += rinst->weight;
+//			}
+//			//rule_inst_table->live[i] = false;
+//		} else {
+//			//rule_inst_table->live[i] = true;
+//		}
+//	}
+//	return cost;
+//}
+
+static int32_t perturb_assignment(samp_table_t *table) {
+	atom_table_t *atom_table = &table->atom_table;
+	
+	//double curr_cost = get_weighted_cost(table);
+
+	int32_t var;
+
+	var = choose_unfixed_variable(atom_table);
+	atom_table->assignment[var] = negate_tval(atom_table->assignment[var]);
+
+	//double flip_cost = get_weighted_cost(table);
+
+	if (get_verbosity_level() >= 3) {
+		cprintf(3, "[perturb_assignment] var = ");
+		print_atom_now(atom_table->atom[var], table);
+		cprintf(3, "\n");
+		//cprintf(3, ", curr = %f, flip = %f\n", curr_cost, flip_cost);
+	}
+
+	//if (fabs(flip_cost - curr_cost) < 100.0) {
+	//	break;
+	//} else { 
+	//	atom_table->assignment[var] = negate_tval(atom_table->assignment[var]);
+	//}
+	
+	return 0;
+}
 
 /**
  * Top-level MCSAT call
@@ -282,9 +322,6 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 
 	conflict = first_sample_sat(table, lazy, sa_probability, sa_temperature,
 			rvar_probability, max_flips);
-
-	soft_rules_included = true;
-
 	if (conflict == -1) {
 		mcsat_err("Found conflict in initialization.\n");
 		return;
@@ -293,22 +330,22 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 
 	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
 
+		rule_inst_table->soft_rules_included = true;
+
 		if (timeout != 0 && time(NULL) >= fintime) {
 			printf("Timeout after %"PRIu32" samples\n", i);
 			break;
 		}
 
 		draw_sample = (i >= burn_in_steps && i % samp_interval == 0);
-
 		cprintf(2, "\n[mc_sat] MC-SAT round %"PRIu32" started:\n", i);
 
 		//assert(valid_table(table));
 		conflict = reset_sample_sat(table);
 
 		copy_assignment_array(atom_table);
-
 		conflict = sample_sat(table, lazy, sa_probability, sa_temperature,
-				rvar_probability, max_flips, max_extra_flips);
+				rvar_probability, max_flips, max_extra_flips, true);
 
 		/*
 		 * If Sample sat did not find a model (within max_flips)
@@ -324,9 +361,6 @@ Consider increasing max_flips and max_tries - see mcsat help.\n");
 
 			// Flip current_assignment (restore the saved assignment)
 			restore_assignment_array(atom_table);
-
-			init_rule_instances(rule_inst_table);
-
 			i--;
 			continue;
 		}
@@ -345,6 +379,39 @@ Consider increasing max_flips and max_tries - see mcsat help.\n");
 			print_assignment(table);
 		}
 		//assert(valid_table(table));
+
+		/* TODO Aug 26: add a perturbation on the current model, resulting
+		 * a new model with approximately similar probability, to jump out
+		 * of the an isolated region of feasible models */
+		rule_inst_table->soft_rules_included = false;
+
+		conflict = perturb_assignment(table);
+
+		init_rule_instances(rule_inst_table);
+		copy_assignment_array(atom_table);
+		conflict = sample_sat(table, lazy, 0.0, 0.0, rvar_probability,
+				max_flips, max_extra_flips, false);
+
+		/*
+		 * If Sample sat did not find a model (within max_flips)
+		 * restore the earlier assignment
+		 */
+		if (conflict == -1 || rule_inst_table->unsat_clauses.length > 0) {
+			if (conflict == -1) {
+				cprintf(2, "Hit a conflict.\n");
+			} else {
+				cprintf(2, "Failed to find a model. \
+Consider increasing max_flips and max_tries - see mcsat help.\n");
+			}
+
+			// Flip current_assignment (restore the saved assignment)
+			restore_assignment_array(atom_table);
+		}
+
+		cprintf(2, "\n[mc_sat] MC-SAT after perturbation %"PRIu32":\n", i);
+		if (get_verbosity_level() >= 2) {
+			print_assignment(table);
+		}
 	}
 }
 
@@ -367,7 +434,8 @@ void push_newly_activated_rule_instance(int32_t ridx, samp_table_t *table) {
 
 	int32_t i;
 	if (rinst->weight == DBL_MAX
-			|| (soft_rules_included && choose() < 1 - exp(-rinst->weight))) {
+			|| (rule_inst_table->soft_rules_included 
+				&& choose() < 1 - exp(-rinst->weight))) {
 		rule_inst_table->live[ridx] = true;
 		for (i = 0; i < rinst->num_clauses; i++) {
 			clause_list_push_back(rinst->conjunct[i], &rule_inst_table->live_clauses);

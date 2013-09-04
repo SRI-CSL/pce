@@ -246,6 +246,7 @@ typedef struct rule_inst_table_s {
 	int32_t num_rule_insts; /* number of rule instance entries */
 	rule_inst_t **rule_insts; /* array of rule instances */
 	bool *live; /* whether a rule instance is live or dead */
+	bool soft_rules_included; /* is false for the initial sample SAT */
 
 	samp_clause_list_t *watched; /* maps literals to samp_clause pointers */
 	samp_clause_list_t sat_clauses; /* list of fixed satisfied clauses */

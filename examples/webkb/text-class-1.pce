@@ -11644,10 +11644,11 @@ add [a1] HasWord('york',a1) implies Topic(Student,a1) -0.234487;
 add [a1,a2] Topic(a1,a2) -1.97925;
 
 add [t1,t2,p] Topic(t1,p) and Topic(t2,p) implies t1 = t2;
+#add [p] Topic(Course,p) or Topic(Department,p) or Topic(Faculty,p) or Topic(Person,p) or Topic(ResearchProject,p) or Topic(Staff,p) or Topic(Student,p);
 
 ask [a1,a2] Topic(a1,a2);
 
-mcsat_params 100,,,,100000,,,10,;
+mcsat_params 1000,,,,100000,,,10,;
 mcsat;
 dumptables qinst;
 

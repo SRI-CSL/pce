@@ -169,6 +169,7 @@ extern int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table);
 
 extern void copy_assignment_array(atom_table_t *atom_table);
 extern void restore_assignment_array(atom_table_t *atom_table);
+extern void unfix_assignment_array(atom_table_t *atom_table);
 
 extern inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 

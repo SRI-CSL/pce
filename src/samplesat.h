@@ -10,10 +10,12 @@
 extern int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double sa_temperature, double rvar_probability, uint32_t max_flips);
 
-/* Later run of sample sat, where soft clauses are also considered */
+/* Later runs of sample sat, where soft clauses are also considered */
 extern int32_t sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double sa_temperature, double rvar_probability,
-		uint32_t max_flips, uint32_t max_extra_flips);
+		uint32_t max_flips, uint32_t max_extra_flips, bool randomize);
+
+extern int32_t choose_unfixed_variable(atom_table_t *atom_table);
 
 /* Put a live clause into sat, unsat, or watched list */
 extern void insert_live_clause(samp_clause_t *clause, samp_table_t *table);
