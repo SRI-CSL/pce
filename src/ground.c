@@ -35,56 +35,6 @@
 //	return true;
 //}
 
-static bool eql_rule_atom(rule_atom_t *atom1, rule_atom_t *atom2, samp_table_t *table) {
-	int32_t i, arity;
-
-	if (atom1->pred != atom2->pred) {
-		return false;
-	}
-	arity = pred_arity(atom1->pred, &table->pred_table);
-	for (i = 0; i < arity; i++) {
-		if ((atom1->args[i].kind != atom2->args[i].kind)
-				|| (atom1->args[i].value != atom2->args[i].value)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-static bool eql_rule_literal(rule_literal_t *lit1, rule_literal_t *lit2,
-		samp_table_t *table) {
-	return ((lit1->neg == lit2->neg) && eql_rule_atom(lit1->atom, lit2->atom,
-				table));
-}
-
-/*
- * Checks if the queries are the same - this is essentially a syntactic
- * test, though it won't care about variable names.
- */
-bool eql_query_entries(rule_literal_t ***lits, samp_query_t *query,
-		samp_table_t *table) {
-	int32_t i, j;
-
-	for (i = 0; i < query->num_clauses; i++) {
-		if (lits[i] == NULL) {
-			return false;
-		}
-		for (j = 0; query->literals[i][j] != NULL; j++) {
-			if (lits[i][j] == NULL) {
-				return false;
-			}
-			if (!eql_rule_literal(query->literals[i][j], lits[i][j], table)) {
-				return false;
-			}
-		}
-		// Check if lits[i] has more elements
-		if (lits[i][j] != NULL) {
-			return false;
-		}
-	}
-	return (lits[i] == NULL);
-}
-
 /* check if two query instances (cnf) are the same */
 static bool eql_query_instance_lits(samp_literal_t **lit1, samp_literal_t **lit2) {
 	int32_t i, j;
@@ -1088,9 +1038,6 @@ static void fixed_const_rule_instances(samp_rule_t *rule, samp_table_t *table,
 	smart_clause_instance_rec(rule, table, atom_index);
 }
 
-/*
- * [lazy only] Instantiate all rule instances
- */
 void smart_all_rule_instances(int32_t rule_index, samp_table_t *table) {
 	rule_table_t *rule_table = &table->rule_table;
 	samp_rule_t *rule = rule_table->samp_rules[rule_index];
@@ -1442,15 +1389,12 @@ void all_query_instances(samp_query_t *query, samp_table_t *table) {
 	}
 }
 
-// Note that substit_buffer.entries has been set up already
+/* Note that substit_buffer.entries has been set up already */
 void fixed_const_query_instances(samp_query_t *query, samp_table_t *table,
 		int32_t atom_index) {
 	all_query_instances_rec(0, query, table, atom_index);
 }
 
-/*
- * When new constants are introduced, may need to add new atoms
- */
 void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	pred_table_t *pred_table = &table->pred_table;
@@ -1491,10 +1435,6 @@ void create_new_const_atoms(int32_t cidx, int32_t csort, samp_table_t *table) {
 	}
 }
 
-/*
- * Called by MCSAT when a new constant is added.
- * Generates all new instances of rules involving this constant.
- */
 void create_new_const_rule_instances(int32_t constidx, int32_t csort,
 		samp_table_t *table, int32_t atom_index) {
 	// FIXME atom_index is always 0?
@@ -1678,11 +1618,6 @@ void activate_rules(int32_t atom_index, samp_table_t *table) {
 	}
 }
 
-/*
- * Adds an atom to the atom_table, returns the index.
- *
- * TODO: what is top_p. Guess: whether to instantiate related clauses
- */
 int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 	atom_table_t *atom_table = &table->atom_table;
 	pred_table_t *pred_table = &table->pred_table;
@@ -1777,14 +1712,10 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 //}
 
 /*
- * add_internal_clause is an internal operation used to add a clause.  The
- * external operation is add_rule, where the rule can be ground or quantified.
- * These clauses must already be simplified so that they do not contain any
- * ground evidence literals.
- *
- * Don't need to check duplication, because we can allow the same rule instances
- * with additive weight. The rule instance is created by the caller and will be
- * added into the table, so the caller does not need to free the rule instance.
+ * Don't need to check duplication, because we can allow the same rule
+ * instances with additive weight. The rule instance is created by the caller
+ * and will be added into the table, so the caller does not need to free the
+ * rule instance.
  */
 int32_t add_internal_rule_instance(samp_table_t *table, rule_inst_t *entry,
 		bool indirect, bool add_weights) {

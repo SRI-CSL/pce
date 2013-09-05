@@ -274,27 +274,6 @@ static int32_t perturb_assignment(samp_table_t *table) {
 	return 0;
 }
 
-/**
- * Top-level MCSAT call
- *
- * Parameters for sample sat:
- * - sa_probability = probability of a simulated annealing step
- * - sa_temperature = temperature for simulated annealing
- * - rvar_probability = probability used by a Walksat step:
- *   a Walksat step selects an unsat clause and flips one of its variables
- *   - with probability rvar_probability, that variable is chosen randomly
- *   - with probability 1(-rvar_probability), that variable is the one that
- *     results in minimal increase of the number of unsat clauses.
- * - max_flips = bound on the number of sample_sat steps
- * - max_extra_flips = number of additional (simulated annealing) steps to perform
- *   after a satisfying assignment is found
- *
- * Parameters for mc_sat:
- * - max_samples = number of samples generated
- * - timeout = maximum running time for MCSAT
- * - burn_in_steps = number of burn-in steps
- * - samp_interval = sampling interval
- */
 void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_probability,
 		double sa_temperature, double rvar_probability, uint32_t max_flips,
 		uint32_t max_extra_flips, uint32_t timeout,
@@ -418,15 +397,20 @@ Consider increasing max_flips and max_tries - see mcsat help.\n");
 /*
  * Pushes a newly created clause to the corresponding list. We first decide
  * whether the clause is alive or dead, by running a test based on its weight
- * (choose() < 1 - exp(-w)). If it is alive, we then call push_alive_clause
- * to put it into sat, watched, or unsat list.
+ * (choose() < 1 - exp(-w)). If it is alive, we then call push_alive_clause to
+ * put it into sat, watched, or unsat list based on the evaluation.
  * 
- * In the first round, we only need to find a model for all the HARD clauses.
- * Therefore, when a new clause is activated, if it is a hard clause, we
- * put it into the corresoponding live list, otherwise we put it into the
- * dead lists. In the following rounds, we determine whether to keep the new
- * clause alive by its weight, more specifically, with probability equal to
- * 1 - exp(-w).
+ * In the first sample SAT, we only need to find a model for all the HARD
+ * clauses.  Therefore, when a new clause is activated, if it is a hard clause,
+ * we put it into the corresoponding live list, otherwise we put it into the
+ * dead lists. In the following rounds of sample SAT, we determine whether to
+ * keep the new clause alive by its weight, more specifically, with probability
+ * equal to 1 - exp(-w).
+ *
+ * We use rule_inst_table->soft_rules_included to determine whether the soft
+ * rules are being considered (true for the sample SAT phase of the second and
+ * following rounds, but false for the first round and the perturb + WalkSAT
+ * phase of the following rounds.
  */
 void push_newly_activated_rule_instance(int32_t ridx, samp_table_t *table) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;

@@ -16,6 +16,7 @@ clause_buffer_t clause_buffer = {0, NULL};
 rule_buffer_t rule_buffer = {0, NULL};
 substit_buffer_t substit_buffer = {0, NULL};
 
+/* Global buffers for input data structures */
 input_clause_buffer_t input_clause_buffer = { 0, 0, NULL };
 input_literal_buffer_t input_literal_buffer = { 0, 0, NULL };
 input_atom_buffer_t input_atom_buffer = { 0, 0, NULL };
@@ -23,8 +24,9 @@ input_atom_buffer_t input_atom_buffer = { 0, 0, NULL };
 /*
  * Allocates enough space for an atom_buffer 
  *
- * atom_buffer.data will be recast to samp_atom_t, so we need
- * length of arity + 1 (1 for the predicate index)
+ * @arity: the arity of the atom to be stored in the buffer. atom_buffer.data
+ * will be recast to samp_atom_t, so we need length of arity + 1 (1 for the
+ * predicate index)
  */
 void atom_buffer_resize(int32_t arity) {
 
@@ -50,6 +52,11 @@ void atom_buffer_resize(int32_t arity) {
 	}
 }
 
+/*
+ * Allocates space for the clause buffer.
+ *
+ * @length: number of literals in the clause
+ */
 void clause_buffer_resize (int32_t length){
 	if (clause_buffer.literals == NULL){
 		clause_buffer.literals = (int32_t *) safe_malloc(INIT_CLAUSE_SIZE * sizeof(int32_t));
@@ -67,6 +74,11 @@ void clause_buffer_resize (int32_t length){
 	}
 }
 
+/*
+ * Allocates space for a rule buffer
+ *
+ * @length: number of clauses in the rule
+ */
 void rule_buffer_resize(int32_t length) {
 	if (rule_buffer.clauses == NULL){
 		rule_buffer.clauses = safe_malloc(INIT_CLAUSE_SIZE * sizeof(samp_clause_t *));
@@ -83,6 +95,11 @@ void rule_buffer_resize(int32_t length) {
 	}
 }
 
+/* 
+ * Allocate space for the substit buffer
+ *
+ * @length: number of quantified variables in the assocated rule
+ */
 void substit_buffer_resize(int32_t length) {
 	if (substit_buffer.entries == NULL) {
 		substit_buffer.entries = (substit_entry_t *)
@@ -183,7 +200,7 @@ input_atom_t *new_input_atom() {
 	return &input_atom_buffer.atoms[input_atom_buffer.size++];
 }
 
-void string_buffer_resize (string_buffer_t *strbuf, int32_t delta) {
+void string_buffer_resize(string_buffer_t *strbuf, int32_t delta) {
 	if (strbuf->capacity == 0) {
 		strbuf->string = (char *)
 			safe_malloc(INIT_STRING_BUFFER_SIZE * sizeof(char));

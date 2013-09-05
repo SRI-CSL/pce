@@ -275,8 +275,7 @@ void free_samp_query_instance(samp_query_instance_t *qinst) {
 void show_help(int32_t topic) {
 	switch (topic) {
 	case ALL: {
-		output(
-				"\n\
+		output("\n\
 Type help followed by a command for details, e.g., 'help mcsat_params;'\n\n\
 Input grammar:\n\
  sort NAME [sortspec] ';'\n\
@@ -624,12 +623,6 @@ bool add_int_const(int32_t icnst, sort_entry_t *entry,
 	return true;
 }
 
-/*
- * Adds a constant of a specific sort
- *
- * @cnst: the name of the constant
- * @sort: the name of the sort
- */
 int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	const_table_t *const_table = &table->const_table;
@@ -690,10 +683,6 @@ int32_t add_constant(char *cnst, char *sort, samp_table_t *table) {
 	return 0;
 }
 
-/*
- * Assert an atom of a witness (direct) predicate. If the predicate is
- * indirect, pop out an error.
- */
 int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source) {
 	pred_table_t *pred_table = &table->pred_table;
 	atom_table_t *atom_table = &table->atom_table;
@@ -849,7 +838,6 @@ static int32_t parse_int(char *str, int32_t *val) {
 
 static ivector_t new_intidx = {0, 0, NULL};
 
-/* Adds an input atom to the table */
 int32_t add_atom(samp_table_t *table, input_atom_t *current_atom) {
 	const_table_t *const_table = &table->const_table;
 	pred_table_t *pred_table = &table->pred_table;
@@ -1083,6 +1071,56 @@ static int32_t add_clause(input_clause_t *rule, double weight, char *source,
 		}
 	}
 	return current_rule;
+}
+
+static bool eql_rule_atom(rule_atom_t *atom1, rule_atom_t *atom2, samp_table_t *table) {
+	int32_t i, arity;
+
+	if (atom1->pred != atom2->pred) {
+		return false;
+	}
+	arity = pred_arity(atom1->pred, &table->pred_table);
+	for (i = 0; i < arity; i++) {
+		if ((atom1->args[i].kind != atom2->args[i].kind)
+				|| (atom1->args[i].value != atom2->args[i].value)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool eql_rule_literal(rule_literal_t *lit1, rule_literal_t *lit2,
+		samp_table_t *table) {
+	return ((lit1->neg == lit2->neg) && eql_rule_atom(lit1->atom, lit2->atom,
+				table));
+}
+
+/*
+ * Checks if the queries are the same - this is essentially a syntactic
+ * test, though it won't care about variable names.
+ */
+static bool eql_query_entries(rule_literal_t ***lits, samp_query_t *query,
+		samp_table_t *table) {
+	int32_t i, j;
+
+	for (i = 0; i < query->num_clauses; i++) {
+		if (lits[i] == NULL) {
+			return false;
+		}
+		for (j = 0; query->literals[i][j] != NULL; j++) {
+			if (lits[i][j] == NULL) {
+				return false;
+			}
+			if (!eql_rule_literal(query->literals[i][j], lits[i][j], table)) {
+				return false;
+			}
+		}
+		// Check if lits[i] has more elements
+		if (lits[i][j] != NULL) {
+			return false;
+		}
+	}
+	return (lits[i] == NULL);
 }
 
 int32_t add_query(var_entry_t **vars, rule_literal_t ***lits,

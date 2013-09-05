@@ -11648,7 +11648,7 @@ add [t1,t2,p] Topic(t1,p) and Topic(t2,p) implies t1 = t2;
 
 ask [a1,a2] Topic(a1,a2);
 
-mcsat_params 1000,,,,100000,,,10,;
+mcsat_params 1000,0.5,5.0,0.05,100000,,,100,;
 mcsat;
 dumptables qinst;
 

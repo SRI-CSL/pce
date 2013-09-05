@@ -134,72 +134,6 @@ void mcsat_warn(const char *fmt, ...) {
 	}
 }
 
-/* 
- * Returns the string for a literal 
- * remember to free the string after use, the same for atom_string
- * and var_string
- */
-char *literal_string(samp_literal_t lit, samp_table_t *table) {
-	bool oldout = output_to_string;
-	char *result;
-	output_to_string = true;
-	print_literal(lit, table);
-	result = get_string_from_buffer(&output_buffer);
-	output_to_string = oldout;
-	return result;
-}
-
-/* Returns the string for an atom */
-char *atom_string(samp_atom_t *atom, samp_table_t *table) {
-	bool oldout = output_to_string;
-	char *result;
-	output_to_string = true;
-	print_atom(atom, table);
-	result = get_string_from_buffer(&output_buffer);
-	output_to_string = oldout;
-	return result;
-}
-
-/* Returns the string for an atom index */
-char *var_string(int32_t var, samp_table_t *table) {
-	atom_table_t *atom_table = &table->atom_table;
-	samp_atom_t *atom = atom_table->atom[var];
-	return atom_string(atom, table);
-}
-
-///* Returns a newly allocated string */
-//char *atom_string(samp_atom_t *atom, samp_table_t *table) {
-//	pred_table_t *pred_table = &table->pred_table;
-//	const_table_t *const_table = &table->const_table;
-//	char *pred, *result;
-//	uint32_t i, strsize;
-//
-//	pred = pred_name(atom->pred, pred_table);
-//	strsize = strlen(pred) + 1;
-//	for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
-//		/* Assume no more than 99 vars in list */
-//		if (atom->args[i] < 0) {
-//			strsize += -(atom->args[i]+1) > 9 ? 3 : 2;
-//		} else {
-//			strsize += strlen(const_name(atom->args[i], const_table));
-//		}
-//		strsize += 2; // include ", " or ")\0"
-//	}
-//	result = (char *) safe_malloc(strsize * sizeof(char));
-//	strcpy(result, pred);
-//	for (i = 0; i < pred_arity(atom->pred, pred_table); i++){
-//		i == 0 ? strcat(result, "(") : strcat(result, ", ");
-//		if (atom->args[i] < 0) {
-//			/* A variable - print X followed by index */
-//			sprintf(result, "X%d", -(atom->args[i]+1));
-//		} else {
-//			sprintf(result, "%s", const_name(atom->args[i], const_table));
-//		}
-//	}
-//	strcat(result, ")");
-//	return result;
-//}
-
 char *samp_truth_value_string(samp_truth_value_t val){
 	return
 		val == v_undef ? "U" :
@@ -211,6 +145,41 @@ char *samp_truth_value_string(samp_truth_value_t val){
 		val == v_db_true ? "db T" : "ERROR";
 }
 
+static double atom_probability(int32_t atom_index, samp_table_t *table) {
+	atom_table_t *atom_table = &table->atom_table;
+	samp_atom_t *atom;
+	double diff;
+
+	atom = atom_table->atom[atom_index];
+	if (atom->pred >= 0) { // an indirect predicate
+		diff = (double)
+			(atom_table->num_samples - atom_table->sampling_nums[atom_index]);
+		if (diff > 0) {
+			return (double) (atom_table->pmodel[atom_index]/diff);
+		} else {
+			// No samples - we know nothing
+			return .5;
+		}
+	} else {
+		return atom_table->assignment[atom_index] == v_fixed_true ? 1.0 : 0.0;
+	}
+}
+
+double query_probability(samp_query_instance_t *qinst, samp_table_t *table) {
+	atom_table_t *atom_table = &table->atom_table;
+	double diff;
+
+	// diff subtracts off the sampling number when the query was introduced
+	cprintf(2,"num_samples = %d, sampling_num = %d\n",
+			atom_table->num_samples, qinst->sampling_num);
+	diff = (double) (atom_table->num_samples - qinst->sampling_num);
+	if (diff > 0) {
+		return (double) (qinst->pmodel/diff);
+	} else {
+		// No samples - we know nothing
+		return .5;
+	}
+}
 /* Print all the predicates */
 void print_predicates(pred_table_t *pred_table, sort_table_t *sort_table){
 	char *buffer;
@@ -273,6 +242,18 @@ void print_atom_now(samp_atom_t *atom, samp_table_t *table) {
 	fflush(stdout);
 }
 
+void print_assignment(samp_table_t *table){
+	atom_table_t *atom_table = &(table->atom_table);
+	int32_t i;
+
+	for (i = 0; i < atom_table->num_vars; i++) {
+		if (atom_table->atom[i]->pred <= 0) continue;
+		atom_table->active[i] ? output("* ") : output ("  ");
+		print_atom(atom_table->atom[i], table);
+		output(": %s\n", samp_truth_value_string(atom_table->assignment[i]));
+	}
+}
+
 void print_atoms(samp_table_t *table){
 	atom_table_t *atom_table = &table->atom_table;
 	uint32_t nvars = atom_table->num_vars;
@@ -301,7 +282,7 @@ void print_atoms(samp_table_t *table){
 	output("-------------------------------------------------------------------------------\n");
 }
 
-void print_literal(samp_literal_t lit, samp_table_t *table) {
+static void print_literal(samp_literal_t lit, samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 	if (is_neg(lit)) output("~");
 	print_atom(atom_table->atom[var_of(lit)], table);
@@ -426,18 +407,6 @@ void print_state(samp_table_t *table, uint32_t round){
 		output("Generated sample %"PRId32"...\n", round);
 	} else if (verbosity_level > 0) {
 		output(".");
-	}
-}
-
-void print_assignment(samp_table_t *table){
-	atom_table_t *atom_table = &(table->atom_table);
-	int32_t i;
-
-	for (i = 0; i < atom_table->num_vars; i++) {
-		if (atom_table->atom[i]->pred <= 0) continue;
-		atom_table->active[i] ? output("* ") : output ("  ");
-		print_atom(atom_table->atom[i], table);
-		output(": %s\n", samp_truth_value_string(atom_table->assignment[i]));
 	}
 }
 
@@ -584,6 +553,72 @@ void print_query_instance(samp_query_instance_t *qinst, samp_table_t *table,
 	}
 	output(")");
 }
+
+/* 
+ * Returns the string for a literal 
+ * remember to free the string after use, the same for atom_string
+ * and var_string
+ */
+char *literal_string(samp_literal_t lit, samp_table_t *table) {
+	bool oldout = output_to_string;
+	char *result;
+	output_to_string = true;
+	print_literal(lit, table);
+	result = get_string_from_buffer(&output_buffer);
+	output_to_string = oldout;
+	return result;
+}
+
+/* Returns the string for an atom */
+char *atom_string(samp_atom_t *atom, samp_table_t *table) {
+	bool oldout = output_to_string;
+	char *result;
+	output_to_string = true;
+	print_atom(atom, table);
+	result = get_string_from_buffer(&output_buffer);
+	output_to_string = oldout;
+	return result;
+}
+
+/* Returns the string for an atom index */
+char *var_string(int32_t var, samp_table_t *table) {
+	atom_table_t *atom_table = &table->atom_table;
+	samp_atom_t *atom = atom_table->atom[var];
+	return atom_string(atom, table);
+}
+
+///* Returns a newly allocated string */
+//char *atom_string(samp_atom_t *atom, samp_table_t *table) {
+//	pred_table_t *pred_table = &table->pred_table;
+//	const_table_t *const_table = &table->const_table;
+//	char *pred, *result;
+//	uint32_t i, strsize;
+//
+//	pred = pred_name(atom->pred, pred_table);
+//	strsize = strlen(pred) + 1;
+//	for (i = 0; i < pred_arity(atom->pred, pred_table); i++) {
+//		/* Assume no more than 99 vars in list */
+//		if (atom->args[i] < 0) {
+//			strsize += -(atom->args[i]+1) > 9 ? 3 : 2;
+//		} else {
+//			strsize += strlen(const_name(atom->args[i], const_table));
+//		}
+//		strsize += 2; // include ", " or ")\0"
+//	}
+//	result = (char *) safe_malloc(strsize * sizeof(char));
+//	strcpy(result, pred);
+//	for (i = 0; i < pred_arity(atom->pred, pred_table); i++){
+//		i == 0 ? strcat(result, "(") : strcat(result, ", ");
+//		if (atom->args[i] < 0) {
+//			/* A variable - print X followed by index */
+//			sprintf(result, "X%d", -(atom->args[i]+1));
+//		} else {
+//			sprintf(result, "%s", const_name(atom->args[i], const_table));
+//		}
+//	}
+//	strcat(result, ")");
+//	return result;
+//}
 
 void dump_sort_table (samp_table_t *table) {
 	sort_table_t *sort_table = &(table->sort_table);
@@ -808,38 +843,3 @@ void summarize_tables(samp_table_t *table) {
 	summarize_rule_table(table);
 }
 
-double atom_probability(int32_t atom_index, samp_table_t *table) {
-	atom_table_t *atom_table = &table->atom_table;
-	samp_atom_t *atom;
-	double diff;
-
-	atom = atom_table->atom[atom_index];
-	if (atom->pred >= 0) { // an indirect predicate
-		diff = (double)
-			(atom_table->num_samples - atom_table->sampling_nums[atom_index]);
-		if (diff > 0) {
-			return (double) (atom_table->pmodel[atom_index]/diff);
-		} else {
-			// No samples - we know nothing
-			return .5;
-		}
-	} else {
-		return atom_table->assignment[atom_index] == v_fixed_true ? 1.0 : 0.0;
-	}
-}
-
-double query_probability(samp_query_instance_t *qinst, samp_table_t *table) {
-	atom_table_t *atom_table = &table->atom_table;
-	double diff;
-
-	// diff subtracts off the sampling number when the query was introduced
-	cprintf(2,"num_samples = %d, sampling_num = %d\n",
-			atom_table->num_samples, qinst->sampling_num);
-	diff = (double) (atom_table->num_samples - qinst->sampling_num);
-	if (diff > 0) {
-		return (double) (qinst->pmodel/diff);
-	} else {
-		// No samples - we know nothing
-		return .5;
-	}
-}

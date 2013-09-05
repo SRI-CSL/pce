@@ -371,10 +371,6 @@ static int32_t scan_live_clauses(samp_table_t *table) {
 //	return conflict;
 //}
 
-/*
- * [eager only] Chooses a random unfixed atom in a simmulated annealing
- * step in sample SAT.
- */
 int32_t choose_unfixed_variable(atom_table_t *atom_table) {
 	samp_truth_value_t *assignment = atom_table->assignment;
 	int32_t num_vars = atom_table->num_vars;
@@ -441,7 +437,7 @@ static int32_t all_atoms_cardinality(pred_tbl_t *pred_tbl, sort_table_t *sort_ta
  * them). If its value is fixed, we skip this flip using the following
  * statement (return 0).
  */
-static int32_t choose_random_atom(samp_table_t *table) {
+int32_t choose_random_atom(samp_table_t *table) {
 	uint32_t i, atom_num, anum;
 	int32_t card, all_card, acard, pcard, predicate;
 	pred_tbl_t *pred_tbl = &table->pred_table.pred_tbl; // Indirect preds
@@ -821,9 +817,6 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
 
 /*
  * A SAT solver for only the hard formulas
- *
- * TODO: To be replaced by other SAT solvers. It should just give a
- * solution but not necessarily uniformly drawn.
  */
 int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double sa_temperature, double rvar_probability, uint32_t max_flips) {
@@ -861,28 +854,27 @@ int32_t first_sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 }
 
 /*
- * Next, need to write the main samplesat routine.
- * How should hard clauses be represented, with weight MAX_DOUBLE?
- * The parameters include clause_set, DB, KB, maxflips, p_anneal,
- * anneal_temp, p_walk.
+ * Next, need to write the main samplesat routine. How should hard clauses be
+ * represented, with weight MAX_DOUBLE? The parameters include clause_set, DB,
+ * KB, maxflips, p_anneal, anneal_temp, p_walk.
  *
- * The assignment will map each atom to undef, T, F, FixedT, FixedF,
- * DB_T, or DB_F.   The latter assignments are fixed by the closed world
- * assumption on the DB.  The other fixed assignments are those obtained
- * from unit propagation on the selected clauses.
+ * The assignment will map each atom to undef, T, F, FixedT, FixedF, DB_T, or
+ * DB_F. The latter assignments are fixed by the closed world assumption on the
+ * DB. The other fixed assignments are those obtained from unit propagation on
+ * the selected clauses.
  *
  * The samplesat routine starts with a random assignment to the non-fixed
- * variables and a selection of alive clauses.  The cost is the
- * number of unsat clauses.  It then either (with prob p_anneal) picks a
- * variable and flips it (if it reduces cost) or with probability (based on
- * the cost diff).  Otherwise, it does a walksat step.
- * The tricky question is what it means to activate a clause or atom.
+ * variables and a selection of alive clauses. The cost is the number of unsat
+ * clauses. It then either (with prob p_anneal) picks a variable and flips it
+ * (if it reduces cost) or with probability (based on the cost diff).
+ * Otherwise, it does a walksat step. The tricky question is what it means to
+ * activate a clause or atom.
  *
  * Code for random selection with filtering is in smtcore.c
  * (select_random_bvar)
  *
- * First step is to write a unit-propagator.  The propagation is
- * done repeatedly to handle recent additions.
+ * First step is to write a unit-propagator. The propagation is done repeatedly
+ * to handle recent additions.
  */
 int32_t sample_sat(samp_table_t *table, bool lazy, double sa_probability,
 		double sa_temperature, double rvar_probability,

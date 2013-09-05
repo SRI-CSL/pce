@@ -10,23 +10,26 @@
 
 extern FILE *mcsat_input;
 
+/* A sort definition in the form of an interval of integers */
 typedef struct input_sortdef_s {
 	int32_t lower_bound;
 	int32_t upper_bound;
 } input_sortdef_t;
 
+/* An atom in a input literal */
 typedef struct input_atom_s {
 	char *pred;
 	int32_t builtinop; /* = 0: not a built-in-op, > 0: built-in-op */
 	char **args;
 } input_atom_t;
 
+/* A literal in an input formula */
 typedef struct input_literal_s {
 	bool neg; /* true: with negation; false: without negation */
 	input_atom_t *atom;
 } input_literal_t;
 
-/* This is used for both clauses (no vars) and rules. */
+/* An input formula in clause form */
 typedef struct input_clause_s {
 	int32_t varlen;
 	char **variables; /* Input variables */
@@ -60,6 +63,7 @@ typedef struct input_formula_s {
 	struct var_entry_s **vars; /* NULL terminated list of vars */
 	input_fmla_t *fmla;
 } input_formula_t;
+
 
 /*
  * Abstract syntax tree
@@ -212,14 +216,34 @@ extern void read_eval_print_loop(char *input, samp_table_t *table);
 extern void load_mcsat_file(char *file, samp_table_t *table);
 
 extern void add_sortdef(sort_table_t *sort_table, char *sort, input_sortdef_t *sortdef);
+
+/* Adds a predicate */
 extern int32_t add_predicate(char *pred, char **sort, bool directp, samp_table_t *table);
+
+/* Adds an integer to a enumerative integer sort */
 extern bool add_int_const(int32_t icnst, sort_entry_t *entry, sort_table_t *sort_table);
+
+/*
+ * Adds a constant of a specific sort
+ * @cnst: the name of the constant
+ * @sort: the name of the sort
+ */
 extern int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
+
+/*
+ * Assert an atom of a witness (direct) predicate. If the predicate is
+ * indirect, pop out an error.
+ */
 extern int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source);
+
+/* Adds an input atom to the table */
 extern int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
+
+/* Adds an query to the query table and generate instances */
 extern int32_t add_query(var_entry_t **vars, rule_literal_t ***lits,
 			 samp_table_t *table);
 
+/* handle the command of dumping a table */
 extern void dumptable(int32_t tbl, samp_table_t *table);
 
 extern void set_print_exp_p(bool flag);
