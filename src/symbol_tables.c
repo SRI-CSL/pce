@@ -3,11 +3,22 @@
  */
 
 #include <assert.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include "memalloc.h"
 #include "hash_functions.h"
 #include "symbol_tables.h"
+
+
+/*
+ * For debugging: check whether n is a power of two
+ */
+#ifndef NDEBUG
+static bool is_power_of_two(uint32_t n) {
+  return (n & (n - 1)) == 0;
+}
+#endif
 
 
 /*
@@ -30,8 +41,6 @@ static stbl_bank_t *stbl_alloc_bank() {
   }
   return b;
 }
-
-
 
 
 /*
@@ -87,46 +96,34 @@ static void stbl_init_record(stbl_rec_t *r, uint32_t h, int32_t val, char *s) {
   r->string = s;
 }
 
-/*
- * Re-insert all non-deleted records into sym_table->data
- */
-static void stbl_restore(stbl_t *sym_table) {
-  uint32_t i, k, mask;
-  stbl_rec_t *r;
-  stbl_bank_t *b;
-
-  mask = sym_table->size - 1;
-  k = sym_table->free_idx;
-  for (b = sym_table->bnk; b != NULL; b = b->next) {
-    for (r = b->block + k; r < b->block + STBL_BANK_SIZE; r ++) {
-      if (r->string != NULL) {
-	i = r->hash & mask;
-	r->next = sym_table->data[i];
-	sym_table->data[i] = r;
-      }
-    }
-    k = 0;
-  }
-}
-
 
 /*
- * Resize the table: n = new size
+ * Insert all the records from list into array tmp
+ * - mask = size of tmp - 1 (tmp's size is a power of 2)
+ * - the records are inserted in reverse order
  */
-static void stbl_resize(stbl_t *sym_table, uint32_t n) {
+static void stbl_restore_list(stbl_rec_t **tmp, uint32_t mask, stbl_rec_t *list) {
+  stbl_rec_t *r, *p;
   uint32_t i;
-  stbl_rec_t **tmp;
 
-  tmp = (stbl_rec_t **) safe_malloc(n * sizeof(stbl_rec_t *));
-  for (i=0; i<n; i++) {
-    tmp[i] = NULL;
+  // reverse the list
+  p = NULL;;
+  while (list != NULL) {
+    r = list->next;
+    list->next = p;
+    p = list;
+    list = r;
   }
 
-  safe_free(sym_table->data);
-  sym_table->data = tmp;
-  sym_table->size = n;
-
-  stbl_restore(sym_table);
+  // now p = list in reverse order
+  while (p != NULL) {
+    r = p->next;
+    assert(p->string != NULL);
+    i = p->hash & mask;
+    p->next = tmp[i];
+    tmp[i] = p;
+    p = r;
+  }
 }
 
 
@@ -134,14 +131,38 @@ static void stbl_resize(stbl_t *sym_table, uint32_t n) {
  * Extend the table: make it twice as large.
  */
 static void stbl_extend(stbl_t *sym_table) {
-  uint32_t n;
+  stbl_rec_t **tmp;
+  stbl_rec_t *list;
+  uint32_t i, n, old_size, mask;
 
-  n = sym_table->size << 1;
+  old_size = sym_table->size;
+  n = old_size << 1;
   if (n == 0 || n >= MAX_STBL_SIZE) {
     // overflow: cannot expand 
     out_of_memory();
   }
-  stbl_resize(sym_table, n);
+
+  assert(is_power_of_two(n));
+
+  // new data array
+  tmp = (stbl_rec_t **) safe_malloc(n * sizeof(stbl_rec_t *));
+  for (i=0; i<n; i++) {
+    tmp[i] = NULL;
+  }
+
+  // move the data lists to tmp
+  mask = n-1;
+  for (i=0; i<old_size; i++) {
+    list = sym_table->data[i];
+    if (list != NULL) {
+      stbl_restore_list(tmp, mask, list);
+    }
+  }
+
+  // clean up
+  safe_free(sym_table->data);
+  sym_table->data = tmp;
+  sym_table->size = n;
 }
 
 
@@ -153,16 +174,6 @@ void init_stbl(stbl_t *sym_table, uint32_t n) {
   uint32_t i;
   stbl_rec_t **tmp;
 
-#ifndef NDEBUG 
-  // check that n is a power of 2
-  uint32_t n2;
-  n2 = n;
-  while (n2 > 1) {
-    assert((n2 & 1) == 0);
-    n2 >>= 1;
-  }  
-#endif
-
   if (n == 0) {
     n = STBL_DEFAULT_SIZE;
   }
@@ -170,6 +181,8 @@ void init_stbl(stbl_t *sym_table, uint32_t n) {
   if (n >= MAX_STBL_SIZE) {    
     out_of_memory(); // abort if too large
   }
+
+  assert(is_power_of_two(n));
 
   tmp = (stbl_rec_t**) safe_malloc(n * sizeof(stbl_rec_t *));
   for (i=0; i<n; i++) {
@@ -204,7 +217,7 @@ void delete_stbl(stbl_t *sym_table) {
     // apply finalizer to all live records
     for (r = b->block + k; r < b->block + STBL_BANK_SIZE; r ++) {
       if (r->string != NULL) {
-	sym_table->finalize(r);
+        sym_table->finalize(r);
       }
     }
     // delete b
@@ -249,7 +262,7 @@ void reset_stbl(stbl_t *sym_table) {
  * Remove first occurrence of symbol.
  * No effect if symbol is not present.
  */
-void stbl_remove(stbl_t *sym_table, char *symbol) {
+void stbl_remove(stbl_t *sym_table, const char *symbol) {
   uint32_t h, mask, i;
   stbl_rec_t *r, *p;
 
@@ -260,9 +273,37 @@ void stbl_remove(stbl_t *sym_table, char *symbol) {
   for (r = sym_table->data[i]; r != NULL; r = r->next) {
     if (r->hash == h && strcmp(symbol, r->string) == 0) {
       if (p == NULL) {
-	sym_table->data[i] = r->next;
+        sym_table->data[i] = r->next;
       } else {
-	p->next = r->next;
+        p->next = r->next;
+      }
+      sym_table->finalize(r);
+      stbl_free_record(sym_table, r);
+      return;
+    }
+    p = r;
+  }
+}
+
+
+/*
+ * Remove the first occurrence of (symbol, value).
+ * No effect if it's not present.
+ */
+void stbl_delete_mapping(stbl_t *sym_table, const char *symbol, int32_t val) {
+  uint32_t h, mask, i;
+  stbl_rec_t *r, *p;
+
+  mask = sym_table->size - 1;
+  h = jenkins_hash_string(symbol);
+  i = h & mask;
+  p = NULL;
+  for (r = sym_table->data[i]; r != NULL; r = r->next) {
+    if (r->hash == h && r->value == val && strcmp(symbol, r->string) == 0) {
+      if (p == NULL) {
+        sym_table->data[i] = r->next;
+      } else {
+        p->next = r->next;
       }
       sym_table->finalize(r);
       stbl_free_record(sym_table, r);
@@ -277,7 +318,7 @@ void stbl_remove(stbl_t *sym_table, char *symbol) {
  * Return value of first occurrence of symbol, or -1 if symbol is not
  * present
  */
-int32_t stbl_find(stbl_t *sym_table, char *symbol) {
+int32_t stbl_find(stbl_t *sym_table, const char *symbol) {
   uint32_t mask, i, h;
   stbl_rec_t *r;
 
@@ -314,5 +355,30 @@ void stbl_add(stbl_t *sym_table, char *symbol, int32_t value) {
   sym_table->nelems ++;
   if (sym_table->nelems > sym_table->size) {
     stbl_extend(sym_table);
+  }
+}
+
+
+
+/*
+ * Iterator: call f(aux, r) for every live record r in the table
+ * - aux is an arbitrary pointer, provided by the caller
+ * - f must not have side effects (it must not add or remove anything 
+ *   from the symbol table, or modify the record r).
+ */
+void stbl_iterate(stbl_t *sym_table, void *aux, stbl_iterator_t f) {
+  stbl_bank_t *b;
+  stbl_rec_t *r;
+  uint32_t k;
+
+  k = sym_table->free_idx;
+  for (b = sym_table->bnk; b != NULL; b = b->next) {
+    for (r = b->block + k; r < b->block + STBL_BANK_SIZE; r++) {
+      if (r->string != NULL) {
+        // r is a live record
+        f(aux, r);
+      }
+    }
+    k = 0;
   }
 }

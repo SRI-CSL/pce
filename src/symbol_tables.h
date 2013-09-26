@@ -3,13 +3,13 @@
  */
 
 #ifndef __SYMBOL_TABLES_H
-#define __SYMBOL_TABLES_H 1
+#define __SYMBOL_TABLES_H
 
 #include <stdint.h>
 
 
 /*
- * Symbol table contains lists of records <string, hash, value>
+ * A symbol table contains a lists of records <string, hash, value>.
  * The same string symbol may occur several times in the list.
  * In such a case, the first record masks the others.
  */
@@ -47,9 +47,9 @@ typedef void (*stbl_finalizer_t)(stbl_rec_t *r);
  * Symbol table
  */
 typedef struct stbl_s {
-  uint32_t size;     // power of 2
-  uint32_t nelems;   // number of records
-  uint32_t ndeleted; // number of deleted records (in the free_rec list)
+  uint32_t size;         // power of 2
+  uint32_t nelems;       // number of records
+  uint32_t ndeleted;     // number of deleted records (in the free_rec list)
   uint32_t free_idx;     // free slot in bnk
   stbl_bank_t *bnk;
   stbl_rec_t *free_rec;  // list of free records
@@ -68,11 +68,7 @@ typedef struct stbl_s {
 /*
  * Maximal size
  */
-#if UINT32_MAX < (SIZE_MAX/8)
-#define MAX_STBL_SIZE UINT32_MAX
-#else 
-#define MAX_STBL_SIZE (SIZE_MAX/8)
-#endif
+#define MAX_STBL_SIZE (UINT32_MAX/sizeof(stbl_rec_t))
 
 
 /*
@@ -89,7 +85,8 @@ static inline void stbl_set_finalizer(stbl_t *sym_table, stbl_finalizer_t fun) {
 }
 
 /*
- * Delete the full table
+ * Delete the full table. The finalizer is called for all the records
+ * in the table.
  */
 extern void delete_stbl(stbl_t *sym_table);
 
@@ -103,12 +100,12 @@ extern void reset_stbl(stbl_t *sym_table);
  * If symbol is in the table, then the finalizer is called on the corresponding
  * record.
  */
-extern void stbl_remove(stbl_t *sym_table, char *symbol);
+extern void stbl_remove(stbl_t *sym_table, const char *symbol);
 
 /*
  * Return value attached to symbol or -1 if symbol is not in the table.
  */
-extern int32_t stbl_find(stbl_t *sym_table, char *symbol);
+extern int32_t stbl_find(stbl_t *sym_table, const char *symbol);
 
 /*
  * Add mapping symbol --> value. The previous value mapped to
@@ -117,6 +114,25 @@ extern int32_t stbl_find(stbl_t *sym_table, char *symbol);
  */
 extern void stbl_add(stbl_t *sym_table, char *symbol, int32_t val);
 
+/*
+ * Remove the mapping symbol --> val from the table.
+ * This removes the mapping even if it's hidden.
+ * If the mapping is not in the table, this has no effect.
+ * If the mapping occurs several times, then only the most recent
+ * occurrence is removed.
+ */
+extern void stbl_delete_mapping(stbl_t *sym_table, const char *symbol, int32_t val);
+
+
+/*
+ * Iterator: call f(aux, r) for every live record r in the table
+ * - aux is an arbitrary pointer, provided by the caller
+ * - f must not have side effects (it must not add or remove anything 
+ *   from the symbol table, or modify the record r).
+ */
+typedef void (*stbl_iterator_t)(void *aux, stbl_rec_t *r);
+
+extern void stbl_iterate(stbl_t *sym_table, void *aux, stbl_iterator_t f);
 
 
 #endif /* __SYMBOL_TABLES_H */
