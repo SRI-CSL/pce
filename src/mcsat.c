@@ -334,9 +334,7 @@ int main(int argc, char *argv[]) {
 	}
 	if (interactive || !file_loaded) {
 		// Now go interactive - empty string is for stdin
-		printf("\n\
-				%s: type 'help;' for help\n\
-				", program_name);
+		printf("\n%s: type 'help;' for help\n", program_name);
 		read_eval_print_loop("", &samp_table);
 		printf("Exiting MCSAT\n");
 	}

@@ -139,8 +139,8 @@ char *samp_truth_value_string(samp_truth_value_t val){
 		val == v_undef ? "U" :
 		val == v_false ? "F" :
 		val == v_true ?  "T" :
-		val == v_fixed_false ? "fx F" :
-		val == v_fixed_true ? "fx T" :
+		val == v_up_false ? "fx F" :
+		val == v_up_true ? "fx T" :
 		val == v_db_false ? "db F" :
 		val == v_db_true ? "db T" : "ERROR";
 }
@@ -161,7 +161,7 @@ static double atom_probability(int32_t atom_index, samp_table_t *table) {
 			return .5;
 		}
 	} else {
-		return atom_table->assignment[atom_index] == v_fixed_true ? 1.0 : 0.0;
+		return atom_table->assignment[atom_index] == v_up_true ? 1.0 : 0.0;
 	}
 }
 
@@ -318,7 +318,7 @@ void print_rule_instances(samp_table_t *table){
 	output("|   | %-*s | weight  | %-*s|\n", nwdth, "i", 62-nwdth, "rule instance");
 	output("-------------------------------------------------------------------------------\n");
 	for (i = 0; i < nrinsts; i++){
-		if (rule_inst_table->live[i])
+		if (assigned_true(rule_inst_table->assignment[i]))
 			output("| * ");
 		else 
 			output("|   ");
@@ -342,7 +342,7 @@ void print_clause_list(samp_clause_list_t *list, samp_table_t *table){
 	samp_clause_t *ptr;
 	samp_clause_t *cls;
 
-	for (ptr = list->head; ptr != list->tail; ptr = next_clause(ptr)) {
+	for (ptr = list->head; ptr != list->tail; ptr = next_clause_ptr(ptr)) {
 		cls = ptr->link;
 		print_clause(cls, table);
 		output("\n");
@@ -360,7 +360,7 @@ void print_watched_clause(samp_literal_t lit, samp_table_t *table) {
 
 		for (ptr = rule_inst_table->watched[lit].head;
 				ptr != rule_inst_table->watched[lit].tail;
-				ptr = next_clause(ptr)) {
+				ptr = next_clause_ptr(ptr)) {
 			cls = ptr->link;
 			output("    ");
 			print_clause(cls, table);
@@ -717,6 +717,7 @@ void dump_var_table (var_table_t * var_table, sort_table_t * sort_table) {
 void dump_atom_table (samp_table_t *table) {
 	output("\nAtom Table:\n");
 	print_atoms(table);
+	print_assignment(table);
 }
 
 void dump_rule_inst_table (samp_table_t *table) {

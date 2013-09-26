@@ -60,12 +60,13 @@ static void kill_rule_instances(samp_table_t *table) {
 	int32_t i;
 
 	for (i = 0; i < rule_inst_table->num_rule_insts; i++) {
-		if (!rule_inst_table->live[i]) continue;
+		if (!assigned_true(rule_inst_table->assignment[i]))
+			continue;
 		rule_inst_t *rinst = rule_inst_table->rule_insts[i];
 		if (rinst->weight == DBL_MAX
 				|| choose() < 1 - exp(-rinst->weight)) {
 		} else {
-			rule_inst_table->live[i] = false;
+			rule_inst_table->assignment[i] = v_up_false;
 		}
 	}
 }
@@ -78,9 +79,9 @@ static void init_rule_instances(rule_inst_table_t *rule_inst_table) {
 	for (i = 0; i < rule_inst_table->num_rule_insts; i++) {
 		rule_inst_t *rinst = rule_inst_table->rule_insts[i];
 		if (rinst->weight == DBL_MAX) {
-			rule_inst_table->live[i] = true;
+			rule_inst_table->assignment[i] = v_up_true;
 		} else {
-			rule_inst_table->live[i] = false;
+			rule_inst_table->assignment[i] = v_up_false;
 		}
 	}
 }
@@ -97,9 +98,9 @@ static void restore_sat_dead_rule_instances(rule_inst_table_t *rule_inst_table,
 		//if (rule_inst_table->live[i]) continue;
 		rinst = rule_inst_table->rule_insts[i];
 		if (eval_rule_inst(assignment, rinst) == -1) {
-			rule_inst_table->live[i] = true;
+			rule_inst_table->assignment[i] = v_up_true;
 		} else {
-			rule_inst_table->live[i] = false;
+			rule_inst_table->assignment[i] = v_up_false;
 		}
 	}
 }
@@ -223,54 +224,51 @@ static void update_pmodel(samp_table_t *table) {
 	//}
 }
 
-//static double get_weighted_cost(samp_table_t *table) {
-//	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
-//	atom_table_t *atom_table = &table->atom_table;
-//	int32_t i;
-//	rule_inst_t *rinst;
-//	double cost = 0.0;
-//	for (i = 0; i < rule_inst_table->num_rule_insts; i++) {
-//		rinst = rule_inst_table->rule_insts[i];
-//		if (eval_rule_inst(atom_table->assignment, rinst) != -1) {
-//			if (rinst->weight == DBL_MAX) {
-//				cost = DBL_MAX;
-//				break;
-//			} else {
-//				cost += rinst->weight;
-//			}
-//			//rule_inst_table->live[i] = false;
-//		} else {
-//			//rule_inst_table->live[i] = true;
-//		}
-//	}
-//	return cost;
-//}
+/*
+ * Add a small perburbation to the current assignment by flipping
+ * one atom, and then run walksat on only the hard rules to get a
+ * consistent model (and close neighboor) of the current model.
+ */
+static int32_t perturb_assignment(samp_table_t *table, bool lazy, 
+		double rvar_probability, uint32_t max_flips, uint32_t max_extra_flips) {
 
-static int32_t perturb_assignment(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
-	
-	//double curr_cost = get_weighted_cost(table);
+	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
 
-	int32_t var;
-
-	var = choose_unfixed_variable(atom_table);
+	int32_t var = choose_unfixed_variable(atom_table);
 	atom_table->assignment[var] = negate_tval(atom_table->assignment[var]);
-
-	//double flip_cost = get_weighted_cost(table);
 
 	if (get_verbosity_level() >= 3) {
 		cprintf(3, "[perturb_assignment] var = ");
 		print_atom_now(atom_table->atom[var], table);
 		cprintf(3, "\n");
-		//cprintf(3, ", curr = %f, flip = %f\n", curr_cost, flip_cost);
 	}
 
-	//if (fabs(flip_cost - curr_cost) < 100.0) {
-	//	break;
-	//} else { 
-	//	atom_table->assignment[var] = negate_tval(atom_table->assignment[var]);
-	//}
-	
+	init_rule_instances(rule_inst_table);
+	copy_assignment_array(atom_table);
+	int32_t conflict = sample_sat(table, lazy, 0.0, 0.0, rvar_probability,
+			max_flips, max_extra_flips, false);
+
+	/*
+	 * If Sample sat did not find a model (within max_flips) restore the
+	 * earlier assignment.
+	 */
+	if (conflict == -1 || rule_inst_table->unsat_clauses.length > 0) {
+		if (conflict == -1) {
+			cprintf(2, "Hit a conflict.\n");
+		} else {
+			cprintf(2, "Failed to find a model. Consider increasing"
+					"max_flips and max_tries - see mcsat help.\n");
+		}
+
+		restore_assignment_array(atom_table);
+	}
+
+	cprintf(2, "\n[mc_sat] MC-SAT after perturbation:\n");
+	if (get_verbosity_level() >= 2) {
+		print_assignment(table);
+	}
+
 	return 0;
 }
 
@@ -283,7 +281,8 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 	int32_t conflict;
 	uint32_t i;
 	time_t fintime = 0;
-	bool draw_sample; /* whether we use the current round of MCMC as a sample */
+	/* whether we use the current round of MCMC as a sample */
+	bool draw_sample; 
 
 	if (timeout != 0) {
 		fintime = time(NULL) + timeout;
@@ -309,13 +308,12 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 
 	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
 
-		rule_inst_table->soft_rules_included = true;
-
 		if (timeout != 0 && time(NULL) >= fintime) {
 			printf("Timeout after %"PRIu32" samples\n", i);
 			break;
 		}
 
+		rule_inst_table->soft_rules_included = true;
 		draw_sample = (i >= burn_in_steps && i % samp_interval == 0);
 		cprintf(2, "\n[mc_sat] MC-SAT round %"PRIu32" started:\n", i);
 
@@ -334,8 +332,8 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 			if (conflict == -1) {
 				cprintf(2, "Hit a conflict.\n");
 			} else {
-				cprintf(2, "Failed to find a model. \
-Consider increasing max_flips and max_tries - see mcsat help.\n");
+				cprintf(2, "Failed to find a model. Consider increasing"
+						"max_flips and max_tries - see mcsat help.\n");
 			}
 
 			// Flip current_assignment (restore the saved assignment)
@@ -359,38 +357,13 @@ Consider increasing max_flips and max_tries - see mcsat help.\n");
 		}
 		//assert(valid_table(table));
 
-		/* TODO Aug 26: add a perturbation on the current model, resulting
-		 * a new model with approximately similar probability, to jump out
-		 * of the an isolated region of feasible models */
+		/* add a perturbation on the current model, resulting a new model with
+		 * approximately similar probability, to jump out of the an isolated
+		 * region of feasible models */
 		rule_inst_table->soft_rules_included = false;
 
-		conflict = perturb_assignment(table);
-
-		init_rule_instances(rule_inst_table);
-		copy_assignment_array(atom_table);
-		conflict = sample_sat(table, lazy, 0.0, 0.0, rvar_probability,
-				max_flips, max_extra_flips, false);
-
-		/*
-		 * If Sample sat did not find a model (within max_flips)
-		 * restore the earlier assignment
-		 */
-		if (conflict == -1 || rule_inst_table->unsat_clauses.length > 0) {
-			if (conflict == -1) {
-				cprintf(2, "Hit a conflict.\n");
-			} else {
-				cprintf(2, "Failed to find a model. \
-Consider increasing max_flips and max_tries - see mcsat help.\n");
-			}
-
-			// Flip current_assignment (restore the saved assignment)
-			restore_assignment_array(atom_table);
-		}
-
-		cprintf(2, "\n[mc_sat] MC-SAT after perturbation %"PRIu32":\n", i);
-		if (get_verbosity_level() >= 2) {
-			print_assignment(table);
-		}
+		conflict = perturb_assignment(table, lazy, rvar_probability, max_flips,
+				max_extra_flips);
 	}
 }
 
@@ -420,13 +393,13 @@ void push_newly_activated_rule_instance(int32_t ridx, samp_table_t *table) {
 	if (rinst->weight == DBL_MAX
 			|| (rule_inst_table->soft_rules_included 
 				&& choose() < 1 - exp(-rinst->weight))) {
-		rule_inst_table->live[ridx] = true;
+		rule_inst_table->assignment[ridx] = v_up_true;
 		for (i = 0; i < rinst->num_clauses; i++) {
-			clause_list_push_back(rinst->conjunct[i], &rule_inst_table->live_clauses);
+			clause_list_insert_tail(rinst->conjunct[i], &rule_inst_table->live_clauses);
 		}
 	}
 	else {
-		rule_inst_table->live[ridx] = false;
+		rule_inst_table->assignment[ridx] = v_up_false;
 	}
 }
 

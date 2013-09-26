@@ -153,6 +153,14 @@ typedef struct input_mcsat_params_decl_s {
   int32_t samp_interval;
 } input_mcsat_params_decl_t;
 
+typedef struct input_mwsat_params_decl_s {
+  int32_t num_params;
+  int32_t num_trials;
+  double rvar_probability;
+  int32_t max_flips;
+  int32_t timeout;
+} input_mwsat_params_decl_t;
+
 typedef struct input_reset_decl_s {
   int32_t kind;
 } input_reset_decl_t;
@@ -195,6 +203,7 @@ typedef union input_decl_s {
   input_ask_decl_t ask_decl;
   //input_mcsat_decl_t mcsat_decl;
   input_mcsat_params_decl_t mcsat_params_decl;
+  input_mwsat_params_decl_t mwsat_params_decl;
   input_reset_decl_t reset_decl;
   input_retract_decl_t retract_decl;
   input_load_decl_t load_decl;
@@ -211,6 +220,7 @@ typedef struct input_command_s {
 
 extern input_command_t input_command;
 
+/* Returns true if an 'quit' command is read */
 extern bool read_eval(samp_table_t *table);
 extern void read_eval_print_loop(char *input, samp_table_t *table);
 extern void load_mcsat_file(char *file, samp_table_t *table);

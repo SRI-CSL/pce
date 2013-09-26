@@ -326,6 +326,8 @@ static samp_clause_t *rule_clause_to_samp_clause(rule_clause_t *rclause, substit
 	for (i = 0; i < num_lits; i++) {
 		sclause->disjunct[i] = clause_buffer.literals[i];
 	}
+	sclause->link = NULL;
+	sclause->rule_index = -1;
 	return sclause;
 }
 
@@ -1274,11 +1276,11 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 			}
 
 			if (query->literals[i][j]->neg &&
-					atom_table->assignment[atom_map->val] == v_fixed_false) {
+					atom_table->assignment[atom_map->val] == v_up_false) {
 				return false;//literal is fixed true
 			}
 			if (!query->literals[i][j]->neg &&
-					atom_table->assignment[atom_map->val] == v_fixed_true) {
+					atom_table->assignment[atom_map->val] == v_up_true) {
 				return false;//literal is fixed true
 			}
 		}
@@ -1734,6 +1736,12 @@ int32_t add_internal_rule_instance(samp_table_t *table, rule_inst_t *entry,
 	rule_inst_table_resize(rule_inst_table);
 	int32_t index = rule_inst_table->num_rule_insts++;
 	rule_inst_table->rule_insts[index] = entry;
+
+	int32_t i;
+	for (i = 0; i < entry->num_clauses; i++) {
+		entry->conjunct[i]->rule_index = index;
+	}
+	init_clause_list(&rule_inst_table->rule_watched[index]);
 	//entry = (rule_inst_t *)
 	//	safe_malloc(sizeof(samp_clause_t) + sizeof(bool *) + num_lits * sizeof(int32_t));
 	//entry->frozen = (bool *) safe_malloc(num_lits * sizeof(bool));

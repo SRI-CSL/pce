@@ -1,0 +1,31 @@
+# Table I. Example of a First-order knowledge base and MLN.
+# Fr() is short for Friends(), Sm() for Smokes(), and Ca() for Cancer().
+# Add Frl() for Friendless, as skolem functions are not available
+
+sort Person;
+const Ann, Bob, Carl, Dee, Earl, Fran: Person;
+predicate Fr(Person, Person) indirect;
+predicate Sm(Person) indirect;
+predicate Ca(Person) indirect;
+predicate Frl(Person) indirect;
+
+# Nobody is his own friend
+add [x] ~Fr(x, x);
+# Friends of friends are friends.
+add [x, y, z] Fr(x, y) and Fr(y, z) => Fr(x, z)  0.7;
+# Anyone with a friend is not Friendless
+add [x, y] Fr(x, y) => ~Frl(x);
+# Friendless people smoke.
+add [x] Frl(x) => Sm(x)  2.3;
+# Smoking causes cancer.
+add [x] Sm(x) => Ca(x)  1.5;
+# If two people are friends, either both smoke or neither does.
+add [x, y] Fr(x, y) implies (Sm(x) iff Sm(y))  1.1;
+
+add Fr(Ann, Bob);
+add Fr(Bob, Carl);
+add Fr(Dee, Earl);
+
+mwsat_params 100;
+mwsat;
+dumptable atom;

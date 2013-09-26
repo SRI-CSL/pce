@@ -42,7 +42,7 @@ void yystrbuf_add(char c, uint32_t i) {
       n = yystrbuf_size + 1;
       n += n >> 1;
       if (n >= UINT32_MAX) {
-	out_of_memory();
+        out_of_memory();
       }
       yystrbuf_size = n;
       yystrbuf = (char *) safe_realloc(yystrbuf, n * sizeof(char));
@@ -100,17 +100,17 @@ bool yy_check_float(char *str) {
     }
     for(i=1; str[i] != '\0'; i++){
       if (isdigit(str[i])){
-	have_digit = true;
+        have_digit = true;
       } else if (str[i] == '.') {
-	if (have_dot) {
-	  yyerror("Number has two decimal points");
-	  return false;
-	}
-	else
-	  have_dot = true;
+        if (have_dot) {
+          yyerror("Number has two decimal points");
+          return false;
+        }
+        else
+          have_dot = true;
       } else {
-	yyerror("Invalid floating point number");
-	return false;
+        yyerror("Invalid floating point number");
+        return false;
       }
     }
   } else {
@@ -244,77 +244,86 @@ input_clause_t *yy_clause(char **vars, input_literal_t **lits) {
 int yylex (void);
 input_command_t input_command;
 
-  void yy_command(int kind, input_decl_t *decl) {
-    input_command.kind = kind;
-    //input_command.decl = decl;
-  };
-  void yy_sort_decl (char *name, input_sortdef_t *sortdef) {
-    input_command.kind = SORT;
-    input_command.decl.sort_decl.name = name;
-    input_command.decl.sort_decl.sortdef = sortdef;
-  };
-  void yy_subsort_decl (char *subsort, char *supersort) {
-    input_command.kind = SUBSORT;
-    input_command.decl.subsort_decl.subsort = subsort;
-    input_command.decl.subsort_decl.supersort = supersort;
-  };
-  void yy_pred_decl (input_atom_t *atom, bool witness) {
-    input_command.kind = PREDICATE;
-    input_command.decl.pred_decl.atom = atom;
-    input_command.decl.pred_decl.witness = witness;
-  };
-  void yy_const_decl (char **name, char *sort) {
-    int32_t i = 0;
-    
-    input_command.kind = CONSTD;
-    while (name[i] != NULL) {i++;}
-    input_command.decl.const_decl.num_names = i;
-    input_command.decl.const_decl.name = name;
-    input_command.decl.const_decl.sort = sort;
-  };
-  void yy_var_decl (char **name, char *sort) {
-    int32_t i = 0;
-    
-    input_command.kind = VAR;
-    while (name[i] != NULL) {i++;}
-    input_command.decl.const_decl.num_names = i;
-    input_command.decl.var_decl.name = name;
-    input_command.decl.var_decl.sort = sort;
-  };
-  void yy_atom_decl (input_atom_t *atom) {
-    input_command.kind = ATOMD;
-    input_command.decl.atom_decl.atom = atom;
-  };
-  void yy_assert_decl (input_atom_t *atom, char *source) {
-    input_command.kind = ASSERT;
-    input_command.decl.assert_decl.atom = atom;
-    input_command.decl.assert_decl.source = source;
-  };
-  void yy_add_fdecl (char **frozen, input_formula_t *formula, char *wt, char *source) {
-    input_command.kind = ADD;
-    input_command.decl.add_fdecl.frozen = frozen;
-    input_command.decl.add_fdecl.formula = formula;
-    input_command.decl.add_fdecl.source = source;
-    if (strcmp(wt, "DBL_MAX") == 0) {
-      input_command.decl.add_fdecl.weight = DBL_MAX;
-    } else {
-      input_command.decl.add_fdecl.weight = strtod(wt, NULL);
-      safe_free(wt);
-    }
-  };
-  // for weight learning
-   void yy_learn_fdecl (char **frozen, input_formula_t *formula, char *prob, char *source) {
-    input_command.kind = LEARN;
-    input_command.decl.add_fdecl.frozen = frozen;
-    input_command.decl.add_fdecl.formula = formula;
-    input_command.decl.add_fdecl.source = source;
-    if (strcmp(prob, "NA") == 0) {
-      input_command.decl.add_fdecl.weight = NOT_AVAILABLE;
-    } else {
-      input_command.decl.add_fdecl.weight = strtod(prob, NULL);
-      safe_free(prob);
-    }
-  };
+void yy_command(int kind, input_decl_t *decl) {
+  input_command.kind = kind;
+  //input_command.decl = decl;
+};
+
+void yy_sort_decl (char *name, input_sortdef_t *sortdef) {
+  input_command.kind = SORT;
+  input_command.decl.sort_decl.name = name;
+  input_command.decl.sort_decl.sortdef = sortdef;
+};
+
+void yy_subsort_decl (char *subsort, char *supersort) {
+  input_command.kind = SUBSORT;
+  input_command.decl.subsort_decl.subsort = subsort;
+  input_command.decl.subsort_decl.supersort = supersort;
+};
+
+void yy_pred_decl (input_atom_t *atom, bool witness) {
+  input_command.kind = PREDICATE;
+  input_command.decl.pred_decl.atom = atom;
+  input_command.decl.pred_decl.witness = witness;
+};
+
+void yy_const_decl (char **name, char *sort) {
+  int32_t i = 0;
+  
+  input_command.kind = CONSTD;
+  while (name[i] != NULL) {i++;}
+  input_command.decl.const_decl.num_names = i;
+  input_command.decl.const_decl.name = name;
+  input_command.decl.const_decl.sort = sort;
+};
+
+void yy_var_decl (char **name, char *sort) {
+  int32_t i = 0;
+  
+  input_command.kind = VAR;
+  while (name[i] != NULL) {i++;}
+  input_command.decl.const_decl.num_names = i;
+  input_command.decl.var_decl.name = name;
+  input_command.decl.var_decl.sort = sort;
+};
+
+void yy_atom_decl (input_atom_t *atom) {
+  input_command.kind = ATOMD;
+  input_command.decl.atom_decl.atom = atom;
+};
+
+void yy_assert_decl (input_atom_t *atom, char *source) {
+  input_command.kind = ASSERT;
+  input_command.decl.assert_decl.atom = atom;
+  input_command.decl.assert_decl.source = source;
+};
+
+void yy_add_fdecl (char **frozen, input_formula_t *formula, char *wt, char *source) {
+  input_command.kind = ADD;
+  input_command.decl.add_fdecl.frozen = frozen;
+  input_command.decl.add_fdecl.formula = formula;
+  input_command.decl.add_fdecl.source = source;
+  if (strcmp(wt, "DBL_MAX") == 0) {
+    input_command.decl.add_fdecl.weight = DBL_MAX;
+  } else {
+    input_command.decl.add_fdecl.weight = strtod(wt, NULL);
+    safe_free(wt);
+  }
+};
+
+// for weight learning
+ void yy_learn_fdecl (char **frozen, input_formula_t *formula, char *prob, char *source) {
+  input_command.kind = LEARN;
+  input_command.decl.add_fdecl.frozen = frozen;
+  input_command.decl.add_fdecl.formula = formula;
+  input_command.decl.add_fdecl.source = source;
+  if (strcmp(prob, "NA") == 0) {
+    input_command.decl.add_fdecl.weight = NOT_AVAILABLE;
+  } else {
+    input_command.decl.add_fdecl.weight = strtod(prob, NULL);
+    safe_free(prob);
+  }
+};
   
 void yy_add_decl (input_clause_t *clause, char *wt, char *source) {
   input_command.kind = ADD_CLAUSE;
@@ -359,47 +368,47 @@ void yy_ask_fdecl (input_formula_t *formula, char **threshold_numresult) {
   }
 };
   
-//   void yy_ask_decl (input_clause_t *clause, char *thresholdstr, char *allstr, char *numsamp) {
-//     double threshold;
-//     input_command.kind = ASK_CLAUSE;
-//     input_command.decl.ask_decl.clause = clause;
-//     threshold = atof(thresholdstr);
-//     if (0.0 <= threshold && threshold <= 1.0) {
-//       input_command.decl.ask_decl.threshold = threshold;
-//     } else {
-//       free_clause(clause);
-//       safe_free(thresholdstr);
-//       safe_free(allstr);
-//       safe_free(numsamp);
-//       yyerror("ask_clause: threshold must be between 0.0 and 1.0");
-//       return;
-//     }
-//     safe_free(thresholdstr);
-//     if (allstr == NULL || strcasecmp(allstr, "BEST") == 0) {
-//       input_command.decl.ask_decl.all = false;
-//     } else if (strcasecmp(allstr, "ALL") == 0) {
-//       input_command.decl.ask_decl.all = true;
-//     } else {
-//       free_clause(clause);
-//       safe_free(allstr);
-//       safe_free(numsamp);
-//       yyerror("ask_clause: which must be 'all' or 'best'");
-//       return;
-//     }
-//     safe_free(allstr);
-//     if (numsamp == NULL) {
-//       input_command.decl.ask_decl.num_samples = DEFAULT_MAX_SAMPLES;
-//     } else if (yy_check_nat(numsamp)) {
-//       input_command.decl.ask_decl.num_samples = atoi(numsamp);
-//     } else {
-//       free_clause(clause);
-//       safe_free(numsamp);
-//       yyerror("ask_clause: numsamps must be an integer");
-//     }
-//     safe_free(numsamp);
-// };
+//void yy_ask_decl (input_clause_t *clause, char *thresholdstr, char *allstr, char *numsamp) {
+//  double threshold;
+//  input_command.kind = ASK_CLAUSE;
+//  input_command.decl.ask_decl.clause = clause;
+//  threshold = atof(thresholdstr);
+//  if (0.0 <= threshold && threshold <= 1.0) {
+//    input_command.decl.ask_decl.threshold = threshold;
+//  } else {
+//    free_clause(clause);
+//    safe_free(thresholdstr);
+//    safe_free(allstr);
+//    safe_free(numsamp);
+//    yyerror("ask_clause: threshold must be between 0.0 and 1.0");
+//    return;
+//  }
+//  safe_free(thresholdstr);
+//  if (allstr == NULL || strcasecmp(allstr, "BEST") == 0) {
+//    input_command.decl.ask_decl.all = false;
+//  } else if (strcasecmp(allstr, "ALL") == 0) {
+//    input_command.decl.ask_decl.all = true;
+//  } else {
+//    free_clause(clause);
+//    safe_free(allstr);
+//    safe_free(numsamp);
+//    yyerror("ask_clause: which must be 'all' or 'best'");
+//    return;
+//  }
+//  safe_free(allstr);
+//  if (numsamp == NULL) {
+//    input_command.decl.ask_decl.num_samples = DEFAULT_MAX_SAMPLES;
+//  } else if (yy_check_nat(numsamp)) {
+//    input_command.decl.ask_decl.num_samples = atoi(numsamp);
+//  } else {
+//    free_clause(clause);
+//    safe_free(numsamp);
+//    yyerror("ask_clause: numsamps must be an integer");
+//  }
+//  safe_free(numsamp);
+//};
 
-// For weight learning 
+/* For weight learning */
 void yy_train_decl (char *file) {
   input_command.kind = TRAIN;
   input_command.decl.train_decl.file = file;
@@ -418,7 +427,7 @@ void yy_mcsat_params_decl (char **params) {
   int32_t arglen = 0;
   
   input_command.kind = MCSAT_PARAMS;
-  // Determine num_params
+  /* Determine num_params */
   if (params != NULL) {
     while (arglen <= 9 && (params[arglen] != NULL)) {
       arglen++;
@@ -428,7 +437,7 @@ void yy_mcsat_params_decl (char **params) {
     yyerror("mcsat_params: too many args");
   }
   input_command.decl.mcsat_params_decl.num_params = arglen;
-  // max_samples
+  /* 0: max_samples */
   if (arglen > 0 && strcmp(params[0], "") != 0) {
     if (yy_check_nat(params[0])) {
       input_command.decl.mcsat_params_decl.max_samples = atoi(params[0]);
@@ -436,46 +445,46 @@ void yy_mcsat_params_decl (char **params) {
   } else {
     input_command.decl.mcsat_params_decl.max_samples = -1;
   }
-  // sa_probability
+  /* 1: sa_probability */
   if (arglen > 1 && strcmp(params[1], "") != 0) {
     if (yy_check_float(params[1])) {
       double prob = atof(params[1]);
       if (0.0 <= prob && prob <= 1.0) {
-	input_command.decl.mcsat_params_decl.sa_probability = prob;
+        input_command.decl.mcsat_params_decl.sa_probability = prob;
       } else {
-	yyerror("sa_probability should be between 0.0 and 1.0");
+        yyerror("sa_probability should be between 0.0 and 1.0");
       }
     }
   } else {
     input_command.decl.mcsat_params_decl.sa_probability = -1;
   }
-  // sa_temperature
+  /* 2: sa_temperature */
   if (arglen > 2 && strcmp(params[2], "") != 0) {
     if (yy_check_float(params[2])) {
       double temp = atof(params[2]);
       if (temp > 0.0) {
-	input_command.decl.mcsat_params_decl.sa_temperature = temp;
+        input_command.decl.mcsat_params_decl.sa_temperature = temp;
       } else {
-	yyerror("sa_temperature should be greater than 0.0");
+        yyerror("sa_temperature should be greater than 0.0");
       }
     }
   } else {
     input_command.decl.mcsat_params_decl.sa_temperature = -1;
   }
-  // rvar_probability
+  /* 3: rvar_probability */
   if (arglen > 3 && strcmp(params[3], "") != 0) {
     if (yy_check_float(params[3])) {
       double prob = atof(params[3]);
       if (0.0 <= prob && prob <= 1.0) {
-	input_command.decl.mcsat_params_decl.rvar_probability = prob;
+        input_command.decl.mcsat_params_decl.rvar_probability = prob;
       } else {
-	yyerror("rvar_probability should be between 0.0 and 1.0");
+        yyerror("rvar_probability should be between 0.0 and 1.0");
       }
     }
   } else {
     input_command.decl.mcsat_params_decl.rvar_probability = -1;
   }
-  // max_flips
+  /* 4: max_flips */
   if (arglen > 4 && strcmp(params[4], "") != 0) {
     if (yy_check_nat(params[4])) {
       input_command.decl.mcsat_params_decl.max_flips = atoi(params[4]);
@@ -483,7 +492,7 @@ void yy_mcsat_params_decl (char **params) {
   } else {
     input_command.decl.mcsat_params_decl.max_flips = -1;
   }
-  // max_extra_flips
+  /* 5: max_extra_flips */
   if (arglen > 5 && strcmp(params[5], "") != 0) {
     if (yy_check_nat(params[5])) {
       input_command.decl.mcsat_params_decl.max_extra_flips = atoi(params[5]);
@@ -491,7 +500,7 @@ void yy_mcsat_params_decl (char **params) {
   } else {
     input_command.decl.mcsat_params_decl.max_extra_flips = -1;
   }
-  // timeout
+  /* 6: timeout */
   if (arglen > 6 && strcmp(params[6], "") != 0) {
     if (yy_check_nat(params[6])) {
       input_command.decl.mcsat_params_decl.timeout = atoi(params[6]);
@@ -499,6 +508,7 @@ void yy_mcsat_params_decl (char **params) {
   } else {
     input_command.decl.mcsat_params_decl.timeout = -1;
   }
+  /* 7: num of burn_in_steps */
   if (arglen > 7 && strcmp(params[7], "") != 0) {
     if (yy_check_nat(params[7])) {
       input_command.decl.mcsat_params_decl.burn_in_steps = atoi(params[7]);
@@ -506,6 +516,7 @@ void yy_mcsat_params_decl (char **params) {
   } else {
     input_command.decl.mcsat_params_decl.burn_in_steps = -1;
   }
+  /* 8: sampling interval */
   if (arglen > 8 && strcmp(params[8], "") != 0) {
     if (yy_check_nat(params[8])) {
       input_command.decl.mcsat_params_decl.samp_interval = atoi(params[8]);
@@ -515,42 +526,108 @@ void yy_mcsat_params_decl (char **params) {
   }
   free_strings(params);
 };
-  void yy_dumptables (int32_t table) {
-    input_command.kind = DUMPTABLE;
-    input_command.decl.dumptable_decl.table = table;
-  };
-  void yy_reset (int32_t what) {
-    input_command.kind = RESET;
-    input_command.decl.reset_decl.kind = what;
-  };
-  void yy_retract (char *source) {
-    input_command.kind = RETRACT;
-    input_command.decl.retract_decl.source = source;
-  };
-  void yy_load (char *name) {
-    input_command.kind = LOAD;
-    input_command.decl.load_decl.file = name;
-  };
-  void yy_verbosity (char *level) {
-    int32_t i;
-    for (i=0; level[i] != '\0'; i++) {
-      if (! isdigit(level[i])) {
-	yyerror("Invalid verbosity");
+
+void yy_mwsat_decl () {
+  //yy_get_mcsat_params(params);
+  input_command.kind = MWSAT;
+}
+
+void yy_mwsat_params_decl (char **params) {
+  int32_t arglen = 0;
+  
+  input_command.kind = MWSAT_PARAMS;
+  /* Determine num_params */
+  if (params != NULL) {
+    while (arglen <= 4 && (params[arglen] != NULL)) {
+      arglen++;
+    }
+  }
+  if (arglen > 4) {
+    yyerror("mcsat_params: too many args");
+  }
+  input_command.decl.mwsat_params_decl.num_params = arglen;
+  /* 0: max_trials */
+  if (arglen > 0 && strcmp(params[0], "") != 0) {
+    if (yy_check_nat(params[0])) {
+      input_command.decl.mwsat_params_decl.num_trials = atoi(params[0]);
+    }
+  } else {
+    input_command.decl.mwsat_params_decl.num_trials = -1;
+  }
+  /* 1: rvar_probability */
+  if (arglen > 1 && strcmp(params[1], "") != 0) {
+    if (yy_check_float(params[1])) {
+      double prob = atof(params[1]);
+      if (0.0 <= prob && prob <= 1.0) {
+        input_command.decl.mwsat_params_decl.rvar_probability = prob;
+      } else {
+        yyerror("rvar_probability should be between 0.0 and 1.0");
       }
     }
-    input_command.kind = VERBOSITY;
-    input_command.decl.verbosity_decl.level = atoi(level);
-    safe_free(level);
-  };
-  void yy_help (int32_t command) {
-    input_command.kind = HELP;
-    input_command.decl.help_decl.command = command;
-  };
-  void yy_quit () {
-    input_command.kind = QUIT;
-  };
+  } else {
+    input_command.decl.mwsat_params_decl.rvar_probability = -1;
+  }
+  /* 2: max_flips */
+  if (arglen > 2 && strcmp(params[2], "") != 0) {
+    if (yy_check_nat(params[2])) {
+      input_command.decl.mwsat_params_decl.max_flips = atoi(params[2]);
+    }
+  } else {
+    input_command.decl.mwsat_params_decl.max_flips = -1;
+  }
+  /* 3: timeout */
+  if (arglen > 3 && strcmp(params[3], "") != 0) {
+    if (yy_check_nat(params[3])) {
+      input_command.decl.mwsat_params_decl.timeout = atoi(params[6]);
+    }
+  } else {
+    input_command.decl.mwsat_params_decl.timeout = -1;
+  }
+  free_strings(params);
+};
 
-  %}
+void yy_dumptables (int32_t table) {
+  input_command.kind = DUMPTABLE;
+  input_command.decl.dumptable_decl.table = table;
+};
+
+void yy_reset (int32_t what) {
+  input_command.kind = RESET;
+  input_command.decl.reset_decl.kind = what;
+};
+
+void yy_retract (char *source) {
+  input_command.kind = RETRACT;
+  input_command.decl.retract_decl.source = source;
+};
+
+void yy_load (char *name) {
+  input_command.kind = LOAD;
+  input_command.decl.load_decl.file = name;
+};
+
+void yy_verbosity (char *level) {
+  int32_t i;
+  for (i=0; level[i] != '\0'; i++) {
+    if (! isdigit(level[i])) {
+  yyerror("Invalid verbosity");
+    }
+  }
+  input_command.kind = VERBOSITY;
+  input_command.decl.verbosity_decl.level = atoi(level);
+  safe_free(level);
+};
+
+void yy_help (int32_t command) {
+  input_command.kind = HELP;
+  input_command.decl.help_decl.command = command;
+};
+
+void yy_quit () {
+  input_command.kind = QUIT;
+};
+
+%}
 
 %token ALL
 %token BEST
@@ -572,6 +649,8 @@ void yy_mcsat_params_decl (char **params) {
 //%token ASK_CLAUSE
 %token MCSAT
 %token MCSAT_PARAMS
+%token MWSAT
+%token MWSAT_PARAMS
 %token RESET
 %token RETRACT
 %token DUMPTABLE
@@ -682,6 +761,8 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | TRAIN trainarg {yy_train_decl($2);}
     | MCSAT {yy_mcsat_decl();}
     | MCSAT_PARAMS oarguments {yy_mcsat_params_decl($2);}
+    | MWSAT {yy_mwsat_decl();}
+    | MWSAT_PARAMS oarguments {yy_mwsat_params_decl($2);}
     | RESET resetarg {yy_reset($2);}
     | RETRACT retractarg {yy_retract($2);}
     | DUMPTABLE table {yy_dumptables($2);}
@@ -698,6 +779,7 @@ cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | ASK {$$ = ASK;}
      //| ASK_CLAUSE {$$ = ASK_CLAUSE;}
      | MCSAT {$$ = MCSAT;} | MCSAT_PARAMS {$$ = MCSAT_PARAMS}
+     | MWSAT {$$ = MWSAT;} | MWSAT_PARAMS {$$ = MWSAT_PARAMS}
      | RESET {$$ = RESET;} | RETRACT {$$ = RETRACT;} | DUMPTABLE {$$ = DUMPTABLE;}
      | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
      | LEARN {$$ = LEARN;} |  TRAIN {$$ = TRAIN;};
@@ -712,7 +794,7 @@ interval: '[' NUM DDOT NUM ']' {$$ = yy_sortdef($2, $4);} ;
 table: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
        | SORT {$$ = SORT;} | PREDICATE {$$ = PREDICATE;} | ATOMD {$$ = ATOMD;}
        | CLAUSE {$$ = CLAUSE;} | RULE {$$ = RULE;} | SUMMARY {$$ = SUMMARY;}
-	   | QINST {$$ = QINST;}
+       | QINST {$$ = QINST;}
        ;
 
 witness: DIRECT {$$ = true;} | INDIRECT {$$ = false;}
@@ -738,7 +820,7 @@ fmla: atom {$$ = yy_atom_to_fmla($1);}
 
 clause: literals {$$ = yy_clause(NULL, $1);};
       | '(' names ')'
-	literals {$$ = yy_clause($2, $4);};
+        literals {$$ = yy_clause($2, $4);};
 
 literals: lits {$$ = copy_yylits();};
 
@@ -808,8 +890,8 @@ trainarg: /* empty */ {$$ = NULL;} | STRING;
 
 int isidentchar(int c) {
   return !(isspace(c) || iscntrl(c) || c =='(' || c == ')'
-	   || c == '|' || c == '[' || c == ']' || c == '{'
-	   || c == '}' || c == ',' || c == ';' || c == ':');
+           || c == '|' || c == '[' || c == ']' || c == '{'
+           || c == '}' || c == ',' || c == ';' || c == ':');
 }
 
 int yygetc(parse_input_t *input) {
@@ -839,24 +921,24 @@ int skip_white_space_and_comments (void) {
     do {
       c = yygetc(parse_input);
       if (c == '\n') {
-	++yylloc.last_line;
-	yylloc.last_column = 0;
-	if (yynerrs && (input_is_stdin(parse_input))) {
-	  return ';';
-	}
+        ++yylloc.last_line;
+        yylloc.last_column = 0;
+        if (yynerrs && (input_is_stdin(parse_input))) {
+          return ';';
+        }
       } else {
-	++yylloc.last_column;
+        ++yylloc.last_column;
       }
     } while (isspace(c));
     if (c == '#') {
       do {
-	c = yygetc(parse_input);
-	if (c == '\n') {
-	  ++yylloc.last_line;
-	  yylloc.last_column = 0;
-	} else {
-	  ++yylloc.last_column;
-	}
+        c = yygetc(parse_input);
+        if (c == '\n') {
+          ++yylloc.last_line;
+          yylloc.last_column = 0;
+        } else {
+          ++yylloc.last_column;
+        }
       } while (c != '\n' && c != EOF);
     } else {
       return c;
@@ -890,24 +972,24 @@ int yylex (void) {
     int have_dot = 0;
     do {
       if (! have_digit && isdigit(c))
-	have_digit = 1;
+        have_digit = 1;
       if (c == '.') {
-	if (have_dot) {
-	  yyerror("Number has two decimal points");
-	} else {
-	  // Do we have '..'?
-	  if ((cc = yygetc(parse_input)) == '.') {
-	    if (i == 0) {
-	      return DDOT;
-	    } else {
-	      ddot_wait = true;
-	      break;
-	    }
-	  } else {
-	    yyungetc(cc, parse_input);
-	  }
-	  have_dot = 1;
-	}
+        if (have_dot) {
+          yyerror("Number has two decimal points");
+        } else {
+          // Do we have '..'?
+          if ((cc = yygetc(parse_input)) == '.') {
+            if (i == 0) {
+              return DDOT;
+            } else {
+              ddot_wait = true;
+              break;
+            }
+          } else {
+            yyungetc(cc, parse_input);
+          }
+          have_dot = 1;
+        }
       };
       yystrbuf_add(c, i++);
       c = yygetc(parse_input);
@@ -924,10 +1006,10 @@ int yylex (void) {
     yylval.str = nstr;
     if (! have_digit) {
       if (strlen(yylval.str) == 1) {
-	switch (yylval.str[0]) {
-	case '+': return PLUS;
-	case '-': return MINUS;
-	}
+        switch (yylval.str[0]) {
+        case '+': return PLUS;
+        case '-': return MINUS;
+        }
       }
       safe_free(nstr);
       yyerror("Syntax error: '.', '+', '-' must be followed by parens or digits");
@@ -948,10 +1030,10 @@ int yylex (void) {
     if (strcasecmp(yylval.str, "PREDICATE") == 0)
       return PREDICATE;
     else if (strcasecmp(yylval.str, "OBSERVABLE") == 0
-	     || strcasecmp(yylval.str, "DIRECT") == 0)
+             || strcasecmp(yylval.str, "DIRECT") == 0)
       return DIRECT;
     else if (strcasecmp(yylval.str, "HIDDEN") == 0
-	     || strcasecmp(yylval.str, "INDIRECT") == 0)
+             || strcasecmp(yylval.str, "INDIRECT") == 0)
       return INDIRECT;
     else if (strcasecmp(yylval.str, "SORT") == 0)
       return SORT;
@@ -971,9 +1053,9 @@ int yylex (void) {
       return ASK;
     else if (strcasecmp(yylval.str, "ADD_CLAUSE") == 0)
       return ADD_CLAUSE;
-//     else if (strcasecmp(yylval.str, "ASK_CLAUSE") == 0)
-//       return ASK_CLAUSE;
-// Weight learning
+//    else if (strcasecmp(yylval.str, "ASK_CLAUSE") == 0)
+//      return ASK_CLAUSE;
+	/* Weight learning */
      else if (strcasecmp(yylval.str, "LEARN") == 0)
       return LEARN;
     else if (strcasecmp(yylval.str, "TRAIN") == 0)
@@ -982,19 +1064,23 @@ int yylex (void) {
       return MCSAT;
     else if (strcasecmp(yylval.str, "MCSAT_PARAMS") == 0)
       return MCSAT_PARAMS;
+        else if (strcasecmp(yylval.str, "MWSAT") == 0)
+          return MWSAT;
+        else if (strcasecmp(yylval.str, "MWSAT_PARAMS") == 0)
+          return MWSAT_PARAMS;
     else if (strcasecmp(yylval.str, "RESET") == 0)
       return RESET;
     else if (strcasecmp(yylval.str, "RETRACT") == 0)
       return RETRACT;
     else if (strcasecmp(yylval.str, "DUMPTABLE") == 0
-	     || strcasecmp(yylval.str, "DUMPTABLES") == 0)
+             || strcasecmp(yylval.str, "DUMPTABLES") == 0)
       return DUMPTABLE;
     else if (strcasecmp(yylval.str, "CLAUSE") == 0)
       return CLAUSE;
     else if (strcasecmp(yylval.str, "RULE") == 0)
       return RULE;
     else if (strcasecmp(yylval.str, "QINST") == 0)
-	  return QINST;
+          return QINST;
     else if (strcasecmp(yylval.str, "INTEGER") == 0)
       return INTEGER;
     else if (strcasecmp(yylval.str, "SUMMARY") == 0)
@@ -1137,7 +1223,7 @@ int yylex (void) {
     c = yygetc(parse_input);
     ++yylloc.last_column;
     if (isspace(c) || c == ',' || c == ';' || c == '(' || c == ')' || c == '[' || c == ']'
-	|| c == ':' || c == '\0' || c == EOF) {
+        || c == ':' || c == '\0' || c == EOF) {
       break;
     } else {
       yystrbuf_add(c, i++);
@@ -1154,9 +1240,7 @@ int yylex (void) {
   return NAME;
 }
 
-
 /* Free the memory allocated for the declaration */
-  
 
 void free_pred_decl_data() {
   free_atom(input_command.decl.pred_decl.atom);
@@ -1220,6 +1304,14 @@ void free_mcsat_decl_data() {
 }
 
 void free_mcsat_params_decl_data() {
+  // Nothing to do here
+}
+
+void free_mwsat_decl_data() {
+  // Nothing to do here
+}
+
+void free_mwsat_params_decl_data() {
   // Nothing to do here
 }
 
@@ -1301,6 +1393,18 @@ void free_parse_data () {
     free_mcsat_decl_data();
     break;
   }
+  case MCSAT_PARAMS: {
+    free_mcsat_params_decl_data();
+    break;
+  }
+  case MWSAT: {
+    free_mwsat_decl_data();
+    break;
+  }
+  case MWSAT_PARAMS: {
+    free_mwsat_params_decl_data();
+	break;
+  }
 // Weight learning
   case TRAIN: {
     free_train_decl_data();
@@ -1308,10 +1412,6 @@ void free_parse_data () {
   }
    case LEARN: {
     free_learn_decl_data();
-    break;
-  }
-  case MCSAT_PARAMS: {
-    free_mcsat_params_decl_data();
     break;
   }
   case RESET: {
@@ -1344,10 +1444,10 @@ void free_parse_data () {
 void yyerror (const char *str) {
   if (parse_input->kind == INFILE) {
     printf("%s:%d:%d: %s: %s\n", parse_input->input.in_file.file,
-	   yylloc.last_line, yylloc.last_column, str, yylval.str);
+           yylloc.last_line, yylloc.last_column, str, yylval.str);
   } else {
     printf("%s:%d:%d: %s: %s\n", parse_input->input.in_string.string,
-	   yylloc.last_line, yylloc.last_column, str, yylval.str);
+           yylloc.last_line, yylloc.last_column, str, yylval.str);
   }
   input_command.kind = 0;
   yyerrflg = true;

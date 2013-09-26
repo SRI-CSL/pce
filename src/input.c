@@ -17,6 +17,7 @@
 #include "mcmc.h"
 #include "input.h"
 #include "buffer.h"
+#include "walksat.h"
 
 extern int yyparse();
 extern void free_parse_data();
@@ -32,6 +33,8 @@ extern int yydebug;
 #define DEFAULT_MCSAT_TIMEOUT 0
 #define DEFAULT_BURN_IN_STEPS 100
 #define DEFAULT_SAMP_INTERVAL 1
+#define DEFAULT_NUM_TRIALS 100
+#define DEFAULT_MWSAT_TIMEOUT 0
 
 static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 static double sa_probability = DEFAULT_SA_PROBABILITY;
@@ -42,6 +45,8 @@ static int32_t max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
 static int32_t mcsat_timeout = DEFAULT_MCSAT_TIMEOUT;
 static int32_t burn_in_steps = DEFAULT_BURN_IN_STEPS;
 static int32_t samp_interval = DEFAULT_SAMP_INTERVAL;
+static int32_t num_trials = DEFAULT_NUM_TRIALS;
+static int32_t mwsat_timeout = DEFAULT_MWSAT_TIMEOUT;
 
 static bool strict_consts = true;
 static bool lazy = false;
@@ -95,6 +100,12 @@ int32_t get_burn_in_steps() {
 int32_t get_samp_interval() {
 	return samp_interval;
 }
+int32_t get_num_trials() {
+	return num_trials;
+}
+int32_t get_mwsat_timeout() {
+	return mwsat_timeout;
+}
 
 void set_max_samples(int32_t m) {
 	max_samples = m;
@@ -122,6 +133,12 @@ void set_burn_in_steps(int32_t m) {
 }
 void set_samp_interval(int32_t m) {
 	samp_interval = m;
+}
+void set_num_trials(int32_t m) {
+	num_trials = m;
+}
+void set_mwsat_timeout(int32_t m) {
+	mwsat_timeout = m;
 }
 
 bool strict_constants() {
@@ -1195,37 +1212,30 @@ void print_ask_results(input_formula_t *fmla, samp_table_t *table) {
 
 extern void dumptable(int32_t tbl, samp_table_t *table) {
 	switch (tbl) {
-	case ALL: {
+	case ALL:
 		dump_all_tables(table);
 		break;
-	}
-	case SORT: {
+	case SORT:
 		dump_sort_table(table);
 		break;
-	}
-	case PREDICATE: {
+	case PREDICATE:
 		dump_pred_table(table);
 		break;
-	}
-	case ATOMD: {
+	case ATOMD:
 		dump_atom_table(table);
 		break;
-	}
-	case CLAUSE: {
+	case CLAUSE:
 		dump_rule_inst_table(table);
 		break;
-	}
-	case RULE: {
+	case RULE:
 		dump_rule_table(table);
 		break;
-	}
 	case QINST:
 		dump_query_instance_table(table);
 		break;
-	case SUMMARY: {
+	case SUMMARY:
 		summarize_tables(table);
 		break;
-	}
 	}
 }
 
@@ -1235,168 +1245,205 @@ extern bool read_eval(samp_table_t *table) {
 	atom_table_t *atom_table = &table->atom_table;
 
 	fflush(stdout);
-	// yyparse returns 0 and sets input_command if no syntax errors
-	if (yyparse() == 0)
-		switch (input_command.kind) {
-		case PREDICATE: {
-			input_pred_decl_t decl;
-			decl = input_command.decl.pred_decl;
-			cprintf(2, "Adding predicate %s\n", decl.atom->pred);
-			add_predicate(decl.atom->pred, decl.atom->args, decl.witness,
-					table);
-			break;
+	if (yyparse() != 0) {
+		free_parse_data();
+		return false;
+	}
+
+	/* yyparse returns 0 and sets input_command if no syntax errors */
+	switch (input_command.kind) {
+	case PREDICATE: {
+		input_pred_decl_t decl;
+		decl = input_command.decl.pred_decl;
+		cprintf(2, "Adding predicate %s\n", decl.atom->pred);
+		add_predicate(decl.atom->pred, decl.atom->args, decl.witness,
+				table);
+		break;
+	}
+	case SORT: {
+		input_sort_decl_t decl = input_command.decl.sort_decl;
+		cprintf(2, "Adding sort %s\n", decl.name);
+		add_sort(sort_table, decl.name);
+		if (decl.sortdef != NULL) {
+			add_sortdef(sort_table, decl.name, decl.sortdef);
 		}
-		case SORT: {
-			input_sort_decl_t decl = input_command.decl.sort_decl;
-			cprintf(2, "Adding sort %s\n", decl.name);
-			add_sort(sort_table, decl.name);
-			if (decl.sortdef != NULL) {
-				add_sortdef(sort_table, decl.name, decl.sortdef);
+		break;
+	}
+	case SUBSORT: {
+		input_subsort_decl_t decl = input_command.decl.subsort_decl;
+		cprintf(2, "Adding subsort %s of %s information\n", decl.subsort,
+				decl.supersort);
+		add_subsort(sort_table, decl.subsort, decl.supersort);
+		break;
+	}
+	case CONSTD: {
+		int32_t i;
+		input_const_decl_t decl = input_command.decl.const_decl;
+		for (i = 0; i < decl.num_names; i++) {
+			//cprintf(2, "Adding const %s\n", decl.name[i]);
+			add_constant(decl.name[i], decl.sort, table);
+		}
+		break;
+	}
+	case VAR: {
+		input_var_decl_t decl = input_command.decl.var_decl;
+		if (sort_name_index(decl.sort, sort_table) == -1) {
+			if (!strict_constants())
+				add_sort(sort_table, decl.sort);
+			else {
+				mcsat_err("Sort %s has not been declared\n", decl.sort);
+				break;
 			}
-			break;
 		}
-		case SUBSORT: {
-			input_subsort_decl_t decl = input_command.decl.subsort_decl;
-			cprintf(2, "Adding subsort %s of %s information\n", decl.subsort,
-					decl.supersort);
-			add_subsort(sort_table, decl.subsort, decl.supersort);
-			break;
+		int32_t i;
+		for (i = 0; i < decl.num_names; i++) {
+			// Need to see if name in const_table
+			cprintf(2, "Adding var %s\n", decl.name[i]);
+			add_var(var_table, decl.name[i], sort_table, decl.sort);
 		}
-		case CONSTD: {
-			int32_t i;
-			input_const_decl_t decl = input_command.decl.const_decl;
-			for (i = 0; i < decl.num_names; i++) {
-				//cprintf(2, "Adding const %s\n", decl.name[i]);
-				add_constant(decl.name[i], decl.sort, table);
-			}
-			break;
-		}
-		case VAR: {
-			input_var_decl_t decl = input_command.decl.var_decl;
-			if (sort_name_index(decl.sort, sort_table) == -1) {
-				if (!strict_constants())
-					add_sort(sort_table, decl.sort);
-				else {
-					mcsat_err("Sort %s has not been declared\n", decl.sort);
-					break;
-				}
-			}
-			int32_t i;
-			for (i = 0; i < decl.num_names; i++) {
-				// Need to see if name in const_table
-				cprintf(2, "Adding var %s\n", decl.name[i]);
-				add_var(var_table, decl.name[i], sort_table, decl.sort);
-			}
-			break;
-		}
-		case ATOMD: {
-			// invoke add_atom
-			input_atom_decl_t decl = input_command.decl.atom_decl;
-			add_atom(table, decl.atom);
-			break;
-		}
-		case ASSERT: {
-			/* 
-			 * TODO Need to check that the predicate is a witness predicate,
-			 * then invoke assert_atom.
-			 */
-			input_assert_decl_t decl = input_command.decl.assert_decl;
-			assert_atom(table, decl.atom, decl.source);
-			break;
-		}
-		case ADD: {
-			input_add_fdecl_t decl = input_command.decl.add_fdecl;
-			cprintf(1, "\nClausifying and adding formula\n");
-			add_cnf(decl.frozen, decl.formula, decl.weight, decl.source, true);
-			break;
-		}
-		case ADD_CLAUSE: {
-			input_add_decl_t decl = input_command.decl.add_decl;
-			if (decl.clause->varlen == 0) {
-				/* No variables - adding a clause */
-				cprintf(2, "Adding clause\n");
-				add_clause_instance(table, decl.clause->literals, decl.weight,
-						decl.source, true);
+		break;
+	}
+	case ATOMD: {
+		// invoke add_atom
+		input_atom_decl_t decl = input_command.decl.atom_decl;
+		add_atom(table, decl.atom);
+		break;
+	}
+	case ASSERT: {
+		/* 
+		 * TODO Need to check that the predicate is a witness predicate,
+		 * then invoke assert_atom.
+		 */
+		input_assert_decl_t decl = input_command.decl.assert_decl;
+		assert_atom(table, decl.atom, decl.source);
+		break;
+	}
+	case ADD: {
+		input_add_fdecl_t decl = input_command.decl.add_fdecl;
+		cprintf(1, "\nClausifying and adding formula\n");
+		add_cnf(decl.frozen, decl.formula, decl.weight, decl.source, true);
+		break;
+	}
+	case ADD_CLAUSE: {
+		input_add_decl_t decl = input_command.decl.add_decl;
+		if (decl.clause->varlen == 0) {
+			/* No variables - adding a clause */
+			cprintf(2, "Adding clause\n");
+			add_clause_instance(table, decl.clause->literals, decl.weight,
+					decl.source, true);
+		} else {
+			/* Have variables - adding a rule */
+			double wt = decl.weight;
+			if (wt == DBL_MAX) {
+				cprintf(2, "Adding rule with MAX weight\n");
 			} else {
-				/* Have variables - adding a rule */
-				double wt = decl.weight;
-				if (wt == DBL_MAX) {
-					cprintf(2, "Adding rule with MAX weight\n");
-				} else {
-					cprintf(2, "Adding rule with weight %f\n", wt);
-				}
-				int32_t ruleidx = add_clause(decl.clause, decl.weight,
-						decl.source, table);
-				/*
-				 * Create instances here rather than add_rule, as this is eager
-				 */
-				if (ruleidx != -1) {
-					all_rule_instances(ruleidx, table);
-				}
+				cprintf(2, "Adding rule with weight %f\n", wt);
 			}
-			break;
-		}
-		case ASK: {
-			input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
-			cprintf(1, "\nAsk: clausifying formula\n");
-
-			if (get_dump_samples_path() != NULL) {
-				output(" samples are not going to be dumped after the first ASK");
-				set_dump_samples_path(NULL);
+			int32_t ruleidx = add_clause(decl.clause, decl.weight,
+					decl.source, table);
+			/*
+			 * Create instances here rather than add_rule, as this is eager
+			 */
+			if (ruleidx != -1) {
+				all_rule_instances(ruleidx, table);
 			}
-			
-			/* add all queries and run mcsat in the end */
-			add_cnf_query(decl.formula);
-
-			///* the following call will run mcsat once for each query */
-			//ask_cnf(decl.formula, decl.threshold, decl.numresults);
-			///* Results are in ask_buffer - print them out */
-			//print_ask_results(decl.formula, table);
-			///* Now clear out the query_instance table for the next query */
-			//reset_query_instance_table(&table->query_instance_table);
-			break;
 		}
+		break;
+	}
+	case ASK: {
+		input_ask_fdecl_t decl = input_command.decl.ask_fdecl;
+		cprintf(1, "\nAsk: clausifying formula\n");
 
-		case LEARN: {
-			// TODO WEIGHT LEARN
-			//input_add_fdecl_t decl = input_command.decl.add_fdecl;
-			//add_weighted_formula(table, &decl);
-
-			//dump_clause_table(table);
-			//dump_rule_table(table);
-			break;
+		if (get_dump_samples_path() != NULL) {
+			output(" samples are not going to be dumped after the first ASK");
+			set_dump_samples_path(NULL);
 		}
-		case TRAIN: {
-			// TODO WEIGHT LEARN
-			//input_train_decl_t decl = input_command.decl.train_decl;
-			//training_data_t *training_data = NULL;
+		
+		/* add all queries and run mcsat in the end */
+		add_cnf_query(decl.formula);
 
-			//if (decl.file != NULL) {
-			//	printf("Loading training data from: %s\n", decl.file);
-			//	training_data = parse_data_file(decl.file, table);
-			//} else {
-			//	printf("No training data was provided\n");
-			//}
-			//if (LBFGS_MODE) {
-			//	weight_training_lbfgs(training_data, table);
-			//} else {
-			//	gradient_ascent(training_data, table);
-			//}
-			//break;
+		///* the following call will run mcsat once for each query */
+		//ask_cnf(decl.formula, decl.threshold, decl.numresults);
+		///* Results are in ask_buffer - print them out */
+		//print_ask_results(decl.formula, table);
+		///* Now clear out the query_instance table for the next query */
+		//reset_query_instance_table(&table->query_instance_table);
+		break;
+	}
 
-		}
-		//case ASK_CLAUSE: {
-		//	input_ask_decl_t decl = input_command.decl.ask_decl;
-		//	assert(decl.clause->litlen == 1);
-		//	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
-		//	break;
+	case LEARN: {
+		// TODO WEIGHT LEARN
+		//input_add_fdecl_t decl = input_command.decl.add_fdecl;
+		//add_weighted_formula(table, &decl);
+
+		//dump_clause_table(table);
+		//dump_rule_table(table);
+		break;
+	}
+	case TRAIN: {
+		// TODO WEIGHT LEARN
+		//input_train_decl_t decl = input_command.decl.train_decl;
+		//training_data_t *training_data = NULL;
+
+		//if (decl.file != NULL) {
+		//	printf("Loading training data from: %s\n", decl.file);
+		//	training_data = parse_data_file(decl.file, table);
+		//} else {
+		//	printf("No training data was provided\n");
 		//}
-		case MCSAT: {
-			clock_t start, end;
+		//if (LBFGS_MODE) {
+		//	weight_training_lbfgs(training_data, table);
+		//} else {
+		//	gradient_ascent(training_data, table);
+		//}
+		//break;
 
-			start = clock();
-			output("\nCalling %sMCSAT with parameters (set using mcsat_params):\n",
-					lazy_mcsat() ? "LAZY_" : "");
+	}
+	//case ASK_CLAUSE: {
+	//	input_ask_decl_t decl = input_command.decl.ask_decl;
+	//	assert(decl.clause->litlen == 1);
+	//	ask_clause(decl.clause, decl.threshold, decl.all, decl.num_samples);
+	//	break;
+	//}
+	case MCSAT: {
+		clock_t start, end;
+
+		start = clock();
+		output("\nCalling %sMCSAT with parameters (set using mcsat_params):\n",
+				lazy_mcsat() ? "LAZY_" : "");
+		output(" max_samples = %"PRId32"\n", get_max_samples());
+		output(" sa_probability = %f\n", get_sa_probability());
+		output(" sa_temperature = %f\n", get_sa_temperature());
+		output(" rvar_probability = %f\n", get_rvar_probability());
+		output(" max_flips = %"PRId32"\n", get_max_flips());
+		output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
+		output(" timeout = %"PRId32"\n", get_mcsat_timeout());
+		output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
+		output(" samp_interval = %"PRId32"\n", get_samp_interval());
+		output("\n");
+
+		if (get_dump_samples_path() != NULL) {
+			output(" dumping samples to %s\n", get_dump_samples_path());
+			// TODO WEIGHT LEARN
+			//init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
+		}
+
+		mc_sat(table, lazy_mcsat(), get_max_samples(),
+				get_sa_probability(), get_sa_temperature(),
+				get_rvar_probability(), get_max_flips(),
+				get_max_extra_flips(), get_mcsat_timeout(),
+				get_burn_in_steps(), get_samp_interval());
+
+		end = clock();
+		output(" running took: %f seconds",
+				(double) (end - start) / CLOCKS_PER_SEC);
+		output("\n");
+		break;
+	}
+	case MCSAT_PARAMS: {
+		input_mcsat_params_decl_t decl = input_command.decl.mcsat_params_decl;
+		if (decl.num_params == 0) {
+			output("MCSAT param values:\n");
 			output(" max_samples = %"PRId32"\n", get_max_samples());
 			output(" sa_probability = %f\n", get_sa_probability());
 			output(" sa_temperature = %f\n", get_sa_temperature());
@@ -1406,147 +1453,175 @@ extern bool read_eval(samp_table_t *table) {
 			output(" timeout = %"PRId32"\n", get_mcsat_timeout());
 			output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
 			output(" samp_interval = %"PRId32"\n", get_samp_interval());
-			output("\n");
+		} else {
+			output("\nSetting MCSAT parameters:\n");
+			if (decl.max_samples >= 0) {
+				output(" max_samples was %"PRId32", now %"PRId32"\n",
+						get_max_samples(), decl.max_samples);
+				set_max_samples(decl.max_samples);
+			}
+			if (decl.sa_probability >= 0) {
+				output(" sa_probability was %f, now %f\n",
+						get_sa_probability(), decl.sa_probability);
+				set_sa_probability(decl.sa_probability);
+			}
+			if (decl.sa_temperature >= 0) {
+				output(" sa_temperature was %f, now %f\n",
+						get_sa_temperature(), decl.sa_temperature);
+				set_sa_temperature(decl.sa_temperature);
+			}
+			if (decl.rvar_probability >= 0) {
+				output(" rvar_probability was %f, now %f\n",
+						get_rvar_probability(), decl.rvar_probability);
+				set_rvar_probability(decl.rvar_probability);
+			}
+			if (decl.max_flips >= 0) {
+				output(" max_flips was %"PRId32", now  %"PRId32"\n",
+						get_max_flips(), decl.max_flips);
+				set_max_flips(decl.max_flips);
+			}
+			if (decl.max_extra_flips >= 0) {
+				output(" max_extra_flips was %"PRId32", now %"PRId32"\n",
+						get_max_extra_flips(), decl.max_extra_flips);
+				set_max_extra_flips(decl.max_extra_flips);
+			}
+			if (decl.timeout >= 0) {
+				output(" timeout was %"PRId32", now %"PRId32"\n",
+						get_mcsat_timeout(), decl.timeout);
+				set_mcsat_timeout(decl.timeout);
+			}
+			if (decl.burn_in_steps >= 0) {
+				output(" burn_in_steps was %"PRId32", now %"PRId32"\n",
+						get_burn_in_steps(), decl.burn_in_steps);
+				set_burn_in_steps(decl.burn_in_steps);
+			}
+			if (decl.samp_interval >= 0) {
+				output(" samp_interval was %"PRId32", now %"PRId32"\n",
+						get_samp_interval(), decl.samp_interval);
+				set_samp_interval(decl.samp_interval);
+			}
+		}
+		output("\n");
+		break;
+	}
+	case MWSAT: {
+		clock_t start, end;
 
-			if (get_dump_samples_path() != NULL) {
-				output(" dumping samples to %s\n", get_dump_samples_path());
-				// TODO WEIGHT LEARN
-				//init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
-			}
+		start = clock();
+		output("\nCalling %sMCSAT with parameters (set using mcsat_params):\n",
+				lazy_mcsat() ? "LAZY_" : "");
+		output(" num_trials = %"PRId32"\n", get_num_trials());
+		output(" rvar_probability = %f\n", get_rvar_probability());
+		output(" max_flips = %"PRId32"\n", get_max_flips());
+		output(" timeout = %"PRId32"\n", get_mwsat_timeout());
+		output("\n");
 
-			mc_sat(table, lazy_mcsat(), get_max_samples(),
-					get_sa_probability(), get_sa_temperature(),
-					get_rvar_probability(), get_max_flips(),
-					get_max_extra_flips(), get_mcsat_timeout(),
-					get_burn_in_steps(), get_samp_interval());
+		if (get_dump_samples_path() != NULL) {
+			output(" dumping samples to %s\n", get_dump_samples_path());
+			// TODO WEIGHT LEARN
+			//init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
+		}
 
-			end = clock();
-			output(" running took: %f seconds",
-					(double) (end - start) / CLOCKS_PER_SEC);
+		mw_sat(table, get_num_trials(), get_rvar_probability(),
+				get_max_flips(), get_mwsat_timeout());
+
+		end = clock();
+		output(" running took: %f seconds",
+				(double) (end - start) / CLOCKS_PER_SEC);
+		output("\n");
+		break;
+	}
+	case MWSAT_PARAMS: {
+		input_mwsat_params_decl_t decl = input_command.decl.mwsat_params_decl;
+		if (decl.num_params == 0) {
+			output("MWSAT param values:\n");
+			output(" num_trials = %"PRId32"\n", get_num_trials());
+			output(" rvar_probability = %f\n", get_rvar_probability());
+			output(" max_flips = %"PRId32"\n", get_max_flips());
+			output(" timeout = %"PRId32"\n", get_mwsat_timeout());
 			output("\n");
+		} else {
+			output("\nSetting MWSAT parameters:\n");
+			if (decl.num_trials >= 0) {
+				output(" num_trials was %"PRId32", now %"PRId32"\n",
+						get_num_trials(), decl.num_trials);
+				set_max_samples(decl.num_trials);
+			}
+			if (decl.rvar_probability >= 0) {
+				output(" rvar_probability was %f, now %f\n",
+						get_rvar_probability(), decl.rvar_probability);
+				set_rvar_probability(decl.rvar_probability);
+			}
+			if (decl.max_flips >= 0) {
+				output(" max_flips was %"PRId32", now  %"PRId32"\n",
+						get_max_flips(), decl.max_flips);
+				set_max_flips(decl.max_flips);
+			}
+			if (decl.timeout >= 0) {
+				output(" timeout was %"PRId32", now %"PRId32"\n",
+						get_mwsat_timeout(), decl.timeout);
+				set_mwsat_timeout(decl.timeout);
+			}
+		}
+		output("\n");
+		break;
+	}
+	case RESET: {
+		input_reset_decl_t decl = input_command.decl.reset_decl;
+		switch (decl.kind) {
+		case ALL: {
+			// Resets the sample tables
+			reset_sort_table(sort_table);
+			// Need to do more here - like free up space.
+			init_samp_table(table);
+			init_gen_rand(pce_rand_seed);
 			break;
 		}
-		case MCSAT_PARAMS: {
-			input_mcsat_params_decl_t decl =
-					input_command.decl.mcsat_params_decl;
-			if (decl.num_params == 0) {
-				output("MCSAT param values:\n");
-				output(" max_samples = %"PRId32"\n", get_max_samples());
-				output(" sa_probability = %f\n", get_sa_probability());
-				output(" sa_temperature = %f\n", get_sa_temperature());
-				output(" rvar_probability = %f\n", get_rvar_probability());
-				output(" max_flips = %"PRId32"\n", get_max_flips());
-				output(" max_extra_flips = %"PRId32"\n", get_max_extra_flips());
-				output(" timeout = %"PRId32"\n", get_mcsat_timeout());
-				output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
-				output(" samp_interval = %"PRId32"\n", get_samp_interval());
-			} else {
-				output("\nSetting MCSAT parameters:\n");
-				if (decl.max_samples >= 0) {
-					output(" max_samples was %"PRId32", now %"PRId32"\n",
-							get_max_samples(), decl.max_samples);
-					set_max_samples(decl.max_samples);
-				}
-				if (decl.sa_probability >= 0) {
-					output(" sa_probability was %f, now %f\n",
-							get_sa_probability(), decl.sa_probability);
-					set_sa_probability(decl.sa_probability);
-				}
-				if (decl.sa_temperature >= 0) {
-					output(" sa_temperature was %f, now %f\n",
-							get_sa_temperature(), decl.sa_temperature);
-					set_sa_temperature(decl.sa_temperature);
-				}
-				if (decl.rvar_probability >= 0) {
-					output(" rvar_probability was %f, now %f\n",
-							get_rvar_probability(), decl.rvar_probability);
-					set_rvar_probability(decl.rvar_probability);
-				}
-				if (decl.max_flips >= 0) {
-					output(" max_flips was %"PRId32", now  %"PRId32"\n",
-							get_max_flips(), decl.max_flips);
-					set_max_flips(decl.max_flips);
-				}
-				if (decl.max_extra_flips >= 0) {
-					output(" max_extra_flips was %"PRId32", now %"PRId32"\n",
-							get_max_extra_flips(), decl.max_extra_flips);
-					set_max_extra_flips(decl.max_extra_flips);
-				}
-				if (decl.timeout >= 0) {
-					output(" timeout was %"PRId32", now %"PRId32"\n",
-							get_mcsat_timeout(), decl.timeout);
-					set_mcsat_timeout(decl.timeout);
-				}
-				if (decl.burn_in_steps >= 0) {
-					output(" burn_in_steps was %"PRId32", now %"PRId32"\n",
-							get_burn_in_steps(), decl.burn_in_steps);
-					set_burn_in_steps(decl.burn_in_steps);
-				}
-				if (decl.samp_interval >= 0) {
-					output(" samp_interval was %"PRId32", now %"PRId32"\n",
-							get_samp_interval(), decl.samp_interval);
-					set_samp_interval(decl.samp_interval);
-				}
-			}
-			output("\n");
-			break;
-		}
-		case RESET: {
-			input_reset_decl_t decl = input_command.decl.reset_decl;
-			switch (decl.kind) {
-			case ALL: {
-				// Resets the sample tables
-				reset_sort_table(sort_table);
-				// Need to do more here - like free up space.
-				init_samp_table(table);
-				init_gen_rand(pce_rand_seed);
-				break;
-			}
-			case PROBABILITIES: {
-				// Simply resets the probabilities of the atom table to -1.0
-				output("Resetting probabilities of atoms to -1.0\n");
-				int32_t i;
-				atom_table->num_samples = 0;
-				for (i = 0; i < atom_table->num_vars; i++) {
-					atom_table->pmodel[i] = -1;
-				}
-				break;
-			}
+		case PROBABILITIES: {
+			// Simply resets the probabilities of the atom table to -1.0
+			output("Resetting probabilities of atoms to -1.0\n");
+			int32_t i;
+			atom_table->num_samples = 0;
+			for (i = 0; i < atom_table->num_vars; i++) {
+				atom_table->pmodel[i] = -1;
 			}
 			break;
 		}
-		case RETRACT: {
-			input_retract_decl_t decl = input_command.decl.retract_decl;
-			retract_source(decl.source, table);
-			break;
 		}
-		case LOAD: {
-			input_load_decl_t decl = input_command.decl.load_decl;
-			load_mcsat_file(decl.file, table);
-			break;
-		}
-		case DUMPTABLE: {
-			input_dumptable_decl_t decl = input_command.decl.dumptable_decl;
-			dumptable(decl.table, table);
-			break;
-		}
-		case VERBOSITY: {
-			input_verbosity_decl_t decl = input_command.decl.verbosity_decl;
-			set_verbosity_level(decl.level);
-			cprintf(1, "Setting verbosity to %"PRId32"\n", decl.level);
-			break;
-		}
-		case HELP: {
-			input_help_decl_t decl = input_command.decl.help_decl;
-			show_help(decl.command);
-			break;
-		}
-		case QUIT:
-			cprintf(1, "QUIT reached, exiting read_eval_print_loop\n");
-			input_command.kind = 0;
-			return true;
-			break;
-		};
+		break;
+	}
+	case RETRACT: {
+		input_retract_decl_t decl = input_command.decl.retract_decl;
+		retract_source(decl.source, table);
+		break;
+	}
+	case LOAD: {
+		input_load_decl_t decl = input_command.decl.load_decl;
+		load_mcsat_file(decl.file, table);
+		break;
+	}
+	case DUMPTABLE: {
+		input_dumptable_decl_t decl = input_command.decl.dumptable_decl;
+		dumptable(decl.table, table);
+		break;
+	}
+	case VERBOSITY: {
+		input_verbosity_decl_t decl = input_command.decl.verbosity_decl;
+		set_verbosity_level(decl.level);
+		cprintf(1, "Setting verbosity to %"PRId32"\n", decl.level);
+		break;
+	}
+	case HELP: {
+		input_help_decl_t decl = input_command.decl.help_decl;
+		show_help(decl.command);
+		break;
+	}
+	case QUIT:
+		cprintf(1, "QUIT reached, exiting read_eval_print_loop\n");
+		input_command.kind = 0;
+		return true;
+		break;
+	};
 	free_parse_data();
 	return false;
 }

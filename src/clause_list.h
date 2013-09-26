@@ -7,7 +7,7 @@
 bool valid_clause_list(samp_clause_list_t *list);
 
 /* Moves a ptr forward */
-static inline samp_clause_t *next_clause(samp_clause_t *ptr) {
+static inline samp_clause_t *next_clause_ptr(samp_clause_t *ptr) {
 	return ptr->link;
 }
 
@@ -18,6 +18,8 @@ static inline samp_clause_t *get_clause(samp_clause_t *ptr) {
 
 /* Initialize a clause list */
 extern void init_clause_list(samp_clause_list_t *list);
+
+/* Remove all elements in a list */
 extern void empty_clause_list(samp_clause_list_t *list);
 
 /* Returns true if the clause list is empty */
@@ -29,20 +31,13 @@ static inline bool is_empty_clause_list(samp_clause_list_t *list) {
 extern void clause_list_insert(samp_clause_t *clause, samp_clause_list_t *list,
 		samp_clause_t *ptr);
 
-/* Inserts a clause before a ptr */
-static inline void clause_list_push(samp_clause_t *clause, samp_clause_list_t *list,
-		samp_clause_t *ptr) {
-	clause_list_insert(clause, list, ptr);
-	ptr = next_clause(ptr);
-}
-
 /* Inserts a clause at the head of a list */
 static inline void clause_list_insert_head(samp_clause_t *clause, samp_clause_list_t *list) {
 	clause_list_insert(clause, list, list->head);
 }
 
 /* Inserts a clause at the tail of a list */
-static inline void clause_list_push_back(samp_clause_t *clause, samp_clause_list_t *list) {
+static inline void clause_list_insert_tail(samp_clause_t *clause, samp_clause_list_t *list) {
 	clause_list_insert(clause, list, list->tail);
 }
 
@@ -56,12 +51,6 @@ static inline samp_clause_t *clause_list_pop_head(samp_clause_list_t *list) {
 
 /* Concatinate two clause lists together */
 extern void clause_list_concat(samp_clause_list_t *list_src, samp_clause_list_t *list_dst);
-
-/* Move all unsat clauses to the live clause list */
-extern void move_unsat_to_live_clauses(rule_inst_table_t *rule_inst_table);
-
-/* Move all sat clauses to the live clause list */
-extern void move_sat_to_live_clauses(rule_inst_table_t *rule_inst_table);
 
 /* Return a random clause from a clause list */
 extern samp_clause_t *choose_random_clause(samp_clause_list_t *list);

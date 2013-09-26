@@ -76,36 +76,54 @@ static inline bool assigned_undef(samp_truth_value_t value){
 static inline bool assigned_true(samp_truth_value_t value){
 	return (value == v_true ||
 			value == v_db_true ||
-			value == v_fixed_true);
+			value == v_up_true);
 }
 
 static inline bool assigned_false(samp_truth_value_t value){
 	return (value == v_false ||
 			value == v_db_false ||
-			value == v_fixed_false);
+			value == v_up_false);
 }
 
-/* Returns if the value is fixed in input database */
+static inline bool assigned_fixed_true(samp_truth_value_t value) {
+	return (value == v_db_true ||
+			value == v_up_true);
+}
+
+static inline bool assigned_fixed_false(samp_truth_value_t value) {
+	return (value == v_db_false ||
+			value == v_up_false);
+}
+
+/* Returns whether the value is fixed in input database */
 static inline bool db_tval(samp_truth_value_t v){
 	return (v == v_db_true || v == v_db_false);
 }
 
-/* Returns if the value is fixed by unit propagation */
-static inline bool fixed_tval(samp_truth_value_t v){
-	return (v == v_fixed_true || v == v_fixed_false);
+/* Returns whether the value is fixed by unit propagation */
+static inline bool up_tval(samp_truth_value_t v) {
+	return (v == v_up_true || v == v_up_false);
 }
 
-/* Returns if the value is unfixed during walksat */
+/* Returns whether the value is fixed */
+static inline bool fixed_tval(samp_truth_value_t v){
+	return (v == v_db_true ||
+			v == v_db_false ||
+			v == v_up_true ||
+			v == v_up_false);
+}
+
+/* Returns if the value is unfixed */
 static inline bool unfixed_tval(samp_truth_value_t v){
 	return (v == v_true || v == v_false);
 }
 
 /* Changes a value from fixed to unfixed, but keep the truth value */
 static inline samp_truth_value_t unfix_tval(samp_truth_value_t v) {
-	if (v == v_fixed_true) {
+	if (v == v_up_true) {
 		return v_true;
 	}
-	else if (v == v_fixed_false) {
+	else if (v == v_up_false) {
 		return v_false;
 	}
 	else {
@@ -124,10 +142,10 @@ static inline samp_truth_value_t negate_tval(samp_truth_value_t v){
 		return v_db_false;
 	case v_db_false:
 		return v_db_true;
-	case v_fixed_true:
-		return v_fixed_false;
-	case v_fixed_false:
-		return v_fixed_true;
+	case v_up_true:
+		return v_up_false;
+	case v_up_false:
+		return v_up_true;
 	default:
 		return v_undef;
 	}
@@ -167,10 +185,6 @@ static inline bool rule_clause_is_direct(rule_clause_t *rule_clause) {
 
 extern int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table);
 
-extern void copy_assignment_array(atom_table_t *atom_table);
-extern void restore_assignment_array(atom_table_t *atom_table);
-extern void unfix_assignment_array(atom_table_t *atom_table);
-
 extern inline void sort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 
 // Based on Bruno's sort_int_array - works on two arrays in parallel
@@ -182,8 +196,19 @@ extern void isort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n);
 /* Evaluates a clause to false (-1) or to the literal index evaluating to true. */
 extern int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause);
 
+static inline bool sat_clause(samp_truth_value_t *assignment, samp_clause_t *clause) {
+	return (eval_clause(assignment, clause) != -1);
+}
+
 /* Evaluates a rule instance to -1 if sat or the index of an unsat clause */
 extern int32_t eval_rule_inst(samp_truth_value_t *assignment, rule_inst_t *rinst);
+
+static inline bool sat_rule_inst(samp_truth_value_t *assignment, rule_inst_t *rinst) {
+	return (eval_rule_inst(assignment, rinst) == -1);
+}
+
+extern void copy_assignment_array(atom_table_t *atom_table);
+extern void restore_assignment_array(atom_table_t *atom_table);
 
 // The builtin binary predicates
 extern char* builtinop_string (int32_t bop);

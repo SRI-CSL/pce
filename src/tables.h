@@ -5,6 +5,7 @@
 #include "integer_stack.h"
 #include "vectors.h"
 #include "array_hash_map.h"
+#include "hash_map.h"
 
 #define INIT_SORT_TABLE_SIZE 64
 #define INIT_CONST_TABLE_SIZE 64
@@ -34,8 +35,8 @@ typedef enum {
 	v_undef = -1, /* undefined */
 	v_false = 0, /* false */
 	v_true = 1, /* true */
-	v_fixed_false = 2, /* false fixed by unit propagation */
-	v_fixed_true = 3, /* true fixed by unit propagation */
+	v_up_false = 2, /* false fixed by unit propagation */
+	v_up_true = 3, /* true fixed by unit propagation */
 	v_db_false = 4, /* false fixed by input db */
 	v_db_true = 5 /* true fixed by input db */
 } samp_truth_value_t;
@@ -204,26 +205,32 @@ typedef struct samp_atom_s {
 } samp_atom_t;
 
 typedef struct atom_table_s {
-	int32_t size; /* size of the var_atom array (double for watched) */
+	int32_t size; /* size of the var_atom array (double for watched clause lists) */
 	int32_t num_vars;  /* number of bvars */
-	int32_t num_unfixed_vars; /* number of unfixed vars */
-	samp_atom_t **atom;
-	bool *active; /* whether an atom is active */
-	int32_t *sampling_nums; /* number of samples BEFORE an atom is activated */
-	samp_truth_value_t *assignments[2]; /* maps atom ids to samp_truth_value_t */
-	uint32_t assignment_index; /* which of two assignment arrays is current */
-	samp_truth_value_t *assignment; /* the current assignment */
-	int32_t num_samples; /* current number of samples */
-	int32_t *pmodel; /* model count of each atom */
+	samp_atom_t **atom; /* the ground atom variables */
 	/* Maps atoms to indices in the table. Uses the predicate index + indices
 	 * of the arguments, an array with total length of arity + 1, as the key */
 	array_hmap_t atom_var_hash; 
+
+	bool *active; /* whether an atom is active */
+	samp_truth_value_t *assignments[2]; /* maps atom ids to samp_truth_value_t */
+	uint32_t assignment_index; /* which of two assignment arrays is current */
+	samp_truth_value_t *assignment; /* the current assignment */
+	int32_t num_unfixed_vars; /* number of unfixed vars */
+
+	int32_t num_samples; /* current number of samples */
+	int32_t *sampling_nums; /* number of samples BEFORE an atom is activated */
+	int32_t *pmodel; /* model count of each atom */
 } atom_table_t;
 
 /* a clause is an array of literals. */
 typedef struct samp_clause_s {
-	//bool *frozen; /* array indicating whether associated literal is frozen */
-	struct samp_clause_s *link; /* link to next clause for a given watched literal */
+	//struct samp_clause_s *prev; /* ptr to the previous clause */
+	//struct samp_clause_s *next; /* ptr to the next clause */
+	struct samp_clause_s *link; /* ptr to the next clause */
+	/* index of the rule that the clause belongs to, used for maxwalksat,
+	 * ~rule_index is the (num_lits)th literal of the clause */
+	int32_t rule_index;
 	int32_t num_lits;
 	samp_literal_t disjunct[0]; /* array of literals */
 } samp_clause_t;
@@ -245,31 +252,19 @@ typedef struct rule_inst_table_s {
 	int32_t size;   /* size of the rule_insts array */
 	int32_t num_rule_insts; /* number of rule instance entries */
 	rule_inst_t **rule_insts; /* array of rule instances */
-	bool *live; /* whether a rule instance is live or dead */
+	samp_truth_value_t *assignment; /* live or dead in mcsat, sat or unsat in mwsat */
 	bool soft_rules_included; /* is false for the initial sample SAT */
 
 	samp_clause_list_t *watched; /* maps literals to samp_clause pointers */
 	samp_clause_list_t sat_clauses; /* list of fixed satisfied clauses */
 	samp_clause_list_t unsat_clauses; /* list of unsat clauses, threaded through link */
 	samp_clause_list_t live_clauses; /* temperory list to store unscaned live clauses */
+
+	hmap_t unsat_soft_rules; /* unsat soft rule instances */
+	double unsat_weight; /* total weight of unsat soft rules */
+	/* clauses of a soft rule that need not to be sat when the rule is unsat */
+	samp_clause_list_t *rule_watched; 
 } rule_inst_table_t;
-
-/* Clauses stored in an array and also organized in several linked lists */
-//typedef struct clause_table_s {
-//	int32_t size;   /* size of the samp_clauses array */
-//	int32_t num_clauses; /* number of clause entries */
-//	samp_clause_t **samp_clauses; /* array of pointers to samp_clauses */
-//	array_hmap_t clause_hash; /* maps clauses to index in clause table */
-//
-//	samp_clause_list_t *watched; /* maps literals to samp_clause pointers */
-//	samp_clause_list_t sat_clauses; /* list of fixed satisfied clauses */
-//	samp_clause_list_t unsat_clauses; /* list of unsat clauses, threaded through link */
-//	samp_clause_list_t live_clauses; /* temperory list to store unscaned live clauses */
-//	samp_clause_list_t negative_or_unit_clauses; /* list of negative weight or unit  */
-//	samp_clause_list_t dead_clauses; /* list of unselected clauses */
-//	samp_clause_list_t dead_negative_or_unit_clauses; /* killed clauses */
-//} clause_table_t;
-
 
 /*
  * A rule is a clause with variables.  Instantiated forms of the rules are

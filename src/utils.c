@@ -75,40 +75,28 @@ int32_t str2int(char *cnst) {
 
 bool assigned_true_lit(samp_truth_value_t *assignment,
 		samp_literal_t lit){
-	if (is_pos(lit)){
-		return assigned_true(assignment[var_of(lit)]);
-	} else {
-		return assigned_false(assignment[var_of(lit)]);
-	}
+	return is_pos(lit) ?
+		assigned_true(assignment[var_of(lit)]) :
+		assigned_false(assignment[var_of(lit)]);
 }
 
 bool assigned_false_lit(samp_truth_value_t *assignment,
 		samp_literal_t lit){
-	if (is_pos(lit)){
-		return assigned_false(assignment[var_of(lit)]);
-	} else {
-		return assigned_true(assignment[var_of(lit)]);
-	}
+	return is_pos(lit) ?
+		assigned_false(assignment[var_of(lit)]) :
+		assigned_true(assignment[var_of(lit)]);
 }
 
 bool assigned_fixed_true_lit(samp_truth_value_t *assignment,
 		samp_literal_t lit){
-	samp_truth_value_t tval = assignment[var_of(lit)];
-	if (is_pos(lit)){
-		return (fixed_tval(tval) && assigned_true(tval));
-	} else {
-		return (fixed_tval(tval) && assigned_false(tval));
-	}
+	return fixed_tval(assignment[var_of(lit)]) &&
+		assigned_true_lit(assignment, lit);
 }
 
 bool assigned_fixed_false_lit(samp_truth_value_t *assignment,
 		samp_literal_t lit){
-	samp_truth_value_t tval = assignment[var_of(lit)];
-	if (is_pos(lit)){
-		return (fixed_tval(tval) && assigned_false(tval));
-	} else {
-		return (fixed_tval(tval) && assigned_true(tval));
-	}
+	return fixed_tval(assignment[var_of(lit)]) &&
+		assigned_false_lit(assignment, lit);
 }
 
 /* Returns the sort name of a constant */
@@ -235,37 +223,6 @@ int32_t samp_atom_index(samp_atom_t *atom, samp_table_t *table) {
 	}
 }
 
-void restore_assignment_array(atom_table_t *atom_table) {
-	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
-	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
-	int32_t i;
-	atom_table->num_unfixed_vars = 0;
-	for (i = 0; i < atom_table->num_vars; i++) {
-		if (unfixed_tval(atom_table->assignment[i])) {
-			atom_table->num_unfixed_vars++;
-		}
-	}
-}
-
-void copy_assignment_array(atom_table_t *atom_table) {
-	samp_truth_value_t *old_assignment = atom_table->assignment;
-	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
-	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
-	memcpy(atom_table->assignment, old_assignment, 
-			atom_table->num_vars * sizeof(samp_truth_value_t));
-}
-
-void unfix_assignment_array(atom_table_t *atom_table) {
-	atom_table->num_unfixed_vars = 0;
-	int32_t i;
-	for (i = 0; i < atom_table->num_vars; i++) {
-		atom_table->assignment[i] = unfix_tval(atom_table->assignment[i]);
-		if (unfixed_tval(atom_table->assignment[i])) {
-			atom_table->num_unfixed_vars++;
-		}
-	}
-}
-
 // insertion sort
 void isort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
 	uint32_t i, j;
@@ -373,6 +330,28 @@ int32_t eval_rule_inst(samp_truth_value_t *assignment, rule_inst_t *rinst) {
 		}
 	}
 	return -1;
+}
+
+/* Make a copy of the current assignment as a backup */
+void copy_assignment_array(atom_table_t *atom_table) {
+	samp_truth_value_t *old_assignment = atom_table->assignment;
+	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
+	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
+	memcpy(atom_table->assignment, old_assignment, 
+			atom_table->num_vars * sizeof(samp_truth_value_t));
+}
+
+/* Restore the backup assignment */
+void restore_assignment_array(atom_table_t *atom_table) {
+	atom_table->assignment_index ^= 1; // flip low order bit: 1 --> 0, 0 --> 1
+	atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
+	int32_t i;
+	atom_table->num_unfixed_vars = 0;
+	for (i = 0; i < atom_table->num_vars; i++) {
+		if (unfixed_tval(atom_table->assignment[i])) {
+			atom_table->num_unfixed_vars++;
+		}
+	}
 }
 
 bool eq (int32_t i, int32_t j) {
