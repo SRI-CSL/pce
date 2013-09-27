@@ -1,0 +1,56 @@
+Source File Descriptions
+------------------------
+
+1) Core source files
+
+tables.c			Data structure containing all the information of a Markov logic
+mcsat.c				Main entry
+mcmc.c				Implements MC-SAT, which calls SampleSAT and WalkSAT
+samplesat.c			Implements SampleSAT, which calls WalkSAT
+walksat.c			Implements WalkSAT and MaxWalkSAT, including the management
+					of atom assignments
+ground.c			Generates ground instances from quantified CNF formulas,
+					eagerly or lazily
+cnf.c				Converts a recursively defined input formula to a CNF formula
+input.c				Handles PCE commands, converts input data structures to
+					internal data structures
+parser.c
+yacc.y				YACC syntax definition of the PCE program
+print.c				Output of results, logs, and other information
+training_data.c		Loads the training data
+weight_learning.c	Weight learning of PCE
+xpce.c
+xpce-client.c
+
+
+2) Utility data structures and algorithms
+
+symbol_table.c
+clause_list.c		Data structure of a singly linked list of clauses, which is used
+					for organizing satisfied, watched, and unsatisfied clauses in
+					WalkSAT
+buffer.c			Buffers of PCE data structures to avoid repeated allocation and 
+					free of temperary variables
+array_hash_map.c	Hash map with arrays of integers as keys and integers as values
+hash_map.c			Hash map with integers as keys and integers as values, used for 
+					managing the unsatisfied auxiliary atoms for rules
+hash_functions.c
+int_array_sort.c
+vectors.c
+integer_stack.c		An integer stack, used for selecting a literal from an unsatisfied
+					clause in WalkSAT
+int_stack.c			How is it difference from integer_stack.c?
+string_heap.c
+memalloc.c			Safe memory allocation and free
+memsize.c
+gcd.c				Computes gcd of two integers
+utils.c				Other utility functions
+
+
+3) External libraries
+
+lbfgs.c				Limited memory BFGS
+arithmetic*			Used by LBFGS
+prng.h				Simple random number generator
+SFMT*				A better random number generator
+

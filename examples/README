@@ -1,0 +1,44 @@
+PCE Example Programs
+--------------------
+
+
+1) Simple test cases
+
+boys.pce			Boys born on Tuesday: An acquaintance tells you she has two
+					children, one is a boy born on tuesday. What is the
+					probability she has two boys?
+
+cancer.pce			Marginal probability of a person being smoking in a social
+					network.
+cancer3.pce			MAP inference for the same model of cancer.pce
+cancer4.pce			Example that illustrates a problem in lazy MC-SAT:
+					samples tend to stay on the lowest cost assignment, causing
+					the lowest cost assignment occupying more probability than
+					it should be.
+
+
+2) Test cases from alchemy tutorials
+
+The original datasets of alchemy are available at 
+http://alchemy.cs.washington.edu/alchemy1.html
+
+Each of these test cases is in a separate folder. Take webkb as an example,
+text-class.mln defines the MLN formulas, in which weights are unspecified and
+to be learned; text-class-train.db is the training data; text-class-test.db is
+the test data. We first use weight learning of alchmey, and text-class.mln and
+text-class-train.db as input, to get text-class-out.mln which includes the
+formulas with learned weights. Then we combine text-class-out.mln and
+text-class-test.db, and convert to PCE format (because in PCE, the Markov logic
+definition and the data are put in a single file), to get text-class.pce.
+
+dice/				Section 2 - The Basics
+smoking/			Section 3 - Social Network Analysis
+voting/				Section 4 - Logistic Regression
+webkb/				Section 5 - Text Classification
+cora/				Section 6 - Entity Resolution
+					Section 8 - Information Extraction
+traffic/			Section 7 - Hidden Markov Models
+dogsandcats/		Section 9 - Natural Language Processing
+robot/				Section 11 - Hybrid Domains
+epinion/			Section 12 - Decision Networks
+

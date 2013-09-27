@@ -1,0 +1,306 @@
+\documentclass{beamer}
+
+\usepackage{beamerthemesplit}
+%\usepackage{fancyvrb, relsize}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{alltt}
+\usepackage{relsize}
+\usepackage{verbatim}
+
+\newcommand{\argmax}{\operatornamewithlimits{argmax}}
+\newcommand{\Prob}{\mbox{Pr}}
+
+\title{Efficient Inference in Probabilistic Consistency Engine (PCE)}
+\author{Shangpu Jiang\\ Supervised by Dr. Natarajan Shankar}
+\date{\today}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\section[Outline]{}
+\frame{\tableofcontents}
+
+\section{Markov Logic}
+
+\begin{frame}{Markov Logic}
+
+  \begin{itemize}
+    \item A probabilistic first-order logic (FOL)
+    \item Knowledge Base (KB) is a set of weighted FOL formulas $W = \{\ldots(w_{i},F_{i})\ldots\}$
+    \item The probability of a truth assignment $x$ to the ground atoms:
+    \[
+      \Prob(X=x|w) = \frac{1}{Z(w)} \exp(\sum_i w_i n_i(x))
+    \]
+    where $w_i$ is the weight of $F_{i}$ (the $i$th formula in the KB) and
+    $n_i(X)$ is the number of true groundings of $F_{i}$ 
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{MAP/MPE Inference: MaxWalkSAT (Kautz et al. 1997)}
+
+	\begin{itemize}
+
+		\item MAP inference is a weighted satisfiability problem (MAX-SAT),
+			which can be solved by MaxWalkSAT
+
+		\item Tseitin-Transformation for CNF formulas with weight, e.g.,
+			$a \wedge (\neg b \vee c): w$ \\
+			$\Rightarrow (r: w) \wedge (\neg r \vee a) \wedge (\neg r \vee \neg b \vee c)$
+
+	\end{itemize}
+
+\end{frame}
+
+\begin{frame}{MAP/MPE Inference: MaxWalkSAT (Kautz et al. 1997)}
+	\begin{tabbing}
+		Ma\=xWalkSAT(\textit{clauses}, \textit{max-tries}, \textit{max-flips}, \textit{p})\\
+		\>\textbf{fo}\=\textbf{r} \textit{i} $\leftarrow$ 1 \textbf{to} \textit{max-tries} \textbf{do}\\
+		\>\>  \textit{solution} = random truth assignment\\
+		\>\>  \textbf{fo}\=\textbf{r} \textit{j} $\leftarrow$ 1 \textbf{to} \textit{max-flips} \textbf{do}\\
+		\>\>\>    \textbf{if}\= \ all \textit{clauses} satisfied \textbf{then}\\
+		\>\>\>\>      \textbf{return} \textit{solution}\\
+		\>\>\>    \textit{c} $\leftarrow$ random unsatisfied clause\\
+		\>\>\>    \textbf{with probability} \textit{p}\\
+		\>\>\>\>      flip a random variable in \textit{c}\\
+		\>\>\>    \textbf{else}\\
+		\>\>\>\>      flip variable in \textit{c} that minimizes the total cost\\
+		\>\>\>    \textbf{if}\= \ \textit{solution} \\
+		\> \textbf{return} failure, best \textit{solution} found\\
+	\end{tabbing}
+
+\end{frame}
+
+\begin{frame}{Probabilistic Inference: MC-SAT (Poon \& Domingos 2006)}
+
+	\begin{tabbing}
+		MC\=SAT(\textit{clauses}, \textit{weights}, \textit{num-samples})\\
+		\> $x^{(0)}$ $\leftarrow$ Satisfy(hard \textit{clauses}) \\
+		\>\textbf{fo}\=\textbf{r} \textit{i} $\leftarrow$ 1 \textbf{to} \textit{num-samples} \textbf{do}\\
+		\>\>  \textit{M} = $\emptyset$\\
+		\>\>  \textbf{fo}\=\textbf{r all} $c_k$ $\in$ \textit{clauses} satisfied by
+		$x^{(i-1)}$ \textbf{do}\\
+		\>\>\>    \textbf{wi}\=\textbf{th probability} $1 - e^{-w_k}$ add $c_k$ to
+		$M$\\
+		\>\> \textbf{end for}\\
+		\>\> Sample $x^{(i)} \sim U_{SAT(M)}$ (\=Random model for set $M$)\\
+		\> \textbf{end for}
+	\end{tabbing}
+
+\end{frame}
+
+\begin{frame}{Problem with MC-SAT}
+	\begin{itemize}
+		\item $(P(x): 10) \wedge (\neg P(x): 9)$
+		\item Proposed solution: Add a small perturbation to every sample before
+			choosing the formulas for the next sample
+		\item Still does not reflect the difference of the weights
+		\pause
+
+		\item Other solutions: a mixture of MC-SAT and Gibbs sampling
+
+	\end{itemize}
+\end{frame}
+
+\section{Lazy Inference}
+
+\begin{frame}{Lazy MaxWalkSAT}
+
+	\begin{itemize}
+		\item Most groundings of a predicate take a default truth value,
+			only a few need to be instantiated into memory. e.g., $Sm(x)$
+		\item Most groundings of a clause is satisfied by default. e.g.,
+			\[
+			Fr(x, y) \wedge Sm(x) \Rightarrow Sm(y)
+			\]
+		\item Only unsatisfied clauses are instantiated, e.g., $Fr(A, B)$,
+			given $Sm(A)$, or $Sm(B)$
+		\item No need for initial randomization
+	\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Lazy MC-SAT}
+	\begin{itemize}
+		\item Calls Lazy WalkSAT and Lazy SampleSAT
+
+		\item In Lazy SampleSAT, we need to randomize 1-hop neighborhood of
+			active atoms (different from Lazy WalkSAT)
+
+		\item When a clause is activated, we need to determine its membership
+			of the current set of formulas immediately
+
+	\end{itemize} \end{frame}
+
+\begin{frame}{Problems with Lazy MC-SAT}
+
+	\begin{itemize}
+
+		\item Sometimes everything will be grounded finally, e.g., $Fr(x, y)
+			\wedge Sm(x) \Rightarrow Sm(y)$
+
+		\item Default value assumption is violated: the default probability is
+			usually not 0/1
+
+			\begin{itemize}
+
+				\item When a prior is imposed, e.g., for $\neg Sm(x): 1$
+					everything needs to be instantiated to achieve sufficient
+					accuracy. 
+
+				\item The grounding strategy for MaxWalkSAT is not correct.
+					e.g., when $Fr(A, B)$, given $Sm(A)$ or $Sm(B)$
+
+			\end{itemize}
+
+	\end{itemize}
+
+\end{frame}
+
+\section{Examples}
+
+\begin{frame}{Example: Boy born on Tuesday}
+
+	\begin{quote}
+		\smaller{
+			An acquaintance tells you she has two children, one is a boy born on
+		tuesday.  What is the probability she has two boys?}
+	\end{quote}
+
+	\begin{itemize}
+		\item $\Prob(boy(A) \wedge boy(B))$ doesn't converge to the correct
+			answer (0.481) as the number of samples goes up
+		\item This suggests SampleSAT does not generate absolutely uniform
+			models
+		\item sa\_probability influences the uniformity
+	\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+
+	\begin{alltt}\smaller\smaller\smaller{
+|  0 | 0.5030 | (boy(A)) \& (boy(B)) 
+|  1 | 0.0340 | (boy(A)) \& (boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Tu)) 
+|  2 | 0.0388 | (boy(A)) \& (boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Mo))
+|  3 | 0.0383 | (boy(A)) \& (boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, We))
+|  4 | 0.0385 | (boy(A)) \& (boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Th))
+|  5 | 0.0384 | (boy(A)) \& (boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Fr))
+|  6 | 0.0364 | (boy(A)) \& (boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Sa))
+|  7 | 0.0402 | (boy(A)) \& (boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Su))
+|  8 | 0.0390 | (boy(A)) \& (boy(B)) \& (born\_on(A, Mo)) \& (born\_on(B, Tu))
+|  9 | 0.0381 | (boy(A)) \& (boy(B)) \& (born\_on(A, We)) \& (born\_on(B, Tu))
+| 10 | 0.0396 | (boy(A)) \& (boy(B)) \& (born\_on(A, Th)) \& (born\_on(B, Tu))
+| 11 | 0.0417 | (boy(A)) \& (boy(B)) \& (born\_on(A, Fr)) \& (born\_on(B, Tu))
+| 12 | 0.0393 | (boy(A)) \& (boy(B)) \& (born\_on(A, Sa)) \& (born\_on(B, Tu))
+| 13 | 0.0407 | (boy(A)) \& (boy(B)) \& (born\_on(A, Su)) \& (born\_on(B, Tu))
+| 14 | 0.0353 | (boy(A)) \& (~boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Mo))
+| 15 | 0.0366 | (boy(A)) \& (~boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Tu))
+| 16 | 0.0333 | (boy(A)) \& (~boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, We))
+| 17 | 0.0366 | (boy(A)) \& (~boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Th))
+| 18 | 0.0335 | (boy(A)) \& (~boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Fr))
+| 19 | 0.0361 | (boy(A)) \& (~boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Sa))
+| 20 | 0.0361 | (boy(A)) \& (~boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Su))
+| 21 | 0.0339 | (~boy(A)) \& (boy(B)) \& (born\_on(A, Mo)) \& (born\_on(B, Tu))
+| 22 | 0.0376 | (~boy(A)) \& (boy(B)) \& (born\_on(A, Tu)) \& (born\_on(B, Tu))
+| 23 | 0.0357 | (~boy(A)) \& (boy(B)) \& (born\_on(A, We)) \& (born\_on(B, Tu))
+| 24 | 0.0371 | (~boy(A)) \& (boy(B)) \& (born\_on(A, Th)) \& (born\_on(B, Tu))
+| 25 | 0.0355 | (~boy(A)) \& (boy(B)) \& (born\_on(A, Fr)) \& (born\_on(B, Tu))
+| 26 | 0.0346 | (~boy(A)) \& (boy(B)) \& (born\_on(A, Sa)) \& (born\_on(B, Tu))
+| 27 | 0.0351 | (~boy(A)) \& (boy(B)) \& (born\_on(A, Su)) \& (born\_on(B, Tu))
+		}
+	\end{alltt}
+
+\end{frame}
+
+\begin{frame}[fragile]{Example: Social Network}
+  
+	\begin{alltt}\smaller\smaller{
+		sort Person;
+		const Ann, Bob, Carl, Dee, Earl, Fran: Person;
+		predicate Fr(Person, Person) direct;
+		predicate Sm(Person) indirect;
+
+		assert Fr(Ann, Bob);
+		assert Fr(Bob, Carl);
+		assert Fr(Carl, Dee);
+		assert Fr(Dee, Earl);
+		assert Fr(Earl, Fran);
+		add [x, y] Fr(x, y) and Sm(x) implies Sm(y) 5;
+
+		ask Sm(Fran);
+		mcsat; dumptable atom;
+	}
+	\end{alltt}
+
+\end{frame}
+
+\begin{frame}[fragile]{Example: Social Network}
+
+	Eager inference:
+	\begin{alltt}\smaller\smaller{
+		| 36 |    3316 |    10000 | 0.3316 | Sm(Ann)
+		| 37 |    4213 |    10000 | 0.4213 | Sm(Bob)
+		| 38 |    4826 |    10000 | 0.4826 | Sm(Carl)
+		| 39 |    5296 |    10000 | 0.5296 | Sm(Dee)
+		| 40 |    5717 |    10000 | 0.5717 | Sm(Earl)
+		| 41 |    6731 |    10000 | 0.6731 | Sm(Fran)
+	}
+	\end{alltt}
+	
+	Lazy inference:
+	\begin{alltt}\smaller\smaller{
+		| 5 |    5037 |    10000 | 0.5037 | Sm(Fran)
+	}
+	\end{alltt}
+
+\end{frame}
+
+\begin{frame}[fragile]{Text Classification (WebKB)}
+
+	\begin{alltt}
+		\smaller\smaller\smaller{
+			sort word;
+			sort page;
+			sort class;
+
+			predicate HasWord(word,page) direct;
+			predicate Topic(class,page) indirect;
+
+			const 'abstract', ...: word;
+			const 'http://ccwf.cc.utexas.edu/~hksa/', ...: page;
+			const Course, Department, Faculty, Person, ResearchProject, Staff, Student : class;
+
+			assert HasWord('abstract','ftp://ftp.cs.utexas.edu/pub/bshults/ATP-tech-reports/INDEX.html');
+			...
+
+			add [a1] HasWord('abstract',a1) implies Topic(Course,a1) -0.192907;
+			add [a1] HasWord('academ',a1) implies Topic(Course,a1) 0.24151;
+			...
+
+			ask [a1,a2] Topic(a1,a2);
+			mcsat; dumptables qinst;
+		}
+	\end{alltt}
+
+\end{frame}
+
+\section{Future Work}
+
+\begin{frame}
+	\begin{itemize}
+
+		\item A mixture of MC-SAT and Gibbs sampling to alleviate the problem
+			of Markov logic with opposite high determinism
+
+		\item Correct activation of associated rules of a given atom in Lazy MC-SAT
+		\item A scheme of choosing a neighborhood network of {\em evidence} and
+			{\em queries} for efficient inference. e.g., $Fr(A, B): 100$, $Fr(A, C): 0.01$,
+			$\Prob(Sm(A)) = ?$
+	\end{itemize}
+
+\end{frame}
+
+\end{document}
