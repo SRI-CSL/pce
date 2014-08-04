@@ -74,7 +74,10 @@ static inline uint32_t jenkins_hash_string(const char * s) {
 /*
  * Hash of an array of signed integers, default seed,
  */
-static inline uint32_t jenkins_hash_intarray(const int32_t *d, uint32_t n) {
+// static inline uint32_t jenkins_hash_intarray(const int32_t *d, uint32_t n) {
+// Arg reversal?  Needs to be checked, but no longer segfaults - CC 8/4/2014
+
+static inline uint32_t jenkins_hash_intarray(uint32_t n, const int32_t *d) {
   return jenkins_hash_array((const uint32_t *) d, n, 0x17836abc);
 }
 

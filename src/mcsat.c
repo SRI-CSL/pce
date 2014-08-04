@@ -20,7 +20,9 @@
 #include <io.h>
 #endif
 
-#define VERSION "0.1"
+// What kind of versioning system should we have?
+
+#define VERSION "0.1.1"
 
 // Flags:
 //  -v num  -- sets verbosity level
