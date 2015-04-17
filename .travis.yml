@@ -1,0 +1,19 @@
+language: c
+
+compiler:
+  - clang
+  - gcc
+
+
+#dependencies
+install:
+  - sudo apt-get update
+  - sudo apt-get -y install autoconf bison libbison-dev  libjson-glib-dev
+  - export PCE_HOME=`pwd`
+
+script:
+  - mkdir -f configs
+  - autoconf && ./configure && make MODE=release lib 
+
+  
+
