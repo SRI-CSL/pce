@@ -6,4 +6,4 @@ curl --form token=ttATxr147wlvZLp1C0OO1g \
   --form file=@pce.tgz \
   --form version="PCE Head" \
   --form description="Probabablistic Consistency Engine" \
-  https://scan.coverity.com/builds?project=Probabilistic+Consistency+Engine
+  https://scan.coverity.com/builds?project=SRI-CSL%2Fpce
