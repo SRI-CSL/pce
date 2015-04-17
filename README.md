@@ -1,5 +1,5 @@
 
-[![Build Status](https://travis-ci.org/SRI-CSL/jel.svg?branch=master)](https://travis-ci.org/SRI-CSL/jel)
+[![Build Status](https://travis-ci.org/SRI-CSL/pce.svg?branch=master)](https://travis-ci.org/SRI-CSL/pce)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/2535/badge.svg)](https://scan.coverity.com/projects/2535)
 
 Content and Directory Structure
