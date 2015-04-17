@@ -1,0 +1,9 @@
+#!/bin/bash
+rm pce.tgz
+tar czvf pce.tgz cov-int
+curl --form token=ttATxr147wlvZLp1C0OO1g \
+  --form email=iam@csl.sri.com \
+  --form file=@pce.tgz \
+  --form version="PCE Head" \
+  --form description="Probabablistic Consistency Engine" \
+  https://scan.coverity.com/builds?project=Probabilistic+Consistency+Engine
