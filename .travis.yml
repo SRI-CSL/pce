@@ -12,7 +12,7 @@ install:
   - export PCE_HOME=`pwd`
 
 script:
-  - mkdir -f configs
+  - mkdir -p configs
   - autoconf && ./configure && make MODE=release lib 
 
   
