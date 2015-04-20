@@ -1,3 +1,7 @@
+
+[![Build Status](https://travis-ci.org/SRI-CSL/pce.svg?branch=master)](https://travis-ci.org/SRI-CSL/pce)
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/4869/badge.svg)](https://scan.coverity.com/projects/4869)
+
 Content and Directory Structure
 -------------------------------
 
