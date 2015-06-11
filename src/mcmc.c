@@ -15,6 +15,7 @@
 #include "buffer.h"
 #include "clause_list.h"
 #include "samplesat.h"
+#include "walksat.h"
 #include "mcmc.h"
 
 #ifdef _WIN32
