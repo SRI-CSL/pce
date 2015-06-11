@@ -8,7 +8,7 @@ compiler:
 #dependencies
 install:
   - sudo apt-get update
-  - sudo apt-get -y install autoconf bison libbison-dev  libjson-glib-dev
+  - sudo apt-get -y install autoconf bison libbison-dev  libjson-glib-dev liblbfgs-dev 
   - export PCE_HOME=`pwd`
 
 script:
