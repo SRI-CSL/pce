@@ -8,12 +8,11 @@ compiler:
 #dependencies
 install:
   - sudo apt-get update
-  - sudo apt-get -y install autoconf bison libbison-dev  libjson-glib-dev liblbfgs-dev 
+  - sudo apt-get -y install autoconf bison libbison-dev  libjson-glib-dev
+  - git clone git://github.com/chokkan/liblbfgs.git
+  - (cd liblbfgs; ./autogen.sh && ./configure && make && sudo make install)
   - export PCE_HOME=`pwd`
 
 script:
   - mkdir -p configs
-  - autoconf && ./configure && make MODE=release lib 
-
-  
-
+  - autoconf && ./configure && make MODE=release lib && make MODE=release bin
