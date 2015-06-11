@@ -638,7 +638,7 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight,
 			num_vars, atom_idx, arity;
 	rule_literal_t ***lits, *lit;
 	rule_clause_t *rule_clause;
-	bool found_indirect;
+	bool found_indirect = false;
 
 	/* Returns the literals, and sets the sort of the variables */
 	if (weight > -1e-8 && weight < 1e-8) {
