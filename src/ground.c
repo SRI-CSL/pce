@@ -468,10 +468,12 @@ static void add_rule_instance_to_rule(samp_rule_t *rule, substit_entry_t *substs
  * Returns -1 if there is a problem.
  */
 static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_table_t *table) {
+#ifndef NDEBUG  
 	const_table_t *const_table = &table->const_table;
+#endif
 	sort_table_t *sort_table = &table->sort_table;
 	sort_entry_t *sort_entry;
-	int32_t vsort, csort, csubst;
+	int32_t vsort;
 	int32_t i;
 	//bool found_indirect;
 
@@ -485,7 +487,9 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 
 	/* check if the constants are compatible with the sorts */
 	for (i = 0; i < rule->num_vars; i++) {
-		csubst = substs[i];
+#ifndef NDEBUG	  
+		int32_t csubst = substs[i];
+#endif		
 		/* Not enough constants, i given, rule->num_vars required */
 		assert(csubst != INT32_MIN);
 		vsort = rule->vars[i]->sort_index;
@@ -495,7 +499,9 @@ static int32_t substit_rule(samp_rule_t *rule, substit_entry_t *substs, samp_tab
 			assert(sort_entry->lower_bound <= csubst
 					&& csubst <= sort_entry->upper_bound);
 		} else {
-			csort = const_sort_index(substs[i], const_table);
+#ifndef NDEBUG
+			int32_t csort = const_sort_index(substs[i], const_table);
+#endif			
 			/* Constant/variable sorts do not match */
 			assert(subsort_p(csort, vsort, sort_table));
 		}
@@ -1262,7 +1268,9 @@ static bool check_query_instance(samp_query_t *query, samp_table_t *table) {
 					printf("\n");
 					fflush(stdout);
 				}
+#ifndef NDEBUG
 				int32_t atom_index = add_internal_atom(table, rule_inst_atom, false);
+#endif
 				assert(atom_index >= 0);
 
 				// check for witness predicate - fixed false if NULL atom_map
