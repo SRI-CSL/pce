@@ -98,7 +98,9 @@ static int32_t get_true_literal(
  */
 static void link_propagate(samp_table_t *table, samp_literal_t lit) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
+#ifndef NDEBUG
 	atom_table_t *atom_table = &table->atom_table;
+#endif	
 
 	/* the assignment of the lit has just changed to false */
 	assert(assigned_false_lit(atom_table->assignment, lit));
@@ -301,38 +303,38 @@ void insert_live_clause(samp_clause_t *clause, samp_table_t *table) {
  * FIXME This seems to be very similar to rescan_live_clauses, it can
  * be replaced by rescan_live_clauses
  */
-static int32_t unit_propagate(samp_table_t *table) {
-	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
-	atom_table_t *atom_table = &table->atom_table;
-	int32_t num_unfixed = 0;
+// static int32_t unit_propagate(samp_table_t *table) {
+// 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
+// 	atom_table_t *atom_table = &table->atom_table;
+// 	int32_t num_unfixed = 0;
 
-	samp_clause_t *cls;
-	while (num_unfixed < rule_inst_table->live_clauses.length) {
-		cls = clause_list_pop_head(&rule_inst_table->live_clauses);
+// 	samp_clause_t *cls;
+// 	while (num_unfixed < rule_inst_table->live_clauses.length) {
+// 		cls = clause_list_pop_head(&rule_inst_table->live_clauses);
 
-		int32_t fixable = get_fixable_literal(atom_table->assignment,
-				rule_inst_table->assignment, cls);
+// 		int32_t fixable = get_fixable_literal(atom_table->assignment,
+// 				rule_inst_table->assignment, cls);
 
-		if (fixable == cls->num_lits) {
-			mcsat_err("There is a fixed unsat clause, no model exists.");
-			return -1;
-		}
-		if (fixable == -2) {
-			num_unfixed++;
-			clause_list_insert_tail(cls, &rule_inst_table->live_clauses);
-		} else {
-			num_unfixed = 0;
-			clause_list_insert_tail(cls, &rule_inst_table->sat_clauses);
-			samp_literal_t lit = cls->disjunct[fixable];
-			if (unfixed_tval(atom_table->assignment[var_of(lit)])) {
-				fix_lit_true(table, lit);
-			}
-			assert(assigned_fixed_true_lit(atom_table->assignment, lit));
-		}
-	}
+// 		if (fixable == cls->num_lits) {
+// 			mcsat_err("There is a fixed unsat clause, no model exists.");
+// 			return -1;
+// 		}
+// 		if (fixable == -2) {
+// 			num_unfixed++;
+// 			clause_list_insert_tail(cls, &rule_inst_table->live_clauses);
+// 		} else {
+// 			num_unfixed = 0;
+// 			clause_list_insert_tail(cls, &rule_inst_table->sat_clauses);
+// 			samp_literal_t lit = cls->disjunct[fixable];
+// 			if (unfixed_tval(atom_table->assignment[var_of(lit)])) {
+// 				fix_lit_true(table, lit);
+// 			}
+// 			assert(assigned_fixed_true_lit(atom_table->assignment, lit));
+// 		}
+// 	}
 	
-	return 0;
-}
+// 	return 0;
+// }
 
 void init_live_clauses(samp_table_t *table) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
@@ -667,7 +669,7 @@ void mw_sat(samp_table_t *table, int32_t num_trials, double rvar_probability,
 		int32_t max_flips, uint32_t timeout) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
 	atom_table_t *atom_table = &table->atom_table;
-	int32_t i, j, k;
+	int32_t i, j;
 	time_t fintime;
 
 	if (timeout != 0) {
