@@ -144,7 +144,9 @@ static unsigned long get_pages(void) {
   }
 
   pages = 0;
-  fscanf(proc_file, "%lu", &pages); // if this fails, pages will remain 0
+  if (fscanf(proc_file, "%lu", &pages) != 1) {
+    pages = 0;
+  }
   fclose(proc_file);
 
   return pages;
