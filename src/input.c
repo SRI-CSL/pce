@@ -18,10 +18,12 @@
 #include "input.h"
 #include "buffer.h"
 #include "walksat.h"
+#include "weight_learning.h"
+#include "training_data.h"
 
-extern int yyparse();
+//extern int yyparse();
 extern void free_parse_data();
-extern int yydebug;
+//extern int yydebug;
 
 // MCSAT parameters
 #define DEFAULT_MAX_SAMPLES 100
@@ -1373,8 +1375,8 @@ extern bool read_eval(samp_table_t *table) {
 
 	case LEARN: {
 		// TODO WEIGHT LEARN
-		//input_add_fdecl_t decl = input_command.decl.add_fdecl;
-		//add_weighted_formula(table, &decl);
+		input_add_fdecl_t decl = input_command.decl.add_fdecl;
+		add_weighted_formula(table, &decl);
 
 		//dump_clause_table(table);
 		//dump_rule_table(table);
@@ -1382,21 +1384,21 @@ extern bool read_eval(samp_table_t *table) {
 	}
 	case TRAIN: {
 		// TODO WEIGHT LEARN
-		//input_train_decl_t decl = input_command.decl.train_decl;
-		//training_data_t *training_data = NULL;
+		input_train_decl_t decl = input_command.decl.train_decl;
+		training_data_t *training_data = NULL;
 
-		//if (decl.file != NULL) {
-		//	printf("Loading training data from: %s\n", decl.file);
-		//	training_data = parse_data_file(decl.file, table);
-		//} else {
-		//	printf("No training data was provided\n");
-		//}
-		//if (LBFGS_MODE) {
-		//	weight_training_lbfgs(training_data, table);
-		//} else {
-		//	gradient_ascent(training_data, table);
-		//}
-		//break;
+		if (decl.file != NULL) {
+			printf("Loading training data from: %s\n", decl.file);
+			training_data = parse_data_file(decl.file, table);
+		} else {
+			printf("No training data was provided\n");
+		}
+		if (LBFGS_MODE) {
+			weight_training_lbfgs(training_data, table);
+		} else {
+			gradient_ascent(training_data, table);
+		}
+		break;
 
 	}
 	//case ASK_CLAUSE: {
