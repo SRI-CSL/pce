@@ -76,9 +76,7 @@ AC_ARG_WITH([oaa],
     fi
    ])
 
-if test "x$liboaa" == x; then
-    AC_MSG_WARN([OAA not provided, pce will not be built (use --with-oaa if desired).])
-  else
+if test "x$liboaa" != x; then
     if test -f $liboaa/src/oaalib/c/include/liboaa.h; then
       if test $build == x86_64-unknown-linux-gnu; then
         oaalibdir=$liboaa/lib/x86-linux
