@@ -16,7 +16,7 @@
 #define YYDEBUG 1
 #define YYERROR_VERBOSE 1
 #define YYINCLUDED_STDLIB_H 1
-#define YYLTYPE_IS_TRIVIAL 0
+//#define YYLTYPE_IS_TRIVIAL 0
 
 extern void free_parse_data();
 
@@ -88,36 +88,14 @@ bool yy_check_int(char *str) {
   }
 }
 
-bool yy_check_float(char *str) {
-  bool have_digit = false;
-  bool have_dot = false;
-  int32_t i;
-  if (str[0] == '.' || str[0] == '+' || str[0] == '-' || isdigit(str[0])) {
-    if (str[0] == '.') {
-      have_dot = true;
-    } else if (isdigit(str[0])) {
-      have_digit = true;
-    }
-    for(i=1; str[i] != '\0'; i++){
-      if (isdigit(str[i])){
-        have_digit = true;
-      } else if (str[i] == '.') {
-        if (have_dot) {
-          yyerror("Number has two decimal points");
-          return false;
-        }
-        else
-          have_dot = true;
-      } else {
-        yyerror("Invalid floating point number");
-        return false;
-      }
-    }
-  } else {
-    yyerror("Invalid floating point number");
-    return false;
+bool yy_get_float(char *str) {
+  char *end;
+  double val;
+  val = strtod(str, &end);
+  if (end == str || end[0] != '\0') {
+    yyerror("Invalid floating point");
   }
-  return true;
+  return val;
 }
 
 input_sortdef_t *yy_sortdef(char *lbnd, char *ubnd) {
@@ -447,39 +425,33 @@ void yy_mcsat_params_decl (char **params) {
   }
   /* 1: sa_probability */
   if (arglen > 1 && strcmp(params[1], "") != 0) {
-    if (yy_check_float(params[1])) {
-      double prob = atof(params[1]);
-      if (0.0 <= prob && prob <= 1.0) {
-        input_command.decl.mcsat_params_decl.sa_probability = prob;
-      } else {
-        yyerror("sa_probability should be between 0.0 and 1.0");
-      }
+    double prob = yy_get_float(params[1]);
+    if (0.0 <= prob && prob <= 1.0) {
+      input_command.decl.mcsat_params_decl.sa_probability = prob;
+    } else {
+    yyerror("sa_probability should be between 0.0 and 1.0");
     }
   } else {
     input_command.decl.mcsat_params_decl.sa_probability = -1;
   }
   /* 2: sa_temperature */
   if (arglen > 2 && strcmp(params[2], "") != 0) {
-    if (yy_check_float(params[2])) {
-      double temp = atof(params[2]);
-      if (temp > 0.0) {
-        input_command.decl.mcsat_params_decl.sa_temperature = temp;
-      } else {
-        yyerror("sa_temperature should be greater than 0.0");
-      }
+    double temp = yy_get_float(params[2]);
+    if (temp > 0.0) {
+      input_command.decl.mcsat_params_decl.sa_temperature = temp;
+    } else {
+      yyerror("sa_temperature should be greater than 0.0");
     }
   } else {
     input_command.decl.mcsat_params_decl.sa_temperature = -1;
   }
   /* 3: rvar_probability */
   if (arglen > 3 && strcmp(params[3], "") != 0) {
-    if (yy_check_float(params[3])) {
-      double prob = atof(params[3]);
-      if (0.0 <= prob && prob <= 1.0) {
-        input_command.decl.mcsat_params_decl.rvar_probability = prob;
-      } else {
-        yyerror("rvar_probability should be between 0.0 and 1.0");
-      }
+    double prob = yy_get_float(params[3]);
+    if (0.0 <= prob && prob <= 1.0) {
+      input_command.decl.mcsat_params_decl.rvar_probability = prob;
+    } else {
+      yyerror("rvar_probability should be between 0.0 and 1.0");
     }
   } else {
     input_command.decl.mcsat_params_decl.rvar_probability = -1;
@@ -556,13 +528,11 @@ void yy_mwsat_params_decl (char **params) {
   }
   /* 1: rvar_probability */
   if (arglen > 1 && strcmp(params[1], "") != 0) {
-    if (yy_check_float(params[1])) {
-      double prob = atof(params[1]);
-      if (0.0 <= prob && prob <= 1.0) {
-        input_command.decl.mwsat_params_decl.rvar_probability = prob;
-      } else {
-        yyerror("rvar_probability should be between 0.0 and 1.0");
-      }
+    double prob = yy_get_float(params[1]);
+    if (0.0 <= prob && prob <= 1.0) {
+      input_command.decl.mwsat_params_decl.rvar_probability = prob;
+    } else {
+      yyerror("rvar_probability should be between 0.0 and 1.0");
     }
   } else {
     input_command.decl.mwsat_params_decl.rvar_probability = -1;
@@ -778,8 +748,8 @@ cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | ASSERT {$$ = ASSERT;} | ADD {$$ = ADD;} | ADD_CLAUSE {$$ = ADD_CLAUSE;}
      | ASK {$$ = ASK;}
      //| ASK_CLAUSE {$$ = ASK_CLAUSE;}
-     | MCSAT {$$ = MCSAT;} | MCSAT_PARAMS {$$ = MCSAT_PARAMS}
-     | MWSAT {$$ = MWSAT;} | MWSAT_PARAMS {$$ = MWSAT_PARAMS}
+     | MCSAT {$$ = MCSAT;} | MCSAT_PARAMS {$$ = MCSAT_PARAMS;}
+     | MWSAT {$$ = MWSAT;} | MWSAT_PARAMS {$$ = MWSAT_PARAMS;}
      | RESET {$$ = RESET;} | RETRACT {$$ = RETRACT;} | DUMPTABLE {$$ = DUMPTABLE;}
      | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
      | LEARN {$$ = LEARN;} |  TRAIN {$$ = TRAIN;};
