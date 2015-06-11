@@ -57,11 +57,18 @@ typedef struct pseudo_log_likelihood_stats_s
 	int32_t num_vars;
 
 	// the number of clauses belonging to each variable
-	int32_t *clause_cnts;
+	//int32_t *clause_cnts;
 
 	// the pointers to clauses belonging to each variable
 	// needed to find the Markov blanket of the variable
-	samp_clause_t ***clauses;
+	//samp_clause_t ***clauses;
+	
+	// the number of rule_insts belonging to each variable
+	int32_t *rule_inst_cnts;
+	
+	// the pointers to rule_insts belonging to each variable
+	// needed to find the Markov blanket of the variable
+	rule_inst_t ***rule_insts;
 
 	// pseudo likelihood of each variable in each training set
 	double **pseudo_likelihoods;
@@ -102,7 +109,8 @@ typedef struct covariance_matrix_s {
 // contains a non-ground rule or ground clause
 typedef union clausified_formula_s {
 	struct samp_rule_s* rule;
-	struct samp_clause_s* clause;
+	struct rule_inst_s* rule_inst;
+	//struct samp_clause_s* clause;
 } clausified_formula_t;
 
 // the ground clauses belonging to the weighted FOL formula
@@ -196,7 +204,7 @@ void compute_pseudo_log_likelihood_statistics(training_data_t* training_data,
 double objective_expert();
 double objective_data();
 
-void set_formula_weight(weighted_formula_t *weighted_formula, double x);
+//void set_formula_weight(weighted_formula_t *weighted_formula, double x);
 void set_formula_weight_lbfgs(weighted_formula_t *weighted_formula, lbfgsfloatval_t x);
 
 void set_subjective_probabilities_available();

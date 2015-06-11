@@ -129,11 +129,12 @@ extern void print_weighted_formula(weighted_formula_t *weighted_formula,
 			weighted_formula->subjective_probability,
 			weighted_formula->data_expected_value);
 	if (weighted_formula->is_ground) {
-		print_clause(weighted_formula->clausified_formula.clause, table);
+		print_rule_instance(weighted_formula->clausified_formula.rule_inst, table);
 	} else {
-		rule_literal_t *lit;
 		int32_t j;
 		samp_rule_t* rule = weighted_formula->clausified_formula.rule;
+		//rule_inst_t* rule_inst = weighted_formula->clausified_formula.rule_inst;
+		//rule_clause_t* clause;
 
 		if (rule->num_vars > 0) {
 			for (j = 0; j < rule->num_vars; j++) {
@@ -142,13 +143,12 @@ extern void print_weighted_formula(weighted_formula_t *weighted_formula,
 			}
 			output(")");
 		}
-		for (j = 0; j < rule->num_lits; j++) {
-			j == 0 ? output("   ") : output(" | ");
-			lit = rule->literals[j];
-			if (lit->neg)
-				output("~");
-			print_rule_atom(lit->atom, lit->neg, rule->vars, table, 0);
-		}
+		print_rule(rule, table, 0);
+		// for (i = 0; i < rule->num_clauses; i++) {
+		// 	i == 0 ? output("   ") : output(" & ");
+		// 	clause = rule->clauses[i];
+		// 	print_rule_clause(rule, clause, table, 0);
+		//}
 	}
 	output("\n");
 }
@@ -251,15 +251,16 @@ extern void add_weighted_formula(samp_table_t* table, input_add_fdecl_t* decl) {
 	}
 
 	int32_t rule_cnt = table->rule_table.num_rules;
-	int32_t clause_cnt = table->clause_table.num_clauses;
+	//int32_t rule_inst_cnt = table->rule_inst_table.num_rule_insts;
+	//rule_inst_t **rule_inst = table->rule_inst_table.rule_insts;
 
 	// To monitor which clauses were added
 	// TODO: implement this in a decent way
-	double clause_weights[clause_cnt];
+	//double rule_weights[rule_inst_cnt];
 	int32_t i;
-	for (i = 0; i < clause_cnt; i++) {
-		clause_weights[i] = table->clause_table.samp_clauses[i]->weight;
-	}
+	// for (i = 0; i < rule_inst_cnt; i++) {
+	//     rule_weights[i] = table->rule_inst_table.rule_insts[i]->weight;
+	// }
 	cprintf(2, "Clausifying and adding formula for LEARN\n");
 	add_cnf(decl->frozen, decl->formula, decl->weight, decl->source, true);
 
@@ -267,26 +268,31 @@ extern void add_weighted_formula(samp_table_t* table, input_add_fdecl_t* decl) {
 		// rule was not ground
 		weighted_formula->is_ground = false;
 		weighted_formula->clausified_formula.rule
-				= table->rule_table.samp_rules[table->rule_table.num_rules - 1];
+			= table->rule_table.samp_rules[table->rule_table.num_rules - 1];
 	} else {
 		weighted_formula->is_ground = true;
-		weighted_formula->clausified_formula.clause
-				= table->clause_table.samp_clauses[table->clause_table.num_clauses
-						- 1];
-	}
-
-	for (i = 0; i < table->clause_table.num_clauses; i++) {
-		samp_clause_t* clause = table->clause_table.samp_clauses[i];
-		if (i >= clause_cnt) { // clause has just been added  to the clause table, it must belong to the formula to be trained
+		weighted_formula->clausified_formula.rule_inst
+			= table->rule_inst_table.rule_insts[table->rule_inst_table.num_rule_insts - 1];
+		for (i = 0; i < weighted_formula->clausified_formula.rule_inst->num_clauses; i++) {
+			samp_clause_t* clause = weighted_formula->clausified_formula.rule_inst->conjunct[i];
+			print_rule_instance(weighted_formula->clausified_formula.rule_inst, table);
 			add_ground_clause_to_weighted_formula(weighted_formula, clause);
-		} else {
-			if (clause->weight != clause_weights[i]) {
-				// the clause's weight has changed, it must belong to the formula to be trained
-				add_ground_clause_to_weighted_formula(weighted_formula, clause);
-			}
 		}
-
 	}
+
+	// for (i = 0; i < table->rule_inst_table.num_rule_insts; i++) {
+	// 	rule_inst_t* rule_inst = table->rule_inst_table.rule_insts[i];
+	// 	for (j = 0; j < rule_inst.num_clauses; j++) {
+	// 	if (i >= clause_cnt) { // clause has just been added  to the clause table, it must belong to the formula to be trained
+	// 		add_ground_clause_to_weighted_formula(weighted_formula, clause);
+	// 	} else {
+	// 		if (clause->weight != clause_weights[i]) {
+	// 			// the clause's weight has changed, it must belong to the formula to be trained
+	// 			add_ground_clause_to_weighted_formula(weighted_formula, clause);
+	// 		}
+	// 	}
+
+	// }
 
 }
 
@@ -341,7 +347,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 		init_covariance_matrix();
 	}
 	if (training_data_available  && USE_PLL) {
-		initialize_pll_stats(training_data, &pll_stats, &table->clause_table);
+		initialize_pll_stats(training_data, &pll_stats, &table->rule_inst_table);
 	}
 
 	double gradient[num_weighted_formulas];
@@ -422,11 +428,11 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 			ground_clause_t *ground_clause =
 					weighted_formula->ground_clause_list;
 			while (ground_clause != NULL) {
-				if (ground_clause->clause->weight != 0) // if not hard clause change its weight
-				{
-					ground_clause->clause->weight += delta_weight;
-					//TODO: change the value if we get 0.0
-				}
+				// if (weighted_formula->weight != 0) // if not hard clause change its weight
+				// {
+				// 	ground_clause->clause->weight += delta_weight;
+				// 	//TODO: change the value if we get 0.0
+				// }
 				ground_clause = ground_clause->next;
 			}
 			// Set the rule's weight if it is not a ground clause
@@ -602,7 +608,7 @@ extern void weight_training_lbfgs(training_data_t *data, samp_table_t* table) {
 	}
 
 	if (training_data_available  && USE_PLL) {
-		initialize_pll_stats(training_data, &pll_stats, &table->clause_table);
+		initialize_pll_stats(training_data, &pll_stats, &table->rule_inst_table);
 	}
 
 	x = lbfgs_malloc(num_weighted_formulas);
@@ -1136,7 +1142,7 @@ void add_training_data(training_data_t *training_data) {
 				for (ground_clause = weighted_formula->ground_clause_list; ground_clause
 						!= NULL; ground_clause = ground_clause->next) {
 					clause = ground_clause->clause;
-					for (j = 0; j < clause->numlits; ++j) {
+					for (j = 0; j < clause->num_lits; ++j) {
 						positive = is_pos(clause->disjunct[j]);
 						var = var_of(clause->disjunct[j]);
 						if (positive ? training_data->evidence_atoms[i][var].truth_value
@@ -1155,7 +1161,7 @@ void add_training_data(training_data_t *training_data) {
 				for (ground_clause = weighted_formula->ground_clause_list; ground_clause
 						!= NULL; ground_clause = ground_clause->next) {
 					clause = ground_clause->clause;
-					for (j = 0; j < clause->numlits; ++j) {
+					for (j = 0; j < clause->num_lits; ++j) {
 						positive = is_pos(clause->disjunct[j]);
 						var = var_of(clause->disjunct[j]);
 						if (positive ? training_data->evidence_atoms[i][var].truth_value
@@ -1175,7 +1181,7 @@ void add_training_data(training_data_t *training_data) {
 			for (ground_clause = weighted_formula->ground_clause_list; ground_clause
 					!= NULL; ground_clause = ground_clause->next) {
 				clause = ground_clause->clause;
-				for (j = 0; j < clause->numlits; ++j) {
+				for (j = 0; j < clause->num_lits; ++j) {
 					positive = is_pos(clause->disjunct[j]);
 					var = var_of(clause->disjunct[j]);
 					if (positive ? training_data->evidence_atoms[i][var].truth_value
@@ -1203,7 +1209,7 @@ void add_training_data(training_data_t *training_data) {
 void initialize_pll_stats(training_data_t* training_data,
 		pseudo_log_likelihood_stats_t *pll_stats, rule_inst_table_t *rule_inst_table) {
 	int32_t i, j, k;
-	rule_inst_t *rinst;
+	rule_inst_t *rule_inst;
 	samp_clause_t *clause;
 	samp_bvar_t var;
 
@@ -1216,30 +1222,36 @@ void initialize_pll_stats(training_data_t* training_data,
 		counters[i] = 0;
 	}
 
-	for (j = 0; j < clause_table->num_clauses; ++j) {
-		clause = clause_table->samp_clauses[j];
-		for (k = 0; k < clause->numlits; ++k) {
-			var = var_of(clause->disjunct[k]);
-			counters[var]++;
+	for (i = 0; i < rule_inst_table->num_rule_insts; ++i) {
+		rule_inst = rule_inst_table->rule_insts[i];
+		for (j = 0; j < rule_inst->num_clauses; ++j) {
+			clause = rule_inst->conjunct[j];
+			for (k = 0; k < clause->num_lits; ++k) {
+				var = var_of(clause->disjunct[k]);
+				counters[var]++;
+			}
 		}
 	}
 
-	pll_stats->clause_cnts = (int32_t*) safe_malloc(
+	pll_stats->rule_inst_cnts = (int32_t*) safe_malloc(
 			pll_stats->num_vars * sizeof(int32_t));
-	pll_stats->clauses = (samp_clause_t***) safe_malloc(
-			pll_stats->num_vars * sizeof(samp_clause_t**));
+	pll_stats->rule_insts = (rule_inst_t***) safe_malloc(
+			pll_stats->num_vars * sizeof(rule_inst_t**));
 	for (i = 0; i < pll_stats->num_vars; ++i) {
-		pll_stats->clauses[i] = (samp_clause_t**) safe_malloc(
-				counters[i] * sizeof(samp_clause_t*));
-		pll_stats->clause_cnts[i] = counters[i];
+		pll_stats->rule_insts[i] = (rule_inst_t**) safe_malloc(
+				counters[i] * sizeof(rule_inst_t*));
+		pll_stats->rule_inst_cnts[i] = counters[i];
 		counters[i] = 0;
 	}
 
-	for (j = 0; j < clause_table->num_clauses; ++j) {
-		clause = clause_table->samp_clauses[j];
-		for (k = 0; k < clause->numlits; ++k) {
-			var = var_of(clause->disjunct[k]);
-			pll_stats->clauses[var][counters[var]++] = clause;
+	for (i = 0; i < rule_inst_table->num_rule_insts; ++i) {
+		rule_inst = rule_inst_table->rule_insts[i];
+		for (j = 0; j < rule_inst->num_clauses; ++j) {
+			clause = rule_inst->conjunct[j];
+			for (k = 0; k < clause->num_lits; ++k) {
+				var = var_of(clause->disjunct[k]);
+				pll_stats->rule_insts[var][counters[var]++] = rule_inst;
+			}
 		}
 	}
 
@@ -1265,10 +1277,10 @@ void free_pll_stats_fields(pseudo_log_likelihood_stats_t *pll_stats) {
 	int i;
 
 	for (i = 0; i < pll_stats->num_vars; ++i) {
-		safe_free(pll_stats->clauses[i]);
+		safe_free(pll_stats->rule_insts[i]);
 	}
-	safe_free(pll_stats->clauses);
-	safe_free(pll_stats->clause_cnts);
+	safe_free(pll_stats->rule_insts);
+	safe_free(pll_stats->rule_inst_cnts);
 
 	for (i = 0; i < pll_stats->training_sets; ++i) {
 		safe_free(pll_stats->pseudo_likelihoods[i]);
@@ -1320,12 +1332,13 @@ double objective_data() {
 // P(X_l| MB(X_l)), P(X_l = 0 | MB(X_l)) and P(X_l = 1 | MB(X_l)) values for every data set
 void compute_pseudo_log_likelihood_statistics(training_data_t* training_data,
 		pseudo_log_likelihood_stats_t* pll_stats) {
-	int i, j, k, l;
-	samp_clause_t *clause;
+	int i, j, k, l, m;
+	rule_inst_t *rule_inst;
 	double pos_weights, neg_weights;
 	double normalization;
 	bool positive;
 	samp_bvar_t var;
+	samp_clause_t *clause;
 
 	for (i = 0; i < pll_stats->training_sets; ++i) {
 		for (j = 0; j < pll_stats->num_vars; ++j) {
@@ -1340,37 +1353,43 @@ void compute_pseudo_log_likelihood_statistics(training_data_t* training_data,
 					training_data->evidence_atoms[i][j].truth_value;
 
 			training_data->evidence_atoms[i][j].truth_value = ev_false;
-			for (k = 0; k < pll_stats->clause_cnts[j]; ++k) {
-				clause = pll_stats->clauses[j][k];
+			for (k = 0; k < pll_stats->rule_inst_cnts[j]; ++k) {
+				rule_inst = pll_stats->rule_insts[j][k];
 
-				for (l = 0; l < clause->numlits; ++l) {
-					positive = is_pos(clause->disjunct[l]);
-					var = var_of(clause->disjunct[l]);
-					if (positive ? training_data->evidence_atoms[i][var].truth_value
-							== ev_true
-							: training_data->evidence_atoms[i][var].truth_value
+				for (l = 0; l < rule_inst->num_clauses; ++l) {
+					clause = rule_inst->conjunct[l];
+					for (m = 0; m < clause->num_lits; ++m) {
+						positive = is_pos(clause->disjunct[m]);
+						var = var_of(clause->disjunct[l]);
+						if (positive ? training_data->evidence_atoms[i][var].truth_value
+						    == ev_true
+						    : training_data->evidence_atoms[i][var].truth_value
 									== ev_false) {
 						// clause is satisfied
-						neg_weights += clause->weight;
+						neg_weights += rule_inst->weight;
 						break;
+						}
 					}
 				}
 			}
 
 			training_data->evidence_atoms[i][j].truth_value = ev_true;
-			for (k = 0; k < pll_stats->clause_cnts[j]; ++k) {
-				clause = pll_stats->clauses[j][k];
+			for (k = 0; k < pll_stats->rule_inst_cnts[j]; ++k) {
+				rule_inst = pll_stats->rule_insts[j][k];
 
-				for (l = 0; l < clause->numlits; ++l) {
-					positive = is_pos(clause->disjunct[l]);
-					var = var_of(clause->disjunct[l]);
-					if (positive ? training_data->evidence_atoms[i][var].truth_value
-							== ev_true
-							: training_data->evidence_atoms[i][var].truth_value
-									== ev_false) {
-						// clause is satisfied
-						pos_weights += clause->weight;
-						break;
+				for (l = 0; l < rule_inst->num_clauses; ++l) {
+					clause = rule_inst->conjunct[l];
+					for (m = 0; m < clause->num_lits; ++m) {
+						positive = is_pos(clause->disjunct[l]);
+						var = var_of(clause->disjunct[l]);
+						if (positive ? training_data->evidence_atoms[i][var].truth_value
+						    == ev_true
+						    : training_data->evidence_atoms[i][var].truth_value
+						    == ev_false) {
+							// clause is satisfied
+							pos_weights += rule_inst->weight;
+							break;
+						}
 					}
 				}
 			}
@@ -1395,40 +1414,40 @@ void compute_pseudo_log_likelihood_statistics(training_data_t* training_data,
 	}
 }
 
-void set_formula_weight(weighted_formula_t *weighted_formula, double x) {
-	double delta_weight = x - weighted_formula->weight;
-	weighted_formula->weight = x;
+// void set_formula_weight(weighted_formula_t *weighted_formula, double x) {
+// 	double delta_weight = x - weighted_formula->weight;
+// 	weighted_formula->weight = x;
 
-	// update the weight of all the ground clauses belonging to the formula
-	ground_clause_t *ground_clause = weighted_formula->ground_clause_list;
-	while (ground_clause != NULL) {
-		if (ground_clause->clause->weight != 0) // if not hard clause change its weight
-		{
-			ground_clause->clause->weight += delta_weight;
-		}
-		ground_clause = ground_clause->next;
-	}
-	// Set the rule's weight if it is not a ground clause
-	if (!weighted_formula->is_ground) {
-		weighted_formula->clausified_formula.rule->weight
-				= weighted_formula->weight;
-	}
-}
+// 	// update the weight of all the ground clauses belonging to the formula
+// 	ground_clause_t *ground_clause = weighted_formula->ground_clause_list;
+// 	while (ground_clause != NULL) {
+// 		if (ground_clause->clause->weight != 0) // if not hard clause change its weight
+// 		{
+// 			ground_clause->clause->weight += delta_weight;
+// 		}
+// 		ground_clause = ground_clause->next;
+// 	}
+// 	// Set the rule's weight if it is not a ground clause
+// 	if (!weighted_formula->is_ground) {
+// 		weighted_formula->clausified_formula.rule->weight
+// 				= weighted_formula->weight;
+// 	}
+// }
 
 void set_formula_weight_lbfgs(weighted_formula_t *weighted_formula,
 		lbfgsfloatval_t x) {
-	double delta_weight = x - weighted_formula->weight;
+	//double delta_weight = x - weighted_formula->weight;
 	weighted_formula->weight = x;
 
 	// update the weight of all the ground clauses belonging to the formula
-	ground_clause_t *ground_clause = weighted_formula->ground_clause_list;
-	while (ground_clause != NULL) {
-		if (ground_clause->clause->weight != 0) // if not hard clause change its weight
-		{
-			ground_clause->clause->weight += delta_weight;
-		}
-		ground_clause = ground_clause->next;
-	}
+	//ground_clause_t *ground_clause = weighted_formula->ground_clause_list;
+	// while (ground_clause != NULL) {
+	// 	if (ground_clause->clause->weight != 0) // if not hard clause change its weight
+	// 	{
+	// 		ground_clause->clause->weight += delta_weight;
+	// 	}
+	// 	ground_clause = ground_clause->next;
+	// }
 	// Set the rule's weight if it is not a ground clause
 	if (!weighted_formula->is_ground) {
 		weighted_formula->clausified_formula.rule->weight
