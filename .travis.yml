@@ -9,8 +9,10 @@ compiler:
 install:
   - sudo apt-get update
   - sudo apt-get -y install autoconf bison libbison-dev  libjson-glib-dev
-  - git clone git://github.com/chokkan/liblbfgs.git
-  - (cd liblbfgs; ./autogen.sh && ./configure && make && sudo make install)
+  - wget http://ubuntu.mirrors.wvstateu.edu/pool/universe/libl/liblbfgs/liblbfgs0_1.10-5_amd64.deb
+  - sudo dpkg -i liblbfgs0_1.10-5_amd64.deb
+  - wget http://ubuntu.mirrors.wvstateu.edu/pool/universe/libl/liblbfgs/liblbfgs-dev_1.10-5_amd64.deb
+  - sudo dpkg -i liblbfgs-dev_1.10-5_amd64.deb
   - export PCE_HOME=`pwd`
 
 script:
