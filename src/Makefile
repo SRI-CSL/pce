@@ -46,10 +46,17 @@ src_c := array_hash_map.c cnf.c gcd.c hash_functions.c input.c \
          clause_list.c hash_map.c walksat.c \
          weight_learning.c training_data.c
 
+#
+# Cheap way to disable xpce on MacOSX (CC):
+#
+ifeq ($(POSIXOS),darwin)
+XMLRPC_SERVER_LIBS := 
+endif
+
+
 ifneq ($(XMLRPC_SERVER_LIBS),)
 src_c := $(src_c) xpce.c test-xpce.c test-xpce2.c xpce-client.c
 endif
-
 
 #
 # additional source files for the binary

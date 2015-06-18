@@ -22,12 +22,21 @@
 #include "memalloc.h"
 #include "vectors.h"
 #include "utils.h"
+#include "buffer.h"
 #include "print.h"
 #include "input.h"
 #include "parser.h"
 #include "cnf.h"
 #include "xpce.h"
 #include "SFMT.h"
+
+#if 1
+static bool output_to_string = false;
+
+static string_buffer_t output_buffer = {0, 0, NULL};
+static string_buffer_t error_buffer = {0, 0, NULL};
+static string_buffer_t warning_buffer = {0, 0, NULL};
+#endif
 
 extern int yyparse ();
 
@@ -917,9 +926,13 @@ xpce_mcsat(xmlrpc_env * const envP,
   // No need to parse, just run MCSAT and return warnings or errors
   pthread_mutex_lock(&mutex);
   if (lazy_mcsat()) {
+#if 0
     lazy_mc_sat(&samp_table, get_max_samples(), get_sa_probability(),
 		get_sa_temperature(), get_rvar_probability(),
 		get_max_flips(), get_max_extra_flips(), get_mcsat_timeout());
+#else
+    cprintf(0, "In xpce_mcsat:\n  lazy_mc_sat(...) is not available!\n");
+#endif
   } else {
     mc_sat(&samp_table, get_max_samples(), get_sa_probability(),
 	   get_sa_temperature(), get_rvar_probability(),
