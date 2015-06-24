@@ -23,10 +23,13 @@
 #define MAX_LBFGS_RANDOM_STEP_SIZE 0.5
 #define MAX_LBFGS_RANDOM_WALK_ATTEMPTS 30
 
-// for gradient ascent
+// for gradient ascent - all of these are now set in input.c, but
+// we still use these #defines:
+
 #define WEIGHT_LEARNING_RATE 0.1
 #define STOPPING_ERROR 0.001
 #define MAX_IT 10000
+
 // use pseudo-loglikelihood, note that L-BFGS should always use PLL
 #define USE_PLL 0
 

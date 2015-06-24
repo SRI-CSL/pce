@@ -328,6 +328,10 @@ extern void initialize_weighted_formulas(samp_table_t* table) {
 
 // The gradient ascent algorithm.
 extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
+  double learning_rate = get_weightlearn_rate();
+  double stopping_error = get_weightlearn_min_error();
+  int max_iter = get_weightlearn_max_iter();
+  int reporting = get_weightlearn_reporting();
 	double error = 0.0;
 	int it = 0;
 	int i, j;
@@ -339,6 +343,9 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 
 	set_subjective_probabilities_available();
 	set_num_weighted_formulas();
+
+	output("train_params: max_iter=%d, stopping_error=%f, learning_rate=%f\n",
+	       max_iter, stopping_error, learning_rate);
 
 	if (training_data_available) {
 		add_training_data(training_data);
@@ -405,7 +412,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 			}
 	    }
 
-		if (it % 100 == 0) {
+		if (it % reporting == 0) {
 			output("it=%d\n", it);
 		}
 
@@ -419,7 +426,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 					- weighted_formula->sampled_expected_value;
 
 			diff = gradient[i];
-			double delta_weight = WEIGHT_LEARNING_RATE / (1.0 + log(
+			double delta_weight = learning_rate / (1.0 + log(
 					(double) (it + 1))) * (diff
 			//- 0.01* weighted_formula->weight
 					);
@@ -447,7 +454,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 			// error += new_diff > 0 ? new_diff : -new_diff;
 			//					previous_weights[k] =  weighted_formula->sampled_expected_value;;
 			//			reset_weighted_formula(weighted_formula);
-			if (it % 100 == 0) {
+			if (it % reporting == 0) {
 				double avg = 0.0;
 				for (j = 0; j < K; ++j) {
 					avg += last_K_expected_values[i][j];
@@ -466,7 +473,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 			free_samp_query(query_table->query[i]);
 		}
 		query_table->num_queries = 0;
-		if (it % 100 == 0) {
+		if (it % reporting == 0) {
 			output("error=%f\n", error);
 		}
 
@@ -476,7 +483,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 
 		it++;
 
-	} while (error > STOPPING_ERROR && it < MAX_IT);
+	} while (error > stopping_error && it < max_iter);
 	output("\n\nAfter weight learning:\n");
 	output("error=%f\tit=%d\n", error, it);
 

@@ -37,6 +37,10 @@ extern void free_parse_data();
 #define DEFAULT_SAMP_INTERVAL 1
 #define DEFAULT_NUM_TRIALS 100
 #define DEFAULT_MWSAT_TIMEOUT 0
+#define DEFAULT_WEIGHTLEARN_MAX_ITER 1000;
+#define DEFAULT_WEIGHTLEARN_MIN_ERROR 0.001;
+#define DEFAULT_WEIGHTLEARN_RATE 0.1;
+#define DEFAULT_WEIGHTLEARN_REPORTING 100;
 
 static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 static double sa_probability = DEFAULT_SA_PROBABILITY;
@@ -49,6 +53,11 @@ static int32_t burn_in_steps = DEFAULT_BURN_IN_STEPS;
 static int32_t samp_interval = DEFAULT_SAMP_INTERVAL;
 static int32_t num_trials = DEFAULT_NUM_TRIALS;
 static int32_t mwsat_timeout = DEFAULT_MWSAT_TIMEOUT;
+
+static int32_t weightlearn_max_iter = DEFAULT_WEIGHTLEARN_MAX_ITER;
+static double weightlearn_min_error = DEFAULT_WEIGHTLEARN_MIN_ERROR;
+static double weightlearn_rate = DEFAULT_WEIGHTLEARN_RATE;
+static int32_t weightlearn_reporting = DEFAULT_WEIGHTLEARN_REPORTING;
 
 static bool strict_consts = true;
 static bool lazy = false;
@@ -108,6 +117,18 @@ int32_t get_num_trials() {
 int32_t get_mwsat_timeout() {
 	return mwsat_timeout;
 }
+double get_weightlearn_min_error() {
+	return weightlearn_min_error;
+}
+int32_t get_weightlearn_max_iter() {
+	return weightlearn_max_iter;
+}
+double get_weightlearn_rate() {
+	return weightlearn_rate;
+}
+int32_t get_weightlearn_reporting() {
+	return weightlearn_reporting;
+}
 
 void set_max_samples(int32_t m) {
 	max_samples = m;
@@ -142,6 +163,19 @@ void set_num_trials(int32_t m) {
 void set_mwsat_timeout(int32_t m) {
 	mwsat_timeout = m;
 }
+void set_weightlearn_min_error(double e) {
+	weightlearn_min_error = e;
+}
+void set_weightlearn_max_iter(int32_t iter) {
+	weightlearn_max_iter = iter;
+}
+void set_weightlearn_rate(double r) {
+	weightlearn_rate = r;
+}
+void set_weightlearn_reporting(int32_t r) {
+	weightlearn_reporting = r;
+}
+
 
 bool strict_constants() {
 	return strict_consts;
@@ -1501,6 +1535,40 @@ extern bool read_eval(samp_table_t *table) {
 				output(" samp_interval was %"PRId32", now %"PRId32"\n",
 						get_samp_interval(), decl.samp_interval);
 				set_samp_interval(decl.samp_interval);
+			}
+		}
+		output("\n");
+		break;
+	}
+	case TRAIN_PARAMS: {
+		input_train_params_decl_t decl = input_command.decl.train_params_decl;
+		if (decl.num_params == 0) {
+			output("Training param values:\n");
+			output(" max_iter = %"PRId32"\n", get_weightlearn_max_iter());
+			output(" min_error = %f\n", get_weightlearn_min_error());
+			output(" rate = %f\n", get_weightlearn_rate());
+			output(" reporting = %f\n", get_weightlearn_reporting());
+		} else {
+			output("\nSetting training parameters:\n");
+			if (decl.max_iter >= 0) {
+				output(" max_iter was %"PRId32", now %"PRId32"\n",
+						get_weightlearn_max_iter(), decl.max_iter);
+				set_weightlearn_max_iter(decl.max_iter);
+			}
+			if (decl.stopping_error >= 0) {
+				output(" min_error (stopping criterion) was %f, now %f\n",
+						get_weightlearn_min_error(), decl.stopping_error);
+				set_weightlearn_min_error(decl.stopping_error);
+			}
+			if (decl.learning_rate >= 0) {
+				output(" rate (learning rate) was %f, now %f\n",
+						get_weightlearn_rate(), decl.learning_rate);
+				set_weightlearn_rate(decl.learning_rate);
+			}
+			if (decl.reporting >= 0) {
+				output(" reporting (interval) was %d, now %d\n",
+						get_weightlearn_reporting(), decl.reporting);
+				set_weightlearn_reporting(decl.reporting);
 			}
 		}
 		output("\n");

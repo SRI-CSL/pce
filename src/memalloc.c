@@ -28,7 +28,13 @@ void out_of_memory() {
 void *safe_malloc(size_t size) {
   void *tmp;
 
-  tmp = malloc(size);
+  // Make sure the allocated area is zeroed out.
+  // There could be uninitialized slots in weight_learning.c
+  // The use of calloc appears to eliminate a segfault there.
+  // -CC
+
+  // tmp = malloc(size);
+  tmp = calloc(1, size);
   if (tmp == NULL && size > 0) {
     out_of_memory();
   }

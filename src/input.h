@@ -153,6 +153,14 @@ typedef struct input_mcsat_params_decl_s {
   int32_t samp_interval;
 } input_mcsat_params_decl_t;
 
+typedef struct input_train_params_decl_s {
+  int32_t num_params;
+  int32_t max_iter;
+  double learning_rate;
+  double stopping_error;
+  int32_t reporting;
+} input_train_params_decl_t;
+
 typedef struct input_mwsat_params_decl_s {
   int32_t num_params;
   int32_t num_trials;
@@ -202,6 +210,7 @@ typedef union input_decl_s {
   input_add_decl_t add_decl;
   input_ask_decl_t ask_decl;
   //input_mcsat_decl_t mcsat_decl;
+  input_train_params_decl_t train_params_decl;
   input_mcsat_params_decl_t mcsat_params_decl;
   input_mwsat_params_decl_t mwsat_params_decl;
   input_reset_decl_t reset_decl;
@@ -271,6 +280,10 @@ extern int32_t get_max_extra_flips();
 extern int32_t get_mcsat_timeout();
 extern int32_t get_burn_in_steps();
 extern int32_t get_samp_interval();
+extern double get_weightlearn_min_error();
+extern int32_t get_weightlearn_max_iter();
+extern double get_weightlearn_rate();
+extern int32_t get_weightlearn_reporting();
 
 extern void set_max_samples(int32_t m);
 extern void set_sa_probability(double d);
@@ -281,6 +294,10 @@ extern void set_max_extra_flips(int32_t m);
 extern void set_mcsat_timeout(int32_t m);
 extern void set_burn_in_steps(int32_t m);
 extern void set_samp_interval(int32_t m);
+extern void set_weightlearn_min_error(double e);
+extern void set_weightlearn_max_iter(int32_t iter);
+extern void set_weightlearn_rate(double r);
+extern void set_weightlearn_reporting(int32_t iter);
 
 extern bool strict_constants();
 extern void set_strict_constants(bool val);

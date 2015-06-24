@@ -17,6 +17,7 @@
 #define YYERROR_VERBOSE 1
 #define YYINCLUDED_STDLIB_H 1
 //#define YYLTYPE_IS_TRIVIAL 0
+#define TPARAMS 1
 
 extern void free_parse_data();
 
@@ -88,7 +89,7 @@ bool yy_check_int(char *str) {
   }
 }
 
-bool yy_get_float(char *str) {
+double yy_get_float(char *str) {
   char *end;
   double val;
   val = strtod(str, &end);
@@ -497,7 +498,69 @@ void yy_mcsat_params_decl (char **params) {
     input_command.decl.mcsat_params_decl.samp_interval = -1;
   }
   free_strings(params);
+}
+
+
+#if TPARAMS
+void yy_train_params_decl (char **params) {
+  int32_t arglen = 0;
+  
+  input_command.kind = TRAIN_PARAMS;
+  /* Determine num_params */
+  if (params != NULL) {
+    while (arglen <= 4 && (params[arglen] != NULL)) {
+      arglen++;
+    }
+  }
+  if (arglen > 4) {
+    yyerror("train_params: too many args");
+  }
+  input_command.decl.train_params_decl.num_params = arglen;
+
+  /* 0: max_iter */
+  if (arglen > 0 && strcmp(params[0], "") != 0) {
+    if (yy_check_nat(params[0])) {
+      input_command.decl.train_params_decl.max_iter = atoi(params[0]);
+    }
+  } else {
+    input_command.decl.train_params_decl.max_iter = -1;
+  }
+  /* 1: stopping_error */
+  if (arglen > 1 && strcmp(params[1], "") != 0) {
+    double err = yy_get_float(params[1]);
+//    printf("arg was %s, err set to %f\n", params[1], err);
+    if (0.0 < err && err <= 1.0) {
+      input_command.decl.train_params_decl.stopping_error = err;
+    } else {
+    yyerror("stopping error should be between 0.0 and 1.0");
+    }
+  } else {
+    input_command.decl.train_params_decl.stopping_error = -1;
+  }
+  /* 2: learning_rate */
+  if (arglen > 2 && strcmp(params[2], "") != 0) {
+    double rate = yy_get_float(params[2]);
+//    printf("arg was %s, rate set to %f\n", params[2], rate);
+    if (rate > 0.0) {
+      input_command.decl.train_params_decl.learning_rate = rate;
+    } else {
+      yyerror("learning rate should be greater than 0.0");
+    }
+  } else {
+    input_command.decl.train_params_decl.learning_rate = -1;
+  }
+  /* 3: reporting interval for weight learning - by default, every 100 iterations: */
+  if (arglen > 3 && strcmp(params[3], "") != 0) {
+    if (yy_check_nat(params[3])) {
+      input_command.decl.train_params_decl.reporting = atoi(params[3]);
+    }
+  } else {
+    input_command.decl.train_params_decl.reporting = -1;
+  }
+
+  free_strings(params);
 };
+#endif
 
 void yy_mwsat_decl () {
   //yy_get_mcsat_params(params);
@@ -619,6 +682,7 @@ void yy_quit () {
 //%token ASK_CLAUSE
 %token MCSAT
 %token MCSAT_PARAMS
+%token TRAIN_PARAMS
 %token MWSAT
 %token MWSAT_PARAMS
 %token RESET
@@ -731,6 +795,7 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | TRAIN trainarg {yy_train_decl($2);}
     | MCSAT {yy_mcsat_decl();}
     | MCSAT_PARAMS oarguments {yy_mcsat_params_decl($2);}
+    | TRAIN_PARAMS oarguments {yy_train_params_decl($2);}
     | MWSAT {yy_mwsat_decl();}
     | MWSAT_PARAMS oarguments {yy_mwsat_params_decl($2);}
     | RESET resetarg {yy_reset($2);}
@@ -748,11 +813,11 @@ cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | ASSERT {$$ = ASSERT;} | ADD {$$ = ADD;} | ADD_CLAUSE {$$ = ADD_CLAUSE;}
      | ASK {$$ = ASK;}
      //| ASK_CLAUSE {$$ = ASK_CLAUSE;}
-     | MCSAT {$$ = MCSAT;} | MCSAT_PARAMS {$$ = MCSAT_PARAMS;}
+     | MCSAT {$$ = MCSAT;} | MCSAT_PARAMS {$$ = MCSAT_PARAMS;} 
      | MWSAT {$$ = MWSAT;} | MWSAT_PARAMS {$$ = MWSAT_PARAMS;}
      | RESET {$$ = RESET;} | RETRACT {$$ = RETRACT;} | DUMPTABLE {$$ = DUMPTABLE;}
      | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
-     | LEARN {$$ = LEARN;} |  TRAIN {$$ = TRAIN;};
+     | LEARN {$$ = LEARN;} |  TRAIN {$$ = TRAIN;} | TRAIN_PARAMS {$$ = TRAIN_PARAMS;};
 
 sortdef: /* empty */ {$$ = NULL;}
        | EQ sortval {$$ = $2;} ;
@@ -1030,14 +1095,16 @@ int yylex (void) {
       return LEARN;
     else if (strcasecmp(yylval.str, "TRAIN") == 0)
       return TRAIN;
+    else if (strcasecmp(yylval.str, "TRAIN_PARAMS") == 0)
+      return TRAIN_PARAMS;
     else if (strcasecmp(yylval.str, "MCSAT") == 0)
       return MCSAT;
     else if (strcasecmp(yylval.str, "MCSAT_PARAMS") == 0)
       return MCSAT_PARAMS;
-        else if (strcasecmp(yylval.str, "MWSAT") == 0)
-          return MWSAT;
-        else if (strcasecmp(yylval.str, "MWSAT_PARAMS") == 0)
-          return MWSAT_PARAMS;
+    else if (strcasecmp(yylval.str, "MWSAT") == 0)
+      return MWSAT;
+    else if (strcasecmp(yylval.str, "MWSAT_PARAMS") == 0)
+      return MWSAT_PARAMS;
     else if (strcasecmp(yylval.str, "RESET") == 0)
       return RESET;
     else if (strcasecmp(yylval.str, "RETRACT") == 0)
@@ -1277,6 +1344,10 @@ void free_mcsat_params_decl_data() {
   // Nothing to do here
 }
 
+void free_train_params_decl_data() {
+  // Nothing to do here
+}
+
 void free_mwsat_decl_data() {
   // Nothing to do here
 }
@@ -1367,6 +1438,12 @@ void free_parse_data () {
     free_mcsat_params_decl_data();
     break;
   }
+#if TPARAMS
+  case TRAIN_PARAMS: {
+    free_train_params_decl_data();
+    break;
+  }
+#endif
   case MWSAT: {
     free_mwsat_decl_data();
     break;
