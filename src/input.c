@@ -37,6 +37,7 @@ extern void free_parse_data();
 #define DEFAULT_SAMP_INTERVAL 1
 #define DEFAULT_NUM_TRIALS 100
 #define DEFAULT_MWSAT_TIMEOUT 0
+#define DEFAULT_WEIGHTLEARN_LBFGS_MODE 1;
 #define DEFAULT_WEIGHTLEARN_MAX_ITER 1000;
 #define DEFAULT_WEIGHTLEARN_MIN_ERROR 0.001;
 #define DEFAULT_WEIGHTLEARN_RATE 0.1;
@@ -54,6 +55,7 @@ static int32_t samp_interval = DEFAULT_SAMP_INTERVAL;
 static int32_t num_trials = DEFAULT_NUM_TRIALS;
 static int32_t mwsat_timeout = DEFAULT_MWSAT_TIMEOUT;
 
+static int32_t weightlearn_lbfgs_mode = DEFAULT_WEIGHTLEARN_LBFGS_MODE;
 static int32_t weightlearn_max_iter = DEFAULT_WEIGHTLEARN_MAX_ITER;
 static double weightlearn_min_error = DEFAULT_WEIGHTLEARN_MIN_ERROR;
 static double weightlearn_rate = DEFAULT_WEIGHTLEARN_RATE;
@@ -129,6 +131,9 @@ double get_weightlearn_rate() {
 int32_t get_weightlearn_reporting() {
 	return weightlearn_reporting;
 }
+int32_t get_weightlearn_lbfgs_mode() {
+	return weightlearn_lbfgs_mode;
+}
 
 void set_max_samples(int32_t m) {
 	max_samples = m;
@@ -174,6 +179,9 @@ void set_weightlearn_rate(double r) {
 }
 void set_weightlearn_reporting(int32_t r) {
 	weightlearn_reporting = r;
+}
+void set_weightlearn_lbfgs_mode(int32_t r) {
+	weightlearn_lbfgs_mode = r;
 }
 
 
@@ -1548,6 +1556,7 @@ extern bool read_eval(samp_table_t *table) {
 			output(" min_error = %f\n", get_weightlearn_min_error());
 			output(" rate = %f\n", get_weightlearn_rate());
 			output(" reporting = %f\n", get_weightlearn_reporting());
+			output(" reporting = %f\n", get_weightlearn_lbfgs_mode());
 		} else {
 			output("\nSetting training parameters:\n");
 			if (decl.max_iter >= 0) {

@@ -500,6 +500,14 @@ void yy_mcsat_params_decl (char **params) {
   free_strings(params);
 }
 
+/* 
+ * Command syntax for train_params is:
+ *
+ * train_params gradient <max_iter> <stopping_err> <learning_rate> <reporting_interval> 
+ *         or
+ * train_params lbfgs <max_iter> <stopping_err> <learning_rate> <reporting_interval> 
+ *
+ */
 
 #if TPARAMS
 void yy_train_params_decl (char **params) {
