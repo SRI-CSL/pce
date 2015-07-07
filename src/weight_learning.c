@@ -29,6 +29,172 @@ static bool training_data_available;
 
 // true if at least for one formula a subjective probability is provided
 static bool subjective_probabilities_available;
+static void describe_lbfgs_error(int);
+
+
+static void describe_lbfgs_error(int error_num) {
+  char *desc = "%d: Unknown error code!";
+  switch (error_num) {
+  case LBFGS_CONVERGENCE:
+    desc = "%d: Success!\n";
+    break;
+
+  case LBFGS_STOP:
+    desc = "%d: Stopped.\n";
+    break;
+
+  case LBFGS_ALREADY_MINIMIZED:
+    desc = "%d: The initial variables already minimize the objective function.\n";
+    break;
+
+  case LBFGSERR_UNKNOWNERROR:
+    desc = "%d: Unknown error.\n";
+    break;
+
+  case LBFGSERR_LOGICERROR:
+    desc = "%d: Logic error.\n";
+    break;
+
+
+  case LBFGSERR_OUTOFMEMORY:
+    desc = "%d: Insufficient memory.\n";
+    break;
+
+
+  case LBFGSERR_CANCELED:
+    desc = "%d: The minimization process has been canceled.\n";
+    break;
+
+  case LBFGSERR_INVALID_N:
+    desc = "Invalid number of variables specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_N_SSE:
+    desc = "%d: Invalid number of variables (for SSE) specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_X_SSE:
+    desc = "%d: The array x must be aligned to 16 (for SSE).\n";
+    break;
+
+
+  case LBFGSERR_INVALID_EPSILON:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::epsilon specified.\n";
+    break;
+
+  case LBFGSERR_INVALID_TESTPERIOD:
+    desc = "Invalid parameter lbfgs_parameter_t::past specified.\n";
+    break;
+
+  case LBFGSERR_INVALID_DELTA:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::delta specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_LINESEARCH:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::linesearch specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_MINSTEP:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::max_step specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_MAXSTEP:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::max_step specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_FTOL:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::ftol specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_WOLFE:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::wolfe specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_GTOL:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::gtol specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_XTOL:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::xtol specified.\n";
+    break;
+
+  case LBFGSERR_INVALID_MAXLINESEARCH:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::max_linesearch specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_ORTHANTWISE:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::orthantwise_c specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_ORTHANTWISE_START:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::orthantwise_start specified.\n";
+    break;
+
+
+  case LBFGSERR_INVALID_ORTHANTWISE_END:
+    desc = "%d: Invalid parameter lbfgs_parameter_t::orthantwise_end specified.\n";
+    break;
+
+
+  case LBFGSERR_OUTOFINTERVAL:
+    desc = "%d: The line-search step went out of the interval of uncertainty.\n";
+    break;
+
+  case LBFGSERR_INCORRECT_TMINMAX:
+    desc = "%d: A logic error occurred; alternatively, the interval of uncertainty became too small.\n";
+    break;
+
+  case LBFGSERR_ROUNDING_ERROR:
+    desc = "%d: A rounding error occurred; alternatively, no line-search step\nsatisfies the sufficient decrease and curvature conditions.\n";
+
+  case LBFGSERR_MINIMUMSTEP:
+    desc = "%d: The line-search step became smaller than lbfgs_parameter_t::min_step.\n";
+    break;
+
+  case LBFGSERR_MAXIMUMSTEP:
+    desc = "%d: The line-search step became larger than lbfgs_parameter_t::max_step.\n";
+    break;
+
+
+  case LBFGSERR_MAXIMUMLINESEARCH:
+    desc = "%d: The line-search routine reaches the maximum number of evaluations.\n";
+    break;
+
+
+  case LBFGSERR_MAXIMUMITERATION:
+    desc = "%d: The algorithm routine reaches the maximum number of iterations.\n";
+    break;
+
+
+  case LBFGSERR_WIDTHTOOSMALL:
+    desc = "%d: Relative width of the interval of uncertainty is at most lbfgs_parameter_t::xtol.\n";
+    break;
+
+  case LBFGSERR_INVALIDPARAMETERS:
+    desc = "%d: A logic error (negative line-search step) occurred.\n";
+    break;
+
+
+  case LBFGSERR_INCREASEGRADIENT:
+    desc = "%d: The current search direction increases the objective function value.\n";
+    break;
+
+  }
+  printf(desc, error_num);
+}
+
+
 
 // Computes the probability of a FOL based on the probabilities of the ground query instances
 // belonging to it.
@@ -634,8 +800,28 @@ extern void weight_training_lbfgs(training_data_t *data, samp_table_t* table) {
 		/* Initialize the parameters for the L-BFGS optimization. */
 		lbfgs_parameter_init(&param);
 
+#if 1
+		param.m = 6;       // # of corrections to approximate the inverse Hessian
+		param.epsilon = 1e-5;  // Epsilon for convergence test
+		param.past = 0;  // Distance in iterations for delta-based convergence test.
+		param.delta = 1e-5;  // Delta for delta-based test.
+		param.max_iterations = 0; // If 0, run till convergence or error.
+		param.linesearch = LBFGS_LINESEARCH_DEFAULT; 
+		param.max_linesearch = 40;
+		param.min_step = 1e-20;
+		param.max_step = 1e20;
+		param.ftol =  1e-4;
+		param.wolfe = 0.9;
+		param.gtol = 0.9;
+		param.xtol = 1.0e-16;
+		param.orthantwise_c = 0.0;
+		param.orthantwise_start = 0;
+		param.orthantwise_end = -1;
+#endif
+
 		//param.min_step = 1e-20;
 		//param.ftol = 1e-4;
+		//param.xtol = 1e-4;
 		/*param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;*/
 
 		/*
@@ -647,6 +833,7 @@ extern void weight_training_lbfgs(training_data_t *data, samp_table_t* table) {
 
 		/* Report the result. */
 		printf("L-BFGS optimization terminated with status code = %d\n", ret);
+		describe_lbfgs_error(ret);
 
 		if (attempts == 0) {
 			best_fx = fx;
