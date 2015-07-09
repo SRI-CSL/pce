@@ -503,10 +503,10 @@ void yy_mcsat_params_decl (char **params) {
 /* 
  * Command syntax for train_params is:
  *
- * train_params gradient <max_iter> <stopping_err> <learning_rate> <reporting_interval> 
- *         or
- * train_params lbfgs <max_iter> <stopping_err> <learning_rate> <reporting_interval> 
+ * train_params <max_iter> <stopping_err> <learning_rate> <reporting_interval> 
  *
+ * How do we select gradient vs. lbfgs?  Suggest an optional arg to
+ * 'train' that indicates the algorithm to use.
  */
 
 #if TPARAMS

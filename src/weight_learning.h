@@ -17,7 +17,7 @@
 
 // this should be specified by the user, set it to 1 for L-BFGS, to 0 for gradient
 // ascent, to use L-BFGS you should also set USE_PLL to 1
-#define LBFGS_MODE 1
+#define LBFGS_MODE 0
 
 // When L-BFGS returns with an error we do a random walk (simulated annealing)
 #define MAX_LBFGS_RANDOM_STEP_SIZE 0.5
@@ -31,7 +31,7 @@
 #define MAX_IT 10000
 
 // use pseudo-loglikelihood, note that L-BFGS should always use PLL
-#define USE_PLL 1
+#define USE_PLL 0
 
 
 // measures the relevance of the expert's subjective probabilities in the objective function

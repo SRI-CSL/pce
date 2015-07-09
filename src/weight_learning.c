@@ -543,6 +543,9 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 		if (subjective_probabilities_available) {
 			reset_covariance_matrix();
 		}
+		// Purely for debugging:
+                // print_covariance_matrix();
+
 		//					printf("number of queries: %d\n", query_table->num_queries);
 		//					printf("number of query instances: %d\n",
 		//							query_instance_table->num_queries);
@@ -560,6 +563,8 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 		if (training_data_available && USE_PLL) {
 			compute_pseudo_log_likelihood_statistics(training_data, &pll_stats);
 		}
+		//                print_covariance_matrix();
+
 		compute_gradient(gradient);
 
 		// normalize gradient if its length is greater than 1.0
@@ -569,7 +574,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 				!= NULL; weighted_formula = weighted_formula->next,k++) {
 			g_length = gradient[k] * gradient[k];
 		}
-		g_length = sqrt(g_length);
+		if (g_length > 0.0) g_length = sqrt(g_length);
 	    if (g_length > 1.0)
 	    {
 			for (weighted_formula = first_weighted_formula, k=0; weighted_formula
@@ -591,11 +596,19 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 			double diff = weighted_formula->subjective_probability
 					- weighted_formula->sampled_expected_value;
 
-			diff = gradient[i];
+                        // Why did we initialize it above, and then just set it here??
+			// diff = gradient[i];
+
 			double delta_weight = learning_rate / (1.0 + log(
 					(double) (it + 1))) * (diff
 			//- 0.01* weighted_formula->weight
 					);
+
+			/*
+                        printf("delta_weight = %f (learning_rate=%f; diff=%f, it=%d)\n",
+                               delta_weight, learning_rate, diff, it);
+			*/
+
 			weighted_formula->weight = weighted_formula->weight + delta_weight;
 			// update the weight of all the ground clauses belonging to the formula
 			ground_clause_t *ground_clause =
@@ -691,6 +704,7 @@ static lbfgsfloatval_t lbfgs_evaluate(void *instance, const lbfgsfloatval_t *x,
 	}
 
 	initialize_weighted_formulas(table);
+        // We should reset the covariance matrix no matter what:
 	if (subjective_probabilities_available) {
 		reset_covariance_matrix();
 	}
@@ -800,7 +814,7 @@ extern void weight_training_lbfgs(training_data_t *data, samp_table_t* table) {
 		/* Initialize the parameters for the L-BFGS optimization. */
 		lbfgs_parameter_init(&param);
 
-#if 1
+#if 0
 		param.m = 6;       // # of corrections to approximate the inverse Hessian
 		param.epsilon = 1e-5;  // Epsilon for convergence test
 		param.past = 0;  // Distance in iterations for delta-based convergence test.
@@ -829,7 +843,7 @@ extern void weight_training_lbfgs(training_data_t *data, samp_table_t* table) {
 		 evaluate() and progress() when necessary.
 		 */
 		ret = lbfgs(num_weighted_formulas, x, &fx, lbfgs_evaluate,
-				lbfgs_progress, (void*) table, &param);
+			    lbfgs_progress, (void*) table, &param);
 
 		/* Report the result. */
 		printf("L-BFGS optimization terminated with status code = %d\n", ret);
@@ -1006,14 +1020,20 @@ extern void update_covariance_matrix_statistics(samp_table_t *table) {
 
 // Normalize exy, and compute cov values
 void compute_covariance_matrix() {
-	int i;
-	for (i = 0; i < covariance_matrix->size; ++i) {
-		covariance_matrix->exy[i] /= (double) covariance_matrix->n_samples;
-		covariance_matrix->ex[i] /= (double) covariance_matrix->n_samples;
-		covariance_matrix->ey[i] /= (double) covariance_matrix->n_samples;
-		covariance_matrix->cov[i] = covariance_matrix->exy[i]
-				- covariance_matrix->ex[i] * covariance_matrix->ey[i];
-	}
+  int i;
+  double n;
+
+  // If there are no samples, then we risk nans in our computations:
+  if (covariance_matrix->n_samples <= 0) n = 1.0;
+  else n = covariance_matrix->n_samples;
+
+  for (i = 0; i < covariance_matrix->size; ++i) {
+    covariance_matrix->exy[i] /= n;
+    covariance_matrix->ex[i]  /= n;
+    covariance_matrix->ey[i]  /= n;
+    covariance_matrix->cov[i] = covariance_matrix->exy[i]
+      - covariance_matrix->ex[i] * covariance_matrix->ey[i];
+  }
 }
 
 void free_covariance_matrix() {
@@ -1184,6 +1204,8 @@ void reset_covariance_matrix() {
 	covariance_matrix->n_samples = 0;
 }
 
+
+
 // It uses the available weighted_formulas and the computed covariance matrix to determine the gradient.
 // The result is returned in the gradient double array.
 // dmu/dtheta * dO/dmu
@@ -1206,6 +1228,7 @@ void compute_gradient(double* gradient) {
 				mean_diffs[i] = weighted_formula->subjective_probability
 						- weighted_formula->sampled_expected_value;
 			}
+                        //printf("mean_diffs[%d] = %f\n", i, mean_diffs[i]);
 		}
 
 		assert(weighted_formula == NULL);
@@ -1214,7 +1237,7 @@ void compute_gradient(double* gradient) {
 			for (j = i; j < num_weighted_formulas; ++j) {
 				// g_i += M_ij * d_j
 				gradient[i] += covariance_matrix->cov[k] * mean_diffs[j];
-
+                                //printf("gradient[%d] = %f (cov[%d]=%f)\n", i, gradient[i], k, covariance_matrix->cov[k]);
 				if (i != j) {
 					// g_j += M_ij * d_i, since M_ij = M_ji
 					gradient[j] += covariance_matrix->cov[k] * mean_diffs[i];
