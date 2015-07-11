@@ -223,6 +223,7 @@ extern void set_empirical_expectation_of_weighted_formulae(
 		weighted_formula_t* first_weighted_formula, samp_table_t *table) {
 	ground_query_t *ground_query;
 	weighted_formula_t* weighted_formula = first_weighted_formula;
+        double d = 1.0;
 	//	dump_atom_table(table);
 	while (weighted_formula != NULL) {
 		weighted_formula->sampled_expected_value = 0.0;
@@ -233,8 +234,11 @@ extern void set_empirical_expectation_of_weighted_formulae(
 			ground_query = ground_query->next;
 			//			cprintf(0, "prob: %f\n", prob);
 		}
-		weighted_formula->sampled_expected_value
-				/= ((double) weighted_formula->num_groundings);
+
+                // Make the divide safe (CC):
+                if (weighted_formula->num_groundings > 0) d = weighted_formula->num_groundings;
+		weighted_formula->sampled_expected_value /= d;
+
 		//		print_weighted_formula(weighted_formula, table);
 		//		cprintf(0, "empirical EF: %f\tfrom %f groundings\n", weighted_formula->sampled_expected_value, (double)weighted_formula->n_groundings);
 		weighted_formula = weighted_formula->next;
@@ -638,6 +642,8 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 				for (j = 0; j < K; ++j) {
 					avg += last_K_expected_values[i][j];
 				}
+
+                                // Default for K is 50, so should be ok:
 				avg /= K;
 				double expectation_diff = avg - avg_last_K_expected_values[i];
 				error += expectation_diff > 0 ? expectation_diff
@@ -959,6 +965,7 @@ extern void update_covariance_matrix_statistics(samp_table_t *table) {
 	atom_table_t *atom_table;
 	samp_query_instance_t *qinst;
 	int32_t i, j, k, l;
+        double d = 1.0;
 	//bool fval;
 
 	// We only need the covariance matrix when do weight learning with subjective probabilities
@@ -1002,7 +1009,10 @@ extern void update_covariance_matrix_statistics(samp_table_t *table) {
 			}
 			done: continue;
 		}
-		normalized_true_groundings[l] /= weighted_formula->num_groundings;
+
+                // Safe divide (CC):
+                if (weighted_formula->num_groundings > 0) d = weighted_formula->num_groundings;
+		normalized_true_groundings[l] /= d;
 	}
 
 	k = 0;
@@ -1211,6 +1221,7 @@ void reset_covariance_matrix() {
 // dmu/dtheta * dO/dmu
 void compute_gradient(double* gradient) {
 	int i, j, k;
+        double d;
 
 	double mean_diffs[num_weighted_formulas];
 	weighted_formula_t *weighted_formula = first_weighted_formula;
@@ -1292,7 +1303,9 @@ void compute_gradient(double* gradient) {
 					 * (weighted_formula->data_expected_value
 					- weighted_formula->sampled_expected_value);
 			// normalize with number of groundings
-			gradient[k] /= weighted_formula->num_groundings;
+
+                        if (weighted_formula->num_groundings > 0) d = weighted_formula->num_groundings;
+			gradient[k] /= d;
 
 			printf("W:%f\tPr:%f\tSPr:%f\tDPr:%f\tG:%f\n",
 					weighted_formula->weight,
@@ -1418,7 +1431,9 @@ void add_training_data(training_data_t *training_data) {
 			weighted_formula->data_expected_value
 					+= weighted_formula->feature_counts[i].total_count;
 		}
-		weighted_formula->data_expected_value /= (double) ground_clause_cnt;
+                // Make sure we don't divide by zero (CC):
+                if (ground_clause_cnt > 0)
+                  weighted_formula->data_expected_value /= (double) ground_clause_cnt;
 
 	}
 }

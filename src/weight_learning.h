@@ -31,7 +31,7 @@
 #define MAX_IT 10000
 
 // use pseudo-loglikelihood, note that L-BFGS should always use PLL
-#define USE_PLL 0
+#define USE_PLL 1
 
 
 // measures the relevance of the expert's subjective probabilities in the objective function
