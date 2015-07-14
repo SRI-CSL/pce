@@ -388,8 +388,9 @@ void yy_ask_fdecl (input_formula_t *formula, char **threshold_numresult) {
 //};
 
 /* For weight learning */
-void yy_train_decl (char *file) {
+void yy_train_decl (int32_t alg, char *file) {
   input_command.kind = TRAIN;
+  input_command.decl.train_decl.alg = alg;
   input_command.decl.train_decl.file = file;
 }
   
@@ -726,6 +727,8 @@ void yy_quit () {
 %token NAME
 %token NUM
 %token STRING
+%token LBFGS
+%token GRADIENT
 
 %union
 {
@@ -748,11 +751,12 @@ void yy_quit () {
 %type <formula> formula
 %type <fmla> fmla
 %type <clause> clause
-%type <lit> literal 
+%type <lit> literal
 %type <lits> literals
 %type <atom> atom
 %type <bval> witness
-%type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM
+%type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM LBFGS GRADIENT trainalg
+
 
 %locations
 
@@ -800,7 +804,9 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | ASK formula onum2 {yy_ask_fdecl($2, $3);}
 // Weight learning
     | LEARN ofrozen formula learnprob oname {yy_learn_fdecl($2, $3, $4, $5);}
-    | TRAIN trainarg {yy_train_decl($2);}
+    | TRAIN trainarg {yy_train_decl(GRADIENT, $2);}
+    | TRAIN trainarg GRADIENT {yy_train_decl(GRADIENT, $2);}
+    | TRAIN trainarg LBFGS {yy_train_decl(LBFGS, $2);}
     | MCSAT {yy_mcsat_decl();}
     | MCSAT_PARAMS oarguments {yy_mcsat_params_decl($2);}
     | TRAIN_PARAMS oarguments {yy_train_params_decl($2);}
@@ -928,6 +934,8 @@ onum2: /* empty */ {$$=NULL;}
 //onum: /* empty */ {$$=NULL;} | NUM;
 
 trainarg: /* empty */ {$$ = NULL;} | STRING;
+
+trainalg: GRADIENT | LBFGS;
 
 %%
 
@@ -1156,6 +1164,10 @@ int yylex (void) {
       return AND;
     else if (strcasecmp(yylval.str, "NOT") == 0)
       return NOT;
+    else if (strcasecmp(yylval.str, "LBFGS") == 0)
+      return LBFGS;
+    else if (strcasecmp(yylval.str, "GRADIENT") == 0)
+      return GRADIENT;
     else
       nstr = (char *) safe_malloc((strlen(yylval.str)+1) * sizeof(char));
     strcpy(nstr, yylval.str);

@@ -345,6 +345,7 @@ Input grammar:\n\
  const NAME++',' ':' NAME ';'\n\
  assert ATOM ';'\n\
  add FORMULA [WEIGHT [SOURCE]] ';'\n\
+ learn FORMULA [WEIGHT [SOURCE]] ';'\n\
  add_clause CLAUSE [NUM [NAME]] ';'\n\
  ask FORMULA [THRESHOLD [NUMRESULTS]] ';'\n\
  mcsat ';'\n\
@@ -354,6 +355,7 @@ Input grammar:\n\
  dumptable ['all' | 'sort' | 'predicate' | 'atom' | 'clause' | 'rule' | 'summary'] ';'\n\
  load STRING ';'\n\
  verbosity NUM ';'\n help ';'\n quit ';'\n\
+ train [<file> [lbfgs | gradient]];\n\
  help [all | sort | subsort | predicate | const | atom | assert |\n\
        add | add_clause | ask | mcsat | mcsat_params | reset | retract |\n\
        dumptable | load | verbosity | help] ';' \n\n\
@@ -504,6 +506,33 @@ For example:\n\
 		break;
 	}
 
+	case LEARN: {
+		output(
+				"\n\
+learn FORMULA [WEIGHT [SOURCE]];\n\
+  A version of 'add' (see above) that permits weight learning.\n\
+  Clauses that are added with 'learn' will have their weights adjusted by the 'train' command.\n\
+For example:\n\
+  learn p(c1) and (p(c2) or p(c3)) 3.3;\n\
+  learn [x, y, z] r(x, y) and r(y, z) implies r(x, z) 15 user;\n\
+");
+		break;
+	}
+	case TRAIN: {
+		output(
+				"\n\
+train STRING [ALGORITHM];\n\
+  Train the weights for 'learn' clauses using ground truth worlds supplied in the file named by STRING.\n\
+  Optionally, select ALGORITHM (either lbfgs or gradient) to be used for optimization.\n\
+  The default algorithm is gradient ascent ('gradient').\n\
+For example:\n\
+  train;\n\
+  train lbfgs;\n\
+  train \"./foo.train\";\n\
+  train \"./foo.train\" lbfgs;\n\
+");
+		break;
+	}
 //  case ASK_CLAUSE:
 	case MCSAT_PARAMS: {
 		output(
@@ -1433,15 +1462,29 @@ extern bool read_eval(samp_table_t *table) {
 			printf("Loading training data from: %s\n", decl.file);
 			training_data = parse_data_file(decl.file, table);
 		} else {
-			printf("No training data was provided\n");
+			printf("\nNo training data was provided\n");
 		}
-		if (LBFGS_MODE) {
-			weight_training_lbfgs(training_data, table);
-		} else {
-			gradient_ascent(training_data, table);
-		}
-		break;
 
+		// printf("decl.alg = %d\n", decl.alg);
+
+		switch (decl.alg) {
+
+		case GRADIENT:
+		  printf("Weight training using gradient ascent.\n");
+		  gradient_ascent(training_data, table);
+		  break;
+
+		case LBFGS:
+		  printf("Weight training using L-BFGS.\n");
+		  weight_training_lbfgs(training_data, table);
+		  break;
+
+		default:
+		  printf("Unrecognized weight training algorithm.  Legal values: lbfgs, gradient\n");
+
+		}
+
+		break;
 	}
 	//case ASK_CLAUSE: {
 	//	input_ask_decl_t decl = input_command.decl.ask_decl;

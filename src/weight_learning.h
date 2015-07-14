@@ -15,6 +15,11 @@
 #include "lbfgs.h"
 
 
+
+#define WLALG_GRADIENT 0
+#define WLALG_LBFGS 1
+
+
 // this should be specified by the user, set it to 1 for L-BFGS, to 0 for gradient
 // ascent, to use L-BFGS you should also set USE_PLL to 1
 #define LBFGS_MODE 0

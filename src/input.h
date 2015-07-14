@@ -195,6 +195,7 @@ typedef struct input_verbosity_decl_s {
 
 typedef struct input_train_decl_s {
   char *file;
+  int32_t alg;
 } input_train_decl_t;
 
 typedef union input_decl_s {
