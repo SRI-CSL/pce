@@ -1436,11 +1436,14 @@ extern bool read_eval(samp_table_t *table) {
 		add_cnf_query(decl.formula);
 
 		///* the following call will run mcsat once for each query */
-		// ask_cnf(decl.formula, decl.threshold, decl.numresults);
+		ask_cnf(decl.formula, decl.threshold, decl.numresults);
+
 		///* Results are in ask_buffer - print them out */
-		// print_ask_results(decl.formula, table);
+		print_ask_results(decl.formula, table);
+
 		///* Now clear out the query_instance table for the next query */
-		//reset_query_instance_table(&table->query_instance_table);
+		reset_query_instance_table(&table->query_instance_table);
+
 		break;
 	}
 
