@@ -25,6 +25,7 @@
 extern void free_parse_data();
 //extern int yydebug;
 
+#if 0
 // MCSAT parameters
 #define DEFAULT_MAX_SAMPLES 100
 #define DEFAULT_SA_PROBABILITY .5
@@ -37,11 +38,11 @@ extern void free_parse_data();
 #define DEFAULT_SAMP_INTERVAL 1
 #define DEFAULT_NUM_TRIALS 100
 #define DEFAULT_MWSAT_TIMEOUT 0
-#define DEFAULT_WEIGHTLEARN_LBFGS_MODE 1;
-#define DEFAULT_WEIGHTLEARN_MAX_ITER 1000;
-#define DEFAULT_WEIGHTLEARN_MIN_ERROR 0.001;
-#define DEFAULT_WEIGHTLEARN_RATE 0.1;
-#define DEFAULT_WEIGHTLEARN_REPORTING 100;
+#define DEFAULT_WEIGHTLEARN_LBFGS_MODE 1
+#define DEFAULT_WEIGHTLEARN_MAX_ITER 1000
+#define DEFAULT_WEIGHTLEARN_MIN_ERROR 0.001
+#define DEFAULT_WEIGHTLEARN_RATE 0.1
+#define DEFAULT_WEIGHTLEARN_REPORTING 100
 
 /*
  * Encapsulation: We could create a struct to hold these things as a
@@ -71,16 +72,33 @@ static bool lazy = false;
 static char *dump_samples_path = NULL;
 
 static bool print_exp_p = false;
+#endif
 
+static mcsat_params_t params = {
+  DEFAULT_MAX_SAMPLES,
+  DEFAULT_SA_PROBABILITY,
+  DEFAULT_SA_TEMPERATURE,
+  DEFAULT_RVAR_PROBABILITY,
+  DEFAULT_MAX_FLIPS,
+  DEFAULT_MAX_EXTRA_FLIPS,
+  DEFAULT_MCSAT_TIMEOUT,
+  DEFAULT_BURN_IN_STEPS,
+  DEFAULT_SAMP_INTERVAL,
+  DEFAULT_NUM_TRIALS,
+  DEFAULT_MWSAT_TIMEOUT,
 
+  DEFAULT_WEIGHTLEARN_LBFGS_MODE,
+  DEFAULT_WEIGHTLEARN_MAX_ITER,
+  DEFAULT_WEIGHTLEARN_MIN_ERROR,
+  DEFAULT_WEIGHTLEARN_RATE,
+  DEFAULT_WEIGHTLEARN_REPORTING,
 
-void set_print_exp_p(bool flag) {
-	print_exp_p = flag;
-}
-
-bool get_print_exp_p() {
-	return print_exp_p;
-}
+  true,
+  false,
+  NULL,
+  false,
+};
+  
 
 uint32_t pce_rand_seed = 12345;
 
@@ -93,127 +111,138 @@ void set_pce_rand_seed(uint32_t seed) {
 	rand_reset();
 }
 
+
+
+
+void set_print_exp_p(bool flag) {
+	params.print_exp_p = flag;
+}
+
+bool get_print_exp_p() {
+	return params.print_exp_p;
+}
+
 int32_t get_max_samples() {
-	return max_samples;
+	return params.max_samples;
 }
 double get_sa_probability() {
-	return sa_probability;
+	return params.sa_probability;
 }
 double get_sa_temperature() {
-	return sa_temperature;
+	return params.sa_temperature;
 }
 double get_rvar_probability() {
-	return rvar_probability;
+	return params.rvar_probability;
 }
 int32_t get_max_flips() {
-	return max_flips;
+	return params.max_flips;
 }
 int32_t get_max_extra_flips() {
-	return max_extra_flips;
+	return params.max_extra_flips;
 }
 int32_t get_mcsat_timeout() {
-	return mcsat_timeout;
+	return params.mcsat_timeout;
 }
 int32_t get_burn_in_steps() {
-	return burn_in_steps;
+	return params.burn_in_steps;
 }
 int32_t get_samp_interval() {
-	return samp_interval;
+	return params.samp_interval;
 }
 int32_t get_num_trials() {
-	return num_trials;
+	return params.num_trials;
 }
 int32_t get_mwsat_timeout() {
-	return mwsat_timeout;
+	return params.mwsat_timeout;
 }
 double get_weightlearn_min_error() {
-	return weightlearn_min_error;
+	return params.weightlearn_min_error;
 }
 int32_t get_weightlearn_max_iter() {
-	return weightlearn_max_iter;
+	return params.weightlearn_max_iter;
 }
 double get_weightlearn_rate() {
-	return weightlearn_rate;
+	return params.weightlearn_rate;
 }
 int32_t get_weightlearn_reporting() {
-	return weightlearn_reporting;
+	return params.weightlearn_reporting;
 }
 int32_t get_weightlearn_lbfgs_mode() {
-	return weightlearn_lbfgs_mode;
+	return params.weightlearn_lbfgs_mode;
 }
 
 void set_max_samples(int32_t m) {
-	max_samples = m;
+	params.max_samples = m;
 }
 void set_sa_probability(double d) {
-	sa_probability = d;
+	params.sa_probability = d;
 }
 void set_sa_temperature(double d) {
-	sa_temperature = d;
+	params.sa_temperature = d;
 }
 void set_rvar_probability(double d) {
-	rvar_probability = d;
+	params.rvar_probability = d;
 }
 void set_max_flips(int32_t m) {
-	max_flips = m;
+	params.max_flips = m;
 }
 void set_max_extra_flips(int32_t m) {
-	max_extra_flips = m;
+	params.max_extra_flips = m;
 }
 void set_mcsat_timeout(int32_t m) {
-	mcsat_timeout = m;
+	params.mcsat_timeout = m;
 }
 void set_burn_in_steps(int32_t m) {
-	burn_in_steps = m;
+	params.burn_in_steps = m;
 }
 void set_samp_interval(int32_t m) {
-	samp_interval = m;
+	params.samp_interval = m;
 }
 void set_num_trials(int32_t m) {
-	num_trials = m;
+	params.num_trials = m;
 }
 void set_mwsat_timeout(int32_t m) {
-	mwsat_timeout = m;
+	params.mwsat_timeout = m;
 }
 void set_weightlearn_min_error(double e) {
-	weightlearn_min_error = e;
+	params.weightlearn_min_error = e;
 }
 void set_weightlearn_max_iter(int32_t iter) {
-	weightlearn_max_iter = iter;
+	params.weightlearn_max_iter = iter;
 }
 void set_weightlearn_rate(double r) {
-	weightlearn_rate = r;
+	params.weightlearn_rate = r;
 }
 void set_weightlearn_reporting(int32_t r) {
-	weightlearn_reporting = r;
+	params.weightlearn_reporting = r;
 }
 void set_weightlearn_lbfgs_mode(int32_t r) {
-	weightlearn_lbfgs_mode = r;
+	params.weightlearn_lbfgs_mode = r;
 }
 
 
 bool strict_constants() {
-	return strict_consts;
+	return params.strict_consts;
 }
 
 void set_strict_constants(bool val) {
-	strict_consts = val;
+	params.strict_consts = val;
 }
 
 bool lazy_mcsat() {
-	return lazy;
+	return params.lazy;
 }
 
 void set_lazy_mcsat(bool val) {
-	lazy = val;
+	params.lazy = val;
 }
 
 extern char* get_dump_samples_path() {
-	return dump_samples_path;
+	return params.dump_samples_path;
 }
 
 extern void set_dump_samples_path(char *path) {
-	dump_samples_path = path;
+	params.dump_samples_path = path;
 }
 
 void free_atom(input_atom_t *atom) {

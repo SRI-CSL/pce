@@ -6,6 +6,7 @@
 #include "vectors.h"
 #include "array_hash_map.h"
 #include "hash_map.h"
+#include "params.h"
 
 #define INIT_SORT_TABLE_SIZE 64
 #define INIT_CONST_TABLE_SIZE 64
