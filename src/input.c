@@ -43,6 +43,11 @@ extern void free_parse_data();
 #define DEFAULT_WEIGHTLEARN_RATE 0.1;
 #define DEFAULT_WEIGHTLEARN_REPORTING 100;
 
+/*
+ * Encapsulation: We could create a struct to hold these things as a
+ * first step toward threadsafe multi-mcsat...
+ */
+
 static int32_t max_samples = DEFAULT_MAX_SAMPLES;
 static double sa_probability = DEFAULT_SA_PROBABILITY;
 static double sa_temperature = DEFAULT_SA_TEMPERATURE;
@@ -66,6 +71,8 @@ static bool lazy = false;
 static char *dump_samples_path = NULL;
 
 static bool print_exp_p = false;
+
+
 
 void set_print_exp_p(bool flag) {
 	print_exp_p = flag;
@@ -1736,6 +1743,84 @@ extern bool read_eval(samp_table_t *table) {
 		cprintf(1, "Setting verbosity to %"PRId32"\n", decl.level);
 		break;
 	}
+
+	case SET: {
+	  input_set_decl_t decl = input_command.decl.set_decl;
+	  switch (decl.param) {
+	    /* mcsat_params here: */
+	  case MAX_SAMPLES: {
+	    set_max_samples((int32_t) decl.value);
+	    output(" max_samples set to %"PRId32"\n", get_max_samples());
+	    break;
+	  }
+	  case SA_PROBABILITY: {
+	    set_sa_probability(decl.value);
+	    output(" sa_probability set to %f\n", get_sa_probability());
+	    break;
+	  }
+	  case SA_TEMPERATURE: {
+	    set_sa_temperature(decl.value);
+	    output(" sa_temperature set to %f\n", get_sa_temperature());
+	    break;
+	  }
+	  case RVAR_PROBABILITY: {
+	    set_rvar_probability(decl.value);
+	    output(" rvar_probability set to %f\n", get_rvar_probability());
+	    break;
+	  }
+	  case MAX_FLIPS: {
+	    set_max_flips((int32_t) decl.value);
+	    output(" max_flips set to %"PRId32"\n", get_max_flips());
+	    break;
+	  }
+	  case MAX_EXTRA_FLIPS: {
+	    set_max_extra_flips((int32_t) decl.value);
+	    output(" max_extra_flips set to %"PRId32"\n", get_max_extra_flips());
+	    break;
+	  }
+	  case MCSAT_TIMEOUT: {
+	    set_mcsat_timeout((int32_t) decl.value);
+	    output(" mcsat_timeout set to %"PRId32"\n", get_mcsat_timeout());
+	    break;
+	  }
+	  case BURN_IN_STEPS: {
+	    set_burn_in_steps((int32_t) decl.value);
+	    output(" burn_in_steps set to %"PRId32"\n", get_burn_in_steps());
+	    break;
+	  }
+	  case SAMP_INTERVAL: {
+	    set_samp_interval((int32_t) decl.value);
+	    output(" samp_interval set to %"PRId32"\n", get_samp_interval());
+	    break;
+	  }
+	    /* train_params here: */
+	    
+	  case MAX_TRAINING_ITER: {
+	    set_weightlearn_max_iter((int32_t) decl.value);
+	    break;
+	  }
+	  case MIN_ERROR: {
+	    set_weightlearn_min_error(decl.value);
+	    break;
+	  }
+	  case LEARNING_RATE: {
+	    set_weightlearn_rate(decl.value);
+	    break;
+	  }
+	  case REPORT_RATE: {
+	    set_weightlearn_reporting((int32_t) decl.value);
+	    break;
+	  }
+
+	    //	  case TRAINING_ALGORITHM: {
+	    //	    break;
+	    //	  }
+	  case VERBOSITY: {
+	    set_verbosity_level((int32_t) decl.value);
+	    break;
+	  }
+	  }
+	}
 	case HELP: {
 		input_help_decl_t decl = input_command.decl.help_decl;
 		show_help(decl.command);
@@ -1747,6 +1832,7 @@ extern bool read_eval(samp_table_t *table) {
 		return true;
 		break;
 	};
+
 	free_parse_data();
 	return false;
 }

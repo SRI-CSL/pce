@@ -403,6 +403,50 @@ void yy_mcsat_decl () {
   input_command.kind = MCSAT;
 }
 
+/*
+ * Look for legal set variables and initialize input_command appropriately:
+ */
+
+void yy_set_decl (char *name, char * v) {
+  int k;
+  input_command.kind = SET;
+  //  output(" name = %s\n", name);
+  k = -1;
+  if (strcasecmp(name, "MAX_SAMPLES") == 0)
+    k = MAX_SAMPLES;
+  else if (strcasecmp(name, "SA_PROBABILITY") == 0)
+    k = SA_PROBABILITY;
+  else if (strcasecmp(name, "SA_TEMPERATURE") == 0)
+    k = SA_TEMPERATURE;
+  else if (strcasecmp(name, "RVAR_PROBABILITY") == 0)
+    k = RVAR_PROBABILITY;
+  else if (strcasecmp(name, "MAX_FLIPS") == 0)
+    k = MAX_FLIPS;
+  else if (strcasecmp(name, "MAX_EXTRA_FLIPS") == 0)
+    k = MAX_EXTRA_FLIPS;
+  else if (strcasecmp(name, "MCSAT_TIMEOUT") == 0)
+    k = MCSAT_TIMEOUT;
+  else if (strcasecmp(name, "BURN_IN_STEPS") == 0)
+    k = BURN_IN_STEPS;
+  else if (strcasecmp(name, "SAMP_INTERVAL") == 0)
+    k = SAMP_INTERVAL;
+  else if (strcasecmp(name, "MAX_TRAINING_ITER") == 0)
+    k = MAX_TRAINING_ITER;
+  else if (strcasecmp(name, "MIN_ERROR") == 0)
+    k = MIN_ERROR;
+  else if (strcasecmp(name, "LEARNING_RATE") == 0)
+    k = LEARNING_RATE;
+  else if (strcasecmp(name, "REPORT_RATE") == 0)
+    k = REPORT_RATE;
+  else {
+    printf("set: Unrecognized variable name: %s\n", name);
+    yyerror("bad set command, value");
+  }
+  /* else what? */
+  input_command.decl.set_decl.param = k;
+  input_command.decl.set_decl.value = yy_get_float(v);
+}
+
 void yy_mcsat_params_decl (char **params) {
   int32_t arglen = 0;
   
@@ -705,6 +749,7 @@ void yy_quit () {
 %token QUIT
 %token TRAIN
 %token LEARN
+%token SET
 %left IFF
 %right IMPLIES
 %left OR
@@ -729,6 +774,22 @@ void yy_quit () {
 %token STRING
 %token LBFGS
 %token GRADIENT
+
+%token MAX_SAMPLES
+%token SA_PROBABILITY
+%token SA_TEMPERATURE
+%token RVAR_PROBABILITY
+%token MAX_FLIPS
+%token MAX_EXTRA_FLIPS
+%token MCSAT_TIMEOUT
+%token BURN_IN_STEPS
+%token SAMP_INTERVAL
+%token MAX_TRAINING_ITER
+%token MIN_ERROR
+%token LEARNING_RATE
+%token REPORT_RATE
+
+
 
 %union
 {
@@ -755,8 +816,12 @@ void yy_quit () {
 %type <lits> literals
 %type <atom> atom
 %type <bval> witness
-%type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM LBFGS GRADIENT trainalg
+%type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM 
 
+/*
+%type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM LBFGS GRADIENT  set_param trainalg
+MAX_SAMPLES SA_PROBABILITY RVAR_PROBABILITY MAX_FLIPS MAX_EXTRA_FLIPS MCSAT_TIMEOUT BURN_IN_STEPS SAMP_INTERVAL MAX_TRAINING_ITER MIN_ERROR LEARNING_RATE REPORT_RATE 
+*/
 
 %locations
 
@@ -813,6 +878,7 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | MWSAT {yy_mwsat_decl();}
     | MWSAT_PARAMS oarguments {yy_mwsat_params_decl($2);}
     | RESET resetarg {yy_reset($2);}
+    | SET NAME NUM {yy_set_decl($2, $3);}
     | RETRACT retractarg {yy_retract($2);}
     | DUMPTABLE table {yy_dumptables($2);}
     | LOAD STRING {yy_load($2);}
@@ -934,8 +1000,6 @@ onum2: /* empty */ {$$=NULL;}
 //onum: /* empty */ {$$=NULL;} | NUM;
 
 trainarg: /* empty */ {$$ = NULL;} | STRING;
-
-trainalg: GRADIENT | LBFGS;
 
 %%
 
@@ -1148,6 +1212,8 @@ int yylex (void) {
       return QUIT;
     else if (strcasecmp(yylval.str, "ALL") == 0)
       return ALL;
+    else if (strcasecmp(yylval.str, "SET") == 0)
+      return SET;
     else if (strcasecmp(yylval.str, "BEST") == 0)
       return BEST;
     else if (strcasecmp(yylval.str, "PROBABILITIES") == 0)
@@ -1380,6 +1446,10 @@ void free_reset_decl_data() {
   // Nothing to do here
 }
 
+void free_set_decl_data() {
+  // Nothing to do here
+}
+
 void free_retract_decl_data() {
   // Nothing to do here
 }
@@ -1483,6 +1553,10 @@ void free_parse_data () {
   }
   case RESET: {
     free_reset_decl_data();
+    break;
+  }
+  case SET: {
+    free_set_decl_data();
     break;
   }
   case RETRACT: {

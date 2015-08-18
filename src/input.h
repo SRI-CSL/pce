@@ -173,6 +173,11 @@ typedef struct input_reset_decl_s {
   int32_t kind;
 } input_reset_decl_t;
 
+typedef struct input_set_decl_s {
+  int32_t param;
+  double value;
+} input_set_decl_t;
+
 typedef struct input_retract_decl_s {
   char *source;
 } input_retract_decl_t;
@@ -215,6 +220,7 @@ typedef union input_decl_s {
   input_mcsat_params_decl_t mcsat_params_decl;
   input_mwsat_params_decl_t mwsat_params_decl;
   input_reset_decl_t reset_decl;
+  input_set_decl_t set_decl;
   input_retract_decl_t retract_decl;
   input_load_decl_t load_decl;
   input_train_decl_t train_decl;
