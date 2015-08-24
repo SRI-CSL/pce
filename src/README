@@ -17,8 +17,8 @@ input.c				Handles PCE commands, converts input data structures to
 parser.c
 yacc.y				YACC syntax definition of the PCE program
 print.c				Output of results, logs, and other information
-training_data.c		Loads the training data
-weight_learning.c	Weight learning of PCE
+training_data.c	                Loads the training data
+weight_learning.c	        Weight learning of PCE
 xpce.c
 xpce-client.c
 
@@ -27,30 +27,30 @@ xpce-client.c
 
 symbol_table.c
 clause_list.c		Data structure of a singly linked list of clauses, which is used
-					for organizing satisfied, watched, and unsatisfied clauses in
-					WalkSAT
-buffer.c			Buffers of PCE data structures to avoid repeated allocation and 
-					free of temperary variables
+		        	for organizing satisfied, watched, and unsatisfied clauses in
+			        WalkSAT
+buffer.c		Buffers of PCE data structures to avoid repeated allocation and 
+			        free of temperary variables
 array_hash_map.c	Hash map with arrays of integers as keys and integers as values
 hash_map.c			Hash map with integers as keys and integers as values, used for 
-					managing the unsatisfied auxiliary atoms for rules
+				managing the unsatisfied auxiliary atoms for rules
 hash_functions.c
 int_array_sort.c
 vectors.c
 integer_stack.c		An integer stack, used for selecting a literal from an unsatisfied
-					clause in WalkSAT
-int_stack.c			How is it difference from integer_stack.c?
+				clause in WalkSAT
+int_stack.c		How is it difference from integer_stack.c?
 string_heap.c
-memalloc.c			Safe memory allocation and free
+memalloc.c		Safe memory allocation and free
 memsize.c
-gcd.c				Computes gcd of two integers
-utils.c				Other utility functions
+gcd.c			Computes gcd of two integers
+utils.c			Other utility functions
 
 
 3) External libraries
 
-lbfgs.c				Limited memory BFGS
-arithmetic*			Used by LBFGS
-prng.h				Simple random number generator
-SFMT*				A better random number generator
+lbfgs.c			Limited memory BFGS
+arithmetic*		Used by LBFGS
+prng.h			Simple random number generator
+SFMT*			A better random number generator
 

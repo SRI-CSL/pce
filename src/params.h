@@ -1,7 +1,12 @@
 #ifndef __PARAMS_H 
 #define __PARAMS_H 1
 
-// MCSAT parameters
+/*
+ * MCSAT and weight learning parameters: Keep all of these parameters
+ * in a struct that (ultimately) can be passed around as an argument,
+ * or even as a slot in samp_tables.
+ */
+
 #define DEFAULT_MAX_SAMPLES 100
 #define DEFAULT_SA_PROBABILITY .5
 #define DEFAULT_SA_TEMPERATURE 5.0

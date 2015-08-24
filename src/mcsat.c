@@ -22,7 +22,7 @@
 
 // What kind of versioning system should we have?
 
-#define VERSION "0.1.1"
+#define VERSION "0.1.2"
 
 // Flags:
 //  -v num  -- sets verbosity level
