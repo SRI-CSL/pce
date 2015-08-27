@@ -1,0 +1,30 @@
+This is a start for some API documentation.  Using the parser and
+'input.c' as a guide, this walks through the functions that can be
+used to build an MLN and perform inference using it.
+
+
+Declaring Sorts:
+
+void add_sort(sort_table_t *sort_table, char *name):
+
+     Adds the named sort 'name' to the specified sort_table.
+
+
+
+void add_subsort(sort_table_t *sort_table, char *subsort, char *supersort):
+
+     Adds the named subsort, to the sort_table, with the designaed supersort.
+
+
+
+
+Declaring constants:
+
+int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
+
+    Declares the name in 'cnst' as a constant of type 'sort', and
+    enters this into 'table'.  Only one constant is declared at a
+    time.
+
+
+
