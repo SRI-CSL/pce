@@ -1484,7 +1484,6 @@ extern bool read_eval(samp_table_t *table) {
 	}
 
 	case LEARN: {
-		// TODO WEIGHT LEARN
 		input_add_fdecl_t decl = input_command.decl.add_fdecl;
 		add_weighted_formula(table, &decl);
 
@@ -1493,7 +1492,6 @@ extern bool read_eval(samp_table_t *table) {
 		break;
 	}
 	case TRAIN: {
-		// TODO WEIGHT LEARN
 		input_train_decl_t decl = input_command.decl.train_decl;
 		training_data_t *training_data = NULL;
 
@@ -1504,7 +1502,7 @@ extern bool read_eval(samp_table_t *table) {
 			printf("\nNo training data was provided\n");
 		}
 
-		// printf("decl.alg = %d\n", decl.alg);
+		printf("decl.alg = %d\n", decl.alg);
 
 		switch (decl.alg) {
 
@@ -1550,8 +1548,7 @@ extern bool read_eval(samp_table_t *table) {
 
 		if (get_dump_samples_path() != NULL) {
 			output(" dumping samples to %s\n", get_dump_samples_path());
-			// TODO WEIGHT LEARN
-			//init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
+			init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
 		}
 
 		mc_sat(table, lazy_mcsat(), get_max_samples(),
@@ -1679,8 +1676,7 @@ extern bool read_eval(samp_table_t *table) {
 
 		if (get_dump_samples_path() != NULL) {
 			output(" dumping samples to %s\n", get_dump_samples_path());
-			// TODO WEIGHT LEARN
-			//init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
+			init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
 		}
 
 		mw_sat(table, get_num_trials(), get_rvar_probability(),

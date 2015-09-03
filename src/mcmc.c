@@ -216,13 +216,12 @@ static void update_pmodel(samp_table_t *table) {
 
 	update_query_pmodel(table);
 
-	// TODO WEIGHT LEARN
 	///* for the covariance matrix */
-	//update_covariance_matrix_statistics(table);
+	update_covariance_matrix_statistics(table);
 
-	//if (get_dump_samples_path() != NULL) {
-	//	append_assignment_to_file(get_dump_samples_path(), table);
-	//}
+	if (get_dump_samples_path() != NULL) {
+		append_assignment_to_file(get_dump_samples_path(), table);
+	}
 }
 
 /*

@@ -232,15 +232,15 @@ extern void set_empirical_expectation_of_weighted_formulae(
 			double prob = query_probability(ground_query->qinst, table);
 			weighted_formula->sampled_expected_value += prob;
 			ground_query = ground_query->next;
-			//			cprintf(0, "prob: %f\n", prob);
+			//cprintf(0, "prob: %f\n", prob);
 		}
 
                 // Make the divide safe (CC):
                 if (weighted_formula->num_groundings > 0) d = weighted_formula->num_groundings;
 		weighted_formula->sampled_expected_value /= d;
 
-		//		print_weighted_formula(weighted_formula, table);
-		//		cprintf(0, "empirical EF: %f\tfrom %f groundings\n", weighted_formula->sampled_expected_value, (double)weighted_formula->n_groundings);
+		//print_weighted_formula(weighted_formula, table);
+		//cprintf(0, "empirical EF: %f\tfrom %f groundings\n", weighted_formula->sampled_expected_value, (double)weighted_formula->n_groundings);
 		weighted_formula = weighted_formula->next;
 	}
 
@@ -293,11 +293,11 @@ extern void add_query_instance_to_weighted_formula(
 }
 
 extern void print_weighted_formula(weighted_formula_t *weighted_formula,
-		samp_table_t* table) {
+				   samp_table_t* table) {
 	output("W:%f\tPr:%f\tSPr:%f\tDPr:%f\t", weighted_formula->weight,
-			weighted_formula->sampled_expected_value,
-			weighted_formula->subjective_probability,
-			weighted_formula->data_expected_value);
+	       weighted_formula->sampled_expected_value,
+	       weighted_formula->subjective_probability,
+	       weighted_formula->data_expected_value);
 	if (weighted_formula->is_ground) {
 		print_rule_instance(weighted_formula->clausified_formula.rule_inst, table);
 	} else {
@@ -306,13 +306,13 @@ extern void print_weighted_formula(weighted_formula_t *weighted_formula,
 		//rule_inst_t* rule_inst = weighted_formula->clausified_formula.rule_inst;
 		//rule_clause_t* clause;
 
-		if (rule->num_vars > 0) {
-			for (j = 0; j < rule->num_vars; j++) {
-				j == 0 ? output(" (") : output(", ");
-				output("%s", rule->vars[j]->name);
-			}
-			output(")");
-		}
+		// if (rule->num_vars > 0) {
+		// 	for (j = 0; j < rule->num_vars; j++) {
+		// 		j == 0 ? output(" (") : output(", ");
+		// 		output("%s", rule->vars[j]->name);
+		// 	}
+		// 	output(")");
+		// }
 		print_rule(rule, table, 0);
 		// for (i = 0; i < rule->num_clauses; i++) {
 		// 	i == 0 ? output("   ") : output(" & ");
@@ -516,6 +516,9 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 
 	output("train_params: max_iter=%d, stopping_error=%f, learning_rate=%f\n",
 	       max_iter, stopping_error, learning_rate);
+	output(" W = weight\n Pr = sampled expected value\n");
+	output(" SPr = subjective probability\n DPr = data expected value\n");
+	output(" PLLG = pseudo log likelihood gradient\n SG = sample gradient\n");
 
 	if (training_data_available) {
 		add_training_data(training_data);
@@ -550,16 +553,15 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 		// Purely for debugging:
                 // print_covariance_matrix();
 
-		//					printf("number of queries: %d\n", query_table->num_queries);
-		//					printf("number of query instances: %d\n",
-		//							query_instance_table->num_queries);
+		// printf("number of queries: %d\n", query_table->num_queries);
+		// printf("number of query instances: %d\n", query_instance_table->num_queries);
 
 		mc_sat(table, false, get_max_samples(), get_sa_probability(),
-				get_sa_temperature(), get_rvar_probability(),
-				get_max_flips(), get_max_extra_flips(), get_mcsat_timeout(),
-				get_burn_in_steps(), get_samp_interval());
+		       get_sa_temperature(), get_rvar_probability(),
+		       get_max_flips(), get_max_extra_flips(), get_mcsat_timeout(),
+		       get_burn_in_steps(), get_samp_interval());
 		set_empirical_expectation_of_weighted_formulae(first_weighted_formula,
-				table);
+							       table);
 
 		if (subjective_probabilities_available) {
 			compute_covariance_matrix();
@@ -567,7 +569,7 @@ extern void gradient_ascent(training_data_t *data, samp_table_t* table) {
 		if (training_data_available && USE_PLL) {
 			compute_pseudo_log_likelihood_statistics(training_data, &pll_stats);
 		}
-		//                print_covariance_matrix();
+		//print_covariance_matrix();
 
 		compute_gradient(gradient);
 
@@ -1281,14 +1283,13 @@ void compute_gradient(double* gradient) {
 													* weighted_formula->feature_counts[i].count_var_one[j]);
 						}
 					}
-					printf(
-							"W:%f\tPr:%f\tSPr:%f\tDPr:%f\tPLLG:%f\tSG:%f\n",
-							weighted_formula->weight,
-							weighted_formula->sampled_expected_value,
-							weighted_formula->subjective_probability,
-							weighted_formula->data_expected_value,
-							pll_grad[k] / (weighted_formula->num_groundings
-									* pll_stats.training_sets), gradient[k]);
+					printf("W:%f\tPr:%f\tSPr:%f\tDPr:%f\tPLLG:%f\tSG:%f\n",
+					       weighted_formula->weight,
+					       weighted_formula->sampled_expected_value,
+					       weighted_formula->subjective_probability,
+					       weighted_formula->data_expected_value,
+					       pll_grad[k] / (weighted_formula->num_groundings
+							      * pll_stats.training_sets), gradient[k]);
 					fflush(stdout);
 					gradient[k] += pll_grad[k] / (weighted_formula->num_groundings
 							* pll_stats.training_sets);
@@ -1345,11 +1346,12 @@ void add_training_data(training_data_t *training_data) {
 	}
 
 	// compute the expected feature counts from the training data
-	for (weighted_formula = first_weighted_formula; weighted_formula != NULL; weighted_formula
-			= weighted_formula-> next) {
+	for (weighted_formula = first_weighted_formula;
+	     weighted_formula != NULL;
+	     weighted_formula = weighted_formula-> next) {
 		weighted_formula->num_training_sets = training_data->num_data_sets;
-		weighted_formula->feature_counts = (feature_counts_t*) safe_malloc(
-				training_data->num_data_sets * sizeof(feature_counts_t));
+		weighted_formula->feature_counts = (feature_counts_t*)
+			safe_malloc(training_data->num_data_sets * sizeof(feature_counts_t));
 		weighted_formula->data_expected_value = 0.0;
 		ground_clause_cnt = 0;
 

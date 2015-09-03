@@ -485,6 +485,7 @@ static void print_rule_clause(samp_rule_t *rule, rule_clause_t *rule_clause,
 /* Prints a quantified clause */
 void print_rule(samp_rule_t *rule, samp_table_t *table, int indent) {
 	int32_t i;
+	output("\n%*s", indent, "");
 	if (rule->num_vars > 0) {
 		for (i = 0; i < rule->num_vars; i++) {
 			i==0 ? output(" (") : output(", ");
@@ -493,7 +494,6 @@ void print_rule(samp_rule_t *rule, samp_table_t *table, int indent) {
 		output(")");
 	}
 	for (i = 0; i < rule->num_clauses; i++) {
-		output("\n%*s", indent, "");
 		i==0 ? output("   ") : output(" & ");
 		rule_clause_t *rule_clause = rule->clauses[i];	
 		if (i > 1 && rule_clause->num_lits > 1)
