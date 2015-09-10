@@ -3,6 +3,18 @@ This is a start for some API documentation.  Using the parser and
 used to build an MLN and perform inference using it.
 
 
+Making a samp_table_t object is required before anything else.  Within
+this struct we can get the variable, sort, and other tables that we
+will need.  Use 'init_samp_table' to set up the structure.  For
+example:
+
+samp_table_t samp_table;
+init_samp_table(&samp_table);
+
+will instantiate a samp_table_t object called 'samp_table'.
+
+
+
 Declaring Sorts:
 
 void add_sort(sort_table_t *sort_table, char *name):
@@ -27,4 +39,120 @@ int32_t add_constant(char *cnst, char *sort, samp_table_t *table);
     time.
 
 
+
+int32_t add_var(var_table_t *var_table,	char *name, sort_table_t *sort_table, char * sort_name);
+
+    Declares the name in 'name' as a variable of type 'sort_name'.
+    The variable name is entered into 'var_type' using the index of
+    'sort_name' found in 'sort_table'.  Not documented as a command.
+
+
+int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
+
+    Adds an atom, but documentation suggests that this is not needed.
+
+
+
+int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source);
+
+    Adds 'current_atom' to the sample table.  How is 'current_atom'
+    constructed?  The yacc parser assembles it by calling yy_atom on
+    various alternative inputs:
+
+    input_atom_t *yy_atom (char *pred, char **args, int32_t builtinop);
+
+    where 'pred' is a predicate name, and 'args' is the predicate arg
+    list.  An input_atom_t is simply a tuple whose slots are the
+    predicate name and the arg list.  Not sure what 'builtinop' is
+    about.  This suggests that we'll need a make_atom() function.
+
+
+void add_cnf(char **frozen, input_formula_t *formula, double weight, char *source, bool add_weights);
+
+    frozen: names delimited by curly braces { }.  Not used by mcsat.
+    weight is the formula weight.
+    add_weights is usually true.
+
+    formula: variable names delimited by square braces [ ], followed
+    by a logical formula over those variables.  Constructed by these
+    parser functions:
+
+    input_atom_t *yy_atom (char *pred, char **args, int32_t builtinop);
+    input_fmla_t *yy_atom_to_fmla (input_atom_t *atom);
+    input_fmla_t *yy_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2);
+    input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
+
+    The yy_ parser functions could be wrapped and exposed as part of
+    the library API.
+
+
+=== NOTE: This describes the results of the 'add_clause' command.  I
+=== have never seen this used, so perhaps it's not critical for most
+=== applications.  It would be good to understand this better though.
+=== The add_clause_xxx functions are declared 'static' within input.c
+
+add_new_clause(samp_table_t *table, input_literal_t **clause, double weight,
+	       char *source, bool add_weights);
+
+    In "case ADD_CLAUSE" of 'read_eval', the static functions
+    add_clause and add_clause_instance are used to add a new clause
+    (with or without variables, respectively).  It might be best to
+    define an external function that provides a wrapper for both of
+    these, (e.g., add_new_clause above).  Here are the two signatures:
+
+With vars:
+static int32_t add_clause(input_clause_t *rule, double weight, char *source,
+		samp_table_t *samp_table);
+
+without:
+static int32_t add_clause_instance(samp_table_t *table, input_literal_t **in_clause,
+		double weight, char *source, bool add_weights);	
+
+
+
+
+
+void add_cnf_query(input_formula_t *formula);
+
+     Used by the 'ask' command to set up a query based on the given formula. 
+     The formula argument can be constructed by yy_formula.
+
+
+
+
+extern void add_weighted_formula(samp_table_t* table, input_add_fdecl_t* decl);
+
+     Used by the 'learn' command.  Adds a formula 'decl' to the table.
+     Weight is included in the input_add_fdecl_t struct.  Not clear if
+     we have to decompose this for a usable embedded API.
+
+
+
+void mc_sat(samp_table_t *table,
+     	    bool lazy,
+	    uint32_t max_samples,
+	    double sa_probability,
+	    double sa_temperature,
+	    double rvar_probability,
+	    uint32_t max_flips,
+	    uint32_t max_extra_flips,
+	    uint32_t timeout,
+	    uint32_t burn_in_steps,
+	    uint32_t samp_interval);
+
+    The Big Kahuna.  Performs inference on the table / network.  Aside
+    from 'table', other args are parameters that affect the sampling
+    algorithm.
+
+
+void retract_source(char *source, samp_table_t *table);
+
+     I think this is supposed to retract things that were added.
+
+
+extern void dumptable(int32_t tbl, samp_table_t *table);
+
+     Dispatcher to print out results of mcsat - this function uses
+     several "dump_" functions that print specific kinds of
+     information.
 
