@@ -1,6 +1,6 @@
 This is a start for some API documentation.  Using the parser and
 'input.c' as a guide, this walks through the functions that can be
-used to build an MLN and perform inference using it.
+used to build an MLN and perform inference with it.
 
 
 Making a samp_table_t object is required before anything else.  Within
@@ -83,7 +83,9 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight, char *sourc
     input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
 
     The yy_ parser functions could be wrapped and exposed as part of
-    the library API.
+    the library API.  Since they are not static, they should be
+    visible to the linker and can probably be used now, but we may
+    want to consider providing a different API for embedded use.
 
 
 === NOTE: This describes the results of the 'add_clause' command.  I
