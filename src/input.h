@@ -331,6 +331,11 @@ extern input_fmla_t *yy_fmla(int32_t op, input_fmla_t *arg1, input_fmla_t *arg2)
 extern input_fmla_t *yy_atom_to_fmla (input_atom_t *atom);
 extern input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
 
+extern input_atom_t *make_atom (char *pred, char **args, int32_t builtinop);
+extern input_fmla_t *make_fmla(int32_t op, input_fmla_t *arg1, input_fmla_t *arg2);
+extern input_fmla_t *atom_to_fmla (input_atom_t *atom);
+extern input_formula_t *make_formula (char **vars, input_fmla_t *fmla);
+
 void set_training_data_file(char *path);
 
 #endif /* __INPUT_H */

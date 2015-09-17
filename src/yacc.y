@@ -120,6 +120,7 @@ input_sortdef_t *yy_sortdef(char *lbnd, char *ubnd) {
 }
 
 input_atom_t *yy_atom (char *pred, char **args, int32_t builtinop) {
+#if 0
   input_atom_t *atom;
   
   atom = (input_atom_t *) safe_malloc(sizeof(input_atom_t));
@@ -127,9 +128,13 @@ input_atom_t *yy_atom (char *pred, char **args, int32_t builtinop) {
   atom->args = args;
   atom->builtinop = builtinop;
   return atom;
+#else
+  return make_atom(pred, args, builtinop);
+#endif
 };
 
 input_formula_t *yy_formula (char **vars, input_fmla_t *fmla) {
+#if 0
   input_formula_t *formula;
   int32_t i, vlen;
 
@@ -149,9 +154,13 @@ input_formula_t *yy_formula (char **vars, input_fmla_t *fmla) {
   }
   formula->fmla = fmla;
   return formula;
+#else
+  return make_formula(vars, fmla);
+#endif
 };
 
 input_fmla_t *yy_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2) {
+#if 0
   input_fmla_t *fmla;
   input_ufmla_t *ufmla;
   input_comp_fmla_t *cfmla;
@@ -166,9 +175,13 @@ input_fmla_t *yy_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2) {
   cfmla->arg1 = arg1;
   cfmla->arg2 = arg2;
   return fmla;
+#else
+  return make_fmla(op, arg1, arg2);
+#endif
 };
 
 input_fmla_t *yy_atom_to_fmla (input_atom_t *atom) {
+#if 0
   input_fmla_t *fmla;
   input_ufmla_t *ufmla;
 
@@ -178,6 +191,9 @@ input_fmla_t *yy_atom_to_fmla (input_atom_t *atom) {
   fmla->ufmla = ufmla;
   ufmla->atom = atom;
   return fmla;
+#else
+  return atom_to_fmla(atom);
+#endif
 };
 
 input_literal_t *yy_literal(bool neg, input_atom_t *atom) {

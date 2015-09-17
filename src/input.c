@@ -1883,3 +1883,71 @@ extern void load_mcsat_file(char *file, samp_table_t *table) {
 	read_eval_print_loop(file, table);
 }
 
+
+/*
+ * These are external versions of some yy_ parser helper functions.
+ * The idea is to expose this input functionality to callers for
+ * embedded PCE.  It's not yet clear whether we can live with this
+ * API, or whether something new is required:
+ */
+
+extern input_atom_t *make_atom (char *pred, char **args, int32_t builtinop) {
+  input_atom_t *atom;
+  
+  atom = (input_atom_t *) safe_malloc(sizeof(input_atom_t));
+  atom->pred = pred;
+  atom->args = args;
+  atom->builtinop = builtinop;
+  return atom;
+};
+
+input_fmla_t *atom_to_fmla (input_atom_t *atom) {
+  input_fmla_t *fmla;
+  input_ufmla_t *ufmla;
+
+  fmla = (input_fmla_t *) safe_malloc(sizeof(input_fmla_t));
+  ufmla = (input_ufmla_t *) safe_malloc(sizeof(input_ufmla_t));
+  fmla->atomic = true;
+  fmla->ufmla = ufmla;
+  ufmla->atom = atom;
+  return fmla;
+}
+
+input_fmla_t *make_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2) {
+  input_fmla_t *fmla;
+  input_ufmla_t *ufmla;
+  input_comp_fmla_t *cfmla;
+
+  fmla = (input_fmla_t *) safe_malloc(sizeof(input_fmla_t));
+  ufmla = (input_ufmla_t *) safe_malloc(sizeof(input_ufmla_t));
+  cfmla = (input_comp_fmla_t *) safe_malloc(sizeof(input_comp_fmla_t));
+  fmla->atomic = false;
+  fmla->ufmla = ufmla;
+  ufmla->cfmla = cfmla;
+  cfmla->op = op;
+  cfmla->arg1 = arg1;
+  cfmla->arg2 = arg2;
+  return fmla;
+}
+
+input_formula_t *make_formula (char **vars, input_fmla_t *fmla) {
+  input_formula_t *formula;
+  int32_t i, vlen;
+
+  formula = (input_formula_t *) safe_malloc(sizeof(input_formula_t));
+  if (vars == NULL) {
+    formula->vars = NULL;
+  } else {
+    for (vlen = 0; vars[vlen] != NULL; vlen++) {}
+    formula->vars = (var_entry_t **)
+      safe_malloc((vlen + 1) * sizeof(var_entry_t *));
+    for (i = 0; i < vlen; i++) {
+      formula->vars[i] = (var_entry_t *) safe_malloc(sizeof(var_entry_t));
+      formula->vars[i]->name = vars[i];
+      formula->vars[i]->sort_index = -1;
+    }
+    formula->vars[vlen] = NULL;
+  }
+  formula->fmla = fmla;
+  return formula;
+}
