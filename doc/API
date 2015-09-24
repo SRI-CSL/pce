@@ -53,13 +53,14 @@ int32_t add_atom(samp_table_t *table, input_atom_t *current_atom);
 
 
 
+WARNING:  
 int32_t assert_atom(samp_table_t *table, input_atom_t *current_atom, char *source);
 
     Adds 'current_atom' to the sample table.  How is 'current_atom'
     constructed?  The yacc parser assembles it by calling yy_atom on
     various alternative inputs:
 
-    input_atom_t *yy_atom (char *pred, char **args, int32_t builtinop);
+input_atom_t *make_atom (char *pred, char **args, int32_t builtinop);
 
     where 'pred' is a predicate name, and 'args' is the predicate arg
     list.  An input_atom_t is simply a tuple whose slots are the
@@ -75,17 +76,12 @@ void add_cnf(char **frozen, input_formula_t *formula, double weight, char *sourc
 
     formula: variable names delimited by square braces [ ], followed
     by a logical formula over those variables.  Constructed by these
-    parser functions:
+    functions:
 
-    input_atom_t *yy_atom (char *pred, char **args, int32_t builtinop);
-    input_fmla_t *yy_atom_to_fmla (input_atom_t *atom);
-    input_fmla_t *yy_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2);
-    input_formula_t *yy_formula (char **vars, input_fmla_t *fmla);
-
-    The yy_ parser functions could be wrapped and exposed as part of
-    the library API.  Since they are not static, they should be
-    visible to the linker and can probably be used now, but we may
-    want to consider providing a different API for embedded use.
+    input_atom_t *make_atom (char *pred, char **args, int32_t builtinop);
+    input_fmla_t *atom_to_fmla (input_atom_t *atom);
+    input_fmla_t *make_fmla (int32_t op, input_fmla_t *arg1, input_fmla_t *arg2);
+    input_formula_t *make_formula (char **vars, input_fmla_t *fmla);
 
 
 === NOTE: This describes the results of the 'add_clause' command.  I
@@ -111,6 +107,12 @@ static int32_t add_clause_instance(samp_table_t *table, input_literal_t **in_cla
 		double weight, char *source, bool add_weights);	
 
 
+
+
+void add_cnf(input_formula_t *formula);
+
+     Used by the 'add' command to add the given formula. 
+     The formula argument can be constructed by make_formula.
 
 
 

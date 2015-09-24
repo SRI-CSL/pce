@@ -301,7 +301,7 @@ extern void print_weighted_formula(weighted_formula_t *weighted_formula,
 	if (weighted_formula->is_ground) {
 		print_rule_instance(weighted_formula->clausified_formula.rule_inst, table);
 	} else {
-		int32_t j;
+	        // int32_t j;
 		samp_rule_t* rule = weighted_formula->clausified_formula.rule;
 		//rule_inst_t* rule_inst = weighted_formula->clausified_formula.rule_inst;
 		//rule_clause_t* clause;

@@ -90,7 +90,7 @@ static int32_t sample_sat_body(samp_table_t *table, bool lazy, double sa_probabi
 		double sa_temperature, double rvar_probability) {
 	rule_inst_table_t *rule_inst_table = &(table->rule_inst_table);
 	atom_table_t *atom_table = &(table->atom_table);
-	int32_t dcost;
+	int32_t dcost = 0;  // to suppress warning.
 	int32_t var;
 	int32_t conflict = 0;
 

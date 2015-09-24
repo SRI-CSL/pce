@@ -68,6 +68,7 @@ void parse_line(char* line, training_data_t *training_data,
 			if (j > 0) {
 				buffer_cnt++;
 			}
+			/* What the heck does this third argument mean?? */
 			if (strncmp(member + buffer_cnt, cname, strlen(cname) != 0)) {
 				break;
 			}

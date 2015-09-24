@@ -621,6 +621,25 @@ retract [all | source];\n\
 ");
 		break;
 	}
+	case SET: {
+		output(
+				"\n\
+set parameter value;\n\
+  Sets various parameters, including:\n\
+  max_samples (int): Number of MC samples to take\n\
+  sa_probability (double): Prob of taking simulated annealing step\n\
+  sa_temperature (double): Simulated annealing temperature\n\
+  rvar_probability (double): Prob of flipping a random variable\n\
+                             in non-simulated annealing step\n\
+  max_flips (int): Max number of variable flips to find a model\n\
+  max_extra_flips (int): Max number of extra flips to try\n\
+  timeout (int): Number of seconds to timeout - 0 means no timeout\n\
+  burn_in_steps (int): Number of burn-in steps for MCSAT\n\
+  samp_interval (int): Sampling interval, i.e., number of steps between samples\n\
+ The sampling runs until either max_samples or the timeout, whichever comes first.\n\
+");
+		break;
+	}
 	case DUMPTABLE: {
 		output(
 				"\n\
