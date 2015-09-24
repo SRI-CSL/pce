@@ -904,7 +904,7 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     ;
 
 cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
-     | SET {$$ = SET;} |
+     | SET {$$ = SET;}
      | SORT {$$ = SORT;} | SUBSORT {$$ = SUBSORT;} | PREDICATE {$$ = PREDICATE;}
      | CONSTD {$$ = CONSTD;} | VAR {$$ = VAR;} | ATOMD {$$ = ATOMD;}
      | ASSERT {$$ = ASSERT;} | ADD {$$ = ADD;} | ADD_CLAUSE {$$ = ADD_CLAUSE;}
