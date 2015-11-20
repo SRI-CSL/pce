@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <float.h>
+#include <math.h>
 #include "memalloc.h"
 #include "samplesat.h"
 #include "mcsat.h"
@@ -293,17 +294,31 @@ void yy_assert_decl (input_atom_t *atom, char *source) {
   input_command.decl.assert_decl.source = source;
 };
 
-void yy_add_fdecl (char **frozen, input_formula_t *formula, char *wt, char *source) {
+/*
+ * What if we want 'wt' to be an arithmetic expression?  Should we
+ * calculate as we parse?  Seems like the right thing...
+ */
+void yy_add_fdecl (char **frozen, input_formula_t *formula, double wt, char *source) {
   input_command.kind = ADD;
   input_command.decl.add_fdecl.frozen = frozen;
   input_command.decl.add_fdecl.formula = formula;
   input_command.decl.add_fdecl.source = source;
+  input_command.decl.add_fdecl.weight = wt;
+/*
+  if (wt == DBL_MAX)
+    fprintf(stderr, "yy_add_decl wt = DBL_MAX\n");
+  else
+    fprintf(stderr, "yy_add_decl wt = %f\n", wt);
+*/
+#if 0
   if (strcmp(wt, "DBL_MAX") == 0) {
     input_command.decl.add_fdecl.weight = DBL_MAX;
   } else {
+    /* Here, we should introduce expressions: */
     input_command.decl.add_fdecl.weight = strtod(wt, NULL);
     safe_free(wt);
   }
+#endif
 };
 
 // for weight learning
@@ -320,16 +335,23 @@ void yy_add_fdecl (char **frozen, input_formula_t *formula, char *wt, char *sour
   }
 };
   
-void yy_add_decl (input_clause_t *clause, char *wt, char *source) {
+//void yy_add_decl (input_clause_t *clause, char *wt, char *source) {
+void yy_add_decl (input_clause_t *clause, double wt, char *source) {
   input_command.kind = ADD_CLAUSE;
   input_command.decl.add_decl.clause = clause;
   input_command.decl.add_decl.source = source;
-  if (strcmp(wt, "DBL_MAX") == 0) {
-    input_command.decl.add_decl.weight = DBL_MAX;
-  } else {
-    input_command.decl.add_decl.weight = atof(wt);
-    safe_free(wt);
-  }
+/*
+  if (wt == DBL_MAX)
+    fprintf(stderr, "yy_add_decl wt = DBL_MAX\n");
+  else
+    fprintf(stderr, "yy_add_decl wt = %f\n", wt);
+*/
+//  if (strcmp(wt, "DBL_MAX") == 0) {
+  input_command.decl.add_decl.weight = wt;
+//  } else {
+//    input_command.decl.add_decl.weight = atof(wt);
+//    safe_free(wt);
+//  }
 };
   
 void yy_ask_fdecl (input_formula_t *formula, char **threshold_numresult) {
@@ -805,6 +827,10 @@ void yy_quit () {
 %token LEARNING_RATE
 %token REPORT_RATE
 
+%token ENDNUM
+%left '+' '-'
+%left '*' '/'
+%left EXP LN SQRT
 
 
 %union
@@ -820,9 +846,10 @@ void yy_quit () {
   struct input_literal_s **lits;
   struct input_atom_s *atom;
   int32_t ival;
+  double dval;
 }
 
-%type <str> arg NAME NUM STRING addwt oarg oname retractarg learnprob trainarg
+%type <str> arg NAME NUM STRING oarg oname retractarg learnprob trainarg
 %type <strs> arguments names oarguments onum2 ofrozen
 %type <sortdef> sortdef sortval interval
 %type <formula> formula
@@ -833,6 +860,7 @@ void yy_quit () {
 %type <atom> atom
 %type <bval> witness
 %type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM 
+%type <dval> addwt expr
 
 /*
 %type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM LBFGS GRADIENT  set_param trainalg
@@ -880,8 +908,15 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | ATOMD atom {yy_atom_decl($2);}
     | ASSERT atom oname {yy_assert_decl($2, $3);}
     | ADD_CLAUSE clause addwt oname {yy_add_decl($2, $3, $4);}
+    | ADD_CLAUSE clause '{' expr '}'  oname {yy_add_decl($2, $4, $6);}
 //    | ASK_CLAUSE clause NUM oarg oarg {yy_ask_decl($2, $3, $4, $5);}
+/* Below, for the ADD production, instead of 'addwt', use a production
+ * that allows arithmetic operations and can compute them on the fly.
+ * This allows us to use a preprocessor to substitute different values
+ * during a survey:
+ */
     | ADD ofrozen formula addwt oname {yy_add_fdecl($2, $3, $4, $5);}
+    | ADD ofrozen formula '{' expr '}' oname {yy_add_fdecl($2, $3, $5, $7);}
     | ASK formula onum2 {yy_ask_fdecl($2, $3);}
 // Weight learning
     | LEARN ofrozen formula learnprob oname {yy_learn_fdecl($2, $3, $4, $5);}
@@ -999,7 +1034,32 @@ oarg: /*empty*/ {$$=NULL;} | arg;
 
 arg: NAME | NUM; // returns string from yystrings
 
-addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
+/*
+ * This has to change to support arithmetic expressions:
+ */
+
+//  addwt: NUM | /* empty */ {$$ = "DBL_MAX";};
+
+/* These productions turn weights into doubles rather than strings,
+   and allow various expressions to be used to compute rule weights.
+   The main idea is to allow preprocessors to perform substitutions
+   that can scale a number of different weights by the same scale
+   factor, or progress surveys by log probabilities instead of simply
+   a linear scale:
+*/
+
+addwt: NUM { $$ = strtod($1, NULL); } | /* empty */ {$$ = DBL_MAX;};
+//addwt: expr | /* empty */ {$$ = DBL_MAX;};
+
+expr: NUM { $$ = strtod($1, NULL); }
+     | expr PLUS expr { $$ = $1 + $3; } 
+     | expr MINUS expr { $$ = $1 - $3; }
+     | expr TIMES expr { $$ = $1 * $3; }
+     | expr DIV expr { $$ = $1 / $3; }
+     | EXP '(' expr ')' { $$ = exp($3); }
+     | LN '(' expr ')' { $$ = log($3); }
+
+
 
 learnprob: NUM | /* empty */ {$$ = "NA";};
 
@@ -1251,6 +1311,10 @@ int yylex (void) {
       return LBFGS;
     else if (strcasecmp(yylval.str, "GRADIENT") == 0)
       return GRADIENT;
+    else if (strcasecmp(yylval.str, "EXP") == 0)
+      return EXP;
+    else if (strcasecmp(yylval.str, "LN") == 0)
+      return LN;
     else
       nstr = (char *) safe_malloc((strlen(yylval.str)+1) * sizeof(char));
     strcpy(nstr, yylval.str);
