@@ -485,6 +485,9 @@ add FORMULA [WEIGHT [SOURCE]];\n\
   Clausifies the FORMULA, and adds each clause to the clause or rules table,\n\
 with the given WEIGHT (a floating point number) and associated with the SOURCE\n\
 (an arbitrary NAME).\n\
+WEIGHTs can also be limited arithmetic expressions bracketed by '{' and '}', e.g.,\n\
+'{ 2.3*3 }'.  The functions 'ln' and 'exp' are also allowed.  Expressions must\n\
+evaluate to floating point numbers.\n\
 Ground clauses are added to the clause table, and clauses with variables are\n\
 added to the rule table.  For a ground clause, the formula is an atom\n\
 (i.e., predicate applied to constants), or a boolean expression\n\
