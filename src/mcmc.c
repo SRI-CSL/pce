@@ -272,6 +272,19 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
 	return 0;
 }
 
+/*
+ * Perhaps the easiest path to parallelization lies in multithreading
+ * this function by cloning the (master copy of the) table and
+ * allowing multiple threads to operate, each on their own copy.  The
+ * trick is that we will need to clone the table and its slots,
+ * following all of the pointers.  Once that is done, we should be
+ * able to start multiple threads that (we hope) won't require
+ * mutexes.
+ *
+ * Then, after joining, we can merge the tables (I make it sound so
+ * easy, don't I!) back into the master copy.
+ */
+
 void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_probability,
 		double sa_temperature, double rvar_probability, uint32_t max_flips,
 		uint32_t max_extra_flips, uint32_t timeout,

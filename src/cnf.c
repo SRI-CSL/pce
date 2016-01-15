@@ -18,6 +18,9 @@
 
 pvector_t ask_buffer = { 0, 0, NULL };
 
+/*
+ * Most of this file helps us construct samp_table:
+ */
 extern samp_table_t samp_table;
 
 static int32_t vars_len(var_entry_t **vars) {
@@ -33,7 +36,8 @@ static int32_t vars_len(var_entry_t **vars) {
 }
 
 rule_atom_t *copy_rule_atom(rule_atom_t *atom, samp_table_t *table) {
-	pred_table_t *pred_table = &samp_table.pred_table;
+  //	pred_table_t *pred_table = &samp_table.pred_table;
+  pred_table_t *pred_table = &(table->pred_table);
 	rule_atom_t *catom;
 	int32_t i, arity;
 
@@ -58,6 +62,10 @@ rule_literal_t *copy_rule_literal(rule_literal_t *lit, samp_table_t *table) {
 	return clit;
 }
 
+
+/*
+ * Uses global samp_table:
+ */
 static rule_literal_t *atom_to_rule_literal(input_atom_t *iatom,
 		var_entry_t **vars, bool neg) {
 	samp_table_t *table = &samp_table;

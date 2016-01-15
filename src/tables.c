@@ -26,6 +26,34 @@ void init_sort_table(sort_table_t *sort_table){
 	init_stbl(&(sort_table->sort_name_index), 0);
 }
 
+/*
+ * "Deep-ish" copy of the sort table, mainly for allowing us to run
+ * multithreaded mcmc.  Corresponding functions are being written for
+ * each other table type too (including samp_table_t).  The theory is
+ * that each MCMC thread will need its own samp_table_t table.  Rather
+ * than use mutexes and a single table, it should be faster to allow
+ * multiple threads to run asynchronously, each with its own copy of
+ * the tables.  This is naive - it's quite possible that this is
+ * overkill, depending on what's really being updated in the mcmc run.
+ * On the other hand, it might be generally useful to provide a deep
+ * copy function for all tables:
+ */
+
+void copy_sort_table(sort_table_t *to, sort_table_t *from) {
+  int32_t size;
+  size = to->size = from->size;
+  to->num_sorts = from->num_sorts;
+  to->entries = (sort_entry_t*) safe_malloc(size * sizeof(sort_entry_t));
+  memcpy(to->entries, from->entries, size * sizeof(sort_entry_t));
+  /* Decisions: Do we need a copy of this, or is it sufficient to
+   * point to the same symbol table?  I claim the latter, since the
+   * primary purpose of the copy is parallelization.  Parallel MCMC
+   * will not modify the symbol table. */
+  to->sort_name_index = from->sort_name_index;
+}
+
+/* How are sort_table_t objects destroyed / freed? */
+
 void reset_sort_table(sort_table_t *sort_table){
 	sort_table->num_sorts = 0;
 	reset_stbl(&(sort_table->sort_name_index));
@@ -264,6 +292,19 @@ void init_const_table(const_table_t *const_table){
 	init_stbl(&(const_table->const_name_index), 0);
 }
 
+
+/*
+ * const table copier:
+ */
+void copy_const_table(const_table_t *to, const_table_t *from) {
+  int32_t size;
+  size = to->size = from->size;
+  to->num_consts = from->num_consts;
+  to->entries = (const_entry_t*) safe_malloc(size*sizeof(const_entry_t));
+  memcpy(to->entries, from->entries, size * sizeof(const_entry_t));
+  to->const_name_index = from->const_name_index;
+}
+
 static void const_table_resize(const_table_t *const_table, uint32_t n){
 	if (n >= MAXSIZE(sizeof(const_entry_t), 0)){
 		out_of_memory();
@@ -420,6 +461,18 @@ void init_var_table(var_table_t *var_table){
 	var_table->entries = (var_entry_t*)
 		safe_malloc(size*sizeof(var_entry_t));
 	init_stbl(&(var_table->var_name_index), 0);
+}
+
+/*
+ * var table copier:
+ */
+void copy_var_table(var_table_t *to, var_table_t *from) {
+  int32_t size;
+  size = to->size = from->size;
+  to->num_vars = from->num_vars;
+  to->entries = (var_entry_t*) safe_malloc(size*sizeof(var_entry_t));
+  memcpy(to->entries, from->entries, size * sizeof(var_entry_t));
+  to->var_name_index = from->var_name_index;
 }
 
 static void var_table_resize(var_table_t *var_table, uint32_t n){
@@ -1464,3 +1517,29 @@ bool valid_table(samp_table_t *table){
 	return true;
 }
 
+
+
+/*
+ * Deep copy of the sample table object:
+ */
+
+#if 0
+
+samp_table_t *clone_samp_table(samp_table_t *table) {
+  samp_table_t *clone;
+
+  clone = clone_memory(table, sizeof(table));
+  copy_sort_table(&table.sort_table, &(table->sort_table));
+  copy_const_table(&table.const_table, &(table->const_table));
+  copy_var_table(&table.var_table, &(table->var_table));
+  copy_pred_table(&table.pred_table, &(table->pred_table));
+  copy_atom_table(&table.atom_table, &(table->atom_table));
+  copy_rule_table(&table.rule_table, &(table->rule_table));
+  copy_rule_inst_table(&table.rule_inst_table, &(table->rule_inst_table));
+  copy_query_table(&table.query_table, &(table->query_table));
+  copy_query_inst_table(&table.query_instance_table, &(table->query_instance_table));
+  copy_source_table(&table.source_table, &(table->source_table));
+  return clone;
+}
+  
+#endif

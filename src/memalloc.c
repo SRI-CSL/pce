@@ -89,4 +89,3 @@ void *clone_memory(void *memory, size_t size) {
 	memcpy(tmp, memory, size);
 	return tmp;
 }
-
