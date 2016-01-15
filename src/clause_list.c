@@ -24,6 +24,7 @@ void init_clause_list(samp_clause_list_t *list) {
 }
 
 
+#if 0
 void copy_clause_list(samp_clause_list_t, *to, samp_clause_list_t *from) {
 	/* sentinel */
   to->length = from->length;
