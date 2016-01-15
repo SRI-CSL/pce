@@ -554,6 +554,29 @@ void init_pred_table(pred_table_t *pred_table){
 
 }
 
+/*
+ * This is a tough one.  The pred_tbl and evpred_tbl objects are
+ * themselves dynamic, so we will need to thread through them too, but
+ * maybe this isn't too bad:
+ */
+void copy_pred_table(pred_table_t *to, pred_table_t *from) {
+  int32_t size;
+
+  size = to->evpred_tbl.size = from->evpred_tbl.size;
+  to->evpred_tbl.num_preds = from->evpred_tbl.num_preds;
+  to->evpred_tbl.entries = (pred_entry_t*) safe_malloc(size*sizeof(pred_entry_t));
+  memcpy(to->evpred_tbl.entries, from->evpred_tbl.entries, size*sizeof(pred_entry_t));
+
+  size = to->pred_tbl.size = from->evpred_tbl.size;
+  to->pred_tbl.num_preds = from->evpred_tbl.num_preds;
+  to->pred_tbl.entries = (pred_entry_t*) safe_malloc(size*sizeof(pred_entry_t));
+  memcpy(to->evpred_tbl.entries, from->evpred_tbl.entries, size*sizeof(pred_entry_t));
+
+  /* Just copy the pointer for the symbol table: */
+  to->pred_name_index = from->pred_name_index;
+}
+
+
 static void pred_tbl_resize(pred_tbl_t *pred_tbl){//call this extend, not resize
 	int32_t size = pred_tbl->size;
 	int32_t num_preds = pred_tbl->num_preds;
@@ -775,6 +798,56 @@ void init_atom_table(atom_table_t *table) {
 	//  table->entries[0].atom->pred = 0;
 }
 
+
+/*
+ * Deep copy of the atom table: This one concerns me.  It smells to me
+ * like the main state object for MCMC.  Are we doing the right thing
+ * here by copying everything?
+ */
+
+void copy_atom_table(atom_table_t *to, atom_table_t *from) {
+  uint32_t size;
+
+  size = to->size = from->size;
+
+  //  to->size = INIT_ATOM_TO_SIZE;
+  to->num_vars = from->num_vars; //atoms are positive
+  to->num_unfixed_vars = from->num_unfixed_vars;
+  if (to->size >= MAXSIZE(sizeof(samp_atom_t *), 0)){
+    out_of_memory();
+  }
+
+  to->atom = (samp_atom_t **) safe_malloc(size * sizeof(samp_atom_t *));
+  memcpy(to->atom, from->atom, size * sizeof(samp_atom_t *));
+
+  to->active = (bool *) safe_malloc(size * sizeof(bool));
+  memcpy(to->active, from->active, size * sizeof(samp_atom_t *));
+
+  to->assignments[0] = (samp_truth_value_t *) safe_malloc(size * sizeof(samp_truth_value_t));
+  memcpy(to->assignments[0], from->assignments[0], size * sizeof(samp_truth_value_t));
+
+  to->assignments[1] = (samp_truth_value_t *) safe_malloc(size * sizeof(samp_truth_value_t));
+  memcpy(to->assignments[1], from->assignments[1], size * sizeof(samp_truth_value_t));
+
+  to->assignment_index = from->assignment_index;
+  to->assignment = from->assignments[from->assignment_index];
+
+  to->pmodel = (int32_t *) safe_malloc(size * sizeof(int32_t));
+  memcpy(to->pmodel, from->pmodel, size * sizeof(int32_t));
+
+  to->sampling_nums = (int32_t *) safe_malloc(size * sizeof(int32_t));
+  memcpy(to->sampling_nums, from->sampling_nums, size * sizeof(int32_t));
+
+  /* What's the "right number" to use here??  This should probably
+   * start fresh at 0 for every new copy, but here we will copy the
+   * value in case the thread needs to know it:
+   */
+  to->num_samples = from->num_samples;
+  copy_array_hmap(&(to->atom_var_hash),  &(from->atom_var_hash) );
+  // init_array_hmap(&to->atom_var_hash, ARRAY_HMAP_DEFAULT_SIZE);
+}
+
+
 /*
  * Resizes the atom table to fit the current atom_table->num_vars. When
  * atom_table is resized, the assignments and the watched literals must also be
@@ -835,6 +908,42 @@ void init_rule_inst_table(rule_inst_table_t *table){
 	init_clause_list(&table->live_clauses);
 	init_hmap(&table->unsat_soft_rules, HMAP_DEFAULT_SIZE);
 }
+
+/*
+ * Deep copy of the rule instance table:
+ */
+
+#if 0
+void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from) {
+  to->size = from->size;
+  to->num_rule_insts = from->num_rule_insts;
+  if (to->size >= MAXSIZE(sizeof(rule_inst_t *), 0)){
+    out_of_memory();
+  }
+
+  to->rule_insts = (rule_inst_t **) safe_malloc(to->size * sizeof(rule_inst_t *));
+  memcpy(to->rule_insts, from->rule_insts, to->size * sizeof(rule_inst_t *));
+
+  to->assignment = (samp_truth_value_t *) safe_malloc(to->size * sizeof(samp_truth_value_t));
+  memcpy(to->assignment, from->assignment, to->size * sizeof(samp_truth_value_t));
+
+  to->watched = (samp_clause_list_t *) safe_malloc( 2 * INIT_ATOM_TABLE_SIZE * sizeof(samp_clause_list_t) );
+  memcpy(to->watched, from->watched, 2 * INIT_ATOM_TABLE_SIZE * sizeof(samp_clause_list_t));
+
+  to->rule_watched = (samp_clause_list_t *) safe_malloc(
+			to->size * sizeof(samp_clause_list_t));
+  memcpy(to->rule_watched, from->rule_watched, to->size * sizeof(samp_clause_list_t));
+
+  /* TO DO:  CHECK THESE AND DO THE RIGHT THING HERE: */
+  copy_clause_list(&to->sat_clauses, &from->sat_clauses);
+  copy_clause_list(&to->unsat_clauses, &from->unsat_clauses);
+  copy_clause_list(&to->live_clauses, &from->live_clauses);
+
+  copy_array_hmap(&to->unsat_soft_rules, &from->unsat_soft_rules);
+  //  init_hmap(&to->unsat_soft_rules, HMAP_DEFAULT_SIZE);
+}
+#endif
+
 
 /*
  * Check whether there's room for one more clause in rule_inst_table.

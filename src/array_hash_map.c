@@ -5,6 +5,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h>
 #include "memalloc.h"
 #include "array_hash_map.h"
 #include "hash_functions.h"
@@ -48,6 +49,24 @@ void init_array_hmap(array_hmap_t *hmap, uint32_t n) {
   hmap->resize_threshold = (uint32_t)(n * ARRAY_HMAP_RESIZE_RATIO);
   hmap->cleanup_threshold = (uint32_t) (n * ARRAY_HMAP_CLEANUP_RATIO);
 }
+
+
+/*
+ * Make a faithful copy of the incoming hmap:
+ */
+void copy_array_hmap(array_hmap_t *newmap, array_hmap_t *hmap) {
+  int32_t n;
+
+  n = hmap->size;
+  newmap->size = n;
+  newmap->data = (array_hmap_pair_t *) safe_malloc(n * sizeof(array_hmap_pair_t));
+  memcpy(newmap->data, hmap->data, n * sizeof(array_hmap_pair_t));
+  newmap->nelems = hmap->nelems;
+  newmap->ndeleted = hmap->ndeleted;
+  newmap->resize_threshold = hmap->resize_threshold;
+  newmap->cleanup_threshold = hmap->cleanup_threshold;
+}
+
 
 
 /*

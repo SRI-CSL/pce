@@ -56,6 +56,12 @@ typedef struct array_hmap_s {
 extern void init_array_hmap(array_hmap_t *hmap, uint32_t n);
 
 /*
+ * Copy the hmap from another and return the copy:
+ */
+extern void copy_array_hmap(array_hmap_t *to, array_hmap_t *from);
+
+
+/*
  * Delete: free memory
  */
 extern void delete_array_hmap(array_hmap_t *hmap);
