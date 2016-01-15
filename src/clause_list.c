@@ -23,16 +23,16 @@ void init_clause_list(samp_clause_list_t *list) {
 	assert(valid_clause_list(list));
 }
 
-#if 0
+
 void copy_clause_list(samp_clause_list_t, *to, samp_clause_list_t *from) {
 	/* sentinel */
   to->length = from->length;
-
-	list->head = (samp_clause_t *) safe_malloc(sizeof(samp_clause_t));
-	list->head->link = NULL;
-	list->tail = list->head;
-	list->length = 0;
-	assert(valid_clause_list(list));
+  to->head = (samp_clause_t *) safe_malloc(sizeof(samp_clause_t));
+  memcpy(to->head, from->head, to->length * sizeof(samp_clause_t));
+  to->head->link = from->head->link;
+  to->tail = from->tail;
+  /* Questionable? */
+  assert(valid_clause_list(list));
 }
 #endif
 
