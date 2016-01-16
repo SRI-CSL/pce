@@ -51,6 +51,27 @@ void init_hmap(hmap_t *hmap, uint32_t n) {
 
 
 /*
+ * Make a faithful full copy of the hmap (from ==> to):
+ */
+void copy_hmap(hmap_t *to, hmap_t *from) {
+  int32_t n;
+
+  n = from->size;
+  to->size = n;
+
+  to->data = (hmap_pair_t *) safe_malloc(n * sizeof(hmap_pair_t));
+  memcpy(to->data, from->data, n*sizeof(hmap_pair_t));
+
+  to->nelems = from->nelems;
+  to->ndeleted = from->ndeleted;
+  to->resize_threshold = from->resize_threshold;
+  to->cleanup_threshold = from->cleanup_threshold;
+}
+
+
+
+
+/*
  * Free memory
  */
 void delete_hmap(hmap_t *hmap) {

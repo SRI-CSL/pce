@@ -58,6 +58,11 @@ extern void init_hmap(hmap_t *hmap, uint32_t n);
 extern void delete_hmap(hmap_t *hmap);
 
 /*
+ * Copy the hash map:
+ */
+extern void copy_hmap(hmap_t *to, hmap_t *from);
+
+/*
  * Find record with key k. Return NULL if there's none
  */
 extern hmap_pair_t *hmap_find(hmap_t *hmap, int32_t k);

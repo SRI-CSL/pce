@@ -52,25 +52,44 @@ void init_array_hmap(array_hmap_t *hmap, uint32_t n) {
 
 
 /*
- * Make a faithful copy of the incoming hmap:
+ * Copy the individual keys - is it better to do this, or to step
+ * through the hmap and explicitly add keys that appear in the old
+ * hmap?  For now, just blit:
  */
-void copy_array_hmap(array_hmap_t *newmap, array_hmap_t *hmap) {
-  int32_t n;
+void copy_array_hmap_key(array_hmap_pair_t *to, array_hmap_pair_t *from) {
+  to->key = (int32_t *) safe_malloc(from->length * sizeof(int32_t));
+  memcpy(to->key, from->key, from->length * sizeof(int32_t));
+  to->val = from->val;
+  to->hash = from->hash;
+  to->length = from->length;
+}
 
-  n = hmap->size;
-  newmap->size = n;
-  newmap->data = (array_hmap_pair_t *) safe_malloc(n * sizeof(array_hmap_pair_t));
-  memcpy(newmap->data, hmap->data, n * sizeof(array_hmap_pair_t));
-  newmap->nelems = hmap->nelems;
-  newmap->ndeleted = hmap->ndeleted;
-  newmap->resize_threshold = hmap->resize_threshold;
-  newmap->cleanup_threshold = hmap->cleanup_threshold;
+
+/*
+ * Make a faithful full copy of the hmap (from ==> to):
+ */
+void copy_array_hmap(array_hmap_t *to, array_hmap_t *from) {
+  int32_t n, i;
+
+  n = from->size;
+  to->size = n;
+  to->data = (array_hmap_pair_t *) safe_malloc(n * sizeof(array_hmap_pair_t));
+
+  /* Copy the keys too: */
+  for (i = 0; i < n; i++)
+    copy_array_hmap_key( &(to->data[i]), &(from->data[i]) );
+
+  to->nelems = from->nelems;
+  to->ndeleted = from->ndeleted;
+  to->resize_threshold = from->resize_threshold;
+  to->cleanup_threshold = from->cleanup_threshold;
 }
 
 
 
 /*
  * Free memory
+ * Seems wrong - what about the keys?
  */
 void delete_array_hmap(array_hmap_t *hmap) {
   safe_free(hmap->data);
