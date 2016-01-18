@@ -1645,6 +1645,7 @@ extern bool read_eval(samp_table_t *table) {
 
                   for (i = 0; i < nthreads; i++) {
                     s = pthread_join(tinfo[i].thread_id, &res);
+                    if (s != 0) perror("pthread_join");
                     merge_atom_tables( &(table->atom_table), &(copy[i]->atom_table) );
                   }
 
