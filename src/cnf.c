@@ -35,7 +35,10 @@ static int32_t vars_len(var_entry_t **vars) {
 	}
 }
 
-rule_atom_t *copy_rule_atom(rule_atom_t *atom, samp_table_t *table) {
+/*
+ * Where else is this used?
+ */
+rule_atom_t *clone_rule_atom(rule_atom_t *atom, samp_table_t *table) {
   //	pred_table_t *pred_table = &samp_table.pred_table;
   pred_table_t *pred_table = &(table->pred_table);
 	rule_atom_t *catom;
@@ -54,11 +57,11 @@ rule_atom_t *copy_rule_atom(rule_atom_t *atom, samp_table_t *table) {
 	return catom;
 }
 
-rule_literal_t *copy_rule_literal(rule_literal_t *lit, samp_table_t *table) {
+rule_literal_t *clone_rule_literal(rule_literal_t *lit, samp_table_t *table) {
 	rule_literal_t *clit;
 	clit = (rule_literal_t *) safe_malloc(sizeof(rule_literal_t));
 	clit->neg = lit->neg;
-	clit->atom = copy_rule_atom(lit->atom, table);
+	clit->atom = clone_rule_atom(lit->atom, table);
 	return clit;
 }
 
@@ -286,10 +289,10 @@ static rule_literal_t ***cnf_product(rule_literal_t ***c1, rule_literal_t ***c2)
 			conjunct = (rule_literal_t **) safe_malloc(
 					(len1 + len2 + 1) * sizeof(rule_literal_t *));
 			for (ii = 0; ii < len1; ii++) {
-				conjunct[ii] = copy_rule_literal(c1[i][ii], &samp_table);
+				conjunct[ii] = clone_rule_literal(c1[i][ii], &samp_table);
 			}
 			for (jj = 0; jj < len2; jj++) {
-				conjunct[len1 + jj] = copy_rule_literal(c2[j][jj], &samp_table);
+				conjunct[len1 + jj] = clone_rule_literal(c2[j][jj], &samp_table);
 			}
 			conjunct[len1 + len2] = NULL;
 			productcnf[idx++] = conjunct;

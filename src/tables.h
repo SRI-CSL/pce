@@ -506,4 +506,6 @@ extern void retract_source(char *source, samp_table_t *table);
 extern void init_samp_table(samp_table_t *table);
 extern bool valid_table(samp_table_t *table);
 
+extern samp_table_t *clone_samp_table(samp_table_t *table);
+
 #endif /* __TABLES_H */

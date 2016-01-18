@@ -26,7 +26,20 @@ void init_sort_table(sort_table_t *sort_table){
 	init_stbl(&(sort_table->sort_name_index), 0);
 }
 
-
+/*
+ * Deep copy: Those functions that begin with 'copy_' will generally
+ * take a 'to' and a 'from' argument, and assume that 'to' has been
+ * allocated by the caller.  Those functions that begin with 'clone_'
+ * will only take a 'from' argument, and will allocate enough space
+ * for a new struct, fill it, and return that.  In the latter case,
+ * the struct is of variable length, so that the last slot is an array
+ * of length dictated by an earlier slot in the struct, so it's a bit
+ * more convenient to allocate on the fly.
+ *
+ * So far, none of these functions has a true, reliable free
+ * mechanism, so until we fix that, we will have to accept the memory
+ * leak.
+ */
 
 
 void copy_sort_entry(sort_entry_t *to, sort_entry_t *from) {
@@ -39,27 +52,39 @@ void copy_sort_entry(sort_entry_t *to, sort_entry_t *from) {
   to->constants = (int32_t *) safe_malloc(from->cardinality * sizeof(int32_t));
   memcpy( to->constants, from->constants, from->cardinality * sizeof(int32_t) );
 
-  to->ints = (int32_t *) safe_malloc(from->cardinality * sizeof(int32_t));
-  memcpy( to->ints, from->ints, from->cardinality * sizeof(int32_t) );
+  if (from->ints == NULL) to->ints = NULL;
+  else {
+    to->ints = (int32_t *) safe_malloc(from->cardinality * sizeof(int32_t));
+    memcpy( to->ints, from->ints, from->cardinality * sizeof(int32_t) );
+  }
 
   to->lower_bound = from->lower_bound;
   to->upper_bound = from->upper_bound;
 
-  /* Not terribly safe: */
-  i = 0;
-  while (from->subsorts[i] != -1) i++;
-  i++;
+  /* As with ints above, am guessing here and we will need to more
+   * thoroughly test when these things are non-NULL...
+   */
+  if (from->subsorts == NULL) to->subsorts = NULL;
+  else {
+    /* Not terribly safe: */
+    i = 0;
+    while (from->subsorts[i] != -1) i++;
+    i++;
 
-  to->subsorts = (int32_t *) safe_malloc(i * sizeof(int32_t));
-  memcpy(to->subsorts, from->subsorts, i*sizeof(int32_t));
+    to->subsorts = (int32_t *) safe_malloc(i * sizeof(int32_t));
+    memcpy(to->subsorts, from->subsorts, i*sizeof(int32_t));
+  }
 
-  /* Not terribly safe: */
-  i = 0;
-  while (from->supersorts[i] != -1) i++;
-  i++;
+  if (from->supersorts == NULL) to->supersorts = NULL;
+  else {
+    /* Not terribly safe: */
+    i = 0;
+    while (from->supersorts[i] != -1) i++;
+    i++;
 
-  to->supersorts = (int32_t *) safe_malloc(i * sizeof(int32_t));
-  memcpy(to->supersorts, from->supersorts, i*sizeof(int32_t));
+    to->supersorts = (int32_t *) safe_malloc(i * sizeof(int32_t));
+    memcpy(to->supersorts, from->supersorts, i*sizeof(int32_t));
+  }
 }
 
 
@@ -70,7 +95,7 @@ void copy_sort_table(sort_table_t *to, sort_table_t *from) {
   to->entries = (sort_entry_t*) safe_malloc(size * sizeof(sort_entry_t));
 
   /* Deep-copy the sort entries: */
-  for (i = 0; i < size; i++)
+  for (i = 0; i < from->num_sorts; i++)
     copy_sort_entry( &(to->entries[i]), &(from->entries[i]) );
 
   /* 
@@ -327,7 +352,8 @@ void init_const_table(const_table_t *const_table){
  */
 
 void copy_const_entry(const_entry_t *to, const_entry_t *from) {
-  to->name = str_copy(from->name);
+  if (from->name == NULL) to->name = NULL;
+  else to->name = str_copy(from->name);
   to->sort_index = from->sort_index;
 }
 
@@ -507,7 +533,8 @@ void init_var_table(var_table_t *var_table){
  * var table copier:
  */
 void copy_var_entry(var_entry_t *to, var_entry_t *from) {
-  to->name = str_copy(from->name);
+  if (from->name == NULL) to->name = NULL;
+  else to->name = str_copy(from->name);
   to->sort_index = from->sort_index;
 }
 
@@ -644,7 +671,7 @@ void copy_pred_tbl(pred_tbl_t *to, pred_tbl_t *from) {
   size = to->size = from->size;
   to->num_preds = from->num_preds;
   to->entries = (pred_entry_t *) safe_malloc(size * sizeof(pred_entry_t));
-  for (i = 0; i < size; i++)
+  for (i = 0; i < to->num_preds; i++)
     copy_pred_entry( &(to->entries[i]), &(from->entries[i]) );
 }
 
@@ -929,7 +956,7 @@ void copy_atom_table(atom_table_t *to, atom_table_t *from, pred_table_t *pt) {
   /* Deeper copy needed?? */
   to->atom = (samp_atom_t **) safe_malloc(size * sizeof(samp_atom_t *));
   //  memcpy(to->atom, from->atom, size * sizeof(samp_atom_t *));
-  for (i = 0; i < size; i++)
+  for (i = 0; i < to->num_vars; i++)
     to->atom[i] = clone_atom( from->atom[i], pt );
 
   /* Looks ok - just an array of booleans: */
@@ -1055,6 +1082,7 @@ void copy_samp_clause_list( samp_clause_list_t *to, samp_clause_list_t *from ) {
   from_next = from->head;
   to_next = clone_samp_clause(from_next);
   to->head = to_next;
+  tail = to->head;
   for (i = 0; i < length; i++) {
     from_next = from_next->link;
     if (from_next)
@@ -1094,7 +1122,7 @@ void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from) {
   to->unsat_weight = from->unsat_weight;
 
   to->rule_insts = (rule_inst_t **) safe_malloc(size * sizeof(rule_inst_t *));
-  for (i = 0; i < size; i++) {
+  for (i = 0; i < to->num_rule_insts; i++) {
     tmp = clone_rule_inst(from->rule_insts[i]);
     to->rule_insts[i] = tmp;
   }
@@ -1103,8 +1131,8 @@ void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from) {
   to->assignment = (samp_truth_value_t *) safe_malloc(size * sizeof(samp_truth_value_t));
   memcpy(to->assignment, from->assignment, size * sizeof(samp_truth_value_t));
 
-
-  /* What's correct here?? */
+  /* This seems wrong - we should probably be stepping through
+   * watched[i] and copying those lists. */
   to->watched = (samp_clause_list_t *) safe_malloc( 2 * size * sizeof(samp_clause_list_t) );
   copy_samp_clause_list( to->watched, from->watched );
 
@@ -1158,18 +1186,79 @@ void init_rule_table(rule_table_t *table){
 		(samp_rule_t **) safe_malloc(table->size * sizeof(samp_rule_t *));
 }
 
-#if 0
-void copy_rule_table( rule_table_t *to, rule_table_t *from) {
-  copy_array_hmap( &(to->subst_hash), &(from->subst_hash) );
-  to->weight = from->weight;
+void copy_rule_atom( rule_atom_t *to, rule_atom_t *from, pred_table_t *pt) {
+  int i, arity;
+  to->pred = from->pred;
+  arity = pred_arity(to->pred, pt);
+  to->builtinop = from->builtinop;
+  to->args = (rule_atom_arg_t *) safe_malloc( arity * sizeof(rule_atom_arg_t) );
+  for (i = 0; i < arity; i++) {
+    to->args[i].kind = from->args[i].kind;
+    to->args[i].value = from->args[i].value;
+  }
+}
 
+void copy_rule_literal( rule_literal_t *to, rule_literal_t *from, pred_table_t *pt ) {
+  to->neg = from->neg;
+  to->grounded = from->grounded;
+  to->atom = (rule_atom_t *) safe_malloc(sizeof(rule_atom_t));
+  copy_rule_atom( to->atom, from->atom, pt );
+}
+
+
+rule_clause_t *clone_rule_clause( rule_clause_t *from, pred_table_t *pt ) {
+  int32_t i, n;
+  rule_clause_t *to;
+
+  n = from->num_lits;
+  to = (rule_clause_t *) safe_malloc(sizeof(rule_clause_t) + (n+1) * sizeof(rule_literal_t *));
+  to->num_lits = n;
+  to->grounded = from->grounded;
+  for (i = 0; i < n; i++) {
+    to->literals[i] = (rule_literal_t *) safe_malloc(sizeof(rule_literal_t));
+    copy_rule_literal( to->literals[i], from->literals[i], pt );
+  }
+  return to;
+}
+
+
+samp_rule_t *clone_samp_rule( samp_rule_t *from, pred_table_t *pt  ) {
+  int32_t i, full_len, size;
+  samp_rule_t *to;
+
+  full_len = sizeof(samp_rule_t) + (from->num_clauses+1) * sizeof(rule_clause_t *);
+
+  to = (samp_rule_t *) safe_malloc( full_len );
+
+  to->weight = from->weight;
   to->num_vars = from->num_vars;
-  copy_var_entry( to->vars, from->vars );
+
+  size = to->num_vars;
+  to->vars = (var_entry_t **) safe_malloc(size*sizeof(var_entry_t));
+  for (i = 0; i < to->num_vars; i++) {
+    to->vars[i] = (var_entry_t *) safe_malloc( sizeof(var_entry_t) );
+    copy_var_entry( to->vars[i], from->vars[i] );
+  }
 
   to->num_clauses = from->num_clauses;
-  copy_rule_clause( to->clauses, from->clauses );
+  for (i = 0; i < to->num_clauses; i++)
+    to->clauses[i] = clone_rule_clause( from->clauses[i], pt );
+
+  return to;
 }
-#endif
+
+
+void copy_rule_table( rule_table_t *to, rule_table_t *from, pred_table_t *pt ) {
+  int32_t i, size, num_rules;
+
+  size = to->size = from->size;
+  num_rules = to->num_rules = from->num_rules;
+
+  to->samp_rules = (samp_rule_t **) safe_malloc( size * sizeof(samp_rule_t *) );
+  for (i = 0; i < num_rules; i++)
+    to->samp_rules[i] = clone_samp_rule( from->samp_rules[i], pt );
+}
+
 
 /*
  * Resize the rule table to be at least 1 more than num_rules
@@ -1198,6 +1287,29 @@ void init_query_table(query_table_t *table) {
 		(samp_query_t **) safe_malloc(table->size * sizeof(samp_query_t *));
 }
 
+void copy_samp_query( samp_query_t *to, samp_query_t *from ) {
+  to->source_index = from->source_index;
+  to->num_clauses = from->num_clauses;
+  to->num_vars = from->num_vars;
+  // to->vars
+  // to->literals
+}
+
+void copy_query_table( query_table_t *to, query_table_t *from ) {
+  int32_t i, n;
+  to->size = from->size;
+  n = to->num_queries = from->num_queries;
+  if (from->query == NULL) to->query = NULL;
+  else {
+    to->query = (samp_query_t**) safe_malloc(n * sizeof(samp_query_t *));
+    for (i = 0; i < n; i++) {
+      to->query[i] = (samp_query_t*) safe_malloc(sizeof(samp_query_t));
+      copy_samp_query( to->query[i], from->query[i] );
+    }
+  }
+}
+
+
 void query_table_resize(query_table_t *table) {
 	int32_t size = table->size;
 	int32_t num_queries = table->num_queries;
@@ -1219,6 +1331,10 @@ void init_query_instance_table(query_instance_table_t *table) {
 	}
 	table->query_inst = (samp_query_instance_t **)
 		safe_malloc(table->size * sizeof(samp_query_instance_t *));
+}
+
+void copy_query_instance_table( query_instance_table_t *to, query_instance_table_t *from ) {
+
 }
 
 void query_instance_table_resize(query_instance_table_t *table) {
@@ -1251,6 +1367,11 @@ void init_source_table(source_table_t *table) {
 	table->entry = (source_entry_t **)
 		safe_malloc(table->size * sizeof(source_entry_t *));
 }
+
+void copy_source_table( source_table_t *to, source_table_t *from ) {
+
+}
+
 
 void source_table_extend(source_table_t *table) {
 	int32_t size = table->size;
@@ -1831,23 +1952,21 @@ bool valid_table(samp_table_t *table){
  * especially if we want to share computation across a network...
  */
 
-#if 0
-
 samp_table_t *clone_samp_table(samp_table_t *table) {
   samp_table_t *clone;
 
-  clone = clone_memory( table, sizeof(table) );
-  copy_sort_table( &table.sort_table, &(table->sort_table) );
-  copy_const_table( &table.const_table, &(table->const_table) );
-  copy_var_table( &table.var_table, &(table->var_table) );
-  copy_pred_table( &table.pred_table, &(table->pred_table) );
-  copy_atom_table( &table.atom_table, &(table->atom_table), &table.pred_table );
-  copy_rule_table(&table.rule_table, &(table->rule_table) );
-  copy_rule_inst_table(&table.rule_inst_table, &(table->rule_inst_table) );
-  copy_query_table(&table.query_table, &(table->query_table) );
-  copy_query_inst_table(&table.query_instance_table, &(table->query_instance_table) );
-  copy_source_table(&table.source_table, &(table->source_table) );
+  clone = (samp_table_t *) safe_malloc( sizeof(samp_table_t) );
+
+  copy_sort_table( &clone->sort_table, &(table->sort_table) );
+  copy_const_table( &clone->const_table, &(table->const_table) );
+  copy_var_table( &clone->var_table, &(table->var_table) );
+  copy_pred_table( &clone->pred_table, &(table->pred_table) );
+  copy_atom_table( &clone->atom_table, &(table->atom_table), &table->pred_table );
+  copy_rule_table(&clone->rule_table, &(table->rule_table), &table->pred_table );
+  copy_rule_inst_table(&clone->rule_inst_table, &(table->rule_inst_table) );
+  copy_query_table(&clone->query_table, &(table->query_table) );
+  copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table) );
+  copy_source_table(&clone->source_table, &(table->source_table) );
   return clone;
 }
-  
-#endif
+

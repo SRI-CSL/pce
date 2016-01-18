@@ -285,99 +285,105 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
  * easy, don't I!) back into the master copy.
  */
 
-void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_probability,
-		double sa_temperature, double rvar_probability, uint32_t max_flips,
-		uint32_t max_extra_flips, uint32_t timeout,
-		uint32_t burn_in_steps, uint32_t samp_interval) {
-	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
-	atom_table_t *atom_table = &table->atom_table;
-	int32_t conflict;
-	uint32_t i;
-	time_t fintime = 0;
-	/* whether we use the current round of MCMC as a sample */
-	bool draw_sample; 
+void mc_sat(samp_table_t *table_in, bool lazy, uint32_t max_samples, double sa_probability,
+	    double sa_temperature, double rvar_probability, uint32_t max_flips,
+	    uint32_t max_extra_flips, uint32_t timeout,
+	    uint32_t burn_in_steps, uint32_t samp_interval) {
 
-	if (timeout != 0) {
-		fintime = time(NULL) + timeout;
-	}
+  /* Deep Copy test - first let's just check that the copy functions
+   * themselves don't puke: */
+  samp_table_t *copy = clone_samp_table(table_in);
+  samp_table_t *table = table_in;
 
-	cprintf(1, "[mc_sat] MC-SAT started ...\n");
+  rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
+  atom_table_t *atom_table = &table->atom_table;
+  int32_t conflict;
+  uint32_t i;
+  time_t fintime = 0;
+  /* whether we use the current round of MCMC as a sample */
+  bool draw_sample; 
 
-	init_rule_instances(rule_inst_table);
+  if (timeout != 0) {
+    fintime = time(NULL) + timeout;
+  }
 
-	if (get_verbosity_level() >= 2) {
-		printf("[mc_sat] Init rule instances done. %"PRIu32" unsat_clauses\n",
-				rule_inst_table->unsat_clauses.length);
-		print_rule_instances(table);
-	}
+  cprintf(1, "[mc_sat] MC-SAT started ...\n");
 
-	conflict = first_sample_sat(table, lazy, sa_probability, sa_temperature,
-			rvar_probability, max_flips);
-	if (conflict == -1) {
-		mcsat_err("Found conflict in initialization.\n");
-		return;
-	}
-	//assert(valid_table(table));
+  init_rule_instances(rule_inst_table);
 
-	for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
+  if (get_verbosity_level() >= 2) {
+    printf("[mc_sat] Init rule instances done. %"PRIu32" unsat_clauses\n",
+	   rule_inst_table->unsat_clauses.length);
+    print_rule_instances(table);
+  }
 
-		if (timeout != 0 && time(NULL) >= fintime) {
-			printf("Timeout after %"PRIu32" samples\n", i);
-			break;
-		}
+  conflict = first_sample_sat(table, lazy, sa_probability, sa_temperature,
+			      rvar_probability, max_flips);
+  if (conflict == -1) {
+    mcsat_err("Found conflict in initialization.\n");
+    return;
+  }
+  //assert(valid_table(table));
 
-		rule_inst_table->soft_rules_included = true;
-		draw_sample = (i >= burn_in_steps && i % samp_interval == 0);
-		cprintf(2, "\n[mc_sat] MC-SAT round %"PRIu32" started:\n", i);
+  for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
 
-		//assert(valid_table(table));
-		conflict = reset_sample_sat(table);
+    if (timeout != 0 && time(NULL) >= fintime) {
+      printf("Timeout after %"PRIu32" samples\n", i);
+      break;
+    }
 
-		copy_assignment_array(atom_table);
-		conflict = sample_sat(table, lazy, sa_probability, sa_temperature,
-				rvar_probability, max_flips, max_extra_flips, true);
+    rule_inst_table->soft_rules_included = true;
+    draw_sample = (i >= burn_in_steps && i % samp_interval == 0);
+    cprintf(2, "\n[mc_sat] MC-SAT round %"PRIu32" started:\n", i);
 
-		/*
-		 * If Sample sat did not find a model (within max_flips)
-		 * restore the earlier assignment
-		 */
-		if (conflict == -1 || rule_inst_table->unsat_clauses.length > 0) {
-			if (conflict == -1) {
-				cprintf(2, "Hit a conflict.\n");
-			} else {
-				cprintf(2, "Failed to find a model. Consider increasing"
-						"max_flips and max_tries - see mcsat help.\n");
-			}
+    //assert(valid_table(table));
+    conflict = reset_sample_sat(table);
 
-			// Flip current_assignment (restore the saved assignment)
-			restore_assignment_array(atom_table);
-			i--;
-			continue;
-		}
+    copy_assignment_array(atom_table);
+    conflict = sample_sat(table, lazy, sa_probability, sa_temperature,
+			  rvar_probability, max_flips, max_extra_flips, true);
 
-		if (draw_sample) {
-			update_pmodel(table);
-		}
+    /*
+     * If Sample sat did not find a model (within max_flips)
+     * restore the earlier assignment
+     */
+    if (conflict == -1 || rule_inst_table->unsat_clauses.length > 0) {
+      if (conflict == -1) {
+	cprintf(2, "Hit a conflict.\n");
+      } else {
+	cprintf(2, "Failed to find a model. Consider increasing"
+		"max_flips and max_tries - see mcsat help.\n");
+      }
 
-		cprintf(2, "\n[mc_sat] MC-SAT after round %"PRIu32":\n", i);
-		if (get_verbosity_level() >= 2 ||
-				(get_verbosity_level() >= 1 && draw_sample)) {
-			if (draw_sample) {
-				cprintf(1, "\n---- Sample[%"PRIu32"] ---\n",
-						(i - burn_in_steps) / samp_interval);
-			}
-			print_assignment(table);
-		}
-		//assert(valid_table(table));
+      // Flip current_assignment (restore the saved assignment)
+      restore_assignment_array(atom_table);
+      i--;
+      continue;
+    }
 
-		/* add a perturbation on the current model, resulting a new model with
-		 * approximately similar probability, to jump out of the an isolated
-		 * region of feasible models */
-		rule_inst_table->soft_rules_included = false;
+    if (draw_sample) {
+      update_pmodel(table);
+    }
 
-		conflict = perturb_assignment(table, lazy, rvar_probability, max_flips,
-				max_extra_flips);
-	}
+    cprintf(2, "\n[mc_sat] MC-SAT after round %"PRIu32":\n", i);
+    if (get_verbosity_level() >= 2 ||
+	(get_verbosity_level() >= 1 && draw_sample)) {
+      if (draw_sample) {
+	cprintf(1, "\n---- Sample[%"PRIu32"] ---\n",
+		(i - burn_in_steps) / samp_interval);
+      }
+      print_assignment(table);
+    }
+    //assert(valid_table(table));
+
+    /* add a perturbation on the current model, resulting a new model with
+     * approximately similar probability, to jump out of the an isolated
+     * region of feasible models */
+    rule_inst_table->soft_rules_included = false;
+
+    conflict = perturb_assignment(table, lazy, rvar_probability, max_flips,
+				  max_extra_flips);
+  }
 }
 
 /*
