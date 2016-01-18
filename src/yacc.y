@@ -464,6 +464,8 @@ void yy_set_decl (char *name, char * v) {
     k = MAX_EXTRA_FLIPS;
   else if (strcasecmp(name, "MCSAT_TIMEOUT") == 0)
     k = MCSAT_TIMEOUT;
+  else if (strcasecmp(name, "MCSAT_THREAD_COUNT") == 0)
+    k = MCSAT_THREAD_COUNT;
   else if (strcasecmp(name, "BURN_IN_STEPS") == 0)
     k = BURN_IN_STEPS;
   else if (strcasecmp(name, "SAMP_INTERVAL") == 0)
@@ -820,6 +822,7 @@ void yy_quit () {
 %token MAX_FLIPS
 %token MAX_EXTRA_FLIPS
 %token MCSAT_TIMEOUT
+%token MCSAT_THREAD_COUNT
 %token BURN_IN_STEPS
 %token SAMP_INTERVAL
 %token MAX_TRAINING_ITER

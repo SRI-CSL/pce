@@ -18,6 +18,8 @@
 #define DEFAULT_SAMP_INTERVAL 1
 #define DEFAULT_NUM_TRIALS 100
 #define DEFAULT_MWSAT_TIMEOUT 0
+#define DEFAULT_MCSAT_THREAD_COUNT 0
+
 #define DEFAULT_WEIGHTLEARN_LBFGS_MODE 1
 #define DEFAULT_WEIGHTLEARN_MAX_ITER 1000
 #define DEFAULT_WEIGHTLEARN_MIN_ERROR 0.001
@@ -41,13 +43,14 @@ typedef struct mcsat_params_s {
   int32_t samp_interval;
   int32_t num_trials;
   int32_t mwsat_timeout;
+  int32_t mcsat_thread_count;
 
   int32_t weightlearn_lbfgs_mode;
   int32_t weightlearn_max_iter;
   double weightlearn_min_error;
   double weightlearn_rate;
   int32_t weightlearn_reporting;
-
+  
   bool strict_consts;
   bool lazy;
   char *dump_samples_path;

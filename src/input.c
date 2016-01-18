@@ -1,5 +1,7 @@
 /* Functions for creating input structures */
 
+#define USE_PTHREADS 1
+
 #include <ctype.h>
 #include <inttypes.h>
 #include <float.h>
@@ -20,6 +22,19 @@
 #include "walksat.h"
 #include "weight_learning.h"
 #include "training_data.h"
+
+
+#if USE_PTHREADS
+#include <pthread.h>
+
+/* Borrowed from the man page, so let's rethink this: */
+struct thread_info {         /* Used as argument to thread_start() */
+  pthread_t thread_id;       /* ID returned by pthread_create() */
+  int       thread_num;      /* Application-defined thread # */
+  samp_table_t *samp_table;  /* Copy of the master samp_table_t object */
+};
+
+#endif
 
 //extern int yyparse();
 extern void free_parse_data();
@@ -43,6 +58,7 @@ extern void free_parse_data();
 #define DEFAULT_WEIGHTLEARN_MIN_ERROR 0.001
 #define DEFAULT_WEIGHTLEARN_RATE 0.1
 #define DEFAULT_WEIGHTLEARN_REPORTING 100
+#define DEFAULT_MCSAT_THREAD_COUNT 0
 
 /*
  * Encapsulation: We could create a struct to hold these things as a
@@ -60,6 +76,7 @@ static int32_t burn_in_steps = DEFAULT_BURN_IN_STEPS;
 static int32_t samp_interval = DEFAULT_SAMP_INTERVAL;
 static int32_t num_trials = DEFAULT_NUM_TRIALS;
 static int32_t mwsat_timeout = DEFAULT_MWSAT_TIMEOUT;
+static int32_t mcsat_thread_count = DEFAULT_MCSAT_THREAD_COUNT;
 
 static int32_t weightlearn_lbfgs_mode = DEFAULT_WEIGHTLEARN_LBFGS_MODE;
 static int32_t weightlearn_max_iter = DEFAULT_WEIGHTLEARN_MAX_ITER;
@@ -86,6 +103,7 @@ static mcsat_params_t params = {
   DEFAULT_SAMP_INTERVAL,
   DEFAULT_NUM_TRIALS,
   DEFAULT_MWSAT_TIMEOUT,
+  DEFAULT_MCSAT_THREAD_COUNT,
 
   DEFAULT_WEIGHTLEARN_LBFGS_MODE,
   DEFAULT_WEIGHTLEARN_MAX_ITER,
@@ -149,6 +167,9 @@ int32_t get_burn_in_steps() {
 int32_t get_samp_interval() {
 	return params.samp_interval;
 }
+int32_t get_mcsat_thread_count() {
+	return params.mcsat_thread_count;
+}
 int32_t get_num_trials() {
 	return params.num_trials;
 }
@@ -191,6 +212,9 @@ void set_max_extra_flips(int32_t m) {
 }
 void set_mcsat_timeout(int32_t m) {
 	params.mcsat_timeout = m;
+}
+void set_mcsat_thread_count(int32_t m) {
+  params.mcsat_thread_count = m;
 }
 void set_burn_in_steps(int32_t m) {
 	params.burn_in_steps = m;
@@ -394,7 +418,7 @@ Input grammar:\n\
  train [<file> [lbfgs | gradient]];\n\
  help [all | sort | subsort | predicate | const | atom | assert |\n\
        add | add_clause | ask | mcsat | mcsat_params | reset | retract |\n\
-       dumptable | load | verbosity | help] ';' \n\n\
+       dumptable | load | verbosity | set | help] ';' \n\n\
 where:\n\
  sortspec :=  '=' '[' INT '..' INT ']'\n\
            |  '=' INTEGER\n\
@@ -639,6 +663,7 @@ set parameter value;\n\
   timeout (int): Number of seconds to timeout - 0 means no timeout\n\
   burn_in_steps (int): Number of burn-in steps for MCSAT\n\
   samp_interval (int): Sampling interval, i.e., number of steps between samples\n\
+  mcsat_thread_count (int): Number of mcmc threads to run.  0 means run in main process.\n\
  The sampling runs until either max_samples or the timeout, whichever comes first.\n\
 ");
 		break;
@@ -1370,6 +1395,16 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
 	}
 }
 
+static void *mc_sat_thread(void *arg) {
+  struct thread_info *tinfo = (struct thread_info *) arg;
+  mc_sat(tinfo->samp_table, lazy_mcsat(), get_max_samples(),
+         get_sa_probability(), get_sa_temperature(),
+         get_rvar_probability(), get_max_flips(),
+         get_max_extra_flips(), get_mcsat_timeout(),
+         get_burn_in_steps(), get_samp_interval());
+  return NULL;
+}
+
 extern bool read_eval(samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
 	var_table_t *var_table = &table->var_table;
@@ -1566,6 +1601,7 @@ extern bool read_eval(samp_table_t *table) {
 		output(" timeout = %"PRId32"\n", get_mcsat_timeout());
 		output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
 		output(" samp_interval = %"PRId32"\n", get_samp_interval());
+		output(" mcsat_thread_count = %"PRId32"\n", get_mcsat_thread_count());
 		output("\n");
 
 		if (get_dump_samples_path() != NULL) {
@@ -1573,11 +1609,54 @@ extern bool read_eval(samp_table_t *table) {
 			init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
 		}
 
-		mc_sat(table, lazy_mcsat(), get_max_samples(),
-				get_sa_probability(), get_sa_temperature(),
-				get_rvar_probability(), get_max_flips(),
-				get_max_extra_flips(), get_mcsat_timeout(),
-				get_burn_in_steps(), get_samp_interval());
+                int nthreads = get_mcsat_thread_count();
+                if (nthreads == 0 || !USE_PTHREADS) {
+                  mc_sat(table, lazy_mcsat(), get_max_samples(),
+                         get_sa_probability(), get_sa_temperature(),
+                         get_rvar_probability(), get_max_flips(),
+                         get_max_extra_flips(), get_mcsat_timeout(),
+                         get_burn_in_steps(), get_samp_interval());
+                } else {
+                  /* Maybe push this to another static function: */
+#if USE_PTHREADS                  
+                  int i, s;
+                  void *res;
+                  pthread_attr_t attr;
+                  struct thread_info *tinfo;
+                  samp_table_t **copy;
+
+                  tinfo = (struct thread_info*) safe_malloc(nthreads * sizeof(struct thread_info));
+                  copy = (samp_table_t **) safe_malloc(nthreads * sizeof(samp_table_t*));
+                  s = pthread_attr_init(&attr);
+                  /* Check s */
+                  for (i = 0; i < nthreads; i++) {
+                    copy[i] = clone_samp_table(table);
+                    tinfo[i].thread_num = i+1;
+                    tinfo[i].samp_table = copy[i];
+                    printf("mcsat thread %d: %llx\n",
+                           tinfo[i].thread_num, (long long unsigned int) tinfo[i].samp_table);
+                    fflush(stdout);
+                    s = pthread_create(&tinfo[i].thread_id, &attr, &mc_sat_thread, &(tinfo[i]));
+                    if (s != 0) perror("pthread_create");
+                  }
+
+                  printf("Done creating threads\n");
+                  fflush(stdout);
+
+                  for (i = 0; i < nthreads; i++) {
+                    s = pthread_join(tinfo[i].thread_id, &res);
+                    merge_atom_tables( &(table->atom_table), &(copy[i]->atom_table) );
+                  }
+
+                  s = pthread_attr_destroy(&attr);
+                  free(tinfo);
+                  /* DANGER - THIS IS A MEMORY LEAK!  Until "deep
+                     freedom" can be implemented, this code will leak
+                     memory like a chump. */
+
+                  /* free(copy) */
+#endif
+                }
 
 		end = clock();
 		output(" running took: %f seconds",
@@ -1830,6 +1909,11 @@ extern bool read_eval(samp_table_t *table) {
 	    output(" mcsat_timeout set to %"PRId32"\n", get_mcsat_timeout());
 	    break;
 	  }
+          case MCSAT_THREAD_COUNT: {
+            set_mcsat_thread_count( (int32_t) decl.value );
+	    output(" mcsat will use %"PRId32" threads\n", get_mcsat_thread_count());
+	    break;
+          }
 	  case BURN_IN_STEPS: {
 	    set_burn_in_steps((int32_t) decl.value);
 	    output(" burn_in_steps set to %"PRId32"\n", get_burn_in_steps());

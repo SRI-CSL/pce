@@ -25,7 +25,7 @@ else
 include $(conf)
 endif
 
-LIBS := $(LIBS) -lm
+LIBS := $(LIBS) -lm -lpthread
 YFLAGS := $(YFLAGS) -d -t
 CFLAGS := $(CFLAGS) -DMEXP=11213
 

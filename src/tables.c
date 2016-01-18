@@ -935,7 +935,8 @@ samp_atom_t *clone_atom( samp_atom_t *from, pred_table_t *pred_table) {
 /*
  * Unlike other copies, this one needs the pred table:
  */
-void copy_atom_table(atom_table_t *to, atom_table_t *from, pred_table_t *pt) {
+void copy_atom_table(atom_table_t *to, atom_table_t *from, samp_table_t *st) {
+  pred_table_t *pt = &st->pred_table;
   uint32_t i, size;
 
   size = to->size = from->size;
@@ -992,6 +993,49 @@ void copy_atom_table(atom_table_t *to, atom_table_t *from, pred_table_t *pt) {
   /* Copy the atom hash table: */
   copy_array_hmap(&(to->atom_var_hash),  &(from->atom_var_hash) );
 }
+
+
+/*
+ * It's not clear whether we want to do this, but for threading or
+ * "cloud" operation, one possibility is to allocate copies of the
+ * samp_table_t object and reset the counts before each usage.  This
+ * function performs ONLY that task.
+ */
+void clear_atom_counts( atom_table_t *tbl ) {
+  int i, nvars;
+  tbl->num_samples = 0;
+  nvars = tbl->num_vars;
+  for (i = 0; i < nvars; i++) {
+    tbl->pmodel[i] = 0;
+    tbl->sampling_nums[i] = 0;
+  }
+}
+
+void merge_atom_tables(atom_table_t *to, atom_table_t *from) {
+  /* Tread carefully.  How much checking can / should we do here?
+   * This function will sweep through the pmodel and sampling_nums
+   * arrays and update 'to' based on the contents of 'from'.  The
+   * point is to be able to merge atom tables after spawning multiple
+   * threads.
+   */
+  int32_t i;
+  uint32_t nvars = from->num_vars;
+  if ( nvars != to->num_vars ) {
+    printf("merge_atom_tables: Tables 'to' (%x) and 'from' (%x) differ in their num_vars (%d vs. %d)\n",
+           to, from, to->num_vars, from->num_vars);
+    printf("                   Cowardly refusing to merge atom tables.\n");
+  } else {
+    /* Here, we assume that clear_atom_counts was called BEFORE the
+     * mcmc run, and that what appears here are differential
+     * counts. */
+    to->num_samples += from->num_samples;
+    for (i = 0; i < nvars; i++) {
+      to->pmodel[i] += from->pmodel[i];
+      to->sampling_nums[i] += from->sampling_nums[i];
+    }
+  }
+ }
+
 
 
 /*
@@ -1079,16 +1123,21 @@ void copy_samp_clause_list( samp_clause_list_t *to, samp_clause_list_t *from ) {
   samp_clause_t *to_next, *from_next, *tail;
   length = to->length = from->length;
 
-  from_next = from->head;
-  to_next = clone_samp_clause(from_next);
-  to->head = to_next;
-  tail = to->head;
-  for (i = 0; i < length; i++) {
-    from_next = from_next->link;
-    if (from_next)
-      tail = to_next->link = clone_samp_clause(from_next);
+  if (!from->head) {
+    to->head = NULL;
+    to->tail = NULL;
+  } else {
+    from_next = from->head;
+    to_next = clone_samp_clause(from_next);
+    to->head = to_next;
+    tail = to->head;
+    for (i = 0; i < length; i++) {
+      from_next = from_next->link;
+      if (from_next)
+        tail = to_next->link = clone_samp_clause(from_next);
+    }
+    to->tail = tail;
   }
-  to->tail = tail;
 }
 
 
@@ -1106,12 +1155,13 @@ rule_inst_t  *clone_rule_inst( rule_inst_t *from ) {
 }
 
 
-void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from) {
-  int32_t i, size, n_insts;
+void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from, samp_table_t *tbl) {
+  int32_t i, size, n_insts, nvars;
   rule_inst_t *tmp;
 
   size = to->size = from->size;
   n_insts = from->num_rule_insts;
+  nvars = (tbl->atom_table).num_vars;
 
   to->num_rule_insts = from->num_rule_insts;
   if (size >= MAXSIZE(sizeof(rule_inst_t *), 0)){
@@ -1134,11 +1184,14 @@ void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from) {
   /* This seems wrong - we should probably be stepping through
    * watched[i] and copying those lists. */
   to->watched = (samp_clause_list_t *) safe_malloc( 2 * size * sizeof(samp_clause_list_t) );
-  copy_samp_clause_list( to->watched, from->watched );
+  for (i = 0; i < 2*nvars; i++)
+    copy_samp_clause_list( &(to->watched[i]), &(from->watched[i]) );
+
 
   //  to->watched = clone_samp_clause_list( from->watched );
   to->rule_watched = (samp_clause_list_t *) safe_malloc(size * sizeof(samp_clause_list_t));
-  copy_samp_clause_list( to->rule_watched, from->rule_watched);
+  for (i = 0; i < n_insts; i++)
+    copy_samp_clause_list( &(to->rule_watched[i]), &(from->rule_watched[i]) );
 
   /* TO DO:  CHECK THESE AND DO THE RIGHT THING HERE: */
   
@@ -1248,8 +1301,9 @@ samp_rule_t *clone_samp_rule( samp_rule_t *from, pred_table_t *pt  ) {
 }
 
 
-void copy_rule_table( rule_table_t *to, rule_table_t *from, pred_table_t *pt ) {
+void copy_rule_table( rule_table_t *to, rule_table_t *from,  samp_table_t *st) {
   int32_t i, size, num_rules;
+  pred_table_t *pt = &st->pred_table;
 
   size = to->size = from->size;
   num_rules = to->num_rules = from->num_rules;
@@ -1961,9 +2015,9 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   copy_const_table( &clone->const_table, &(table->const_table) );
   copy_var_table( &clone->var_table, &(table->var_table) );
   copy_pred_table( &clone->pred_table, &(table->pred_table) );
-  copy_atom_table( &clone->atom_table, &(table->atom_table), &table->pred_table );
-  copy_rule_table(&clone->rule_table, &(table->rule_table), &table->pred_table );
-  copy_rule_inst_table(&clone->rule_inst_table, &(table->rule_inst_table) );
+  copy_atom_table( &clone->atom_table, &(table->atom_table), clone );
+  copy_rule_table(&clone->rule_table, &(table->rule_table), clone );
+  copy_rule_inst_table(&clone->rule_inst_table, &(table->rule_inst_table), clone );
   copy_query_table(&clone->query_table, &(table->query_table) );
   copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table) );
   copy_source_table(&clone->source_table, &(table->source_table) );

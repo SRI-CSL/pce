@@ -292,7 +292,6 @@ void mc_sat(samp_table_t *table_in, bool lazy, uint32_t max_samples, double sa_p
 
   /* Deep Copy test - first let's just check that the copy functions
    * themselves don't puke: */
-  samp_table_t *copy = clone_samp_table(table_in);
   samp_table_t *table = table_in;
 
   rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
