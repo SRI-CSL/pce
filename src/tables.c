@@ -1025,8 +1025,8 @@ void merge_atom_tables(atom_table_t *to, atom_table_t *from) {
   int32_t i;
   uint32_t nvars = from->num_vars;
   if ( nvars != to->num_vars ) {
-    printf("merge_atom_tables: Tables 'to' (%x) and 'from' (%x) differ in their num_vars (%d vs. %d)\n",
-           to, from, to->num_vars, from->num_vars);
+    printf("merge_atom_tables: Tables 'to' (%llx) and 'from' (%llx) differ in their num_vars (%d vs. %d)\n",
+           (unsigned long long) to, (unsigned long long) from, to->num_vars, from->num_vars);
     printf("                   Cowardly refusing to merge atom tables.\n");
   } else {
     /* Here, we assume that clear_atom_counts was called BEFORE the
@@ -1362,16 +1362,42 @@ void init_query_table(query_table_t *table) {
 		(samp_query_t **) safe_malloc(table->size * sizeof(samp_query_t *));
 }
 
-void copy_samp_query( samp_query_t *to, samp_query_t *from ) {
+void copy_samp_query( samp_query_t *to, samp_query_t *from, pred_table_t *pt ) {
+  int i, j, m, n;
+  rule_literal_t ***lits;
+
   to->source_index = from->source_index;
-  to->num_clauses = from->num_clauses;
-  to->num_vars = from->num_vars;
-  // to->vars
-  // to->literals
+  m = to->num_clauses = from->num_clauses;
+  n = to->num_vars = from->num_vars;
+  to->vars = (var_entry_t **) safe_malloc( m * sizeof(var_entry_t *) );
+  for (i = 0; i < m; i++) {
+    to->vars[i] = (var_entry_t *) safe_malloc( sizeof(var_entry_t) );
+    copy_var_entry( to->vars[i], from->vars[i] );
+  }
+  
+  n = 0;
+
+  lits = (rule_literal_t ***) safe_malloc(m * sizeof(rule_literal_t **));
+
+  for (i = 0; i < m; i++) {
+    if (from->literals[i] == NULL) lits[i] = NULL;
+    else {
+      for (n = 0; from->literals[i][n] != NULL; n++);
+      lits[i] = (rule_literal_t **) safe_malloc(n * sizeof(rule_literal_t *));
+      for (j = 0; j < n; j++) {
+        lits[i][j] = (rule_literal_t *) safe_malloc( sizeof(rule_literal_t) );
+        copy_rule_literal( lits[i][j], from->literals[i][j], pt );
+      }
+    }
+  }
+
+  to->literals = lits;
 }
 
-void copy_query_table( query_table_t *to, query_table_t *from ) {
+
+void copy_query_table( query_table_t *to, query_table_t *from, samp_table_t *tbl ) {
   int32_t i, n;
+  pred_table_t *pt = &tbl->pred_table;
   to->size = from->size;
   n = to->num_queries = from->num_queries;
   if (from->query == NULL) to->query = NULL;
@@ -1379,7 +1405,7 @@ void copy_query_table( query_table_t *to, query_table_t *from ) {
     to->query = (samp_query_t**) safe_malloc(n * sizeof(samp_query_t *));
     for (i = 0; i < n; i++) {
       to->query[i] = (samp_query_t*) safe_malloc(sizeof(samp_query_t));
-      copy_samp_query( to->query[i], from->query[i] );
+      copy_samp_query( to->query[i], from->query[i], pt );
     }
   }
 }
@@ -1408,8 +1434,33 @@ void init_query_instance_table(query_instance_table_t *table) {
 		safe_malloc(table->size * sizeof(samp_query_instance_t *));
 }
 
-void copy_query_instance_table( query_instance_table_t *to, query_instance_table_t *from ) {
 
+
+void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t *from ) {
+  to->query_indices = from->query_indices;
+  to->sampling_num = from->sampling_num;
+  to->pmodel = from->pmodel;
+#if 0
+  // int32_t * - this is an array or pointer so copy it!!
+  to->subst = from->subst;
+
+  // bool* - this is an array or pointer so copy it!!
+  to->constp = from->constp;
+
+  to->lit = from->lit;
+#endif
+}
+
+void copy_query_instance_table( query_instance_table_t *to, query_instance_table_t *from ) {
+  int i;
+
+  to->size = from->size;
+  to->num_queries = from->num_queries;
+  to->query_inst = (samp_query_instance_t **) safe_malloc( to->size * sizeof(samp_query_instance_t *));
+  for (i = 0; i < to->num_queries; i++) {
+    to->query_inst[i] = (samp_query_instance_t *) safe_malloc( sizeof(samp_query_instance_t) );
+    copy_samp_query_instance( to->query_inst[i], from->query_inst[i] );
+  }
 }
 
 void query_instance_table_resize(query_instance_table_t *table) {
@@ -2039,11 +2090,11 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   copy_atom_table( &clone->atom_table, &(table->atom_table), clone );
   copy_rule_table(&clone->rule_table, &(table->rule_table), clone );
   copy_rule_inst_table(&clone->rule_inst_table, &(table->rule_inst_table), clone );
-  copy_query_table(&clone->query_table, &(table->query_table) );
+  copy_query_table(&clone->query_table, &(table->query_table), clone );
   copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table) );
   copy_source_table(&clone->source_table, &(table->source_table) );
   /* Let us know how it went: */
-  //  printf("valid_table(clone) = %d\n", valid_table(clone));
+  printf("valid_table(clone) = %d\n", valid_table(clone));
   return clone;
 }
 
