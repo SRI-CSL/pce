@@ -64,6 +64,10 @@ void output(const char *fmt, ...) {
 
 	if (output_to_string) {
 		pthread_mutex_lock(&pmutex);
+                /* Suspicious.  This protects 'output_buffer' against
+                   concurrent calls to 'output', but won't protect
+                   against ACCESS of 'output_buffer' by other
+                   threads. */
 		// Find out how big it will be
 		va_start(argp, fmt);
 		out_size = vsnprintf(NULL, 0, fmt, argp); // Number of chars not include trailing '\0'

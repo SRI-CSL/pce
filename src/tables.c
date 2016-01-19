@@ -546,7 +546,6 @@ void copy_var_table(var_table_t *to, var_table_t *from) {
   to->entries = (var_entry_t*) safe_malloc(size*sizeof(var_entry_t));
   for (i = 0; i < size; i++)
     copy_var_entry( &(to->entries[i]), &(from->entries[i]) );
-  // memcpy(to->entries, from->entries, size * sizeof(var_entry_t));
 
   /* If we are to pickle the tables, then this will need to be copied.
    * Just copy the pointer for now:   */
@@ -922,6 +921,10 @@ void init_atom_table(atom_table_t *table) {
  * and check their arity:
  */
 
+/* Functionally equivalent to atom_copy( samp_atom_t *atom, int32_t arity),
+ * but with a slightly different signature & internals:
+ */
+
 samp_atom_t *clone_atom( samp_atom_t *from, pred_table_t *pred_table) {
   int32_t arity, len;
   samp_atom_t *to;
@@ -957,7 +960,7 @@ void copy_atom_table(atom_table_t *to, atom_table_t *from, samp_table_t *st) {
   
   /* Deeper copy needed?? */
   to->atom = (samp_atom_t **) safe_malloc(size * sizeof(samp_atom_t *));
-  //  memcpy(to->atom, from->atom, size * sizeof(samp_atom_t *));
+
   for (i = 0; i < to->num_vars; i++)
     to->atom[i] = clone_atom( from->atom[i], pt );
 
@@ -1105,12 +1108,24 @@ void init_rule_inst_table(rule_inst_table_t *table){
  */
 
 samp_clause_t *clone_samp_clause( samp_clause_t *from ) {
-  int32_t n = from->num_lits;
-  int32_t len = sizeof(samp_clause_t) + (n+1) * sizeof(samp_literal_t);
-  samp_clause_t *to = (samp_clause_t *) safe_malloc( len );
-  memcpy(to, from, len);
+  int32_t i, n, len;
+  samp_clause_t *to;
+
+  if (!from) return NULL;
+
+  n = from->num_lits;
+  len = sizeof(samp_clause_t) + (n+1) * sizeof(samp_literal_t);
+  to = (samp_clause_t *) safe_malloc( len );
+
+  to->rule_index = from->rule_index;
+  to->num_lits = from->num_lits;
+
+  /* samp_literal_t is a scalar (int), so just copy these: */
+  for (i = 0; i < n; i++)
+    to->disjunct[i] = from->disjunct[i];
+
   /* Must fill this in after the call! */
-  to->link = NULL;
+  to->link = clone_samp_clause( from->link );
 
   return to;
 }
@@ -1145,13 +1160,17 @@ void copy_samp_clause_list( samp_clause_list_t *to, samp_clause_list_t *from ) {
 
 
 rule_inst_t  *clone_rule_inst( rule_inst_t *from ) {
-  int n, len;
+  int i, n, len;
   rule_inst_t *to;
 
   n = from->num_clauses;
   len = sizeof(double) + sizeof(int32_t) + (n+1)*sizeof(samp_clause_t*);
   to = (rule_inst_t *) safe_malloc(len);
-  memcpy(to, from, len);
+
+  to->weight = from->weight;
+  to->num_clauses = n;
+  for (i = 0; i < n; i++)
+    to->conjunct[i] = clone_samp_clause(from->conjunct[i]);
 
   return to;
 }
