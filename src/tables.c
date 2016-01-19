@@ -2043,7 +2043,7 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table) );
   copy_source_table(&clone->source_table, &(table->source_table) );
   /* Let us know how it went: */
-  printf("valid_table(clone) = %d\n", valid_table(clone));
+  //  printf("valid_table(clone) = %d\n", valid_table(clone));
   return clone;
 }
 

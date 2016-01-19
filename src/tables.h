@@ -8,6 +8,11 @@
 #include "hash_map.h"
 #include "params.h"
 
+/*
+ * You should be able to set this to 0 to keep threads out of mcsat altogether:
+ */
+#define USE_PTHREADS 1
+
 #define INIT_SORT_TABLE_SIZE 64
 #define INIT_CONST_TABLE_SIZE 64
 #define INIT_VAR_TABLE_SIZE 64

@@ -63,11 +63,8 @@ void output(const char *fmt, ...) {
 	va_list argp;
 
 	if (output_to_string) {
+                /* Protect output_buffer: */
 		pthread_mutex_lock(&pmutex);
-                /* Suspicious.  This protects 'output_buffer' against
-                   concurrent calls to 'output', but won't protect
-                   against ACCESS of 'output_buffer' by other
-                   threads. */
 		// Find out how big it will be
 		va_start(argp, fmt);
 		out_size = vsnprintf(NULL, 0, fmt, argp); // Number of chars not include trailing '\0'
@@ -568,7 +565,11 @@ char *literal_string(samp_literal_t lit, samp_table_t *table) {
 	char *result;
 	output_to_string = true;
 	print_literal(lit, table);
+
+        pthread_mutex_lock(&pmutex);
 	result = get_string_from_buffer(&output_buffer);
+        pthread_mutex_unlock(&pmutex);
+
 	output_to_string = oldout;
 	return result;
 }
@@ -579,7 +580,12 @@ char *atom_string(samp_atom_t *atom, samp_table_t *table) {
 	char *result;
 	output_to_string = true;
 	print_atom(atom, table);
+
+        /* Protect consumers: */
+        pthread_mutex_lock(&pmutex);
 	result = get_string_from_buffer(&output_buffer);
+        pthread_mutex_unlock(&pmutex);
+
 	output_to_string = oldout;
 	return result;
 }

@@ -1,7 +1,5 @@
 /* Functions for creating input structures */
 
-#define USE_PTHREADS 1
-
 #include <ctype.h>
 #include <inttypes.h>
 #include <float.h>
@@ -24,6 +22,9 @@
 #include "training_data.h"
 
 
+/*
+ * Defined in tables.h for lack of a better place:
+ */
 #if USE_PTHREADS
 #include <pthread.h>
 
@@ -1397,8 +1398,6 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
 
 static void *mc_sat_thread(void *arg) {
   struct thread_info *tinfo = (struct thread_info *) arg;
-  printf("thread %d valid_table(tinfo->samp_table) = %d\n",
-	 tinfo->thread_num, valid_table(tinfo->samp_table));
   mc_sat(tinfo->samp_table, lazy_mcsat(), get_max_samples(),
          get_sa_probability(), get_sa_temperature(),
          get_rvar_probability(), get_max_flips(),
@@ -1643,9 +1642,6 @@ extern bool read_eval(samp_table_t *table) {
 
                     s = pthread_create(&tinfo[i].thread_id, &attr, &mc_sat_thread, &(tinfo[i]));
                     if (s != 0) perror("pthread_create");
-
-		    // s = pthread_join(tinfo[i].thread_id, &res);
-                    // if (s != 0) perror("pthread_join");
                   }
 
                   printf("Done creating threads\n");

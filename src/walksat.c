@@ -145,13 +145,20 @@ static int32_t update_atom_tval(int32_t var, samp_truth_value_t tval, samp_table
 			return 0;
 		}
 	}
-#if 0
-        /* Secretly, this appears to use stdio to format var_str.  Not threadsafe. */
+
+#if USE_PTHREADS
+        /* Internally, this is now theoretically protected with a
+           mutex, but do we really want a multithreaded mcmc to be
+           waiting for mutexes? */
+#else
+        /* Something's still bad here.  For now, we ignore this code
+           block if we are compiled for pthreads */
 	char *var_str = var_string(var, table);
 	cprintf(3, "[update_atom_tval] Setting the value of %s to %s\n",
 			var_str, samp_truth_value_string(tval));
 	free(var_str);
 #endif
+
 	/* Not case 0: update the value */
 	atom_table->assignment[var] = tval;
 	if (fixed_tval(tval)) {

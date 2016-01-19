@@ -75,7 +75,8 @@ typedef struct W128_T w128_t;
 */
 
 #include <pthread.h>
-static pthread_mutex_t rand_mutex;
+static pthread_mutex_t rmutex;
+static pthread_mutexattr_t rmutex_attr;
 
 /** the 128-bit internal state array */
 static w128_t sfmt[N];
@@ -94,19 +95,22 @@ static int initialized = 0;
 static uint32_t parity[4] = {PARITY1, PARITY2, PARITY3, PARITY4};
 
 
+#if 0
 static int idx_incf() {
-  pthread_mutex_lock(&rand_mutex);
+  pthread_mutex_lock(&rmutex);
   idx++;
-  pthread_mutex_unlock(&rand_mutex);
+  pthread_mutex_unlock(&rmutex);
   return idx;
 }
 
 static int idx_set(int k) {
-  pthread_mutex_lock(&rand_mutex);
+  pthread_mutex_lock(&rmutex);
   idx = k;
-  pthread_mutex_unlock(&rand_mutex);
+  pthread_mutex_unlock(&rmutex);
   return idx;
 }
+#endif
+
 /*----------------
   STATIC FUNCTIONS
   ----------------*/
@@ -277,6 +281,7 @@ inline static void gen_rand_all(void) {
 
     r1 = &sfmt[N - 2];
     r2 = &sfmt[N - 1];
+
     for (i = 0; i < N - POS1; i++) {
 	do_recursion(&sfmt[i], &sfmt[i], &sfmt[i + POS1], r1, r2);
 	r1 = r2;
@@ -372,6 +377,7 @@ static void period_certification(void) {
     int i, j;
     uint32_t work;
 
+    //    pthread_mutex_lock(&rmutex);
     for (i = 0; i < 4; i++)
 	inner ^= psfmt32[idxof(i)] & parity[i];
     for (i = 16; i > 0; i >>= 1)
@@ -392,6 +398,7 @@ static void period_certification(void) {
 	    work = work << 1;
 	}
     }
+    //    pthread_mutex_unlock(&rmutex);
 }
 
 /*----------------
@@ -434,12 +441,14 @@ uint32_t gen_rand32(void) {
     uint32_t r;
 
     assert(initialized);
+    pthread_mutex_lock(&rmutex);
     if (idx >= N32) {
 	gen_rand_all();
-	idx_set(0);
-	//	idx = 0;
+        idx = 0;
     }
-    r = psfmt32[idx_incf()];
+    r = psfmt32[idx++];
+    pthread_mutex_unlock(&rmutex);
+
     return r;
 }
 #endif
@@ -458,6 +467,8 @@ uint64_t gen_rand64(void) {
 #endif
 
     assert(initialized);
+
+    pthread_mutex_lock(&rmutex);
     assert(idx % 2 == 0);
 
     if (idx >= N32) {
@@ -468,10 +479,12 @@ uint64_t gen_rand64(void) {
     r1 = psfmt32[idx];
     r2 = psfmt32[idx + 1];
     idx += 2;
+    pthread_mutex_unlock(&rmutex);
     return ((uint64_t)r2 << 32) | r1;
 #else
     r = psfmt64[idx / 2];
     idx += 2;
+    pthread_mutex_unlock(&rmutex);
     return r;
 #endif
 }
@@ -509,7 +522,9 @@ void fill_array32(uint32_t *array, int size) {
     assert(size >= N32);
 
     gen_rand_array((w128_t *)array, size / 4);
+    //    pthread_mutex_lock(&rmutex);
     idx = N32;
+    //    pthread_mutex_unlock(&rmutex);
 }
 #endif
 
@@ -545,7 +560,9 @@ void fill_array64(uint64_t *array, int size) {
     assert(size >= N64);
 
     gen_rand_array((w128_t *)array, size / 2);
+    //    pthread_mutex_lock(&rmutex);
     idx = N32;
+    //    pthread_mutex_unlock(&rmutex);
 
 #if defined(BIG_ENDIAN64) && !defined(ONLY64)
     swap((w128_t *)array, size /2);
@@ -561,14 +578,23 @@ void fill_array64(uint64_t *array, int size) {
 void init_gen_rand(uint32_t seed) {
     int i;
 
+#if 0
+    pthread_mutexattr_init(&rmutex_attr);
+    pthread_mutexattr_settype(&rmutex_attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&rmutex, &rmutex_attr);
+#endif
+
     psfmt32[idxof(0)] = seed;
     for (i = 1; i < N32; i++) {
 	psfmt32[idxof(i)] = 1812433253UL * (psfmt32[idxof(i - 1)] 
 					    ^ (psfmt32[idxof(i - 1)] >> 30))
 	    + i;
     }
+    //    pthread_mutex_lock(&rmutex);
     idx = N32;
+    //    pthread_mutex_unlock(&rmutex);
     period_certification();
+
     initialized = 1;
 }
 
@@ -638,7 +664,9 @@ void init_by_array(uint32_t *init_key, int key_length) {
 	i = (i + 1) % N32;
     }
 
+    //    pthread_mutex_lock(&rmutex);
     idx = N32;
+    //    pthread_mutex_unlock(&rmutex);
     period_certification();
     initialized = 1;
 }
