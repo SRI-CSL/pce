@@ -19,6 +19,6 @@ add [x] Sm(x) => Ca(x)  1.5;
 add [x, y] Fr(x, y) implies (Sm(x) iff Sm(y))  1.1;
 
 set mcsat_thread_count 1;
-mcsat_params 10000;
+mcsat_params 500;
 mcsat;
 dumptable atom;

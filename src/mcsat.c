@@ -329,8 +329,12 @@ int main(int argc, char *argv[]) {
 			load_mcsat_file(argv[i], &samp_table);
 			file_loaded = true;
 		} else {
+		  /* Strange problem.  I created this file:
+		     'examples/threads/cancer1-2threads.pce'
+		     permissions good, and fell through to here: */
 			//err(1, "File %s\n", argv[i]);
-			fprintf(stderr, "%s: File %s\n", program_name, argv[i]);
+			fprintf(stderr, "%s: No access to file %s\n", program_name, argv[i]);
+			perror("main (access)");
 			exit(1);
 		}
 	}

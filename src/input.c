@@ -1397,6 +1397,8 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
 
 static void *mc_sat_thread(void *arg) {
   struct thread_info *tinfo = (struct thread_info *) arg;
+  printf("thread %d valid_table(tinfo->samp_table) = %d\n",
+	 tinfo->thread_num, valid_table(tinfo->samp_table));
   mc_sat(tinfo->samp_table, lazy_mcsat(), get_max_samples(),
          get_sa_probability(), get_sa_temperature(),
          get_rvar_probability(), get_max_flips(),
@@ -1627,8 +1629,10 @@ extern bool read_eval(samp_table_t *table) {
 
                   tinfo = (struct thread_info*) safe_malloc(nthreads * sizeof(struct thread_info));
                   copy = (samp_table_t **) safe_malloc(nthreads * sizeof(samp_table_t*));
+
                   s = pthread_attr_init(&attr);
-                  /* Check s */
+		  if (s != 0) perror("pthread_attr_init");
+
                   for (i = 0; i < nthreads; i++) {
                     copy[i] = clone_samp_table(table);
                     tinfo[i].thread_num = i+1;
@@ -1636,8 +1640,12 @@ extern bool read_eval(samp_table_t *table) {
                     printf("mcsat thread %d: %llx\n",
                            tinfo[i].thread_num, (long long unsigned int) tinfo[i].samp_table);
                     fflush(stdout);
+
                     s = pthread_create(&tinfo[i].thread_id, &attr, &mc_sat_thread, &(tinfo[i]));
                     if (s != 0) perror("pthread_create");
+
+		    // s = pthread_join(tinfo[i].thread_id, &res);
+                    // if (s != 0) perror("pthread_join");
                   }
 
                   printf("Done creating threads\n");

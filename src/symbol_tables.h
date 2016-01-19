@@ -25,6 +25,13 @@ struct stbl_rec_s {
 
 /*
  * Bank for allocation of records
+ *
+ * More description would be helpful for deep copy.  Is the "Bank" a
+ * pool of unused storage?  When copying symbol tables, is it
+ * necessary to copy the contents of the "Bank", or is it sufficient
+ * to simply allocate a "Bank" and run with that?  "Banks" are
+ * arranged in a linked list, apparently, but this list does not quite
+ * follow the same pattern that appears elsewhere in PCE....
  */
 #define STBL_BANK_SIZE 255
 
@@ -133,6 +140,8 @@ extern void stbl_delete_mapping(stbl_t *sym_table, const char *symbol, int32_t v
 typedef void (*stbl_iterator_t)(void *aux, stbl_rec_t *r);
 
 extern void stbl_iterate(stbl_t *sym_table, void *aux, stbl_iterator_t f);
-
+extern void copy_stbl_rec( stbl_rec_t *to, stbl_rec_t *from );
+extern stbl_rec_t *clone_stbl_rec( stbl_rec_t *from );
+extern void copy_stbl( stbl_t *to, stbl_t *from );
 
 #endif /* __SYMBOL_TABLES_H */

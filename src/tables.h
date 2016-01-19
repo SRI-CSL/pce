@@ -404,16 +404,20 @@ typedef struct source_table_s {
 
 /* All the tables */
 typedef struct samp_table_s {
-	sort_table_t sort_table;
-	const_table_t const_table;
-	var_table_t var_table;
-	pred_table_t pred_table;
-	atom_table_t atom_table;
-	rule_table_t rule_table; /* formulas with variables */
-	rule_inst_table_t rule_inst_table;
-	query_table_t query_table;
-	query_instance_table_t query_instance_table;
-	source_table_t source_table;
+  sort_table_t sort_table;
+  const_table_t const_table;
+  var_table_t var_table;
+  pred_table_t pred_table;
+  atom_table_t atom_table;
+  rule_table_t rule_table; /* formulas with variables */
+  rule_inst_table_t rule_inst_table;
+  query_table_t query_table;
+  query_instance_table_t query_instance_table;
+  source_table_t source_table;
+  /* Purely ephemeral, but allocated per samp_table object for thread
+   * safety:
+   */
+  integer_stack_t clause_var_stack;
 } samp_table_t;
 
 

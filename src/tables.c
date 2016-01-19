@@ -103,8 +103,9 @@ void copy_sort_table(sort_table_t *to, sort_table_t *from) {
    * safe to point to the same name_index, but this will not work if
    * we ever want to pickle the top-level samp_table_t:
    */
-  to->sort_name_index = from->sort_name_index;
+  copy_stbl( &to->sort_name_index, &from->sort_name_index );
 }
+
 
 /* How are sort_table_t objects destroyed / freed? */
 
@@ -368,7 +369,7 @@ void copy_const_table(const_table_t *to, const_table_t *from) {
 
   /* If we are to pickle the tables, then this will need to be copied.
    * Just copy the pointer for now:   */
-  to->const_name_index = from->const_name_index;
+  copy_stbl( &to->const_name_index, &from->const_name_index );
 }
 
 static void const_table_resize(const_table_t *const_table, uint32_t n){
@@ -549,7 +550,7 @@ void copy_var_table(var_table_t *to, var_table_t *from) {
 
   /* If we are to pickle the tables, then this will need to be copied.
    * Just copy the pointer for now:   */
-  to->var_name_index = from->var_name_index;
+  copy_stbl( &to->var_name_index, &from->var_name_index );
 }
 
 
@@ -684,7 +685,7 @@ void copy_pred_table(pred_table_t *to, pred_table_t *from) {
   copy_pred_tbl( &(to->pred_tbl), &(from->pred_tbl) );
 
   /* Just copy the pointer for the symbol table: */
-  to->pred_name_index = from->pred_name_index;
+  copy_stbl( &to->pred_name_index, &from->pred_name_index );
 }
 
 
@@ -1138,6 +1139,7 @@ void copy_samp_clause_list( samp_clause_list_t *to, samp_clause_list_t *from ) {
     }
     to->tail = tail;
   }
+  //  printf("Valid clause list returns %d\n", valid_clause_list(to));
 }
 
 
@@ -2021,6 +2023,8 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   copy_query_table(&clone->query_table, &(table->query_table) );
   copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table) );
   copy_source_table(&clone->source_table, &(table->source_table) );
+  /* Let us know how it went: */
+  printf("valid_table(clone) = %d\n", valid_table(clone));
   return clone;
 }
 

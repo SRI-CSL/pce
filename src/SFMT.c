@@ -67,7 +67,16 @@ typedef struct W128_T w128_t;
 /*--------------------------------------
   FILE GLOBAL VARIABLES
   internal state, index counter and flag 
-  --------------------------------------*/
+  --------------------------------------
+
+  OBSTACLES TO THREADING.  Use a mutex
+  to protect these.
+
+*/
+
+#include <pthread.h>
+static pthread_mutex_t rand_mutex;
+
 /** the 128-bit internal state array */
 static w128_t sfmt[N];
 /** the 32bit integer pointer to the 128-bit internal state array */
@@ -84,6 +93,20 @@ static int initialized = 0;
 /** a parity check vector which certificate the period of 2^{MEXP} */
 static uint32_t parity[4] = {PARITY1, PARITY2, PARITY3, PARITY4};
 
+
+static int idx_incf() {
+  pthread_mutex_lock(&rand_mutex);
+  idx++;
+  pthread_mutex_unlock(&rand_mutex);
+  return idx;
+}
+
+static int idx_set(int k) {
+  pthread_mutex_lock(&rand_mutex);
+  idx = k;
+  pthread_mutex_unlock(&rand_mutex);
+  return idx;
+}
 /*----------------
   STATIC FUNCTIONS
   ----------------*/
@@ -413,9 +436,10 @@ uint32_t gen_rand32(void) {
     assert(initialized);
     if (idx >= N32) {
 	gen_rand_all();
-	idx = 0;
+	idx_set(0);
+	//	idx = 0;
     }
-    r = psfmt32[idx++];
+    r = psfmt32[idx_incf()];
     return r;
 }
 #endif

@@ -610,29 +610,31 @@ void cost_flip_unfixed_rule(samp_table_t *table, int32_t rule_index,
 /*
  * A temperary stack that store the unfixed variables in a clause;
  * used in choose_clause_var.
+ *
  */
-static integer_stack_t clause_var_stack = { 0, 0, NULL };
+//static integer_stack_t clause_var_stack = { 0, 0, NULL };
 
 int32_t choose_clause_var(samp_table_t *table, samp_clause_t *clause,
 		double rvar_probability) {
 	rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
 	atom_table_t *atom_table = &table->atom_table;
+	integer_stack_t *clause_var_stack = &table->clause_var_stack;
 	uint32_t i, sidx, vidx;
 
-	if (clause_var_stack.size == 0) {
-		init_integer_stack(&clause_var_stack, 0);
+	if (clause_var_stack->size == 0) {
+		init_integer_stack(clause_var_stack, 0);
 	} else {
-		clear_integer_stack(&clause_var_stack);
+		clear_integer_stack(clause_var_stack);
 	}
 
 	double choice = choose();
 	if (choice < rvar_probability) { /* flip a random unfixed variable */
 		for (i = 0; i < clause->num_lits; i++) {
 			if (unfixed_tval(atom_table->assignment[var_of(clause->disjunct[i])]))
-				push_integer_stack(i, &clause_var_stack);
+				push_integer_stack(i, clause_var_stack);
 		} 
 		if (unfixed_tval(rule_inst_table->assignment[clause->rule_index]))
-			push_integer_stack(clause->num_lits, &clause_var_stack);
+			push_integer_stack(clause->num_lits, clause_var_stack);
 		/* all unfixed vars are now in clause_var_stack */
 	} else {
 		int32_t dcost = INT32_MAX, vcost = 0;
@@ -642,9 +644,9 @@ int32_t choose_clause_var(samp_table_t *table, samp_clause_t *clause,
 				if (dcost >= vcost) {
 					if (dcost > vcost) {
 						dcost = vcost;
-						clear_integer_stack(&clause_var_stack);
+						clear_integer_stack(clause_var_stack);
 					}
-					push_integer_stack(i, &clause_var_stack);
+					push_integer_stack(i, clause_var_stack);
 				}
 			}
 		}
@@ -652,14 +654,14 @@ int32_t choose_clause_var(samp_table_t *table, samp_clause_t *clause,
 			cost_flip_unfixed_rule(table, clause->rule_index, &vcost);
 			if (dcost > vcost) {
 				dcost = vcost;
-				clear_integer_stack(&clause_var_stack);
-				push_integer_stack(clause->num_lits, &clause_var_stack);
+				clear_integer_stack(clause_var_stack);
+				push_integer_stack(clause->num_lits, clause_var_stack);
 			}
 		}
 	}
-	//sidx = random_uint(length_integer_stack(&clause_var_stack));
-	sidx = genrand_uint(length_integer_stack(&clause_var_stack));
-	vidx = nth_integer_stack(sidx, &clause_var_stack);
+	//sidx = random_uint(length_integer_stack(clause_var_stack));
+	sidx = genrand_uint(length_integer_stack(clause_var_stack));
+	vidx = nth_integer_stack(sidx, clause_var_stack);
 
 	return vidx;
 }

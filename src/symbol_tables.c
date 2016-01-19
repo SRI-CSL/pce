@@ -199,7 +199,72 @@ void init_stbl(stbl_t *sym_table, uint32_t n) {
   sym_table->finalize = default_stbl_finalizer;
 }
 
+void copy_stbl_rec( stbl_rec_t *to, stbl_rec_t *from ) {
+  if ( !from ) return;
+  else {
+    to->hash = from->hash;
+    to->value = from->value;
 
+    if ( !from->string ) to->string = NULL;
+    else to->string = strdup(from->string);
+
+    to->next = clone_stbl_rec( from->next );
+  }
+}
+
+
+stbl_rec_t *clone_stbl_rec( stbl_rec_t *from ) {
+  stbl_rec_t *to;
+  if ( !from ) return NULL;
+  else {
+    to = (stbl_rec_t *) safe_malloc(sizeof(stbl_rec_t));
+    to->hash = from->hash;
+    to->value = from->value;
+    if ( !from->string ) to->string = NULL;
+    else to->string = strdup(from->string);
+    to->next = clone_stbl_rec( from->next );
+  }
+  return to;
+}
+
+
+stbl_bank_t *clone_stbl_bank( stbl_bank_t *from ) {
+  int i;
+  stbl_bank_t *to;
+  if ( !from ) return NULL;
+  else {
+    to = (stbl_bank_t *) safe_malloc( sizeof(stbl_bank_t) );
+    /* Really unclear as to whether this is necessary: */
+    for (i = 0; i < STBL_BANK_SIZE; i++)
+      copy_stbl_rec( &(to->block[i]),  &(from->block[i]) );
+
+    /* Ensure list integrity: */
+    to->next = clone_stbl_bank( from->next );
+  }
+  return to;
+}
+
+
+void copy_stbl( stbl_t *to, stbl_t *from ) {
+  int i, n;
+  stbl_rec_t *r;
+  n = to->size = from->size;
+  to->nelems = from->nelems;
+  to->ndeleted = from->ndeleted;
+  to->free_idx = from->free_idx;
+
+  to->free_rec = (stbl_rec_t *) safe_malloc( to->ndeleted * sizeof(stbl_rec_t) );
+  for (i = 0; i < from->ndeleted; i++)
+    copy_stbl_rec( &to->free_rec[i], &from->free_rec[i] );
+
+  to->data = (stbl_rec_t**) safe_malloc(n * sizeof(stbl_rec_t *));
+  for (i = 0; i < n; i++)
+    to->data[i] = clone_stbl_rec( from->data[i] );
+
+  to->bnk = clone_stbl_bank( from->bnk );
+
+  to->finalize = from->finalize;
+}
 
 /*
  * Delete all the table

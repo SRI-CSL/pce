@@ -7,6 +7,7 @@ bool valid_clause_list(samp_clause_list_t *list) {
 	assert(list->tail->link == NULL);
 	samp_clause_t *ptr;
 	int32_t length = 0;
+	/* When two threads are running,  ptr == list->tail can fail: */
 	for (ptr = list->head; ptr != list->tail; ptr = next_clause_ptr(ptr)) {
 		length++;
 	}
@@ -46,6 +47,7 @@ void empty_clause_list(samp_clause_list_t *list) {
 
 void clause_list_insert(samp_clause_t *clause, samp_clause_list_t *list,
 		samp_clause_t *ptr) {
+  /* Fails when multithreading: */
 	assert(valid_clause_list(list));
 	clause->link = ptr->link;
 	ptr->link = clause;
