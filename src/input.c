@@ -22,20 +22,7 @@
 #include "training_data.h"
 
 
-/*
- * Defined in tables.h for lack of a better place:
- */
-#if USE_PTHREADS
-#include <pthread.h>
 
-/* Borrowed from the man page, so let's rethink this: */
-struct thread_info {         /* Used as argument to thread_start() */
-  pthread_t thread_id;       /* ID returned by pthread_create() */
-  int       thread_num;      /* Application-defined thread # */
-  samp_table_t *samp_table;  /* Copy of the master samp_table_t object */
-};
-
-#endif
 
 //extern int yyparse();
 extern void free_parse_data();
@@ -1396,15 +1383,8 @@ extern void dumptable(int32_t tbl, samp_table_t *table) {
 	}
 }
 
-static void *mc_sat_thread(void *arg) {
-  struct thread_info *tinfo = (struct thread_info *) arg;
-  mc_sat(tinfo->samp_table, lazy_mcsat(), get_max_samples(),
-         get_sa_probability(), get_sa_temperature(),
-         get_rvar_probability(), get_max_flips(),
-         get_max_extra_flips(), get_mcsat_timeout(),
-         get_burn_in_steps(), get_samp_interval());
-  return NULL;
-}
+
+
 
 extern bool read_eval(samp_table_t *table) {
 	sort_table_t *sort_table = &table->sort_table;
@@ -1610,60 +1590,13 @@ extern bool read_eval(samp_table_t *table) {
 			init_samples_output(get_dump_samples_path(), get_max_samples() + 1);
 		}
 
-                int nthreads = get_mcsat_thread_count();
-                if (nthreads == 0 || !USE_PTHREADS) {
-                  mc_sat(table, lazy_mcsat(), get_max_samples(),
-                         get_sa_probability(), get_sa_temperature(),
-                         get_rvar_probability(), get_max_flips(),
-                         get_max_extra_flips(), get_mcsat_timeout(),
-                         get_burn_in_steps(), get_samp_interval());
-                } else {
-                  /* Maybe push this to another static function: */
-#if USE_PTHREADS                  
-                  int i, s;
-                  void *res;
-                  pthread_attr_t attr;
-                  struct thread_info *tinfo;
-                  samp_table_t **copy;
-
-                  tinfo = (struct thread_info*) safe_malloc(nthreads * sizeof(struct thread_info));
-                  copy = (samp_table_t **) safe_malloc(nthreads * sizeof(samp_table_t*));
-
-                  s = pthread_attr_init(&attr);
-		  if (s != 0) perror("pthread_attr_init");
-
-                  for (i = 0; i < nthreads; i++) {
-                    copy[i] = clone_samp_table(table);
-                    tinfo[i].thread_num = i+1;
-                    tinfo[i].samp_table = copy[i];
-                    printf("mcsat thread %d: %llx\n",
-                           tinfo[i].thread_num, (long long unsigned int) tinfo[i].samp_table);
-                    fflush(stdout);
-
-                    s = pthread_create(&tinfo[i].thread_id, &attr, &mc_sat_thread, &(tinfo[i]));
-                    if (s != 0) perror("pthread_create");
-                  }
-
-                  printf("Done creating threads\n");
-                  fflush(stdout);
-
-                  for (i = 0; i < nthreads; i++) {
-                    s = pthread_join(tinfo[i].thread_id, &res);
-                    if (s != 0) perror("pthread_join");
-                    merge_atom_tables( &(table->atom_table), &(copy[i]->atom_table) );
-                  }
-
-                  s = pthread_attr_destroy(&attr);
-                  free(tinfo);
-                  /* DANGER - THIS IS A MEMORY LEAK!  Until "deep
-                     freedom" can be implemented, this code will leak
-                     memory like a chump. */
-
-                  /* free(copy) */
-#endif
-                }
-
+                mc_sat(table, lazy_mcsat(), get_max_samples(),
+                       get_sa_probability(), get_sa_temperature(),
+                       get_rvar_probability(), get_max_flips(),
+                       get_max_extra_flips(), get_mcsat_timeout(),
+                       get_burn_in_steps(), get_samp_interval());
 		end = clock();
+
 		output(" running took: %f seconds",
 				(double) (end - start) / CLOCKS_PER_SEC);
 		output("\n");

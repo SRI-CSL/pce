@@ -285,6 +285,7 @@ extern double get_rvar_probability();
 extern int32_t get_max_flips();
 extern int32_t get_max_extra_flips();
 extern int32_t get_mcsat_timeout();
+extern int32_t get_mcsat_thread_count();
 extern int32_t get_burn_in_steps();
 extern int32_t get_samp_interval();
 extern double get_weightlearn_min_error();
