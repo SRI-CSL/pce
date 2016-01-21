@@ -1435,17 +1435,26 @@ void init_query_instance_table(query_instance_table_t *table) {
 }
 
 
+void copy_ivector( ivector_t *to, ivector_t *from ) {
+  int n;
+  n = to->capacity = from->capacity;
+  to->size = from->size;
+  to->data = (int32_t *) safe_malloc( n * sizeof(int32_t) );
+  memcpy( &to->data, &from->data, n*sizeof(int32_t) );
+}
 
-void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t *from ) {
-  to->query_indices = from->query_indices;
+
+void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t *from, int nvars ) {
+
+  copy_ivector( &(to->query_indices), &(from->query_indices) );
   to->sampling_num = from->sampling_num;
   to->pmodel = from->pmodel;
 #if 0
-  // int32_t * - this is an array or pointer so copy it!!
-  to->subst = from->subst;
+  to->subst = (int32_t *) safe_malloc( nvars * sizeof(int32_t) );
+  memcpy( &to->subst, &from->subst, nvars * sizeof(int32_t) );
 
-  // bool* - this is an array or pointer so copy it!!
-  to->constp = from->constp;
+  to->constp = (bool *) safe_malloc( nvars * sizeof(bool) );
+  memcpy( &to->constp, &from->constp, nvars * sizeof(bool) );
 
   to->lit = from->lit;
 #endif
@@ -1459,9 +1468,10 @@ void copy_query_instance_table( query_instance_table_t *to, query_instance_table
   to->query_inst = (samp_query_instance_t **) safe_malloc( to->size * sizeof(samp_query_instance_t *));
   for (i = 0; i < to->num_queries; i++) {
     to->query_inst[i] = (samp_query_instance_t *) safe_malloc( sizeof(samp_query_instance_t) );
-    copy_samp_query_instance( to->query_inst[i], from->query_inst[i] );
+    copy_samp_query_instance( to->query_inst[i], from->query_inst[i], 0 );
   }
 }
+
 
 void query_instance_table_resize(query_instance_table_t *table) {
 	int32_t size = table->size;
