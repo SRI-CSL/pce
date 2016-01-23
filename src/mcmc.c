@@ -467,6 +467,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
       s = pthread_join(tinfo[i].thread_id, &res);
       if (s != 0) perror("pthread_join");
       merge_atom_tables( &(table->atom_table), &(copy[i]->atom_table) );
+      merge_query_instance_tables( &(table->query_instance_table), &(copy[i]->query_instance_table) );
     }
 
     s = pthread_attr_destroy(&attr);

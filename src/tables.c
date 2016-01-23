@@ -1444,13 +1444,26 @@ void copy_ivector( ivector_t *to, ivector_t *from ) {
 }
 
 
-void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t *from, int nvars ) {
-  int32_t i, j, n;
+void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t *from, query_table_t *qt ) {
+  int32_t i, j, n, nvars;
+  samp_query_t *query;
 
   copy_ivector( &(to->query_indices), &(from->query_indices) );
   to->sampling_num = from->sampling_num;
   to->pmodel = from->pmodel;
-#if 0
+
+  printf("------\n");
+  /* Hack */
+  for (i = 0; i < to->query_indices.size; i++) {
+    printf("query_index: %d, ", to->query_indices.data[i]);
+    j = to->query_indices.data[i];
+    if (j < qt->num_queries) {
+      query = qt->query[j];
+      nvars = query->num_vars;
+      printf("nvars = %d\n", nvars);
+    }
+  }
+
   to->subst = (int32_t *) safe_malloc( nvars * sizeof(int32_t) );
   memcpy( &to->subst, &from->subst, nvars * sizeof(int32_t) );
 
@@ -1464,12 +1477,12 @@ void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t 
     to->lit[i] = (samp_literal_t *) safe_malloc((j+1) * sizeof(samp_literal_t));
     memcpy( to->lit[i], from->lit[i], (j+1) * sizeof(samp_literal_t) );  // copy the trailing '-1'
   }
-#endif
 }
 
-void copy_query_instance_table( query_instance_table_t *to, query_instance_table_t *from ) { // , samp_table_t *stbl ) {
+
+void copy_query_instance_table( query_instance_table_t *to, query_instance_table_t *from, samp_table_t *stbl ) {
   int i;
-  //  query_table_t *qt = &(stbl->query_table);
+  query_table_t *qt = &(stbl->query_table);
   samp_query_t *query;
 
   to->size = from->size;
@@ -1478,9 +1491,38 @@ void copy_query_instance_table( query_instance_table_t *to, query_instance_table
   for (i = 0; i < to->num_queries; i++) {
     to->query_inst[i] = (samp_query_instance_t *) safe_malloc( sizeof(samp_query_instance_t) );
     // query = qt->query[i];
-    copy_samp_query_instance( to->query_inst[i], from->query_inst[i], 1); // query->num_vars );
+    copy_samp_query_instance( to->query_inst[i], from->query_inst[i], qt); // query->num_vars );
   }
 }
+
+
+void merge_query_instance_tables(query_instance_table_t *to, query_instance_table_t *from) {
+  /* Tread carefully.  How much checking can / should we do here?
+   * This function will sweep through the pmodel and sampling_nums
+   * arrays and update 'to' based on the contents of 'from'.  The
+   * point is to be able to merge atom tables after spawning multiple
+   * threads.
+   */
+  int32_t i;
+  int32_t nq = from->num_queries;
+  samp_query_instance_t *qifrom, *qito;
+
+  if ( nq != to->num_queries ) {
+    printf("merge_query_instance_tables: Tables 'to' (%llx) and 'from' (%llx) differ in their num_queries (%d vs. %d)\n",
+           (unsigned long long) to, (unsigned long long) from, to->num_queries, from->num_queries);
+    printf("                   Cowardly refusing to merge query instance tables.\n");
+  } else {
+    /* Here, we assume that clear_atom_counts was called BEFORE the
+     * mcmc run, and that what appears here are differential
+     * counts. */
+    for (i = 0; i < from->num_queries; i++) {
+      qifrom = from->query_inst[i];
+      qito = to->query_inst[i];
+      qito->pmodel += qifrom->pmodel;
+      qito->sampling_num += qifrom->sampling_num; // Almost certainly wrong.
+    }
+  }
+ }
 
 
 void query_instance_table_resize(query_instance_table_t *table) {
@@ -1695,6 +1737,7 @@ void init_samp_table(samp_table_t *table) {
  * at most size, and each sort name is hashed to the right index.
  */
 bool valid_sort_table(sort_table_t *sort_table){
+#ifdef VALIDATE
 	assert(sort_table->size >= 0);
 	assert(sort_table->num_sorts <= sort_table->size);
 	if (sort_table->size < 0 || sort_table->num_sorts > sort_table->size)
@@ -1706,11 +1749,13 @@ bool valid_sort_table(sort_table_t *sort_table){
 		i++;
 	assert(i >= sort_table->num_sorts);
 	if (i < sort_table->num_sorts) return false;
+#endif
 	return true;
 }
 
 /* Checks that the const names are hashed to the right index. */
 bool valid_const_table(const_table_t *const_table, sort_table_t *sort_table){
+#ifdef VALIDATE
 	assert(const_table->size >= 0); 
 	assert(const_table->num_consts <= const_table->size);
 	if (const_table->size < 0 || const_table->num_consts > const_table->size)
@@ -1723,6 +1768,7 @@ bool valid_const_table(const_table_t *const_table, sort_table_t *sort_table){
 		i++;
 	assert(i >= const_table->num_consts);
 	if (i < const_table->num_consts) return false;
+#endif
 	return true;
 }
 
@@ -1733,6 +1779,7 @@ bool valid_const_table(const_table_t *const_table, sort_table_t *sort_table){
 bool valid_pred_table(pred_table_t *pred_table,
 		sort_table_t *sort_table,
 		atom_table_t *atom_table){
+#ifdef VALIDATE
 	pred_tbl_t *evpred_tbl = &(pred_table->evpred_tbl);
 	pred_entry_t *entry;
 	uint32_t i, j;
@@ -1831,6 +1878,7 @@ bool valid_pred_table(pred_table_t *pred_table,
 		}
 		i++;
 	}
+#endif
 	return true;
 }
 
@@ -1839,6 +1887,7 @@ bool valid_pred_table(pred_table_t *pred_table,
  */
 bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 		const_table_t *const_table, sort_table_t *sort_table){
+#ifdef VALIDATE
 	assert(atom_table->size >= 0);
 	assert(atom_table->num_vars <= atom_table->size);
 	if (atom_table->size < 0 ||
@@ -1911,6 +1960,7 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 		printf("Invalid atom num unfixed vars\n");
 		return false;
 	}
+#endif
 	return true;
 }
 
@@ -1931,6 +1981,7 @@ static bool clause_contains_lit(samp_clause_t *clause, samp_literal_t lit) {
 
 static bool valid_watched_lit(rule_inst_table_t *rule_inst_table, samp_literal_t lit,
 		atom_table_t *atom_table) {
+#ifdef VALIDATE
 	valid_clause_list(&rule_inst_table->watched[lit]);
 
 	bool lit_true = (is_pos(lit) && assigned_true(atom_table->assignment[var_of(lit)]))
@@ -1950,6 +2001,7 @@ static bool valid_watched_lit(rule_inst_table_t *rule_inst_table, samp_literal_t
 		if (!clause_contains_lit(cls, lit))
 			return false;
 	}
+#endif
 	return true;
 }
 
@@ -1969,7 +2021,8 @@ static bool clause_contains_fixed_true_lit(samp_clause_t *clause,
 /*
  * Validate all the lists in the clause table
  */
-bool valid_rule_inst_table(rule_inst_table_t *rule_inst_table, atom_table_t *atom_table){
+bool valid_rule_inst_table(rule_inst_table_t *rule_inst_table, atom_table_t *atom_table) {
+#ifdef VALIDATE
 	samp_clause_t *ptr;
 	samp_clause_t *cls;
 	int32_t lit, i;
@@ -2052,10 +2105,12 @@ bool valid_rule_inst_table(rule_inst_table_t *rule_inst_table, atom_table_t *ato
 		//		return false;
 		//}
 	}
+#endif
 	return true;
 }
 
 bool valid_table(samp_table_t *table){
+#if VALIDATE
 	sort_table_t *sort_table = &(table->sort_table); 
 	const_table_t *const_table = &(table->const_table);
 	atom_table_t *atom_table = &(table->atom_table);
@@ -2082,6 +2137,7 @@ bool valid_table(samp_table_t *table){
 		printf("Invalid rule_inst_table\n");
 		return false;
 	}
+#endif
 	return true;
 }
 
@@ -2111,7 +2167,7 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   copy_rule_table(&clone->rule_table, &(table->rule_table), clone );
   copy_rule_inst_table(&clone->rule_inst_table, &(table->rule_inst_table), clone );
   copy_query_table(&clone->query_table, &(table->query_table), clone );
-  copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table) );
+  copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table), clone );
   copy_source_table(&clone->source_table, &(table->source_table) );
   /* Let us know how it went: */
   printf("valid_table(clone) = %d\n", valid_table(clone));

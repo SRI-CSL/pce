@@ -183,7 +183,7 @@ CFLAGS := $(CFLAGS) -O3 -fomit-frame-pointer -g $(PIC)
 CPPFLAGS := $(CPPFLAGS) -DNDEBUG
 else
 ifeq ($(MCSAT_MODE),debug) 
-CFLAGS := $(CFLAGS) -ggdb
+CFLAGS := $(CFLAGS) -ggdb -DVALIDATE
 else 
 CFLAGS := $(CFLAGS) -g
 endif
