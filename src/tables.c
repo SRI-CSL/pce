@@ -1445,6 +1445,7 @@ void copy_ivector( ivector_t *to, ivector_t *from ) {
 
 
 void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t *from, int nvars ) {
+  int32_t i, j, n;
 
   copy_ivector( &(to->query_indices), &(from->query_indices) );
   to->sampling_num = from->sampling_num;
@@ -1456,19 +1457,28 @@ void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t 
   to->constp = (bool *) safe_malloc( nvars * sizeof(bool) );
   memcpy( &to->constp, &from->constp, nvars * sizeof(bool) );
 
-  to->lit = from->lit;
+  for (n = 0; from->lit[n] != NULL; n++);
+  to->lit = (samp_literal_t **) safe_malloc( (n+1) * sizeof(samp_literal_t*));
+  for (i = 0; i < n; i++) {
+    for (j = 0; from->lit[i][j] != -1; j++);
+    to->lit[i] = (samp_literal_t *) safe_malloc((j+1) * sizeof(samp_literal_t));
+    memcpy( to->lit[i], from->lit[i], (j+1) * sizeof(samp_literal_t) );  // copy the trailing '-1'
+  }
 #endif
 }
 
-void copy_query_instance_table( query_instance_table_t *to, query_instance_table_t *from ) {
+void copy_query_instance_table( query_instance_table_t *to, query_instance_table_t *from ) { // , samp_table_t *stbl ) {
   int i;
+  //  query_table_t *qt = &(stbl->query_table);
+  samp_query_t *query;
 
   to->size = from->size;
   to->num_queries = from->num_queries;
   to->query_inst = (samp_query_instance_t **) safe_malloc( to->size * sizeof(samp_query_instance_t *));
   for (i = 0; i < to->num_queries; i++) {
     to->query_inst[i] = (samp_query_instance_t *) safe_malloc( sizeof(samp_query_instance_t) );
-    copy_samp_query_instance( to->query_inst[i], from->query_inst[i], 0 );
+    // query = qt->query[i];
+    copy_samp_query_instance( to->query_inst[i], from->query_inst[i], 1); // query->num_vars );
   }
 }
 
