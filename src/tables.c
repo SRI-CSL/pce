@@ -43,6 +43,7 @@ void init_sort_table(sort_table_t *sort_table){
 
 
 void copy_sort_entry(sort_entry_t *to, sort_entry_t *from) {
+
   int i;
 
   to->size = from->size;
@@ -1143,15 +1144,23 @@ void copy_samp_clause_list( samp_clause_list_t *to, samp_clause_list_t *from ) {
     to->head = NULL;
     to->tail = NULL;
   } else {
-    from_next = from->head;
-    to_next = clone_samp_clause(from_next);
-    to->head = to_next;
+    // from_next = from->head;
+
+    /* clone_samp_clause will build out a copy of the entire list: */
+    to->head = clone_samp_clause(from->head);
     tail = to->head;
+    i = 0;
+    while (tail->link) {
+      tail = tail->link;
+      i++;
+    }
+    /*      
     for (i = 0; i < length; i++) {
       from_next = from_next->link;
       if (from_next)
         tail = to_next->link = clone_samp_clause(from_next);
     }
+    */
     to->tail = tail;
   }
   //  printf("Valid clause list returns %d\n", valid_clause_list(to));
@@ -2166,9 +2175,9 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   copy_atom_table( &clone->atom_table, &(table->atom_table), clone );
   copy_rule_table(&clone->rule_table, &(table->rule_table), clone );
   copy_rule_inst_table(&clone->rule_inst_table, &(table->rule_inst_table), clone );
-  copy_query_table(&clone->query_table, &(table->query_table), clone );
-  copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table), clone );
-  copy_source_table(&clone->source_table, &(table->source_table) );
+  //  copy_query_table(&clone->query_table, &(table->query_table), clone );
+  //  copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table), clone );
+  //  copy_source_table(&clone->source_table, &(table->source_table) );
   /* Let us know how it went: */
   printf("valid_table(clone) = %d\n", valid_table(clone));
   return clone;
