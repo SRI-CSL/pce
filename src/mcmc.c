@@ -452,15 +452,16 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
       copy[i] = clone_samp_table(table);
       tinfo[i].thread_num = i+1;
       tinfo[i].samp_table = copy[i];
+#if 0
       printf("mcsat thread %d: %llx\n",
              tinfo[i].thread_num, (long long unsigned int) tinfo[i].samp_table);
       fflush(stdout);
-
+#endif
       s = pthread_create(&tinfo[i].thread_id, &attr, &mc_sat_thread, &(tinfo[i]));
       if (s != 0) perror("pthread_create");
     }
 
-    printf("Done creating threads\n");
+    printf("Created %d mcmc threads\n", nthreads);
     fflush(stdout);
 
     for (i = 0; i < nthreads; i++) {
