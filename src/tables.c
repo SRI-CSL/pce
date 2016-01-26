@@ -1190,10 +1190,10 @@ void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from, samp_t
   rule_inst_t *tmp;
 
   size = to->size = from->size;
-  n_insts = from->num_rule_insts;
+  n_insts = to->num_rule_insts = from->num_rule_insts;
+
   nvars = (tbl->atom_table).num_vars;
 
-  to->num_rule_insts = from->num_rule_insts;
   if (size >= MAXSIZE(sizeof(rule_inst_t *), 0)){
     out_of_memory();
   }
@@ -1214,20 +1214,27 @@ void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from, samp_t
   /* This seems wrong - we should probably be stepping through
    * watched[i] and copying those lists. */
   to->watched = (samp_clause_list_t *) safe_malloc( 2 * size * sizeof(samp_clause_list_t) );
+
   for (i = 0; i < 2*nvars; i++)
     copy_samp_clause_list( &(to->watched[i]), &(from->watched[i]) );
 
-
   //  to->watched = clone_samp_clause_list( from->watched );
   to->rule_watched = (samp_clause_list_t *) safe_malloc(size * sizeof(samp_clause_list_t));
-  for (i = 0; i < n_insts; i++)
+  for (i = 0; i < n_insts; i++) {
     copy_samp_clause_list( &(to->rule_watched[i]), &(from->rule_watched[i]) );
+    printf("valid_clause_list(rule_watched[%d]) = %d\n", i, valid_clause_list(&to->rule_watched[i]));
+  }
 
   /* TO DO:  CHECK THESE AND DO THE RIGHT THING HERE: */
   
   copy_samp_clause_list(&to->sat_clauses, &from->sat_clauses);
+  printf("valid_clause_list(sat) = %d\n", valid_clause_list(&to->sat_clauses));
+
   copy_samp_clause_list(&to->unsat_clauses, &from->unsat_clauses);
+  printf("valid_clause_list(unsat) = %d\n", valid_clause_list(&to->unsat_clauses));
+
   copy_samp_clause_list(&to->live_clauses, &from->live_clauses);
+  printf("valid_clause_list(live) = %d\n", valid_clause_list(&to->live_clauses));
 
   copy_hmap(&to->unsat_soft_rules, &from->unsat_soft_rules);
   //  init_hmap(&to->unsat_soft_rules, HMAP_DEFAULT_SIZE);
@@ -2169,12 +2176,19 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   clone = (samp_table_t *) safe_malloc( sizeof(samp_table_t) );
 
   copy_sort_table( &clone->sort_table, &(table->sort_table) );
+  printf("valid_sort_table = %d\n", valid_sort_table(&clone->sort_table));
   copy_const_table( &clone->const_table, &(table->const_table) );
+
+  printf("valid_const_table = %d\n", valid_const_table(&clone->const_table, &clone->sort_table));
   copy_var_table( &clone->var_table, &(table->var_table) );
+
   copy_pred_table( &clone->pred_table, &(table->pred_table) );
   copy_atom_table( &clone->atom_table, &(table->atom_table), clone );
+  printf("valid_pred_table = %d\n", valid_pred_table(&clone->pred_table, &clone->sort_table, &clone->atom_table));
+
   copy_rule_table(&clone->rule_table, &(table->rule_table), clone );
   copy_rule_inst_table(&clone->rule_inst_table, &(table->rule_inst_table), clone );
+  printf("valid_rule_inst_table = %d\n", valid_rule_inst_table(&clone->rule_inst_table, &clone->atom_table));
   //  copy_query_table(&clone->query_table, &(table->query_table), clone );
   //  copy_query_instance_table(&clone->query_instance_table, &(table->query_instance_table), clone );
   //  copy_source_table(&clone->source_table, &(table->source_table) );
