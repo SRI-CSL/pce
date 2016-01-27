@@ -90,66 +90,66 @@ void parse_line(char* line, training_data_t *training_data,
 }
 
 extern training_data_t* parse_data_file(const char *path, samp_table_t* table) {
-	FILE *fp = fopen(path, "r");
-	int wspace_cnt;
-	char line[100];
-	int i, in_world;
-	atom_table_t atom_table = table->atom_table;
-	int32_t current_world = 0;
+  FILE *fp = fopen(path, "r");
+  int wspace_cnt;
+  char line[100];
+  int i, n_items, in_world;
+  atom_table_t atom_table = table->atom_table;
+  int32_t current_world = 0;
 
-	if (fp == NULL) {
-		fprintf(stderr, "Could not open %s", path);
-	}
+  if (fp == NULL) {
+    fprintf(stderr, "Could not open %s", path);
+  }
 
-	training_data = (training_data_t*) safe_malloc(sizeof(training_data_t));
-	training_data->num_evidence_atoms = atom_table.num_vars;
+  training_data = (training_data_t*) safe_malloc(sizeof(training_data_t));
+  training_data->num_evidence_atoms = atom_table.num_vars;
 
-	// allocate memory for each world in the training data
-	fscanf(fp, "%d\n", &training_data->num_data_sets);
+  // allocate memory for each world in the training data
+  n_items = fscanf(fp, "%d\n", &training_data->num_data_sets);
 
-	training_data->evidence_atoms = (evidence_atom_t**) safe_malloc(
-			training_data->num_data_sets * sizeof(evidence_atom_t*));
-	for (i = 0; i < training_data->num_data_sets; ++i) {
-		training_data->evidence_atoms[i] = (evidence_atom_t*) safe_malloc(
-				atom_table.num_vars * sizeof(evidence_atom_t));
-	}
+  training_data->evidence_atoms = (evidence_atom_t**) safe_malloc(
+                                                                  training_data->num_data_sets * sizeof(evidence_atom_t*));
+  for (i = 0; i < training_data->num_data_sets; ++i) {
+    training_data->evidence_atoms[i] = (evidence_atom_t*) safe_malloc(
+                                                                      atom_table.num_vars * sizeof(evidence_atom_t));
+  }
 
-        /* in_world is a flag to indicate whether we processed a
-         * world after we saw '>>'.  This adds a measure of
-         * flexibility so that we can permit a trailing '>>' to appear
-         * in the file.
-         */
+  /* in_world is a flag to indicate whether we processed a
+   * world after we saw '>>'.  This adds a measure of
+   * flexibility so that we can permit a trailing '>>' to appear
+   * in the file.
+   */
 
+  in_world = 0;
+  while (!feof(fp)) {
+    n_items = fscanf(fp, "%s\n", line);
+    // do a left trim
+    wspace_cnt = 0;
+    while (wspace_cnt < strlen(line) && isspace(line[wspace_cnt]))
+      wspace_cnt++;
+    if (wspace_cnt == strlen(line)) // skip empty lines
+      continue;
+    if (strcmp(line + wspace_cnt, NEXT_WORLD) == 0) {
+      current_world++;
+      in_world = 1;
+    } else {
+      parse_line(line + wspace_cnt, training_data, current_world, table);
+      if (current_world > training_data->num_data_sets-1) {
+        printf("File worlds exceeds the declared number of training worlds, %d.  Ignoring the rest.\n",
+               training_data->num_data_sets);
+      } else {
         in_world = 0;
-	while (!feof(fp)) {
-		fscanf(fp, "%s\n", line);
-		// do a left trim
-		wspace_cnt = 0;
-		while (wspace_cnt < strlen(line) && isspace(line[wspace_cnt]))
-			wspace_cnt++;
-		if (wspace_cnt == strlen(line)) // skip empty lines
-			continue;
-		if (strcmp(line + wspace_cnt, NEXT_WORLD) == 0) {
-			current_world++;
-                        in_world = 1;
-		} else {
-			parse_line(line + wspace_cnt, training_data, current_world, table);
-                        if (current_world > training_data->num_data_sets-1) {
-                          printf("File worlds exceeds the declared number of training worlds, %d.  Ignoring the rest.\n",
-                                 training_data->num_data_sets);
-                        } else {
-                          in_world = 0;
-                        }
-		}
-	}
+      }
+    }
+  }
 
-	fclose(fp);
-        /* If true, roll back since the file doesn't really contain a
-         * world: */
-        if (in_world) current_world--;
-        printf("Number of training data sets: %d\n", training_data->num_data_sets);
-	assert(current_world + 1 == training_data->num_data_sets);
-	return training_data;
+  fclose(fp);
+  /* If true, roll back since the file doesn't really contain a
+   * world: */
+  if (in_world) current_world--;
+  printf("Number of training data sets: %d\n", training_data->num_data_sets);
+  assert(current_world + 1 == training_data->num_data_sets);
+  return training_data;
 }
 
 extern void free_training_data(training_data_t *training_data) {

@@ -17,6 +17,7 @@
 #include "samplesat.h"
 #include "walksat.h"
 #include "mcmc.h"
+#include "weight_learning.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -214,30 +215,30 @@ done: continue;
  * Updates the counts based on the current sample
  */
 static void update_pmodel(samp_table_t *table) {
-	atom_table_t *atom_table = &table->atom_table;
-	int32_t num_vars = table->atom_table.num_vars;
-	int32_t *pmodel = table->atom_table.pmodel;
-	int32_t i;
+  atom_table_t *atom_table = &table->atom_table;
+  int32_t num_vars = table->atom_table.num_vars;
+  int32_t *pmodel = table->atom_table.pmodel;
+  int32_t i;
 
-	table->atom_table.num_samples++;
-	for (i = 0; i < num_vars; i++) {
-		if (assigned_true(atom_table->assignment[i])) {
-			if (get_verbosity_level() >= 3 && i > 0) { // FIXME why i > 0?
-				printf("Atom %d was assigned true\n", i);
-				fflush(stdout);
-			}
-			pmodel[i]++;
-		}
-	}
+  table->atom_table.num_samples++;
+  for (i = 0; i < num_vars; i++) {
+    if (assigned_true(atom_table->assignment[i])) {
+      if (get_verbosity_level() >= 3 && i > 0) { // FIXME why i > 0?
+        printf("Atom %d was assigned true\n", i);
+        fflush(stdout);
+      }
+      pmodel[i]++;
+    }
+  }
 
-	update_query_pmodel(table);
+  update_query_pmodel(table);
 
-	///* for the covariance matrix */
-	update_covariance_matrix_statistics(table);
+  ///* for the covariance matrix */
+  update_covariance_matrix_statistics(table);
 
-	if (get_dump_samples_path() != NULL) {
-		append_assignment_to_file(get_dump_samples_path(), table);
-	}
+  if (get_dump_samples_path() != NULL) {
+    append_assignment_to_file(get_dump_samples_path(), table);
+  }
 }
 
 /*

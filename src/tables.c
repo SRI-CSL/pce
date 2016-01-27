@@ -88,6 +88,20 @@ void copy_sort_entry(sort_entry_t *to, sort_entry_t *from) {
   }
 }
 
+void free_sort_entry(sort_entry_t **obj) {
+  sort_entry_t *from;
+
+  from = *obj;
+
+  free(from->name);
+  if (from->supersorts) free(from->supersorts);
+  if (from->subsorts) free(from->subsorts);
+  if (from->ints) free(from->ints);
+  free(from->constants);
+  free(from);
+  obj = NULL;
+}
+
 
 void copy_sort_table(sort_table_t *to, sort_table_t *from) {
   int32_t i, size;
@@ -1136,17 +1150,14 @@ samp_clause_t *clone_samp_clause( samp_clause_t *from ) {
  */
 
 void copy_samp_clause_list( samp_clause_list_t *to, samp_clause_list_t *from ) {
-  int32_t i, length;
-  //  samp_clause_t *to_next, *from_next;
+  int32_t i;
   samp_clause_t  *tail;
-  length = to->length = from->length;
+  to->length = from->length;
 
   if (!from->head) {
     to->head = NULL;
     to->tail = NULL;
   } else {
-    // from_next = from->head;
-
     /* clone_samp_clause will build out a copy of the entire list: */
     to->head = clone_samp_clause(from->head);
     tail = to->head;
@@ -1155,13 +1166,6 @@ void copy_samp_clause_list( samp_clause_list_t *to, samp_clause_list_t *from ) {
       tail = tail->link;
       i++;
     }
-    /*      
-    for (i = 0; i < length; i++) {
-      from_next = from_next->link;
-      if (from_next)
-        tail = to_next->link = clone_samp_clause(from_next);
-    }
-    */
     to->tail = tail;
   }
   //  printf("Valid clause list returns %d\n", valid_clause_list(to));
@@ -1460,6 +1464,7 @@ void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t 
   copy_ivector( &(to->query_indices), &(from->query_indices) );
   to->sampling_num = from->sampling_num;
   to->pmodel = from->pmodel;
+  nvars = 1;
 
   //  printf("------\n");
   /* Hack */
@@ -1492,7 +1497,7 @@ void copy_samp_query_instance( samp_query_instance_t *to, samp_query_instance_t 
 void copy_query_instance_table( query_instance_table_t *to, query_instance_table_t *from, samp_table_t *stbl ) {
   int i;
   query_table_t *qt = &(stbl->query_table);
-  samp_query_t *query;
+  //  samp_query_t *query;
 
   to->size = from->size;
   to->num_queries = from->num_queries;
@@ -1506,12 +1511,8 @@ void copy_query_instance_table( query_instance_table_t *to, query_instance_table
 
 
 void merge_query_instance_tables(query_instance_table_t *to, query_instance_table_t *from) {
-  /* Tread carefully.  How much checking can / should we do here?
-   * This function will sweep through the pmodel and sampling_nums
-   * arrays and update 'to' based on the contents of 'from'.  The
-   * point is to be able to merge atom tables after spawning multiple
-   * threads.
-   */
+  /* It might make more sense to combine this with merge_atom_tables
+     for a single merge_tables function. */
   int32_t i;
   int32_t nq = from->num_queries;
   samp_query_instance_t *qifrom, *qito;
@@ -1527,8 +1528,19 @@ void merge_query_instance_tables(query_instance_table_t *to, query_instance_tabl
     for (i = 0; i < from->num_queries; i++) {
       qifrom = from->query_inst[i];
       qito = to->query_inst[i];
+      /* Increment the count of true instances: */
       qito->pmodel += qifrom->pmodel;
-      qito->sampling_num += qifrom->sampling_num; // Almost certainly wrong.
+
+      /* Increment the sampling number - the sample at which the
+         instance first appeared.  The probability value is computed
+         as:
+
+         qinst->pmodel / (atom_table->num_samples - qinst->sampling_num)
+
+         Both terms in the denominator are incremented during a merge,
+         so this should still be ok.
+      */
+      qito->sampling_num += qifrom->sampling_num;
     }
   }
  }
@@ -1976,6 +1988,7 @@ bool valid_atom_table(atom_table_t *atom_table, pred_table_t *pred_table,
 /*
  * Returns if a clause contains the literal lit
  */
+#ifdef VALIDATE
 static bool clause_contains_lit(samp_clause_t *clause, samp_literal_t lit) {
 	int32_t i;
 	bool lit_exists = false;
@@ -1987,10 +2000,13 @@ static bool clause_contains_lit(samp_clause_t *clause, samp_literal_t lit) {
 		return false;
 	return true;
 }
+#endif
 
+
+
+#ifdef VALIDATE
 static bool valid_watched_lit(rule_inst_table_t *rule_inst_table, samp_literal_t lit,
 		atom_table_t *atom_table) {
-#ifdef VALIDATE
 	valid_clause_list(&rule_inst_table->watched[lit]);
 
 	bool lit_true = (is_pos(lit) && assigned_true(atom_table->assignment[var_of(lit)]))
@@ -2010,13 +2026,14 @@ static bool valid_watched_lit(rule_inst_table_t *rule_inst_table, samp_literal_t
 		if (!clause_contains_lit(cls, lit))
 			return false;
 	}
-#endif
 	return true;
 }
+#endif
 
 /*
  * Returns if a clause contains a literal that is fixed to true
  */
+#ifdef VALIDATE
 static bool clause_contains_fixed_true_lit(samp_clause_t *clause,
 		samp_truth_value_t *assignment) {
 	int32_t i;
@@ -2026,6 +2043,7 @@ static bool clause_contains_fixed_true_lit(samp_clause_t *clause,
 	}
 	return false;
 }
+#endif
 
 /*
  * Validate all the lists in the clause table

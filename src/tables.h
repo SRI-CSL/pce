@@ -517,5 +517,6 @@ extern bool valid_table(samp_table_t *table);
 
 extern samp_table_t *clone_samp_table(samp_table_t *table);
 extern void merge_atom_tables(atom_table_t *to, atom_table_t *from);
+extern void merge_query_instance_tables(query_instance_table_t *to, query_instance_table_t *from);
 
 #endif /* __TABLES_H */
