@@ -290,16 +290,15 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
 }
 
 /*
- * Perhaps the easiest path to parallelization lies in multithreading
- * this function by cloning the (master copy of the) table and
- * allowing multiple threads to operate, each on their own copy.  The
- * trick is that we will need to clone the table and its slots,
- * following all of the pointers.  Once that is done, we should be
- * able to start multiple threads that (we hope) won't require
- * mutexes.
+ * Perhaps the easiest path to parallelization: thread this function
+ * by cloning the (master copy of the) table and allowing each thread
+ * to operate on its own independent copy.  The trick is that we will
+ * need to clone the table and its slots, following all of the
+ * pointers.  Once that is done, we should be able to start multiple
+ * threads that (we hope) won't require mutexes.
  *
- * Then, after joining, we can merge the tables (I make it sound so
- * easy, don't I!) back into the master copy.
+ * Then, after joining, we can merge the tables back into the master
+ * copy.
  */
 
 
@@ -343,7 +342,21 @@ void mc_sat_internal(samp_table_t *table_in, bool lazy, uint32_t max_samples, do
   //assert(valid_table(table));
 
   for (i = 0; i < burn_in_steps + max_samples * samp_interval; i++) {
-
+    /* Top-level sampling loop: 
+     *    reset sample_sat
+     *    back up the assignment array (copy_assignment_array)
+     *
+     *    Call sample_sat:
+     *        check sample_sat_body() until no conflicts or until num_flips is exceeded.
+     *        if no conflict, walk around neigboring models calling sample_sat_body()
+     *
+     *    if conflict then restore_assignment_array from backup
+     *    after burn-in, update
+     *    perturb (calls sample_sat again)
+     *
+     * sample_sat_body() calls simulated annealing with probability
+     * sa_probability, otherwise it does walksat.
+     */
     if (timeout != 0 && time(NULL) >= fintime) {
       printf("Timeout after %"PRIu32" samples\n", i);
       break;
