@@ -268,6 +268,7 @@ typedef struct rule_inst_table_s {
 
 	hmap_t unsat_soft_rules; /* unsat soft rule instances */
 	double unsat_weight; /* total weight of unsat soft rules */
+	double sat_weight;   /* total weight of sat soft rules */
 	/* clauses of a soft rule that need not to be sat when the rule is unsat */
 	samp_clause_list_t *rule_watched; 
 } rule_inst_table_t;

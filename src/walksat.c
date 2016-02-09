@@ -280,7 +280,9 @@ void insert_live_clause(samp_clause_t *clause, samp_table_t *table) {
 			rule_inst_t *rinst = rule_inst_table->rule_insts[clause->rule_index];
 			if (assigned_true(rule_inst_table->assignment[clause->rule_index])) {
 				rule_inst_table->unsat_weight += rinst->weight;
-			}
+			} else {
+				rule_inst_table->sat_weight   += rinst->weight;
+                        }
 			if (get_verbosity_level() >= 3) {
 				printf("[insert_live_clause] Fix rule %d: \n", clause->rule_index);
 				print_rule_instance(rinst, table);
@@ -733,6 +735,8 @@ void mw_sat(samp_table_t *table, int32_t num_trials, double rvar_probability,
 					rule_inst_table->assignment[clause->rule_index] = v_false;
 					rule_inst_t *rinst = rule_inst_table->rule_insts[clause->rule_index];
 					rule_inst_table->unsat_weight += rinst->weight;
+                                        /* Is this really going to do the right thing?? */
+					rule_inst_table->sat_weight   -= rinst->weight;
 					/* move unsat_clauses to live_clause_list and rescan */
 					clause_list_concat(&rule_inst_table->unsat_clauses, 
 							&rule_inst_table->live_clauses);
@@ -746,6 +750,7 @@ void mw_sat(samp_table_t *table, int32_t num_trials, double rvar_probability,
 				rule_inst_table->assignment[rule_index] = v_true;
 				rule_inst_t *rinst = rule_inst_table->rule_insts[rule_index];
 				rule_inst_table->unsat_weight -= rinst->weight;
+				rule_inst_table->sat_weight   += rinst->weight;
 				if (get_verbosity_level() >= 3) {
 					printf("[flip_rule_to_sat] Rule %d: ", rule_index);
 					print_rule_instance(rinst, table);
@@ -759,10 +764,12 @@ void mw_sat(samp_table_t *table, int32_t num_trials, double rvar_probability,
 
 			if (get_verbosity_level() >= 1) {
 				printf("[mw_sat] Flip %d: # unsat hard = %d, # unsat soft = %d, " 
-						"weight of unsat soft = %f\n", j,
+						"weight of unsat soft = %f; weight of sat soft = %f\n", j,
 						rule_inst_table->unsat_clauses.length,
 						rule_inst_table->unsat_soft_rules.nelems,
-						rule_inst_table->unsat_weight);
+                                                rule_inst_table->unsat_weight,
+                                                rule_inst_table->sat_weight
+                                       );
 			}
 			if (get_verbosity_level() >= 3) {
 				print_live_clauses(table);

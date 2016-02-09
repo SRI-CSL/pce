@@ -131,6 +131,29 @@ static void restore_sat_dead_rule_instances(rule_inst_table_t *rule_inst_table,
 }
 
 /*
+ * Sum up the weights of all satisfiable rules modulo the current
+ * assignment:
+ */
+double sat_clause_weight(rule_inst_table_t *rule_inst_table) {
+  int32_t i;
+  rule_inst_t *rinst;
+  double w = 0.0;
+  samp_truth_value_t *assignment;
+
+  for (i = 0; i < rule_inst_table->num_rule_insts; i++) {
+    //if (rule_inst_table->live[i]) continue;
+    rinst = rule_inst_table->rule_insts[i];
+    assignment = rule_inst_table->assignment;
+    if (sat_rule_inst(assignment, rinst)) {
+      if ( rinst->weight == DBL_MAX ) w = DBL_MAX;
+      else w += rinst->weight;
+    }
+  }
+  return w;
+}
+
+
+/*
  * Prepare for a new round in mcsat: select a new set of live rule instances
  */
 static int32_t reset_sample_sat(samp_table_t *table) {
@@ -296,6 +319,52 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
 	return 0;
 }
 
+
+static int32_t gibbs_sample(samp_table_t *table) {
+  atom_table_t *atom_table = &table->atom_table;
+  rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
+  double w0, w1, c;
+  int k, var, nvars, conflict;
+  samp_truth_value_t *assignment = atom_table->assignment;
+
+  nvars = atom_table->num_unfixed_vars;
+  w0 = sat_clause_weight(rule_inst_table);
+
+  for (k = 0;  k < nvars; k++) {
+    var = choose_unfixed_variable(atom_table);
+    if ( unfixed_tval(assignment[var]) ) {
+      copy_assignment_array(atom_table);
+#if 0
+      conflict = flip_unfixed_variable(table, var);
+#else
+      //      conflict = perturb_assignment(table, false, 0.1, nvars, nvars);
+      conflict = perturb_assignment(table, false, 0.0, nvars, nvars);
+#endif
+      w1 = sat_clause_weight(rule_inst_table);
+
+      // printf("w(M') = %f, w(M) = %f\n", w1, w0);
+      c = choose();
+
+      /* The use of DBL_MAX screws things up a bit - if these are
+         used, then the weight sums will be 'inf'.  
+      */
+      if (w1 == w0) {
+        if (c > 0.5) restore_assignment_array(atom_table);
+        else w0 = w1;
+      } else {
+        /* Special cases when one weight is DBL_MAX and the other is not: */
+        if (w1 == DBL_MAX && w0 < DBL_MAX) w0 = w1;
+        else if (w0 == DBL_MAX && w1 < DBL_MAX) restore_assignment_array(atom_table);
+        else if ( (w1 * c) > w0 ) w0 = w1;
+        else restore_assignment_array(atom_table);
+      }
+
+    }
+  }
+  return 0;
+}
+
+
 /*
  * Perhaps the easiest path to parallelization: thread this function
  * by cloning the (master copy of the) table and allowing each thread
@@ -418,8 +487,17 @@ void mc_sat_internal(samp_table_t *table_in, bool lazy, uint32_t max_samples, do
      * region of feasible models */
     rule_inst_table->soft_rules_included = false;
 
+    /* Should this change to a Gibbs sampling step?  This flips a
+       variable such that the new model M' satisfies the hard clauses.
+       We can then choose to accept this with odds w(M') / w(M), where
+       M is the previous model.  Just a tweak on the code here: */
+#if 0
     conflict = perturb_assignment(table, lazy, rvar_probability, max_flips,
 				  max_extra_flips);
+#else
+    conflict = gibbs_sample(table);
+#endif
+
   }
 }
 
