@@ -104,6 +104,13 @@ static void init_rule_instances(rule_inst_table_t *rule_inst_table) {
 	}
 }
 
+// One of these scanning functions might be an appropriate template
+// for scanning the rule instance table to sum up the weights of
+// satisfiable clauses corresponding to a particular model.  Remember
+// that for Gibbs sampling, we need to compute the weight sum for two
+// models: the current and the proposed.
+
+
 /*
  * Scan the dead rule instances, restore all dead rule instances that are
  * satisfied by assignment.
