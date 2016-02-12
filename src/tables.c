@@ -2166,6 +2166,25 @@ bool valid_table(samp_table_t *table){
   return true;
 }
 
+bool valid_samp_rule(samp_rule_t* rule) {
+  return true;
+}
+
+bool valid_rule_table(rule_table_t *rule_table) {
+#ifdef VALIDATE
+  int32_t i;
+  assert(rule_table->size >= 0);
+  assert(rule_table->num_rules >= 0);
+  assert(rule_table->num_rules <= rule_table->size);
+  if (rule_table->size < 0) return false;
+  if (rule_table->num_rules < 0 
+      || rule_table->num_rules > rule_table->size)
+    return false;
+  for (i = 0; i < rule_table->size; i++)
+    assert(valid_samp_rule(rule_table->samp_rules[i]));
+#endif
+  return true;
+}
 
 
 /*
@@ -2189,7 +2208,17 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   copy_pred_table( &clone->pred_table, &(table->pred_table) );
   copy_atom_table( &clone->atom_table, &(table->atom_table), clone );
 
-  copy_rule_table(&clone->rule_table, &(table->rule_table), clone );
+  assert(valid_atom_table(
+                          &(clone->atom_table),
+                          &(clone->pred_table),
+                          &(clone->const_table),
+                          &(clone->sort_table))
+         );
+
+  assert(valid_rule_table( &(table->rule_table) ));
+
+  copy_rule_table(&(clone->rule_table), &(table->rule_table), clone );
+  assert(valid_rule_table( &(clone->rule_table) ));
   copy_rule_inst_table(&(clone->rule_inst_table), &(table->rule_inst_table), clone );
 
   copy_query_table(&clone->query_table, &(table->query_table), clone );
