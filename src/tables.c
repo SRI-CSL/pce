@@ -1274,8 +1274,13 @@ void init_rule_table(rule_table_t *table){
 void copy_rule_atom( rule_atom_t *to, rule_atom_t *from, pred_table_t *pt) {
   int i, arity;
   to->pred = from->pred;
-  arity = pred_arity(to->pred, pt);
   to->builtinop = from->builtinop;
+
+  /* Need to check whether this is sufficient.  Are binary relations
+     the only builtinops?? */
+  if (from->builtinop > 0) arity = 2;
+  else arity = pred_arity(to->pred, pt);
+
   to->args = (rule_atom_arg_t *) safe_malloc( arity * sizeof(rule_atom_arg_t) );
   for (i = 0; i < arity; i++) {
     to->args[i].kind = from->args[i].kind;
@@ -1380,10 +1385,13 @@ void copy_samp_query( samp_query_t *to, samp_query_t *from, pred_table_t *pt ) {
   to->source_index = from->source_index;
   m = to->num_clauses = from->num_clauses;
   n = to->num_vars = from->num_vars;
-  to->vars = (var_entry_t **) safe_malloc( m * sizeof(var_entry_t *) );
-  for (i = 0; i < m; i++) {
-    to->vars[i] = (var_entry_t *) safe_malloc( sizeof(var_entry_t) );
-    copy_var_entry( to->vars[i], from->vars[i] );
+  if (n == 0) to->vars = from->vars;
+  else {
+    to->vars = (var_entry_t **) safe_malloc( m * sizeof(var_entry_t *) );
+    for (i = 0; i < m; i++) {
+      to->vars[i] = (var_entry_t *) safe_malloc( sizeof(var_entry_t) );
+      copy_var_entry( to->vars[i], from->vars[i] );
+    }
   }
   
   n = 0;
