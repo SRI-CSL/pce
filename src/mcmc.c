@@ -294,7 +294,7 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
 	init_rule_instances(rule_inst_table);
 	copy_assignment_array(atom_table);
 	int32_t conflict = sample_sat(table, lazy, 0.0, 0.0, rvar_probability,
-			max_flips, max_extra_flips, false);
+                                      max_flips, max_extra_flips, false);
 
 	/*
 	 * If Sample sat did not find a model (within max_flips) restore the
@@ -320,45 +320,47 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
 }
 
 
-static int32_t gibbs_sample(samp_table_t *table) {
+static int32_t gibbs_sample(samp_table_t *table, int nsteps, int max_flips, int max_extra_flips) {
   atom_table_t *atom_table = &table->atom_table;
   rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
   double w0, w1, c;
-  int k, var, nvars, conflict;
+  int k, var, conflict;
   samp_truth_value_t *assignment = atom_table->assignment;
 
-  nvars = atom_table->num_unfixed_vars;
+  // First get the weight of the current model:
   w0 = sat_clause_weight(rule_inst_table);
 
-  for (k = 0;  k < nvars; k++) {
+  for (k = 0;  k < nsteps; k++) {
+    // Pick an unfixed variable:
     var = choose_unfixed_variable(atom_table);
     if ( unfixed_tval(assignment[var]) ) {
-      copy_assignment_array(atom_table);
-#if 0
-      conflict = flip_unfixed_variable(table, var);
-#else
-      //      conflict = perturb_assignment(table, false, 0.1, nvars, nvars);
-      conflict = perturb_assignment(table, false, 0.0, nvars, nvars);
-#endif
-      w1 = sat_clause_weight(rule_inst_table);
+      // Flip it, and run sample_sat:
+      flip_unfixed_variable(table, var);
+      conflict = perturb_assignment(table, false, 0.0, max_flips, max_extra_flips);
 
-      // printf("w(M') = %f, w(M) = %f\n", w1, w0);
-      c = choose();
+      // If we came out with a conflict, revert the variable:
+      if (conflict != 0) flip_unfixed_variable(table, var); // revert it.
+      else {
+        // Otherwise, compute the weight of the new satisfiable model:
+        w1 = sat_clause_weight(rule_inst_table);
 
-      /* The use of DBL_MAX screws things up a bit - if these are
-         used, then the weight sums will be 'inf'.  
-      */
-      if (w1 == w0) {
-        if (c > 0.5) restore_assignment_array(atom_table);
-        else w0 = w1;
-      } else {
-        /* Special cases when one weight is DBL_MAX and the other is not: */
-        if (w1 == DBL_MAX && w0 < DBL_MAX) w0 = w1;
-        else if (w0 == DBL_MAX && w1 < DBL_MAX) restore_assignment_array(atom_table);
-        else if ( (w1 * c) > w0 ) w0 = w1;
-        else restore_assignment_array(atom_table);
+        // printf("w(M') = %f, w(M) = %f\n", w1, w0);
+        c = choose();   // Random number in [0,1]
+
+        /* We flipped a coin, now use the weights to decide whether to
+           keep this model.  The use of DBL_MAX screws things up a bit
+           - if these are used, then the weight sums will be 'inf'.  */
+        if (w1 == w0) {
+          if (c > 0.5) flip_unfixed_variable(table, var); // revert the var.
+          else w0 = w1; // keep the flip, update w0
+        } else {
+          /* Special cases when one weight is DBL_MAX and the other is not: */
+          if (w1 == DBL_MAX && w0 < DBL_MAX) w0 = w1; // Keep the flip, update w0
+          else if (w0 == DBL_MAX && w1 < DBL_MAX) flip_unfixed_variable(table, var); // revert the var.
+          else if ( (w1 * c) > w0 ) w0 = w1;  // keep the flip, update w0
+          else flip_unfixed_variable(table, var); // revert the var.
+        }
       }
-
     }
   }
   return 0;
@@ -378,10 +380,13 @@ static int32_t gibbs_sample(samp_table_t *table) {
  */
 
 
-void mc_sat_internal(samp_table_t *table_in, bool lazy, uint32_t max_samples, double sa_probability,
-                     double sa_temperature, double rvar_probability, uint32_t max_flips,
-                     uint32_t max_extra_flips, uint32_t timeout,
-                     uint32_t burn_in_steps, uint32_t samp_interval) {
+static void mc_sat_internal(samp_table_t *table_in, bool lazy,
+                            uint32_t max_samples, double sa_probability,
+                            double sa_temperature, double rvar_probability,
+                            uint32_t max_flips, uint32_t max_extra_flips,
+                            uint32_t timeout, uint32_t burn_in_steps,
+                            uint32_t samp_interval, int32_t gibbs_steps) {
+  // A whole lotta args now - maybe we should just pass the params object...
 
   /* Deep Copy test - first let's just check that the copy functions
    * themselves don't puke: */
@@ -487,16 +492,11 @@ void mc_sat_internal(samp_table_t *table_in, bool lazy, uint32_t max_samples, do
      * region of feasible models */
     rule_inst_table->soft_rules_included = false;
 
-    /* Should this change to a Gibbs sampling step?  This flips a
-       variable such that the new model M' satisfies the hard clauses.
-       We can then choose to accept this with odds w(M') / w(M), where
-       M is the previous model.  Just a tweak on the code here: */
-#if 0
-    conflict = perturb_assignment(table, lazy, rvar_probability, max_flips,
-				  max_extra_flips);
-#else
-    conflict = gibbs_sample(table);
-#endif
+    /* For 'gibbs_steps' iterations, this flips a variable such that
+       the new model M' satisfies the hard clauses.  We can then
+       choose to accept this with odds w(M') / w(M), where M is the
+       previous model.  Just a tweak on the code here: */
+    conflict = gibbs_sample(table, gibbs_steps, max_flips, max_extra_flips);
 
   }
 }
@@ -507,15 +507,19 @@ static void *mc_sat_thread(void *arg) {
                   get_sa_probability(), get_sa_temperature(),
                   get_rvar_probability(), get_max_flips(),
                   get_max_extra_flips(), get_mcsat_timeout(),
-                  get_burn_in_steps(), get_samp_interval());
+                  get_burn_in_steps(), get_samp_interval(), get_gibbs_steps());
   return NULL;
 }
 
 
+// Many of the args here aren't going to be used, since args to
+// mc_sat_internal are coming from the 'get_' functions.  We need to
+// fix that.
+
 void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_probability,
             double sa_temperature, double rvar_probability, uint32_t max_flips,
             uint32_t max_extra_flips, uint32_t timeout,
-            uint32_t burn_in_steps, uint32_t samp_interval) {
+            uint32_t burn_in_steps, uint32_t samp_interval, int32_t gibbs_steps) {
 
   /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
   /* Start threading - ultimately, we want to migrate
@@ -530,7 +534,7 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
                     get_sa_probability(), get_sa_temperature(),
                     get_rvar_probability(), get_max_flips(),
                     get_max_extra_flips(), get_mcsat_timeout(),
-                    get_burn_in_steps(), get_samp_interval());
+                    get_burn_in_steps(), get_samp_interval(), get_gibbs_steps());
   } else {
     /* Maybe push this to another static function: */
 #if USE_PTHREADS                  

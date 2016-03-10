@@ -47,6 +47,7 @@ extern void free_parse_data();
 #define DEFAULT_WEIGHTLEARN_RATE 0.1
 #define DEFAULT_WEIGHTLEARN_REPORTING 100
 #define DEFAULT_MCSAT_THREAD_COUNT 0
+#define DEFAULT_GIBBS_STEPS 4
 
 /*
  * Encapsulation: We could create a struct to hold these things as a
@@ -62,6 +63,7 @@ static int32_t max_extra_flips = DEFAULT_MAX_EXTRA_FLIPS;
 static int32_t mcsat_timeout = DEFAULT_MCSAT_TIMEOUT;
 static int32_t burn_in_steps = DEFAULT_BURN_IN_STEPS;
 static int32_t samp_interval = DEFAULT_SAMP_INTERVAL;
+static int32_t gibbs_steps = DEFAULT_GIBBS_STEPS;
 static int32_t num_trials = DEFAULT_NUM_TRIALS;
 static int32_t mwsat_timeout = DEFAULT_MWSAT_TIMEOUT;
 static int32_t mcsat_thread_count = DEFAULT_MCSAT_THREAD_COUNT;
@@ -89,6 +91,7 @@ static mcsat_params_t params = {
   DEFAULT_MCSAT_TIMEOUT,
   DEFAULT_BURN_IN_STEPS,
   DEFAULT_SAMP_INTERVAL,
+  DEFAULT_GIBBS_STEPS,
   DEFAULT_NUM_TRIALS,
   DEFAULT_MWSAT_TIMEOUT,
   DEFAULT_MCSAT_THREAD_COUNT,
@@ -155,6 +158,9 @@ int32_t get_burn_in_steps() {
 int32_t get_samp_interval() {
 	return params.samp_interval;
 }
+int32_t get_gibbs_steps() {
+	return params.gibbs_steps;
+}
 int32_t get_mcsat_thread_count() {
 	return params.mcsat_thread_count;
 }
@@ -209,6 +215,9 @@ void set_burn_in_steps(int32_t m) {
 }
 void set_samp_interval(int32_t m) {
 	params.samp_interval = m;
+}
+void set_gibbs_steps(int32_t m) {
+	params.gibbs_steps = m;
 }
 void set_num_trials(int32_t m) {
 	params.num_trials = m;
@@ -591,7 +600,7 @@ For example:\n\
 mcsat_params [NUM++','];\n\
   Sets the MCSAT parameters.  With no arguments, displays the current values.\n\
 mcsat NUMs are optional, and represent, in order:\n\
-  max_samples (int): Number of samples to take\n\
+  max_samples (int): Number of sampling runs to make\n\
   sa_probability (double): Prob of taking simulated annealing step\n\
   sa_temperature (double): Simulated annealing temperature\n\
   rvar_probability (double): Prob of flipping a random variable\n\
@@ -601,6 +610,7 @@ mcsat NUMs are optional, and represent, in order:\n\
   timeout (int): Number of seconds to timeout - 0 means no timeout\n\
   burn_in_steps (int): Number of burn-in steps for MCSAT\n\
   samp_interval (int): Sampling interval, i.e., number of steps between samples\n\
+  gibbs_steps (int): Number of Gibbs sampling steps per sampling run\n\
  The sampling runs until either max_samples or the timeout, whichever comes first.\n\
 Example:\n\
   mcsat_params ,.8,,,1000;\n\
@@ -641,7 +651,7 @@ retract [all | source];\n\
 				"\n\
 set parameter value;\n\
   Sets various parameters, including:\n\
-  max_samples (int): Number of MC samples to take\n\
+  max_samples (int): Number of sampling runs to make\n\
   sa_probability (double): Prob of taking simulated annealing step\n\
   sa_temperature (double): Simulated annealing temperature\n\
   rvar_probability (double): Prob of flipping a random variable\n\
@@ -651,6 +661,7 @@ set parameter value;\n\
   timeout (int): Number of seconds to timeout - 0 means no timeout\n\
   burn_in_steps (int): Number of burn-in steps for MCSAT\n\
   samp_interval (int): Sampling interval, i.e., number of steps between samples\n\
+  gibbs_steps (int): Number of Gibbs sampling steps per sampling run\n\
   mcsat_thread_count (int): Number of mcmc threads to run.  0 means run in main process.\n\
  The sampling runs until either max_samples or the timeout, whichever comes first.\n\
 ");
@@ -1582,6 +1593,7 @@ extern bool read_eval(samp_table_t *table) {
 		output(" timeout = %"PRId32"\n", get_mcsat_timeout());
 		output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
 		output(" samp_interval = %"PRId32"\n", get_samp_interval());
+		output(" gibbs_steps = %"PRId32"\n", get_gibbs_steps());
 		output(" mcsat_thread_count = %"PRId32"\n", get_mcsat_thread_count());
 		output("\n");
 
@@ -1594,7 +1606,8 @@ extern bool read_eval(samp_table_t *table) {
                        get_sa_probability(), get_sa_temperature(),
                        get_rvar_probability(), get_max_flips(),
                        get_max_extra_flips(), get_mcsat_timeout(),
-                       get_burn_in_steps(), get_samp_interval());
+                       get_burn_in_steps(), get_samp_interval(),
+                       get_gibbs_steps());
 		end = clock();
 
 		output(" running took: %f seconds",
@@ -1604,7 +1617,7 @@ extern bool read_eval(samp_table_t *table) {
 	}
 	case MCSAT_PARAMS: {
 		input_mcsat_params_decl_t decl = input_command.decl.mcsat_params_decl;
-		if (decl.num_params == 0) {
+		if (decl.num_params == 1) {
 			output("MCSAT param values:\n");
 			output(" max_samples = %"PRId32"\n", get_max_samples());
 			output(" sa_probability = %f\n", get_sa_probability());
@@ -1615,6 +1628,7 @@ extern bool read_eval(samp_table_t *table) {
 			output(" timeout = %"PRId32"\n", get_mcsat_timeout());
 			output(" burn_in_steps = %"PRId32"\n", get_burn_in_steps());
 			output(" samp_interval = %"PRId32"\n", get_samp_interval());
+			output(" gibbs_steps = %"PRId32"\n", get_gibbs_steps());
 		} else {
 			output("\nSetting MCSAT parameters:\n");
 			if (decl.max_samples >= 0) {
@@ -1661,6 +1675,11 @@ extern bool read_eval(samp_table_t *table) {
 				output(" samp_interval was %"PRId32", now %"PRId32"\n",
 						get_samp_interval(), decl.samp_interval);
 				set_samp_interval(decl.samp_interval);
+			}
+			if (decl.gibbs_steps >= 0) {
+				output(" gibbs_steps was %"PRId32", now %"PRId32"\n",
+						get_gibbs_steps(), decl.gibbs_steps);
+				set_samp_interval(decl.gibbs_steps);
 			}
 		}
 		output("\n");
@@ -1860,6 +1879,11 @@ extern bool read_eval(samp_table_t *table) {
 	  case SAMP_INTERVAL: {
 	    set_samp_interval((int32_t) decl.value);
 	    output(" samp_interval set to %"PRId32"\n", get_samp_interval());
+	    break;
+	  }
+	  case GIBBS_STEPS: {
+	    set_gibbs_steps((int32_t) decl.value);
+	    output(" gibbs_steps set to %"PRId32"\n", get_gibbs_steps());
 	    break;
 	  }
 	    /* train_params here: */

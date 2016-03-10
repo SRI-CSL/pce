@@ -49,6 +49,7 @@ enum {
 	TIMEOUT_OPTION,
 	BURN_IN_STEPS_OPTION,
 	SAMP_INTERVAL_OPTION,
+	GIBBS_STEPS_OPTION,
 };
 
 // enum subcommand {
@@ -75,6 +76,7 @@ static struct option long_options[] = {
 	{"timeout", required_argument, 0, TIMEOUT_OPTION},
 	{"burn_in_steps", required_argument, 0, BURN_IN_STEPS_OPTION},
 	{"samp_interval", required_argument, 0, SAMP_INTERVAL_OPTION},
+	{"gibbs_steps", required_argument, 0, GIBBS_STEPS_OPTION},
 	{0, 0, 0, 0}
 };
 
@@ -112,6 +114,7 @@ Options:\n\
           --timeout=NUM            MCSAT will terminate if exceeds timeout\n\
           --burn_in_steps=NUM      number of burn_in steps of MCSAT\n\
           --samp_interval=NUM      number of SampleSAT between two samples\n\
+          --gibbs_steps=NUM        number of Gibbs steps to perform at each sample\n\
 ", program_name, program_name);
   exit(0);
 }
@@ -249,6 +252,15 @@ static void decode_options(int argc, char **argv) {
 				}
 			}
 			set_samp_interval(atoi(optarg));
+			break;
+		case GIBBS_STEPS_OPTION:
+			for (i=0; optarg[i] != '\0'; i++) {
+				if (! isdigit(optarg[i])) {
+					mcsat_err("Error: gibbs_steps must be a positive integer\n");
+					exit(1);
+				}
+			}
+			set_gibbs_steps(atoi(optarg));
 			break;
 		case DUMP_SAMPLES_OPTION:
 			set_dump_samples_path(optarg);

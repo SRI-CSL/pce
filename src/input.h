@@ -151,6 +151,7 @@ typedef struct input_mcsat_params_decl_s {
   int32_t timeout;
   int32_t burn_in_steps;
   int32_t samp_interval;
+  int32_t gibbs_steps;
 } input_mcsat_params_decl_t;
 
 typedef struct input_train_params_decl_s {
@@ -288,6 +289,7 @@ extern int32_t get_mcsat_timeout();
 extern int32_t get_mcsat_thread_count();
 extern int32_t get_burn_in_steps();
 extern int32_t get_samp_interval();
+extern int32_t get_gibbs_steps();
 extern double get_weightlearn_min_error();
 extern int32_t get_weightlearn_max_iter();
 extern double get_weightlearn_rate();
@@ -302,6 +304,7 @@ extern void set_max_extra_flips(int32_t m);
 extern void set_mcsat_timeout(int32_t m);
 extern void set_burn_in_steps(int32_t m);
 extern void set_samp_interval(int32_t m);
+extern void set_gibbs_steps(int32_t m);
 extern void set_weightlearn_min_error(double e);
 extern void set_weightlearn_max_iter(int32_t iter);
 extern void set_weightlearn_rate(double r);

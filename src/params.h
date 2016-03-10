@@ -16,6 +16,7 @@
 #define DEFAULT_MCSAT_TIMEOUT 0
 #define DEFAULT_BURN_IN_STEPS 100
 #define DEFAULT_SAMP_INTERVAL 1
+#define DEFAULT_GIBBS_STEPS 4
 #define DEFAULT_NUM_TRIALS 100
 #define DEFAULT_MWSAT_TIMEOUT 0
 #define DEFAULT_MCSAT_THREAD_COUNT 0
@@ -41,6 +42,7 @@ typedef struct mcsat_params_s {
   int32_t mcsat_timeout;
   int32_t burn_in_steps;
   int32_t samp_interval;
+  int32_t gibbs_steps;
   int32_t num_trials;
   int32_t mwsat_timeout;
   int32_t mcsat_thread_count;

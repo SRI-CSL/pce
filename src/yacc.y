@@ -470,6 +470,8 @@ void yy_set_decl (char *name, char * v) {
     k = BURN_IN_STEPS;
   else if (strcasecmp(name, "SAMP_INTERVAL") == 0)
     k = SAMP_INTERVAL;
+  else if (strcasecmp(name, "GIBBS_STEPS") == 0)
+    k = GIBBS_STEPS;
   else if (strcasecmp(name, "MAX_TRAINING_ITER") == 0)
     k = MAX_TRAINING_ITER;
   else if (strcasecmp(name, "MIN_ERROR") == 0)
@@ -581,6 +583,14 @@ void yy_mcsat_params_decl (char **params) {
     }
   } else {
     input_command.decl.mcsat_params_decl.samp_interval = -1;
+  }
+  /* 9: Gibbs sampling steps */
+  if (arglen > 9 && strcmp(params[9], "") != 0) {
+    if (yy_check_nat(params[9])) {
+      input_command.decl.mcsat_params_decl.gibbs_steps = atoi(params[9]);
+    }
+  } else {
+    input_command.decl.mcsat_params_decl.gibbs_steps = -1;
   }
   free_strings(params);
 }
@@ -825,6 +835,7 @@ void yy_quit () {
 %token MCSAT_THREAD_COUNT
 %token BURN_IN_STEPS
 %token SAMP_INTERVAL
+%token GIBBS_STEPS
 %token MAX_TRAINING_ITER
 %token MIN_ERROR
 %token LEARNING_RATE
@@ -867,7 +878,7 @@ void yy_quit () {
 
 /*
 %type <ival> cmd table resetarg bop preop EQ NEQ LT LE GT GE PLUS MINUS TIMES DIV REM LBFGS GRADIENT  set_param trainalg
-MAX_SAMPLES SA_PROBABILITY RVAR_PROBABILITY MAX_FLIPS MAX_EXTRA_FLIPS MCSAT_TIMEOUT BURN_IN_STEPS SAMP_INTERVAL MAX_TRAINING_ITER MIN_ERROR LEARNING_RATE REPORT_RATE 
+MAX_SAMPLES SA_PROBABILITY RVAR_PROBABILITY MAX_FLIPS MAX_EXTRA_FLIPS MCSAT_TIMEOUT BURN_IN_STEPS SAMP_INTERVAL GIBBS_STEPS MAX_TRAINING_ITER MIN_ERROR LEARNING_RATE REPORT_RATE 
 */
 
 %locations
