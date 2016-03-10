@@ -452,8 +452,6 @@ void yy_set_decl (char *name, char * v) {
   k = -1;
   if (strcasecmp(name, "MAX_SAMPLES") == 0)
     k = MAX_SAMPLES;
-  else if (strcasecmp(name, "GIBBS_STEPS") == 0)
-    k = GIBBS_STEPS;
   else if (strcasecmp(name, "SA_PROBABILITY") == 0)
     k = SA_PROBABILITY;
   else if (strcasecmp(name, "SA_TEMPERATURE") == 0)
@@ -584,15 +582,6 @@ void yy_mcsat_params_decl (char **params) {
   } else {
     input_command.decl.mcsat_params_decl.samp_interval = -1;
   }
-  /* 9: gibbs_steps */
-  if (arglen > 9 && strcmp(params[9], "") != 0) {
-    if (yy_check_nat(params[9])) {
-      input_command.decl.mcsat_params_decl.gibbs_steps = atoi(params[9]);
-      }
-  } else {
-    input_command.decl.mcsat_params_decl.gibbs_steps = -1;
-  }
-
   free_strings(params);
 }
 
@@ -827,7 +816,6 @@ void yy_quit () {
 %token GRADIENT
 
 %token MAX_SAMPLES
-%token GIBBS_STEPS
 %token SA_PROBABILITY
 %token SA_TEMPERATURE
 %token RVAR_PROBABILITY

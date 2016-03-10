@@ -22,6 +22,8 @@
 #include "training_data.h"
 
 
+
+
 //extern int yyparse();
 extern void free_parse_data();
 //extern int yydebug;
@@ -78,14 +80,10 @@ static bool print_exp_p = false;
 #endif
 
 static mcsat_params_t params = {
+  DEFAULT_MAX_SAMPLES,
   DEFAULT_SA_PROBABILITY,
   DEFAULT_SA_TEMPERATURE,
   DEFAULT_RVAR_PROBABILITY,
-  DEFAULT_WEIGHTLEARN_MIN_ERROR,
-  DEFAULT_WEIGHTLEARN_RATE,
-
-  DEFAULT_MAX_SAMPLES,
-  DEFAULT_GIBBS_STEPS,
   DEFAULT_MAX_FLIPS,
   DEFAULT_MAX_EXTRA_FLIPS,
   DEFAULT_MCSAT_TIMEOUT,
@@ -97,12 +95,14 @@ static mcsat_params_t params = {
 
   DEFAULT_WEIGHTLEARN_LBFGS_MODE,
   DEFAULT_WEIGHTLEARN_MAX_ITER,
+  DEFAULT_WEIGHTLEARN_MIN_ERROR,
+  DEFAULT_WEIGHTLEARN_RATE,
   DEFAULT_WEIGHTLEARN_REPORTING,
 
   true,
   false,
-  false,
   NULL,
+  false,
 };
   
 
@@ -133,9 +133,6 @@ int32_t get_max_samples() {
 }
 double get_sa_probability() {
 	return params.sa_probability;
-}
-int32_t get_gibbs_steps() {
-	return params.gibbs_steps;
 }
 double get_sa_temperature() {
 	return params.sa_temperature;
@@ -185,9 +182,6 @@ int32_t get_weightlearn_lbfgs_mode() {
 
 void set_max_samples(int32_t m) {
 	params.max_samples = m;
-}
-void set_gibbs_steps(int32_t d) {
-	params.gibbs_steps = d;
 }
 void set_sa_probability(double d) {
 	params.sa_probability = d;
@@ -648,7 +642,6 @@ retract [all | source];\n\
 set parameter value;\n\
   Sets various parameters, including:\n\
   max_samples (int): Number of MC samples to take\n\
-  gibbs_steps (int): number of steps to use for Gibbs Sampling (default=3)\n\
   sa_probability (double): Prob of taking simulated annealing step\n\
   sa_temperature (double): Simulated annealing temperature\n\
   rvar_probability (double): Prob of flipping a random variable\n\
@@ -1581,7 +1574,6 @@ extern bool read_eval(samp_table_t *table) {
 		output("\nCalling %sMCSAT with parameters (set using mcsat_params):\n",
 				lazy_mcsat() ? "LAZY_" : "");
 		output(" max_samples = %"PRId32"\n", get_max_samples());
-		output(" gibbs_steps = %"PRId32"\n", get_gibbs_steps());
 		output(" sa_probability = %f\n", get_sa_probability());
 		output(" sa_temperature = %f\n", get_sa_temperature());
 		output(" rvar_probability = %f\n", get_rvar_probability());
@@ -1602,8 +1594,7 @@ extern bool read_eval(samp_table_t *table) {
                        get_sa_probability(), get_sa_temperature(),
                        get_rvar_probability(), get_max_flips(),
                        get_max_extra_flips(), get_mcsat_timeout(),
-                       get_burn_in_steps(), get_samp_interval(),
-                       get_gibbs_steps());
+                       get_burn_in_steps(), get_samp_interval());
 		end = clock();
 
 		output(" running took: %f seconds",
@@ -1613,10 +1604,9 @@ extern bool read_eval(samp_table_t *table) {
 	}
 	case MCSAT_PARAMS: {
 		input_mcsat_params_decl_t decl = input_command.decl.mcsat_params_decl;
-		if (decl.num_params <= 1) {
+		if (decl.num_params == 0) {
 			output("MCSAT param values:\n");
 			output(" max_samples = %"PRId32"\n", get_max_samples());
-			output(" gibbs_steps = %"PRId32"\n", get_gibbs_steps());
 			output(" sa_probability = %f\n", get_sa_probability());
 			output(" sa_temperature = %f\n", get_sa_temperature());
 			output(" rvar_probability = %f\n", get_rvar_probability());
@@ -1631,11 +1621,6 @@ extern bool read_eval(samp_table_t *table) {
 				output(" max_samples was %"PRId32", now %"PRId32"\n",
 						get_max_samples(), decl.max_samples);
 				set_max_samples(decl.max_samples);
-			}
-			if (decl.gibbs_steps >= 0) {
-				output(" gibbs_steps was %d, now %d\n",
-						get_gibbs_steps(), decl.gibbs_steps);
-				set_gibbs_steps(decl.gibbs_steps);
 			}
 			if (decl.sa_probability >= 0) {
 				output(" sa_probability was %f, now %f\n",
@@ -1830,11 +1815,6 @@ extern bool read_eval(samp_table_t *table) {
 	  case MAX_SAMPLES: {
 	    set_max_samples((int32_t) decl.value);
 	    output(" max_samples set to %"PRId32"\n", get_max_samples());
-	    break;
-	  }
-	  case GIBBS_STEPS: {
-	    set_gibbs_steps((int32_t) decl.value);
-	    output(" gibbs_steps set to %d\n", get_gibbs_steps());
 	    break;
 	  }
 	  case SA_PROBABILITY: {

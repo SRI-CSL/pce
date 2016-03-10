@@ -320,7 +320,7 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
 }
 
 
-static int32_t gibbs_sample(samp_table_t *table, int nsteps, int max_flips, int max_extra_flips) {
+static int32_t gibbs_sample(samp_table_t *table) {
   atom_table_t *atom_table = &table->atom_table;
   rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
   double w0, w1, c;
@@ -330,16 +330,16 @@ static int32_t gibbs_sample(samp_table_t *table, int nsteps, int max_flips, int 
   nvars = atom_table->num_unfixed_vars;
   w0 = sat_clause_weight(rule_inst_table);
 
-  //  nsteps =  (int) (gibbs_steps * (double) nvars);
-  //  printf("gibbs_steps=%f; nvars=%d; nsteps=%d\n", gibbs_steps, nvars, nsteps);
-
-  for (k = 0;  k < nsteps; k++) {
+  for (k = 0;  k < nvars; k++) {
     var = choose_unfixed_variable(atom_table);
     if ( unfixed_tval(assignment[var]) ) {
-      //      copy_assignment_array(atom_table);
+      copy_assignment_array(atom_table);
+#if 0
+      conflict = flip_unfixed_variable(table, var);
+#else
+      //      conflict = perturb_assignment(table, false, 0.1, nvars, nvars);
       conflict = perturb_assignment(table, false, 0.0, nvars, nvars);
-      // conflict = perturb_assignment(table, false, 0.0, max_flips, max_extra_flips);
-
+#endif
       w1 = sat_clause_weight(rule_inst_table);
 
       // printf("w(M') = %f, w(M) = %f\n", w1, w0);
@@ -349,14 +349,14 @@ static int32_t gibbs_sample(samp_table_t *table, int nsteps, int max_flips, int 
          used, then the weight sums will be 'inf'.  
       */
       if (w1 == w0) {
-        if (c > 0.5) flip_unfixed_variable(table, var); // restore_assignment_array(atom_table);
+        if (c > 0.5) restore_assignment_array(atom_table);
         else w0 = w1;
       } else {
         /* Special cases when one weight is DBL_MAX and the other is not: */
         if (w1 == DBL_MAX && w0 < DBL_MAX) w0 = w1;
-        else if (w0 == DBL_MAX && w1 < DBL_MAX) flip_unfixed_variable(table, var); // restore_assignment_array(atom_table);
+        else if (w0 == DBL_MAX && w1 < DBL_MAX) restore_assignment_array(atom_table);
         else if ( (w1 * c) > w0 ) w0 = w1;
-        else flip_unfixed_variable(table, var); // restore_assignment_array(atom_table);
+        else restore_assignment_array(atom_table);
       }
 
     }
@@ -381,7 +381,7 @@ static int32_t gibbs_sample(samp_table_t *table, int nsteps, int max_flips, int 
 void mc_sat_internal(samp_table_t *table_in, bool lazy, uint32_t max_samples, double sa_probability,
                      double sa_temperature, double rvar_probability, uint32_t max_flips,
                      uint32_t max_extra_flips, uint32_t timeout,
-                     uint32_t burn_in_steps, uint32_t samp_interval, double gibbs_steps) {
+                     uint32_t burn_in_steps, uint32_t samp_interval) {
 
   /* Deep Copy test - first let's just check that the copy functions
    * themselves don't puke: */
@@ -389,7 +389,7 @@ void mc_sat_internal(samp_table_t *table_in, bool lazy, uint32_t max_samples, do
 
   rule_inst_table_t *rule_inst_table = &table->rule_inst_table;
   atom_table_t *atom_table = &table->atom_table;
-  int32_t conflict, nsteps;
+  int32_t conflict;
   uint32_t i;
   time_t fintime = 0;
   /* whether we use the current round of MCMC as a sample */
@@ -467,7 +467,9 @@ void mc_sat_internal(samp_table_t *table_in, bool lazy, uint32_t max_samples, do
       continue;
     }
 
-    if (draw_sample) update_pmodel(table);
+    if (draw_sample) {
+      update_pmodel(table);
+    }
 
     cprintf(2, "\n[mc_sat] MC-SAT after round %"PRIu32":\n", i);
     if (get_verbosity_level() >= 2 ||
@@ -493,8 +495,7 @@ void mc_sat_internal(samp_table_t *table_in, bool lazy, uint32_t max_samples, do
     conflict = perturb_assignment(table, lazy, rvar_probability, max_flips,
 				  max_extra_flips);
 #else
-    // nsteps = (int32_t) (gibbs_steps * (double) atom_table->num_unfixed_vars);
-    conflict = gibbs_sample(table, gibbs_steps, max_flips, max_extra_flips);
+    conflict = gibbs_sample(table);
 #endif
 
   }
@@ -506,7 +507,7 @@ static void *mc_sat_thread(void *arg) {
                   get_sa_probability(), get_sa_temperature(),
                   get_rvar_probability(), get_max_flips(),
                   get_max_extra_flips(), get_mcsat_timeout(),
-                  get_burn_in_steps(), get_samp_interval(), get_gibbs_steps());
+                  get_burn_in_steps(), get_samp_interval());
   return NULL;
 }
 
@@ -514,8 +515,7 @@ static void *mc_sat_thread(void *arg) {
 void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_probability,
             double sa_temperature, double rvar_probability, uint32_t max_flips,
             uint32_t max_extra_flips, uint32_t timeout,
-            uint32_t burn_in_steps, uint32_t samp_interval,
-            int gibbs_steps) {
+            uint32_t burn_in_steps, uint32_t samp_interval) {
 
   /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
   /* Start threading - ultimately, we want to migrate
@@ -526,12 +526,11 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
 
   int nthreads = get_mcsat_thread_count();
   if (nthreads == 0 || !USE_PTHREADS) {
-    // Why are we calling these static fns??
     mc_sat_internal(table, lazy_mcsat(), get_max_samples(),
                     get_sa_probability(), get_sa_temperature(),
                     get_rvar_probability(), get_max_flips(),
                     get_max_extra_flips(), get_mcsat_timeout(),
-                    get_burn_in_steps(), get_samp_interval(), gibbs_steps);
+                    get_burn_in_steps(), get_samp_interval());
   } else {
     /* Maybe push this to another static function: */
 #if USE_PTHREADS                  
