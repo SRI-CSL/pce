@@ -1617,7 +1617,7 @@ extern bool read_eval(samp_table_t *table) {
 	}
 	case MCSAT_PARAMS: {
 		input_mcsat_params_decl_t decl = input_command.decl.mcsat_params_decl;
-		if (decl.num_params == 1) {
+		if (decl.num_params == 0) {
 			output("MCSAT param values:\n");
 			output(" max_samples = %"PRId32"\n", get_max_samples());
 			output(" sa_probability = %f\n", get_sa_probability());

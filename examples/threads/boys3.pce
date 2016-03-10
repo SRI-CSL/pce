@@ -11,8 +11,10 @@ add [c] born_on(c, Mo) or born_on(c, Tu) or born_on(c, We)
 add [c, d1, d2] (born_on(c, d1) and born_on(c, d2)) implies d1 = d2;
 add (born_on(A, Tu) and boy(A)) or (born_on(B, Tu) and boy(B));
 
-#set mcsat_thread_count 2;
-mcsat_params 10000;
+set mcsat_thread_count 3;
+set max_samples 5000;
+set gibbs_steps 3;
+mcsat_params;
 
 ask (boy(A) and boy(B));
 

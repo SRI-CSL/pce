@@ -12,10 +12,11 @@ add [c, d1, d2] (born_on(c, d1) and born_on(c, d2)) implies d1 = d2;
 add (born_on(A, Tu) and boy(A)) or (born_on(B, Tu) and boy(B));
 
 set max_samples 1000;
-set gibbs_steps 3;
 mcsat_params;
 
 ask (boy(A) and boy(B));
+
+ask (boy(A) and ~boy(B)) or (boy(B) and ~boy(A));
 
 ask (boy(A) and boy(B) and born_on(A, Tu) and born_on(B, Tu));
 

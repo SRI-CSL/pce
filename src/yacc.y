@@ -502,6 +502,12 @@ void yy_mcsat_params_decl (char **params) {
   if (arglen > 9) {
     yyerror("mcsat_params: too many args");
   }
+  // This papers over a bug - some kind of off-by-one error during
+  // parsing.  If we have 1 parameter, and that parameter is the null
+  // string, then pretend that arglen is really zero:
+  
+  if (arglen == 1 && strlen(params[0]) == 0) arglen = 0;
+
   input_command.decl.mcsat_params_decl.num_params = arglen;
   /* 0: max_samples */
   if (arglen > 0 && strcmp(params[0], "") != 0) {
