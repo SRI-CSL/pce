@@ -8,6 +8,7 @@
  */
 
 #define DEFAULT_MAX_SAMPLES 100
+#define DEFAULT_GIBBS_STEPS 3
 #define DEFAULT_SA_PROBABILITY .5
 #define DEFAULT_SA_TEMPERATURE 5.0
 #define DEFAULT_RVAR_PROBABILITY .05
@@ -32,10 +33,14 @@ typedef struct mcsat_params_s {
  * Encapsulation: We create a struct to hold these things as a first
  * step toward threadsafe multi-mcsat...
  */
-  int32_t max_samples;
   double sa_probability;
   double sa_temperature;
   double rvar_probability;
+  double weightlearn_min_error;
+  double weightlearn_rate;
+
+  int32_t max_samples;
+  int32_t gibbs_steps;
   int32_t max_flips;
   int32_t max_extra_flips;
   int32_t mcsat_timeout;
@@ -47,15 +52,12 @@ typedef struct mcsat_params_s {
 
   int32_t weightlearn_lbfgs_mode;
   int32_t weightlearn_max_iter;
-  double weightlearn_min_error;
-  double weightlearn_rate;
   int32_t weightlearn_reporting;
-  
+
+  bool print_exp_p;
   bool strict_consts;
   bool lazy;
   char *dump_samples_path;
-
-  bool print_exp_p;
 
 } mcsat_params_t;
 

@@ -143,6 +143,7 @@ typedef struct input_ask_decl_s {
 typedef struct input_mcsat_params_decl_s {
   int32_t num_params;
   int32_t max_samples;
+  int32_t gibbs_steps;
   double sa_probability;
   double sa_temperature;
   double rvar_probability;
@@ -279,6 +280,7 @@ extern void set_pce_rand_seed(uint32_t seed);
 extern void rand_reset();
 
 extern int32_t get_max_samples();
+extern int32_t get_gibbs_steps();
 extern double get_sa_probability();
 extern double get_sa_temperature();
 extern double get_rvar_probability();
@@ -294,6 +296,7 @@ extern double get_weightlearn_rate();
 extern int32_t get_weightlearn_reporting();
 
 extern void set_max_samples(int32_t m);
+extern void set_gibbs_steps(int32_t m);
 extern void set_sa_probability(double d);
 extern void set_sa_temperature(double d);
 extern void set_rvar_probability(double d);
