@@ -306,6 +306,7 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
 		} else {
 			cprintf(2, "Failed to find a model. Consider increasing"
 					"max_flips and max_tries - see mcsat help.\n");
+			conflict = -2;
 		}
 
 		restore_assignment_array(atom_table);
@@ -316,7 +317,7 @@ static int32_t perturb_assignment(samp_table_t *table, bool lazy,
 		print_assignment(table);
 	}
 
-	return 0;
+	return conflict;
 }
 
 
@@ -363,7 +364,7 @@ static int32_t gibbs_sample(samp_table_t *table, int nsteps, int max_flips, int 
       }
     }
   }
-  return 0;
+  return conflict;
 }
 
 
