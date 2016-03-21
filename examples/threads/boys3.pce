@@ -13,7 +13,8 @@ add (born_on(A, Tu) and boy(A)) or (born_on(B, Tu) and boy(B));
 
 set mcsat_thread_count 3;
 set max_samples 5000;
-set gibbs_steps 3;
+#set gibbs_steps 3;
+set gibbs_steps 80;
 mcsat_params;
 
 ask (boy(A) and boy(B));
