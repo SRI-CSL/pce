@@ -552,8 +552,11 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
     s = pthread_attr_init(&attr);
     if (s != 0) perror("pthread_attr_init");
 
-    for (i = 0; i < nthreads; i++) {
+    /* Do not create any threads until the copying is complete: */
+    for (i = 0; i < nthreads; i++)
       copy[i] = clone_samp_table(table);
+
+    for (i = 0; i < nthreads; i++) {
       tinfo[i].thread_num = i+1;
       tinfo[i].samp_table = copy[i];
 #if 0
@@ -571,11 +574,17 @@ void mc_sat(samp_table_t *table, bool lazy, uint32_t max_samples, double sa_prob
     for (i = 0; i < nthreads; i++) {
       s = pthread_join(tinfo[i].thread_id, &res);
       if (s != 0) perror("pthread_join");
+    }
+
+    /* Wait until all joins are done before merging: */
+    for (i = 0; i < nthreads; i++) {
       merge_atom_tables( &(table->atom_table), &(copy[i]->atom_table) );
       merge_query_instance_tables( &(table->query_instance_table), &(copy[i]->query_instance_table) );
     }
 
     s = pthread_attr_destroy(&attr);
+    if (s != 0) perror("pthread_attr_destroy");
+
     free(tinfo);
     /* DANGER - THIS IS A MEMORY LEAK!  Until "deep
        freedom" can be implemented, this code will leak
