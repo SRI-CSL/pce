@@ -991,7 +991,9 @@ void copy_atom_table(atom_table_t *to, atom_table_t *from, samp_table_t *st) {
 
   /* Should be ok - probably overwritten during MCMC */
   to->assignment_index = from->assignment_index;
-  to->assignment = from->assignments[from->assignment_index];
+  /* This is suspicious.  Is 'assignment' a pointer? */
+  //  to->assignment = from->assignments[from->assignment_index];
+  to->assignment = to->assignments[to->assignment_index];
 
   /* Ok - an array of int32s: */
   to->pmodel = (int32_t *) safe_malloc(size * sizeof(int32_t));
