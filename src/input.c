@@ -1532,6 +1532,12 @@ extern bool read_eval(samp_table_t *table) {
 		break;
 	}
 
+        case QUBO: {
+          input_qubo_decl_t decl = input_command.decl.qubo_decl;
+          save_qubo_form( table, decl.file );
+          break;
+        }
+
 	case LEARN: {
 		input_add_fdecl_t decl = input_command.decl.add_fdecl;
 		add_weighted_formula(table, &decl);

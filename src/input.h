@@ -204,6 +204,10 @@ typedef struct input_train_decl_s {
   int32_t alg;
 } input_train_decl_t;
 
+typedef struct input_qubo_decl_s {
+  char *file;
+} input_qubo_decl_t;
+
 typedef union input_decl_s {
   input_sort_decl_t sort_decl;
   input_subsort_decl_t subsort_decl;
@@ -225,6 +229,7 @@ typedef union input_decl_s {
   input_retract_decl_t retract_decl;
   input_load_decl_t load_decl;
   input_train_decl_t train_decl;
+  input_qubo_decl_t qubo_decl;
   input_verbosity_decl_t verbosity_decl;
   input_dumptable_decl_t dumptable_decl;
   input_help_decl_t help_decl;

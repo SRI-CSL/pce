@@ -2244,3 +2244,10 @@ samp_table_t *clone_samp_table(samp_table_t *table) {
   return clone;
 }
 
+
+
+void save_qubo_form(samp_table_t *table, char *filename) {
+  printf("Saving #<samp_table %x> into file %s at some time in the future.\n",
+         table, filename);
+         
+}

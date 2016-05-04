@@ -748,6 +748,11 @@ void yy_load (char *name) {
   input_command.decl.load_decl.file = name;
 };
 
+void yy_save_qubo (char *name) {
+  input_command.kind = QUBO;
+  input_command.decl.qubo_decl.file = name;
+};
+
 void yy_verbosity (char *level) {
   int32_t i;
   for (i=0; level[i] != '\0'; i++) {
@@ -799,6 +804,7 @@ void yy_quit () {
 %token DUMPTABLE
 %token SUMMARY
 %token QINST
+%token QUBO
 %token LOAD
 %token VERBOSITY
 %token HELP
@@ -953,6 +959,7 @@ decl: SORT NAME sortdef {yy_sort_decl($2, $3);}
     | RETRACT retractarg {yy_retract($2);}
     | DUMPTABLE table {yy_dumptables($2);}
     | LOAD STRING {yy_load($2);}
+    | QUBO STRING {yy_save_qubo($2);}
     | VERBOSITY NUM {yy_verbosity($2);}
 // Need to reference @$ in order for locations to be generated
     | HELP cmd {yy_help($2);}
@@ -968,7 +975,7 @@ cmd: /* empty */ {$$ = ALL;} | ALL {$$ = ALL;}
      | MCSAT {$$ = MCSAT;} | MCSAT_PARAMS {$$ = MCSAT_PARAMS;} 
      | MWSAT {$$ = MWSAT;} | MWSAT_PARAMS {$$ = MWSAT_PARAMS;}
      | RESET {$$ = RESET;} | RETRACT {$$ = RETRACT;} | DUMPTABLE {$$ = DUMPTABLE;}
-     | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
+     | QUBO {$$ = QUBO;}   | LOAD {$$ = LOAD;} | VERBOSITY {$$ = VERBOSITY;} | HELP {$$ = HELP;}
      | LEARN {$$ = LEARN;} |  TRAIN {$$ = TRAIN;} | TRAIN_PARAMS {$$ = TRAIN_PARAMS;};
 
 sortdef: /* empty */ {$$ = NULL;}
@@ -1301,6 +1308,8 @@ int yylex (void) {
       return SUMMARY;
     else if (strcasecmp(yylval.str, "LOAD") == 0)
       return LOAD;
+    else if (strcasecmp(yylval.str, "QUBO") == 0)
+      return QUBO;
     else if (strcasecmp(yylval.str, "VERBOSITY") == 0)
       return VERBOSITY;
     else if (strcasecmp(yylval.str, "HELP") == 0)
@@ -1523,6 +1532,11 @@ void free_learn_decl_data() {
   free_formula(input_command.decl.add_fdecl.formula);
 }
 
+// QUadratic Binary Optimization output:
+void free_qubo_decl_data() {
+  safe_free(input_command.decl.qubo_decl.file);
+}
+
 void free_mcsat_decl_data() {
   // Nothing to do here
 }
@@ -1650,6 +1664,10 @@ void free_parse_data () {
   }
    case LEARN: {
     free_learn_decl_data();
+    break;
+  }
+  case QUBO: {
+    free_qubo_decl_data();
     break;
   }
   case RESET: {
