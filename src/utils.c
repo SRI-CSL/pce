@@ -75,6 +75,9 @@ int32_t str2int(char *cnst) {
 
 bool assigned_true_lit(samp_truth_value_t *assignment,
 		samp_literal_t lit){
+  // Note: var_of(x) is a right shift by 1 bit.  If lit is an index (a
+  // literal number), then lit >> 1 corresponds to a variable number.
+  // For some reason, we are overrunning the assignment array:
 	return is_pos(lit) ?
 		assigned_true(assignment[var_of(lit)]) :
 		assigned_false(assignment[var_of(lit)]);
