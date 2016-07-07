@@ -1063,7 +1063,8 @@ void merge_atom_tables(atom_table_t *to, atom_table_t *from) {
  * resized. 
  */
 void atom_table_resize(atom_table_t *atom_table, rule_inst_table_t *rule_inst_table) {
-  int32_t size, num_vars, i;
+  int32_t ds, size, old_size, num_vars, i;
+  samp_truth_value_t *x;
 
   num_vars = atom_table->num_vars;
   size = atom_table->size;
@@ -1072,17 +1073,29 @@ void atom_table_resize(atom_table_t *atom_table, rule_inst_table_t *rule_inst_ta
   if (MAXSIZE(sizeof(samp_atom_t *), 0) - size <= (size/2)){
     out_of_memory();
   }
-  size += size/2;
+  old_size = size;
+  ds = size / 2;
+  size += ds;
+
   atom_table->atom = (samp_atom_t **)
     safe_realloc(atom_table->atom, size * sizeof(samp_atom_t *));
   atom_table->active = (bool *)
     safe_realloc(atom_table->active, size * sizeof(bool));
   atom_table->sampling_nums = (int32_t *)
     safe_realloc(atom_table->sampling_nums, size * sizeof(int32_t));
+
+  /* Need to initialize the newly allocated memory: */
   atom_table->assignments[0] = (samp_truth_value_t *) 
     safe_realloc(atom_table->assignments[0], size * sizeof(samp_truth_value_t));
+  x = atom_table->assignments[0] + old_size;
+  memset(x, 0, sizeof(samp_truth_value_t) * ds);
+
   atom_table->assignments[1] = (samp_truth_value_t *) 
     safe_realloc(atom_table->assignments[1], size * sizeof(samp_truth_value_t));
+  x = atom_table->assignments[1] + old_size;
+  memset(x, 0, sizeof(samp_truth_value_t) * ds);
+  /* */
+
   atom_table->assignment = atom_table->assignments[atom_table->assignment_index];
   atom_table->pmodel = (int32_t *)
     safe_realloc(atom_table->pmodel, size * sizeof(int32_t));
@@ -1106,6 +1119,7 @@ void init_rule_inst_table(rule_inst_table_t *table){
     out_of_memory();
   }
   table->rule_insts = (rule_inst_t **) safe_malloc(table->size * sizeof(rule_inst_t *));
+  //  printf("===>>> init_rule_inst_table: size = %d\n", table->size);
   table->assignment = (samp_truth_value_t *) safe_malloc(
                                                          table->size * sizeof(samp_truth_value_t));
   table->watched = (samp_clause_list_t *) safe_malloc(
@@ -1243,20 +1257,39 @@ void copy_rule_inst_table(rule_inst_table_t *to, rule_inst_table_t *from, samp_t
  * Check whether there's room for one more clause in rule_inst_table.
  * - if not, make the table larger
  */
-void rule_inst_table_resize(rule_inst_table_t *rule_inst_table){
+void rule_inst_table_resize(rule_inst_table_t *rule_inst_table) {
   int32_t size = rule_inst_table->size;
   int32_t num_rinsts = rule_inst_table->num_rule_insts;
+  int32_t old, ds;
+  void *x;
+
   if (num_rinsts + 1 < size) return;
-  if (MAXSIZE(sizeof(rule_inst_t *), 0) - size <= (size/2)){
+  if (MAXSIZE(sizeof(rule_inst_t *), 0) - size <= (size/2)) {
     out_of_memory();
   }
-  size += size/2;
+  /* This little dance forces initialization of the new memory
+   * provided by realloc.  If nothing else, it prevents valgrind
+   * complaints: */
+  old = size;
+  ds = size / 2;
+  size += ds;
   rule_inst_table->rule_insts = (rule_inst_t **) safe_realloc(
                                                               rule_inst_table->rule_insts, size * sizeof(rule_inst_t *));
+  x = (void*) (rule_inst_table->rule_insts + old);
+  memset(x, 0, ds*sizeof(rule_inst_t *));
+
+  //  printf("===>>> rule_inst_table_resize: old = %d, new = %d, ds = %d\n", old, size, ds);
   rule_inst_table->assignment = (samp_truth_value_t *) safe_realloc(
                                                                     rule_inst_table->assignment, size * sizeof(samp_truth_value_t));
+  x = (void*) (rule_inst_table->assignment + old);
+  memset(x, 0, ds*sizeof(samp_truth_value_t));
+
   rule_inst_table->rule_watched = (samp_clause_list_t *) safe_realloc(
                                                                       rule_inst_table->rule_watched, size * sizeof(samp_clause_list_t));
+  x = (void*) (rule_inst_table->rule_watched + old);
+  memset(x, 0, ds*sizeof(samp_clause_list_t));
+
+
   rule_inst_table->size = size; 
   //if (MAXSIZE(sizeof(samp_clause_t *), sizeof(rule_inst_t)) < num_clauses) {
   //	out_of_memory();
@@ -2045,6 +2078,7 @@ static bool valid_watched_lit(rule_inst_table_t *rule_inst_table, samp_literal_t
 static bool clause_contains_fixed_true_lit(samp_clause_t *clause,
                                            samp_truth_value_t *assignment) {
   int32_t i;
+  return true;
   for (i = 0; i < clause->num_lits; i++) {
     if (assigned_fixed_true_lit(assignment, clause->disjunct[i]))
       return true;

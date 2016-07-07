@@ -74,9 +74,9 @@ static inline bool assigned_undef(samp_truth_value_t value){
 }
 
 static inline bool assigned_true(samp_truth_value_t value){
-	return (value == v_true ||
-			value == v_db_true ||
-			value == v_up_true);
+	return (value == v_true    ||
+                value == v_db_true ||
+                value == v_up_true);
 }
 
 static inline bool assigned_false(samp_truth_value_t value){

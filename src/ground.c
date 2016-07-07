@@ -1660,6 +1660,7 @@ int32_t add_internal_atom(samp_table_t *table, samp_atom_t *atom, bool top_p) {
 	assert(valid_table(table));
 
 	current_atom_index = atom_table->num_vars++;
+        //        printf("===>>> add_internal_atom: new atom index is %d\n", current_atom_index);
 	samp_atom_t * current_atom = (samp_atom_t *) safe_malloc((arity + 1) * sizeof(int32_t));
 	current_atom->pred = predicate;
 	for (i = 0; i < arity; i++) {

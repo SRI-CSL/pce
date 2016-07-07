@@ -134,7 +134,7 @@ static void restore_sat_dead_rule_instances(rule_inst_table_t *rule_inst_table,
  * Sum up the weights of all satisfiable rules modulo the current
  * assignment:
  */
-double sat_clause_weight(rule_inst_table_t *rule_inst_table) {
+double sat_clause_weight(rule_inst_table_t *rule_inst_table, atom_table_t *atom_table) {
   int32_t i;
   rule_inst_t *rinst;
   double w = 0.0;
@@ -143,7 +143,13 @@ double sat_clause_weight(rule_inst_table_t *rule_inst_table) {
   for (i = 0; i < rule_inst_table->num_rule_insts; i++) {
     //if (rule_inst_table->live[i]) continue;
     rinst = rule_inst_table->rule_insts[i];
-    assignment = rule_inst_table->assignment;
+    /* Mixing assignment arrays??  This assignment applies to the rule
+       instances - begs the question, where is
+       rule_inst_table->assignment actually used? */
+    //    assignment = rule_inst_table->assignment;
+    assignment = atom_table->assignment;
+    /* But further down, this assignment vector is used as if it had
+       come from atom_table (literals as opposed to formulas): */
     if (sat_rule_inst(assignment, rinst)) {
       if ( rinst->weight == DBL_MAX ) w = DBL_MAX;
       else w += rinst->weight;
@@ -329,7 +335,7 @@ static int32_t gibbs_sample(samp_table_t *table, int nsteps, int max_flips, int 
   samp_truth_value_t *assignment = atom_table->assignment;
 
   // First get the weight of the current model:
-  w0 = sat_clause_weight(rule_inst_table);
+  w0 = sat_clause_weight(rule_inst_table, atom_table);
 
   for (k = 0;  k < nsteps; k++) {
     // Pick an unfixed variable:
@@ -343,7 +349,7 @@ static int32_t gibbs_sample(samp_table_t *table, int nsteps, int max_flips, int 
       if (conflict != 0) flip_unfixed_variable(table, var); // revert it.
       else {
         // Otherwise, compute the weight of the new satisfiable model:
-        w1 = sat_clause_weight(rule_inst_table);
+        w1 = sat_clause_weight(rule_inst_table, atom_table);
 
         // printf("w(M') = %f, w(M) = %f\n", w1, w0);
         c = choose();   // Random number in [0,1]
@@ -497,7 +503,8 @@ static void mc_sat_internal(samp_table_t *table_in, bool lazy,
        the new model M' satisfies the hard clauses.  We can then
        choose to accept this with odds w(M') / w(M), where M is the
        previous model.  Just a tweak on the code here: */
-    conflict = gibbs_sample(table, gibbs_steps, max_flips, max_extra_flips);
+    if (draw_sample)
+      conflict = gibbs_sample(table, gibbs_steps, max_flips, max_extra_flips);
 
   }
 }

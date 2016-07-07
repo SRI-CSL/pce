@@ -23,6 +23,7 @@
 #define INIT_QUERY_TABLE_SIZE 16
 #define INIT_QUERY_INSTANCE_TABLE_SIZE 64
 #define INIT_SOURCE_TABLE_SIZE 16
+/* vvv   Bug related to this?   vvv  */
 #define INIT_RULE_INST_TABLE_SIZE 64
 #define INIT_RULE_TABLE_SIZE 64
 #define INIT_SORT_CONST_SIZE 16

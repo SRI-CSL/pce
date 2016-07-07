@@ -73,8 +73,11 @@ int32_t str2int(char *cnst) {
 	return (int32_t) lcnst;
 }
 
+/* Possible array overrun.  When enough consts are added to an
+   existing table, is it possible that the assignment array is too
+   short? */
 bool assigned_true_lit(samp_truth_value_t *assignment,
-		samp_literal_t lit){
+                       samp_literal_t lit){
   // Note: var_of(x) is a right shift by 1 bit.  If lit is an index (a
   // literal number), then lit >> 1 corresponds to a variable number.
   // For some reason, we are overrunning the assignment array:
@@ -316,6 +319,7 @@ void qsort_query_atoms_and_probs(int32_t *a, double *p, uint32_t n) {
 	sort_query_atoms_and_probs(a + j, p + j, n - j);
 }
 
+/* Q:  should 'assignment' come from rule_inst_table or atom_table??? */
 int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
 	int32_t i;
 	for (i = 0; i < clause->num_lits; i++){
@@ -325,6 +329,7 @@ int32_t eval_clause(samp_truth_value_t *assignment, samp_clause_t *clause){
 	return -1;
 }
 
+/* Seems to me that A: atom_table... */
 int32_t eval_rule_inst(samp_truth_value_t *assignment, rule_inst_t *rinst) {
 	int32_t i;
 	for (i = 0; i < rinst->num_clauses; i++) {

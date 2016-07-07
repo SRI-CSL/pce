@@ -162,6 +162,8 @@ static int32_t update_atom_tval(int32_t var, samp_truth_value_t tval, samp_table
 	/* Not case 0: update the value */
 	atom_table->assignment[var] = tval;
 	if (fixed_tval(tval)) {
+          /* If fixed, this can break a later assertion that there are
+             no fixed vars. Why? */
 		atom_table->num_unfixed_vars--;
 	}
 
